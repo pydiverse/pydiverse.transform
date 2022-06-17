@@ -91,7 +91,6 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     available_cols = left.available_columns | right.available_columns
     check_is_cols_subset(available_cols, on_cols, 'join')
 
-    on = left.resolve_lambda_cols(on)
 
     # Check for name collisions
     if ambiguous_cols := ({str(c) for c in left.available_columns}
@@ -124,6 +123,12 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     new_left.col_expr.update(right.col_expr)
     new_left.col_dtype.update(right.col_dtype)
     new_left.available_columns.update(right.available_columns)
+
+    # By resolving lambdas this late, we enable the user to use lambda columns
+    # to reference mutated columns from the right side of the join.
+    # -> `λ.columnname_righttablename` is a valid lambda in the on condition.
+    check_lambdas_valid(new_left, on)
+    on = new_left.resolve_lambda_cols(on)
 
     new_left.join(right, on, how)
     return new_left

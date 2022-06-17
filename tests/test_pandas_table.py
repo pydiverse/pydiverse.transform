@@ -176,6 +176,12 @@ class TestPandasTable:
             tbl1 >> select() >> mutate(a = tbl1.col1) >> join(tbl2, tbl1.col1 == tbl2.col1, 'left') >> collect()
         )
 
+        # Join that also uses lambda for the right table
+        assert_frame_equal(
+            tbl1 >> select() >> mutate(a = tbl1.col1) >> join(tbl2, λ.a == λ.col1_df2, 'left') >> collect(),
+            tbl1 >> select() >> mutate(a = tbl1.col1) >> join(tbl2, tbl1.col1 == tbl2.col1, 'left') >> collect()
+        )
+
         # Filter
         assert_frame_equal(
             tbl1 >> mutate(a = tbl1.col1 * 2) >> filter(λ.a % 2 == 0) >> collect(),
