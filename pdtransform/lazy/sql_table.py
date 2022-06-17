@@ -115,6 +115,16 @@ class SQLTableImpl(LazyTableImpl):
         s = [self.translator.translate(col).value.label(name) for name, col in named_cols.items() ]
         select = select.with_only_columns(s)
 
+        # ORDER BY
+        if self.order_bys:
+            o = []
+            for o_by in self.order_bys:
+                col = self.translator.translate(o_by.order).value
+                col = col.asc() if o_by.asc else col.desc()
+                col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
+                o.append(col)
+            select = select.order_by(*o)
+
         return select
 
     #### Verb Operations ####
@@ -163,6 +173,10 @@ class SQLTableImpl(LazyTableImpl):
 
     def filter(self, *args):
         self.wheres.extend(args)
+
+    def arrange(self, ordering):
+        order_by = [OrderByDescriptor(col, ascending, False) for col, ascending in ordering]
+        self.order_bys = order_by + self.order_bys
 
     def query_string(self):
         query = self.build_query()

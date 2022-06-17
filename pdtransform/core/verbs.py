@@ -1,7 +1,7 @@
 from .column import Column, generate_col_uuid
 from .dispatchers import builtin_verb
 from .expressions import SymbolicExpression
-from .expressions.expression import iterate_over_expr
+from .expressions.expression import iterate_over_expr, FunctionCall
 from .expressions.lambda_column import LambdaColumn
 from .table_impl import AbstractTableImpl
 
@@ -138,4 +138,30 @@ def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
 
     new_tbl = tbl.copy()
     new_tbl.filter(*args)
+    return new_tbl
+
+@builtin_verb()
+def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
+    # Validate Input
+    check_is_cols_subset(tbl.available_columns, cols_in_expressions(args), 'select')
+    check_lambdas_valid(tbl, *args)
+
+    # Determine if ascending or descending
+    def ordering_pealer(expr):
+        num_neg = 0
+        while isinstance(expr, FunctionCall) and expr._operator == '__neg__':
+            num_neg += 1
+            expr = expr._args[0]
+        return expr, num_neg % 2 == 0
+
+    ordering = []
+    for arg in args:
+        col, ascending = ordering_pealer(arg)
+        if not isinstance(col, (Column, LambdaColumn)):
+            raise ValueError(f"Arguments to select verb must be of type 'Column' or 'LambdaColumn' and not '{type(col)}'.")
+        col = tbl.resolve_lambda_cols(col)
+        ordering.append((col, ascending))
+
+    new_tbl = tbl.copy()
+    new_tbl.arrange(ordering)
     return new_tbl

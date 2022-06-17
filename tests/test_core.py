@@ -1,9 +1,8 @@
 import pytest
 
-from pdtransform import λ
 from pdtransform.core import Table, AbstractTableImpl, Column
 from pdtransform.core.dispatchers import inverse_partial, verb, wrap_tables, unwrap_tables
-from pdtransform.core.verbs import collect, select, mutate, join, filter
+from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange
 
 
 @pytest.fixture
@@ -128,6 +127,20 @@ class TestBuiltinVerbs:
 
         with pytest.raises(ValueError):
             tbl1 >> filter(tbl2.col1)
+
+    def test_arrange(self, tbl1, tbl2):
+        tbl1 >> arrange(tbl1.col1)
+        tbl1 >> arrange(-tbl1.col1)
+        tbl1 >> arrange(tbl1.col1, tbl1.col2)
+        tbl1 >> arrange(tbl1.col1, -tbl1.col2)
+
+        with pytest.raises(ValueError):
+            tbl1 >> arrange(tbl2.col1)
+        with pytest.raises(ValueError):
+            tbl1 >> arrange(tbl1.col1, -tbl2.col1)
+
+        with pytest.raises(ValueError):
+            tbl1 >> arrange(tbl1.col1 * 4)
 
 
 class MockTableImpl(AbstractTableImpl):

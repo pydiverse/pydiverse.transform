@@ -127,6 +127,11 @@ class PandasTableImpl(EagerTableImpl):
 
         self.df = self.df.loc[condition]
 
+    def arrange(self, ordering: list[tuple[SymbolicExpression, bool]]):
+        cols, ascending = zip(*ordering)
+        cols = [self.df_name_mapping[col._uuid] for col in cols]
+        self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort', inplace = True)
+
 
 class PandasExpressionTranslator(Translator):
 

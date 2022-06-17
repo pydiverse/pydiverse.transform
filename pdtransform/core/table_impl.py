@@ -97,6 +97,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def filter(self, *args):
         ...
 
+    def arrange(self, ordering: list[tuple[SymbolicExpression, bool]]):
+        ...
+
     #### Symbolic Operators ####
 
     @classmethod

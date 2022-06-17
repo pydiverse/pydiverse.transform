@@ -1,15 +1,14 @@
 import numpy as np
-import pytest
 import pandas as pd
-from pandas.testing import assert_frame_equal
+import pytest
 import sqlalchemy
+from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
 from pdtransform.core.table import Table
-from pdtransform.core.verbs import collect, select, mutate, join, filter
+from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange
 from pdtransform.lazy.sql_table import SQLTableImpl
 from pdtransform.lazy.verbs import show_query
-
 
 df1 = pd.DataFrame({
     'col1': [1, 2, 3, 4],
@@ -19,7 +18,7 @@ df1 = pd.DataFrame({
 df2 = pd.DataFrame({
     'col1': [1, 2, 2, 4, 5, 6],
     'col2': [2, 2, 0, 0, 2, None],
-    'col3': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
+    'col3': [0.0, 0.1, 0.2, 0.3, 0.01, 0.02],
 })
 
 df_left = pd.DataFrame({
@@ -148,6 +147,33 @@ class TestSQLTable:
             df1.loc[(1 < df1['col1']) & (df1['col1'] < 4)].reset_index(drop=True)
         )
 
+    def test_arrange(self, tbl2):
+        assert_frame_equal(
+            tbl2 >> arrange(tbl2.col3) >> select(tbl2.col3) >> collect(),
+            df2[['col3']].sort_values('col3', ascending = True, kind = 'mergesort').reset_index(drop=True)
+        )
+
+        assert_frame_equal(
+            tbl2 >> arrange(-tbl2.col3) >> select(tbl2.col3) >> collect(),
+            df2[['col3']].sort_values('col3', ascending = False, kind = 'mergesort').reset_index(drop=True)
+        )
+
+        assert_frame_equal(
+            tbl2 >> arrange(tbl2.col1, tbl2.col2) >> collect(),
+            df2.sort_values(['col1', 'col2'], ascending = [True, True], kind = 'mergesort').reset_index(drop=True)
+        )
+
+        assert_frame_equal(
+            tbl2 >> arrange(tbl2.col1, tbl2.col2) >> collect(),
+            tbl2 >> arrange(tbl2.col2) >> arrange(tbl2.col1) >> collect()
+        )
+
+        assert_frame_equal(
+            tbl2 >> arrange(--tbl2.col3) >> collect(),
+            tbl2 >> arrange(tbl2.col3) >> collect()
+        )
+
+
     def test_lambda_column(self, tbl1, tbl2):
         # Select
         assert_frame_equal(
@@ -176,5 +202,11 @@ class TestSQLTable:
         assert_frame_equal(
             tbl1 >> mutate(a = tbl1.col1 * 2) >> filter(λ.a % 2 == 0) >> collect(),
             tbl1 >> mutate(a = tbl1.col1 * 2) >> filter((tbl1.col1 * 2) % 2 == 0) >> collect()
+        )
+
+        # Arrange
+        assert_frame_equal(
+            tbl1 >> mutate(a = tbl1.col1 * 2) >> arrange(λ.a) >> collect(),
+            tbl1 >> arrange(tbl1.col1) >> mutate(a = tbl1.col1 * 2) >> collect(),
         )
 
