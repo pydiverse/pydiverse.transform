@@ -93,7 +93,7 @@ class TestSQLTable:
             tbl_left >> join(tbl_right, tbl_left.a == tbl_right.b, 'left') >> select(tbl_left.a, tbl_right.b) >> collect(),
             pd.DataFrame({
                 'a': [1, 2, 2, 3, 4],
-                'df_right_b': [1.0, 2.0, 2.0, np.nan, np.nan]
+                'b_df_right': [1.0, 2.0, 2.0, np.nan, np.nan]
             })
         )
 
@@ -101,7 +101,7 @@ class TestSQLTable:
             tbl_left >> join(tbl_right, tbl_left.a == tbl_right.b, 'inner') >> select(tbl_left.a, tbl_right.b) >> collect(),
             pd.DataFrame({
                 'a': [1, 2, 2],
-                'df_right_b': [1, 2, 2]
+                'b_df_right': [1, 2, 2]
             })
         )
 
@@ -112,7 +112,7 @@ class TestSQLTable:
         #     tbl_left >> join(tbl_right, tbl_left.a == tbl_right.b, 'outer') >> select(tbl_left.a, tbl_right.b) >> collect(),
         #     pd.DataFrame({
         #         'a': [1.0, 2.0, 2.0, 3.0, 4.0, np.nan],
-        #         'df_right_b': [1.0, 2.0, 2.0, np.nan, np.nan, 0.0]
+        #         'b_df_right': [1.0, 2.0, 2.0, np.nan, np.nan, 0.0]
         #     })
         # )
 

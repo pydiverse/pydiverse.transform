@@ -108,9 +108,8 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     new_left = left.copy()
 
     # Update selects
-    # TODO: Find a proper renaming scheme
-    right_renamed_selects = { right.name + '_' + k: v for k, v in right.selects.items() }
-    right_renamed_cols = { right.name + '_' + k: v for k, v in right.named_cols.fwd.items() }
+    right_renamed_selects = { k + '_' + right.name: v for k, v in right.selects.items() }
+    right_renamed_cols = { k + '_' + right.name: v for k, v in right.named_cols.fwd.items() }
 
     for k, v in right_renamed_selects.items():
         if k in new_left.selects:
