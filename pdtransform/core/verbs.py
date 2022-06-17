@@ -32,6 +32,11 @@ def cols_in_expressions(expressions) -> set[Column]:
 
 
 @builtin_verb()
+def alias(tbl: AbstractTableImpl, name: str):
+    """Creates a new table object with a different name."""
+    return tbl.alias(name)
+
+@builtin_verb()
 def collect(tbl: AbstractTableImpl):
     return tbl.collect()
 

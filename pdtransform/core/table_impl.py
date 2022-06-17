@@ -79,6 +79,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
     #### Verb Callbacks ####
 
+    def alias(self, name) -> 'AbstractTableImpl':
+        ...
+
     def collect(self):
         ...
 

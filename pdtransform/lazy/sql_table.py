@@ -117,6 +117,12 @@ class SQLTableImpl(LazyTableImpl):
 
         return select
 
+    #### Verb Operations ####
+
+    def alias(self, name):
+        subquery = self.build_query().subquery(name=name)
+        return self.__class__(self.engine, subquery)
+
     def collect(self):
         compiled = self.build_query()
         with self.engine.connect() as conn:

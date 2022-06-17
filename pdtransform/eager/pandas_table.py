@@ -69,7 +69,11 @@ class PandasTableImpl(EagerTableImpl):
 
     #### Verb Operations ####
 
-    def collect(self):
+    def alias(self, name):
+        # Creating a new table object also acts like a garbage collecting mechanism.
+        return self.__class__(name, self.collect())
+
+    def collect(self) -> pd.DataFrame:
         # SELECT -> Apply mask
         selected_cols_name_map = { self.df_name_mapping[self.named_cols.fwd[name]]: name for name in self.selects }
         masked_df = self.df[[*selected_cols_name_map.keys()]]
