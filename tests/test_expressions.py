@@ -1,3 +1,4 @@
+from pdtransform import λ
 from pdtransform.core.expressions.expression import SymbolicExpression, FunctionCall
 
 
@@ -19,3 +20,6 @@ class TestExpressions:
 
         compare_sexpr(s1.argument(), FunctionCall('argument', s1))
         compare_sexpr(s1.str.argument(), FunctionCall('str.argument', s1))
+
+    def test_lambda_col(self):
+        assert λ.something._name == λ['something']._name

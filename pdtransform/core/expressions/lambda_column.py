@@ -8,6 +8,9 @@ class LambdaColumnGetter:
     def __getattr__(self, item):
         return LambdaColumn(item)
 
+    def __getitem__(self, item):
+        return LambdaColumn(item)
+
 
 class LambdaColumn(SymbolicExpression):
     """ Anonymous Column
