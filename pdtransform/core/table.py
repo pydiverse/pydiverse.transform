@@ -18,9 +18,17 @@ class Table:
     def __getitem__(self, key) -> Column:
         return self._impl.get_col(key)
 
-    def __setitem__(self, key, value):
-        # TODO: Key doesn't have to be a Column but could also be a string
-        self._impl = (self >> verbs.mutate(**{key._name: value}))._impl
+    def __setitem__(self, col, expr):
+        """ Mutate a column
+        :param col: Either a str, Column or LambdaColumn
+        """
+        if isinstance(col, (Column, LambdaColumn)):
+            col_name = col._name
+        elif isinstance(col, str):
+            col_name = col
+        else:
+            raise KeyError(f'Invalid key {col}. Must be either a string, Column or LambdaColumn.')
+        self._impl = (self >> verbs.mutate(**{col_name: expr}))._impl
 
     def __getattr__(self, name) -> Column:
         return self._impl.get_col(name)

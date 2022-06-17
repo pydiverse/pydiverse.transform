@@ -29,6 +29,11 @@ class TestTable:
         assert hash(tbl1.col1) == hash(tbl1['col1'])
         assert hash(tbl1.col2) == hash(tbl1['col2'])
 
+    def test_setitem(self, tbl1):
+        tbl1['col1'] = 1
+        tbl1[tbl1.col1] = 1
+        tbl1[λ.col1] = 1
+
     def test_iter(self, tbl1, tbl2):
         assert len(list(tbl1)) == len(list(tbl1._impl.selected_cols()))
         assert len(list(tbl2)) == len(list(tbl2._impl.selected_cols()))
