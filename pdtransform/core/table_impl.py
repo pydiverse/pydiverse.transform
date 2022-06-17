@@ -1,10 +1,9 @@
 import copy
 import uuid
+import typing
 
 from .column import Column
-from .expressions import Translator
 from .expressions.expression import SymbolicExpression
-from .expressions.lambda_column import LambdaColumn
 from .expressions.operator_registry import OperatorRegistry
 from .utils import bidict
 
@@ -73,6 +72,10 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         if name in self.columns:
             return self.columns[name]
         raise KeyError(f"Table '{self.name}' has not column named '{name}'.")
+
+    def selected_cols(self) -> typing.Iterable[tuple[str, uuid.UUID]]:
+        for name in self.selects.keys():
+            yield (name, self.named_cols.fwd[name])
 
     def resolve_lambda_cols(self, expr: SymbolicExpression):
         raise NotImplementedError

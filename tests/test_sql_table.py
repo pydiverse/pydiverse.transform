@@ -216,3 +216,30 @@ class TestSQLTable:
             tbl1 >> arrange(tbl1.col1) >> mutate(a = tbl1.col1 * 2) >> collect(),
         )
 
+    def test_table_setitem(self, tbl_left, tbl_right):
+        tl = tbl_left >> alias('df_left')
+        tr = tbl_right >> alias('df_right')
+
+        # Iterate over cols and modify
+        for col in tl:
+            tl[col] = (col * 2) % 3
+        for col in tr:
+            tr[col] = (col * 2) % 5
+
+        # Check if it worked...
+        assert_frame_equal(
+            (
+                tl >> join(tr, λ.a == λ.b_df_right, 'left') >> show_query() >> collect()
+            ),
+            (tbl_left
+                >> mutate(a = (tbl_left.a * 2) % 3)
+                >> join(
+                        tbl_right >> mutate(b = (tbl_right.b * 2) % 5, c = (tbl_right.c * 2) % 5),
+                        λ.a == λ.b_df_right,
+                        'left'
+                    )
+                >> show_query()
+                >> collect()
+            )
+        )
+

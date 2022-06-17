@@ -1,15 +1,14 @@
-import itertools
 import functools
+import itertools
 import operator
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from .eager_table import EagerTableImpl, uuid_to_str
-from pdtransform.core.expressions.translator import Translator, TypedValue
 from pdtransform.core.column import Column
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
-from ..core.expressions.lambda_column import LambdaColumn
+from pdtransform.core.expressions.translator import Translator, TypedValue
+from .eager_table import EagerTableImpl, uuid_to_str
 
 
 class PandasTableImpl(EagerTableImpl):
@@ -75,7 +74,7 @@ class PandasTableImpl(EagerTableImpl):
 
     def collect(self) -> pd.DataFrame:
         # SELECT -> Apply mask
-        selected_cols_name_map = { self.df_name_mapping[self.named_cols.fwd[name]]: name for name in self.selects }
+        selected_cols_name_map = { self.df_name_mapping[uuid]: name for name, uuid in self.selected_cols() }
         masked_df = self.df[[*selected_cols_name_map.keys()]]
         return masked_df.rename(columns = selected_cols_name_map)
 

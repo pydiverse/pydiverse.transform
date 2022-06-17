@@ -1,5 +1,6 @@
 import pytest
 
+from pdtransform import λ
 from pdtransform.core import Table, AbstractTableImpl, Column
 from pdtransform.core.dispatchers import inverse_partial, verb, wrap_tables, unwrap_tables
 from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange
@@ -23,6 +24,21 @@ class TestTable:
 
         with pytest.raises(KeyError, match = 'colXXX'):
             _ = tbl1.colXXX
+
+    def test_getitem(self, tbl1):
+        assert hash(tbl1.col1) == hash(tbl1['col1'])
+        assert hash(tbl1.col2) == hash(tbl1['col2'])
+
+    def test_iter(self, tbl1, tbl2):
+        assert len(list(tbl1)) == len(list(tbl1._impl.selected_cols()))
+        assert len(list(tbl2)) == len(list(tbl2._impl.selected_cols()))
+
+        assert list(tbl1) == [λ.col1, λ.col2]
+        assert list(tbl2) == [λ.col1, λ.col2, λ.col3]
+
+        assert list(tbl2 >> select(tbl2.col2)) == [λ.col2]
+
+        assert list(tbl1 >> join(tbl2 >> select(tbl2.col3), tbl1.col1 == tbl2.col2, 'left')) == [λ.col1, λ.col2, λ.col3_mock2]
 
 
 class TestDispatchers:

@@ -1,13 +1,13 @@
 import functools
 import operator
 from functools import reduce
+
 import sqlalchemy
 
 from pdtransform.core.column import Column
 from pdtransform.core.expressions import FunctionCall
 from pdtransform.core.expressions.translator import Translator, TypedValue
 from .lazy_table import LazyTableImpl, JoinDescriptor, OrderByDescriptor
-from ..core.expressions.lambda_column import LambdaColumn
 
 
 class SQLTableImpl(LazyTableImpl):
@@ -111,7 +111,7 @@ class SQLTableImpl(LazyTableImpl):
 
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
-        named_cols = { name: self.col_expr[self.named_cols.fwd[name]] for name in self.selects.keys() }
+        named_cols = { name: self.col_expr[uuid] for name, uuid in self.selected_cols() }
         s = [self.translator.translate(col).value.label(name) for name, col in named_cols.items() ]
         select = select.with_only_columns(s)
 

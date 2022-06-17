@@ -1,6 +1,7 @@
-from .table import Table
-from .table_impl import AbstractTableImpl
 from functools import reduce, wraps, partial
+
+from pdtransform.core import table
+from .table_impl import AbstractTableImpl
 
 
 class Pipeable:
@@ -100,7 +101,7 @@ def unwrap_tables(arg=None):
         return tuple(unwrap_tables(x) for x in arg)
     if isinstance(arg, dict):
         return { k: unwrap_tables(v) for k, v in arg.items() }
-    return arg._impl if isinstance(arg, Table) else arg
+    return arg._impl if isinstance(arg, table.Table) else arg
 
 def wrap_tables(arg=None):
     """
@@ -111,4 +112,4 @@ def wrap_tables(arg=None):
         return [wrap_tables(x) for x in arg]
     if isinstance(arg, tuple):
         return tuple(wrap_tables(x) for x in arg)
-    return Table(implementation = arg) if isinstance(arg, AbstractTableImpl) else arg
+    return table.Table(implementation = arg) if isinstance(arg, AbstractTableImpl) else arg
