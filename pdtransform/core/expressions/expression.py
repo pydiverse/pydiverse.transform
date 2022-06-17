@@ -85,8 +85,8 @@ class SymbolAttribute:
 # This has to be done, because Python doesn't call __getattr__ for
 # dunder methods.
 def create_operator(op):
-    def impl(self, other):
-        return FunctionCall(op, self, other)
+    def impl(*args, **kwargs):
+        return FunctionCall(op, *args, **kwargs)
     return impl
 for dunder in OperatorRegistry.SUPPORTED_DUNDER:
     setattr(SymbolicExpression, dunder, create_operator(dunder))
