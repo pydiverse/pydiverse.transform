@@ -6,7 +6,7 @@ from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
 from pdtransform.core.table import Table
-from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange
+from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange, alias
 from pdtransform.lazy.sql_table import SQLTableImpl
 from pdtransform.lazy.verbs import show_query
 
@@ -173,6 +173,30 @@ class TestSQLTable:
             tbl2 >> arrange(tbl2.col3) >> collect()
         )
 
+    def test_alias(self, tbl1, tbl2):
+        x = tbl2 >> alias('x')
+        assert(x._impl.name == 'x')
+
+        # Check that applying alias doesn't change the output
+        a = tbl1 >> mutate(xyz = (tbl1.col1 * tbl1.col1) // 2) >> join(tbl2, tbl1.col1 == tbl2.col1, 'left') >> mutate(col1 = tbl1.col1 - λ.xyz)
+        b = a >> alias('b')
+
+        assert_frame_equal(
+            a >> collect(),
+            b >> collect()
+        )
+
+        # Self Join
+        self_join = tbl2 >> join(x, tbl2.col1 == x.col1, 'left') >> alias('self_join')
+        self_join >>= arrange(*self_join)
+
+        self_join_expected = df2.merge(df2.rename(columns = {'col1': 'col1_x', 'col2': 'col2_x', 'col3': 'col3_x'}), how = 'left', left_on = 'col1', right_on = 'col1_x')
+        self_join_expected = self_join_expected.sort_values(by = [col._name for col in self_join])
+
+        assert_frame_equal(
+            self_join >> collect(),
+            self_join_expected.reset_index(drop = True)
+        )
 
     def test_lambda_column(self, tbl1, tbl2):
         # Select
