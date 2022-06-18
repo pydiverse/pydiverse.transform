@@ -18,9 +18,8 @@ class _TableImplMeta(type):
 
         # By using `super` to get the super_registry, we can check for potential
         # operation definitions in order of the MRO.
-
         super_reg = super(c, c).operator_registry if hasattr(super(c, c), 'operator_registry') else None
-        setattr(c, 'operator_registry', OperatorRegistry(super_reg))
+        setattr(c, 'operator_registry', OperatorRegistry(name, super_reg))
         return c
 
 
@@ -128,61 +127,89 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 #### ARITHMETIC OPERATORS ######################################################
 
 
-@AbstractTableImpl.register_op('__add__', 'int, int -> int')
-@AbstractTableImpl.register_op('__radd__', 'int, int -> int')
+@AbstractTableImpl.op('__add__', 'int, int -> int')
+@AbstractTableImpl.op('__add__', 'int, float -> float')
+@AbstractTableImpl.op('__add__', 'float, int -> float')
+@AbstractTableImpl.op('__add__', 'float, float -> float')
+@AbstractTableImpl.op('__radd__', 'int, int -> int')
+@AbstractTableImpl.op('__radd__', 'int, float -> float')
+@AbstractTableImpl.op('__radd__', 'float, int -> float')
+@AbstractTableImpl.op('__radd__', 'float, float -> float')
 def _add(x, y):
     return x + y
 
-@AbstractTableImpl.register_op('__sub__', 'int, int -> int')
+@AbstractTableImpl.op('__sub__', 'int, int -> int')
+@AbstractTableImpl.op('__sub__', 'int, float -> float')
+@AbstractTableImpl.op('__sub__', 'float, int -> float')
+@AbstractTableImpl.op('__sub__', 'float, float -> float')
 def _sub(x, y):
     return x - y
 
-@AbstractTableImpl.register_op('__rsub__', 'int, int -> int')
+@AbstractTableImpl.op('__rsub__', 'int, int -> int')
+@AbstractTableImpl.op('__rsub__', 'int, float -> float')
+@AbstractTableImpl.op('__rsub__', 'float, int -> float')
+@AbstractTableImpl.op('__rsub__', 'float, float -> float')
 def _rsub(x, y):
     return y - x
 
-@AbstractTableImpl.register_op('__mul__', 'int, int -> int')
-@AbstractTableImpl.register_op('__rmul__', 'int, int -> int')
+@AbstractTableImpl.op('__mul__', 'int, int -> int')
+@AbstractTableImpl.op('__mul__', 'int, float -> float')
+@AbstractTableImpl.op('__mul__', 'float, int -> float')
+@AbstractTableImpl.op('__mul__', 'float, float -> float')
+@AbstractTableImpl.op('__rmul__', 'int, int -> int')
+@AbstractTableImpl.op('__rmul__', 'int, float -> float')
+@AbstractTableImpl.op('__rmul__', 'float, int -> float')
+@AbstractTableImpl.op('__rmul__', 'float, float -> float')
 def _mul(x, y):
     return x * y
 
-@AbstractTableImpl.register_op('__truediv__', 'int, int -> float')
+@AbstractTableImpl.op('__truediv__', 'int, int -> float')
+@AbstractTableImpl.op('__truediv__', 'int, float -> float')
+@AbstractTableImpl.op('__truediv__', 'float, int -> float')
+@AbstractTableImpl.op('__truediv__', 'float, float -> float')
 def _truediv(x, y):
     return x / y
 
-@AbstractTableImpl.register_op('__rtruediv__', 'int, int -> float')
+@AbstractTableImpl.op('__rtruediv__', 'int, int -> float')
+@AbstractTableImpl.op('__rtruediv__', 'int, float -> float')
+@AbstractTableImpl.op('__rtruediv__', 'float, int -> float')
+@AbstractTableImpl.op('__rtruediv__', 'float, float -> float')
 def _rtruediv(x, y):
     return y / x
 
-@AbstractTableImpl.register_op('__floordiv__', 'int, int -> int')
+@AbstractTableImpl.op('__floordiv__', 'int, int -> int')
 def _floordiv(x, y):
     return x // y
 
-@AbstractTableImpl.register_op('__rfloordiv__', 'int, int -> int')
+@AbstractTableImpl.op('__rfloordiv__', 'int, int -> int')
 def _rfloordiv(x, y):
     return y // x
 
-@AbstractTableImpl.register_op('__pow__', 'int, int -> int')
+@AbstractTableImpl.op('__pow__', 'int, int -> int')
 def _pow(x, y):
     return x ** y
 
-@AbstractTableImpl.register_op('__rpow__', 'int, int -> int')
+@AbstractTableImpl.op('__rpow__', 'int, int -> int')
 def _rpow(x, y):
     return y ** x
 
-@AbstractTableImpl.register_op('__mod__', 'int, int -> int')
+@AbstractTableImpl.op('__mod__', 'int, int -> int')
+@AbstractTableImpl.op('__mod__', 'float, int -> float')
 def _mod(x, y):
     return x % y
 
-@AbstractTableImpl.register_op('__rmod__', 'int, int -> int')
+@AbstractTableImpl.op('__rmod__', 'int, int -> int')
+@AbstractTableImpl.op('__rmod__', 'int, float -> float')
 def _rmod(x, y):
     return y % x
 
-@AbstractTableImpl.register_op('__neg__', 'int -> int')
+@AbstractTableImpl.op('__neg__', 'int -> int')
+@AbstractTableImpl.op('__neg__', 'float -> float')
 def _neg(x):
     return -x
 
-@AbstractTableImpl.register_op('__pos__', 'int -> int')
+@AbstractTableImpl.op('__pos__', 'int -> int')
+@AbstractTableImpl.op('__pos__', 'float -> float')
 def _pos(x):
     return x
 
@@ -190,22 +217,22 @@ def _pos(x):
 #### BINARY OPERATORS ##########################################################
 
 
-@AbstractTableImpl.register_op('__and__', 'bool, bool -> bool')
-@AbstractTableImpl.register_op('__rand__', 'bool, bool -> bool')
+@AbstractTableImpl.op('__and__', 'bool, bool -> bool')
+@AbstractTableImpl.op('__rand__', 'bool, bool -> bool')
 def _and(x, y):
     return x & y
 
-@AbstractTableImpl.register_op('__or__', 'bool, bool -> bool')
-@AbstractTableImpl.register_op('__ror__', 'bool, bool -> bool')
+@AbstractTableImpl.op('__or__', 'bool, bool -> bool')
+@AbstractTableImpl.op('__ror__', 'bool, bool -> bool')
 def _or(x, y):
     return x | y
 
-@AbstractTableImpl.register_op('__xor__', 'bool, bool -> bool')
-@AbstractTableImpl.register_op('__rxor__', 'bool, bool -> bool')
+@AbstractTableImpl.op('__xor__', 'bool, bool -> bool')
+@AbstractTableImpl.op('__rxor__', 'bool, bool -> bool')
 def _xor(x, y):
     return x ^ y
 
-@AbstractTableImpl.register_op('__invert__', 'bool -> bool')
+@AbstractTableImpl.op('__invert__', 'bool -> bool')
 def _invert(x):
     return ~x
 
@@ -213,27 +240,27 @@ def _invert(x):
 #### COMPARISON OPERATORS ######################################################
 
 
-@AbstractTableImpl.register_op('__lt__', 'T, T -> bool')
+@AbstractTableImpl.op('__lt__', 'T, T -> bool')
 def _lt(x, y):
     return x < y
 
-@AbstractTableImpl.register_op('__le__', 'T, T -> bool')
+@AbstractTableImpl.op('__le__', 'T, T -> bool')
 def _le(x, y):
     return x <= y
 
-@AbstractTableImpl.register_op('__eq__', 'T, U -> bool')
+@AbstractTableImpl.op('__eq__', 'T, U -> bool')
 def _eq(x, y):
     return x == y
 
-@AbstractTableImpl.register_op('__ne__', 'T, U -> bool')
+@AbstractTableImpl.op('__ne__', 'T, U -> bool')
 def _ne(x, y):
     return x != y
 
-@AbstractTableImpl.register_op('__gt__', 'T, T -> bool')
+@AbstractTableImpl.op('__gt__', 'T, T -> bool')
 def _gt(x, y):
     return x > y
 
-@AbstractTableImpl.register_op('__ge__', 'T, T -> bool')
+@AbstractTableImpl.op('__ge__', 'T, T -> bool')
 def _ge(x, y):
     return x >= y
 

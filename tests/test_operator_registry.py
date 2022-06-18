@@ -46,7 +46,7 @@ class TestOperatorSignature:
 class TestOperatorRegistry:
 
     def test_simple(self):
-        reg = OperatorRegistry()
+        reg = OperatorRegistry('TestRegistry')
         reg.register_op('__add__')
         reg.register_op('__sub__')
 
@@ -68,7 +68,7 @@ class TestOperatorRegistry:
             reg.get_implementation('not_registered', ('int'))
 
     def test_template(self):
-        reg = OperatorRegistry()
+        reg = OperatorRegistry('TestRegistry')
 
         reg.add_implementation(1, 'equal', 'T, T -> bool')
         reg.add_implementation(2, 'equal', 'T, U -> U')
@@ -102,7 +102,7 @@ class TestOperatorRegistry:
         assert reg.get_implementation('y', ('str', 'int', 'float')) == TypedOperatorImpl('y', 3, 'float')
 
     def test_vararg(self):
-        reg = OperatorRegistry()
+        reg = OperatorRegistry('TestRegistry')
         reg.add_implementation(1, 'x', 'int... -> int')
         reg.add_implementation(2, 'x', 'int, int... -> int')
         reg.add_implementation(3, 'x', 'int, T... -> T')
@@ -111,6 +111,3 @@ class TestOperatorRegistry:
         assert reg.get_implementation('x', ('int', 'int')).func == 2
         assert reg.get_implementation('x', ('int', 'int', 'int')).func == 2
         assert reg.get_implementation('x', ('int', 'str', 'str')) == TypedOperatorImpl('x', 3, 'str')
-
-
-

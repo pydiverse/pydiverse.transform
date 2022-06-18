@@ -1,6 +1,7 @@
 import itertools
 import dataclasses
 import typing
+import warnings
 
 
 class OperatorImpl:
@@ -88,7 +89,8 @@ class OperatorRegistry:
         '__gt__', '__ge__',
     }
 
-    def __init__(self, super_registry = None):
+    def __init__(self, name, super_registry = None):
+        self.name = name
         self.super_registry = super_registry
         self.implementations = dict()  # type: dict[str, 'OperationImplementationStore']
         self.check_super = dict()  # type: dict[str, bool]
@@ -102,6 +104,9 @@ class OperatorRegistry:
         if name.startswith('__') and name.endswith('__'):
             if name not in OperatorRegistry.SUPPORTED_DUNDER:
                 raise ValueError(f"Dunder method {name} is not supported.")
+
+        if name in self.implementations:
+            warnings.warn(f"Operator '{name}' already registered in operator registry '{self.name}'. All previous implementation will be deleted.")
 
         self.implementations[name] = OperatorImplementationStore(name)
         self.check_super[name] = check_super
