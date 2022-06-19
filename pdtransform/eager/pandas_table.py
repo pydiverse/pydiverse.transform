@@ -29,12 +29,12 @@ class PandasTableImpl(EagerTableImpl):
 
         # Rename columns
         self.df_name_mapping = {
-            col._uuid: f'{self.name}_{col._name}_' + uuid_to_str(col._uuid)
+            col.uuid: f'{self.name}_{col.name}_' + uuid_to_str(col.uuid)
             for col in self.columns.values()
         }  # type: dict[uuid.UUID: str]
 
         self.df = self.df.rename(columns = {
-            name: self.df_name_mapping[col._uuid]
+            name: self.df_name_mapping[col.uuid]
             for name, col in self.columns.items()
         })
 
@@ -99,9 +99,9 @@ class PandasTableImpl(EagerTableImpl):
         # Parse ON condition
         on_cols = []
         for col1, col2 in self.join_translator.translate(on):
-            if col1._uuid in self.col_expr and col2._uuid in right.col_expr:
+            if col1.uuid in self.col_expr and col2.uuid in right.col_expr:
                 on_cols.append((col1, col2))
-            elif col2._uuid in self.col_expr and col1._uuid in right.col_expr:
+            elif col2.uuid in self.col_expr and col1.uuid in right.col_expr:
                 on_cols.append((col2, col1))
             else:
                 raise Exception
@@ -111,8 +111,8 @@ class PandasTableImpl(EagerTableImpl):
             raise Exception("Must specify how argument")
 
         left_on, right_on = zip(*on_cols)
-        left_on  = [self.df_name_mapping[col._uuid] for col in left_on]
-        right_on = [right.df_name_mapping[col._uuid] for col in right_on]
+        left_on  = [self.df_name_mapping[col.uuid] for col in left_on]
+        right_on = [right.df_name_mapping[col.uuid] for col in right_on]
 
         self.df_name_mapping.update(right.df_name_mapping)
         self.df = self.df.merge(right.df, how = how, left_on = left_on, right_on = right_on)
@@ -128,7 +128,7 @@ class PandasTableImpl(EagerTableImpl):
 
     def arrange(self, ordering: list[tuple[SymbolicExpression, bool]]):
         cols, ascending = zip(*ordering)
-        cols = [self.df_name_mapping[col._uuid] for col in cols]
+        cols = [self.df_name_mapping[col.uuid] for col in cols]
         self.df = self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort')
 
 
@@ -136,14 +136,14 @@ class PandasExpressionTranslator(Translator[PandasTableImpl]):
 
     def _translate(self, expr):
         if isinstance(expr, Column):
-            df_col_name = self.backend.df_name_mapping[expr._uuid]
+            df_col_name = self.backend.df_name_mapping[expr.uuid]
             df_col = self.backend.df[df_col_name]
-            return TypedValue(df_col, expr._dtype)
+            return TypedValue(df_col, expr.dtype)
 
         if isinstance(expr, FunctionCall):
-            arguments = [arg.value for arg in expr._args]
-            signature = tuple(arg.dtype for arg in expr._args)
-            implementation = self.backend.operator_registry.get_implementation(expr._operator, signature)
+            arguments = [arg.value for arg in expr.args]
+            signature = tuple(arg.dtype for arg in expr.args)
+            implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
             return TypedValue(implementation(*arguments), implementation.rtype)
 
         # Literals
@@ -165,13 +165,13 @@ class PandasJoinTranslator(Translator[PandasTableImpl]):
         if isinstance(expr, Column):
             return expr
         if isinstance(expr, FunctionCall):
-            if expr._operator == '__eq__':
-                c1 = expr._args[0]
-                c2 = expr._args[1]
+            if expr.operator == '__eq__':
+                c1 = expr.args[0]
+                c2 = expr.args[1]
                 assert(isinstance(c1, Column) and isinstance(c2, Column))
                 return ((c1, c2),)
-            if expr._operator == '__and__':
-                return tuple(itertools.chain(*expr._args))
+            if expr.operator == '__and__':
+                return tuple(itertools.chain(*expr.args))
         raise Exception(f'Invalid ON clause element: {expr}. Only a conjunction of equalities is supported by pandas (ands of equals).')
 
 

@@ -6,7 +6,7 @@ from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
 from pdtransform.core.table import Table
-from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange, alias
+from pdtransform.core.verbs import alias, arrange, collect, filter, join, mutate, select
 from pdtransform.lazy.sql_table import SQLTableImpl
 from pdtransform.lazy.verbs import show_query
 
@@ -191,7 +191,7 @@ class TestSQLTable:
         self_join >>= arrange(*self_join)
 
         self_join_expected = df2.merge(df2.rename(columns = {'col1': 'col1_x', 'col2': 'col2_x', 'col3': 'col3_x'}), how = 'left', left_on = 'col1', right_on = 'col1_x')
-        self_join_expected = self_join_expected.sort_values(by = [col._name for col in self_join])
+        self_join_expected = self_join_expected.sort_values(by = [col._.name for col in self_join])
 
         assert_frame_equal(
             self_join >> collect(),

@@ -1,6 +1,5 @@
-from pdtransform.core import Column
+from pdtransform.core.column import Column, LambdaColumn
 from pdtransform.core.expressions import Translator
-from pdtransform.core.expressions.lambda_column import LambdaColumn
 from pdtransform.core.table_impl import AbstractTableImpl
 
 
@@ -27,11 +26,11 @@ class EagerLambdaTranslator(Translator):
     def _translate(self, expr):
         # Resolve lambda and return Column object
         if isinstance(expr, LambdaColumn):
-            uuid = self.backend.named_cols.fwd[expr._name]
+            uuid = self.backend.named_cols.fwd[expr.name]
             dtype = self.backend.col_dtype[uuid]
 
             return Column(
-                name = 'λ_' + expr._name,
+                name = 'λ_' + expr.name,
                 table = self.backend,
                 dtype = dtype,
                 uuid = uuid

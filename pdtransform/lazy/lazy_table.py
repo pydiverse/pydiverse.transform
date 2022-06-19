@@ -1,12 +1,25 @@
-from collections import namedtuple
+from dataclasses import dataclass
+from typing import Any, Generic, TypeVar
 
+from pdtransform.core.column import LambdaColumn
 from pdtransform.core.expressions import Translator
-from pdtransform.core.expressions.lambda_column import LambdaColumn
 from pdtransform.core.table_impl import AbstractTableImpl
 
+ImplT = TypeVar('ImplT', bound = AbstractTableImpl)
 
-JoinDescriptor = namedtuple('JoinDescriptor', ['right', 'on', 'how'])
-OrderByDescriptor = namedtuple('OrderByDescriptor', ['order', 'asc', 'nulls_first'])
+
+@dataclass(slots = True)
+class JoinDescriptor(Generic[ImplT]):
+    right: ImplT
+    on: Any
+    how: str
+
+
+@dataclass(slots = True)
+class OrderByDescriptor:
+    order: Any
+    asc: bool
+    nulls_first: bool
 
 
 class LazyTableImpl(AbstractTableImpl):
@@ -30,7 +43,7 @@ class LazyLambdaTranslator(Translator):
     def _translate(self, expr):
         # Replace lambda with corresponding symbolic expression
         if isinstance(expr, LambdaColumn):
-            uuid = self.backend.named_cols.fwd[expr._name]
+            uuid = self.backend.named_cols.fwd[expr.name]
             lambda_expr = self.backend.col_expr[uuid]
             return lambda_expr
         return expr

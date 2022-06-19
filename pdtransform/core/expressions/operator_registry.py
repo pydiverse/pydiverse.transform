@@ -1,5 +1,5 @@
-import itertools
 import dataclasses
+import itertools
 import typing
 import warnings
 

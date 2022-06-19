@@ -1,8 +1,10 @@
-from .column import Column, generate_col_uuid
+from typing import Any
+
+from .column import Column, LambdaColumn, generate_col_uuid
 from .dispatchers import builtin_verb
+from .expressions import FunctionCall
 from .expressions import SymbolicExpression
-from .expressions.expression import iterate_over_expr, FunctionCall
-from .expressions.lambda_column import LambdaColumn
+from .expressions.utils import iterate_over_expr
 from .table_impl import AbstractTableImpl
 from .utils import ordered_set
 
@@ -18,7 +20,7 @@ def check_lambdas_valid(tbl: AbstractTableImpl, *expressions):
     lambdas = []
     for expression in expressions:
         lambdas.extend(l for l in iterate_over_expr(expression) if isinstance(l, LambdaColumn))
-    missing_lambdas = { l for l in lambdas if l._name not in tbl.named_cols.fwd }
+    missing_lambdas = { l for l in lambdas if l.name not in tbl.named_cols.fwd }
     if missing_lambdas:
         missing_lambdas_str = ", ".join(map(lambda x: str(x), missing_lambdas))
         raise ValueError(f"Invalid lambda column(s) {missing_lambdas_str}.")
@@ -59,9 +61,9 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     selects = []
     for col in args:
         if isinstance(col, Column):
-            selects.append(tbl.named_cols.bwd[col._uuid])
+            selects.append(tbl.named_cols.bwd[col.uuid])
         elif isinstance(col, LambdaColumn):
-            selects.append(col._name)
+            selects.append(col.name)
     # SELECT
     new_tbl = tbl.copy()
     new_tbl.selects = ordered_set(selects)
@@ -151,11 +153,11 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     check_lambdas_valid(tbl, *args)
 
     # Determine if ascending or descending
-    def ordering_pealer(expr):
+    def ordering_pealer(expr: Any):
         num_neg = 0
-        while isinstance(expr, FunctionCall) and expr._operator == '__neg__':
+        while isinstance(expr, FunctionCall) and expr.operator == '__neg__':
             num_neg += 1
-            expr = expr._args[0]
+            expr = expr.args[0]
         return expr, num_neg % 2 == 0
 
     ordering = []

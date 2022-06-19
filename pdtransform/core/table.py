@@ -1,11 +1,10 @@
 import itertools
-from typing import TypeVar, Generic, Iterable
+from typing import Generic, Iterable, TypeVar
 
 import pdtransform.core.verbs as verbs
-from pdtransform.core.column import Column
-from pdtransform.core.expressions.lambda_column import LambdaColumn
+from pdtransform.core.column import Column, LambdaColumn
+from pdtransform.core.expressions import SymbolicExpression
 from pdtransform.core.table_impl import AbstractTableImpl
-
 
 ImplT = TypeVar('ImplT', bound=AbstractTableImpl)
 class Table(Generic[ImplT]):
@@ -17,32 +16,40 @@ class Table(Generic[ImplT]):
     def __init__(self, implementation: ImplT):
         self._impl = implementation
 
-    def __getitem__(self, key) -> Column:
-        return self._impl.get_col(key)
+    def __getitem__(self, key) -> SymbolicExpression[Column]:
+        return SymbolicExpression(self._impl.get_col(key))
 
     def __setitem__(self, col, expr):
         """ Mutate a column
-        :param col: Either a str, Column or LambdaColumn
+        :param col: Either a str or SymbolicColumn
         """
-        if isinstance(col, (Column, LambdaColumn)):
-            col_name = col._name
+        col_name = None
+
+        if isinstance(col, SymbolicExpression):
+            underlying = col._
+            if isinstance(underlying, (Column, LambdaColumn)):
+                col_name = underlying.name
         elif isinstance(col, str):
             col_name = col
-        else:
+
+        if not col_name:
             raise KeyError(f'Invalid key {col}. Must be either a string, Column or LambdaColumn.')
         self._impl = (self >> verbs.mutate(**{col_name: expr}))._impl
 
-    def __getattr__(self, name) -> Column:
-        return self._impl.get_col(name)
+    def __getattr__(self, name) -> SymbolicExpression[Column]:
+        return SymbolicExpression(self._impl.get_col(name))
 
     def __dir__(self):
         return itertools.chain(self._impl.columns.keys(), ('_impl', ))
 
-    def __iter__(self) -> Iterable[LambdaColumn]:
-        return iter(LambdaColumn(name) for name, _ in self._impl.selected_cols())
+    def __iter__(self) -> Iterable[SymbolicExpression[LambdaColumn]]:
+        return iter(SymbolicExpression(LambdaColumn(name)) for name, _ in self._impl.selected_cols())
 
     def __eq__(self, other):
-        return self._impl == other._impl
+        return isinstance(other, self.__class__) and self._impl == other._impl
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __hash__(self):
         return hash(self._impl)

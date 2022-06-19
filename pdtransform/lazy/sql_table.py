@@ -5,9 +5,9 @@ from functools import reduce
 import sqlalchemy
 
 from pdtransform.core.column import Column
-from pdtransform.core.expressions import FunctionCall
+from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 from pdtransform.core.expressions.translator import Translator, TypedValue
-from .lazy_table import LazyTableImpl, JoinDescriptor, OrderByDescriptor
+from .lazy_table import JoinDescriptor, LazyTableImpl, OrderByDescriptor
 
 
 class SQLTableImpl(LazyTableImpl):
@@ -27,7 +27,7 @@ class SQLTableImpl(LazyTableImpl):
         )
 
         self.sql_columns = {
-            col._uuid: self.tbl.columns[col._name]
+            col.uuid: self.tbl.columns[col.name]
             for col in self.columns.values()
         }  # from uuid to sqlalchemy column
 
@@ -104,8 +104,9 @@ class SQLTableImpl(LazyTableImpl):
 
         # WHERE
         if self.wheres:
-            where_sexpr = functools.reduce(operator.and_, self.wheres)
-            where, where_dtype = self.translator.translate(where_sexpr)
+            # Combine wheres using ands
+            combined_where = functools.reduce(operator.and_, map(SymbolicExpression, self.wheres))._
+            where, where_dtype = self.translator.translate(combined_where)
             assert(where_dtype == 'bool')
             select = select.where(where)
 
@@ -193,12 +194,12 @@ class SQLExpressionTranslator(Translator[SQLTableImpl]):
 
     def _translate(self, expr):
         if isinstance(expr, Column):
-            return TypedValue(self.backend.sql_columns[expr._uuid], expr._dtype)
+            return TypedValue(self.backend.sql_columns[expr.uuid], expr.dtype)
 
         if isinstance(expr, FunctionCall):
-            arguments = [arg.value for arg in expr._args]
-            signature = tuple(arg.dtype for arg in expr._args)
-            implementation = self.backend.operator_registry.get_implementation(expr._operator, signature)
+            arguments = [arg.value for arg in expr.args]
+            signature = tuple(arg.dtype for arg in expr.args)
+            implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
             return TypedValue(implementation(*arguments), implementation.rtype)
 
 

@@ -1,25 +1,29 @@
 from pdtransform import λ
-from pdtransform.core.expressions.expression import SymbolicExpression, FunctionCall
+from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 
 
 def compare_sexpr(expr1, expr2):
     # Must compare using repr, because using == would result in another sexpr
-    assert repr(expr1) == repr(expr2)
+    expr1 = expr1 if not isinstance(expr1, SymbolicExpression) else expr1._
+    expr2 = expr2 if not isinstance(expr2, SymbolicExpression) else expr2._
+    assert expr1 == expr2
 
 
 class TestExpressions:
 
     def test_symbolic_expression(self):
-        s1 = SymbolicExpression()
-        s2 = SymbolicExpression()
+        s1 = SymbolicExpression(1)
+        s2 = SymbolicExpression(2)
 
-        compare_sexpr(s1 + s1, FunctionCall('__add__', s1, s1))
-        compare_sexpr(s1 + s2, FunctionCall('__add__', s1, s2))
-        compare_sexpr(s1 + 10, FunctionCall('__add__', s1, 10))
-        compare_sexpr(10 + s1, FunctionCall('__radd__', s1, 10))
+        compare_sexpr(s1 + s1, FunctionCall('__add__', 1, 1))
+        compare_sexpr(s1 + s2, FunctionCall('__add__', 1, 2))
+        compare_sexpr(s1 + 10, FunctionCall('__add__', 1, 10))
+        compare_sexpr(10 + s1, FunctionCall('__radd__', 1, 10))
 
-        compare_sexpr(s1.argument(), FunctionCall('argument', s1))
-        compare_sexpr(s1.str.argument(), FunctionCall('str.argument', s1))
+        compare_sexpr(s1.argument(), FunctionCall('argument', 1))
+        compare_sexpr(s1.str.argument(), FunctionCall('str.argument', 1))
+        compare_sexpr(s1.argument(s2, 3), FunctionCall('argument', 1, 2, 3))
 
     def test_lambda_col(self):
-        assert λ.something._name == λ['something']._name
+        compare_sexpr(λ.something, λ['something'])
+        compare_sexpr(λ.something.chained(), λ['something'].chained())

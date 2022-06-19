@@ -6,7 +6,7 @@ from pandas.testing import assert_frame_equal
 from pdtransform import λ
 from pdtransform.core.dispatchers import Pipeable
 from pdtransform.core.table import Table
-from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange, alias
+from pdtransform.core.verbs import alias, arrange, collect, filter, join, mutate, select
 from pdtransform.eager.pandas_table import PandasTableImpl
 
 df1 = pd.DataFrame({

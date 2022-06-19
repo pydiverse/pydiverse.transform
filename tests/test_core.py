@@ -27,8 +27,8 @@ class TestTable:
             _ = tbl1.colXXX
 
     def test_getitem(self, tbl1):
-        assert hash(tbl1.col1) == hash(tbl1['col1'])
-        assert hash(tbl1.col2) == hash(tbl1['col2'])
+        assert tbl1.col1._ == tbl1['col1']._
+        assert tbl1.col2._ == tbl1['col2']._
 
     def test_setitem(self, tbl1):
         tbl1['col1'] = 1

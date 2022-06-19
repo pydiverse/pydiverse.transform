@@ -1,14 +1,21 @@
-from collections import namedtuple
-from typing import Generic, TYPE_CHECKING, TypeVar
+from dataclasses import dataclass
+from typing import Any, Generic, TYPE_CHECKING, TypeVar
 
-from pdtransform.core.expressions import FunctionCall, SymbolicExpression
+from pdtransform.core.expressions import FunctionCall
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
     from pdtransform.core.table_impl import AbstractTableImpl
 
 # Basic container to store value and associated type metadata
-TypedValue = namedtuple('TypedValue', ['value', 'dtype'])
+@dataclass(slots = True)
+class TypedValue:
+    value: Any
+    dtype: str
+
+    def __iter__(self):
+        return iter((self.value, self.dtype))
+
 
 ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
 
@@ -27,25 +34,16 @@ class Translator(Generic[ImplT]):
         raise NotImplementedError
 
 
-def bottom_up_replace(expr: SymbolicExpression, _replace):
+def bottom_up_replace(expr, replace):
     # TODO: This is bad... At some point this should be refactored
     #       and replaced with something less hacky.
-
-    replaced = dict()
-
-    def replace(expr):
-        if expr in replaced:
-            return replaced[expr]
-        v = _replace(expr)
-        replaced[expr] = v
-        return v
 
     def clone(expr):
         if isinstance(expr, FunctionCall):
             f = FunctionCall(
-                expr._operator,
-                *(clone(arg) for arg in expr._args),
-                **{k: clone(v) for k, v in expr._kwargs.items()}
+                expr.operator,
+                *(clone(arg) for arg in expr.args),
+                **{k: clone(v) for k, v in expr.kwargs.items()}
             )
             return replace(f)
         else:

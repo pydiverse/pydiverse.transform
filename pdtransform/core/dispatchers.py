@@ -1,7 +1,9 @@
-from functools import reduce, wraps, partial
+from functools import partial, reduce, wraps
+from typing import Any
 
 from pdtransform.core import table
-from .table_impl import AbstractTableImpl
+from pdtransform.core.expressions import unwrap_symbolic_expressions
+from pdtransform.core.table_impl import AbstractTableImpl
 
 
 class Pipeable:
@@ -62,7 +64,13 @@ def builtin_verb(backends = None):
     def wrap_and_unwrap(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            return wrap_tables(func(*unwrap_tables(args), **unwrap_tables(kwargs)))
+            args = unwrap_tables(args)
+            args = unwrap_symbolic_expressions(args)
+
+            kwargs = unwrap_tables(kwargs)
+            kwargs = unwrap_symbolic_expressions(kwargs)
+
+            return wrap_tables(func(*args, **kwargs))
         return wrapper
 
     def check_backend(func):
@@ -90,7 +98,7 @@ def builtin_verb(backends = None):
 
 # Helper
 
-def unwrap_tables(arg=None):
+def unwrap_tables(arg: Any = None):
     """
     Takes an instance or collection of `Table` objects and replaces them with
     their implementation.
@@ -103,7 +111,7 @@ def unwrap_tables(arg=None):
         return { k: unwrap_tables(v) for k, v in arg.items() }
     return arg._impl if isinstance(arg, table.Table) else arg
 
-def wrap_tables(arg=None):
+def wrap_tables(arg: Any = None):
     """
     Takes an instance or collection of `AbstractTableImpl` objects and wraps
     them in a `Table` object. This is an inverse to the `unwrap_tables` function.
@@ -113,3 +121,4 @@ def wrap_tables(arg=None):
     if isinstance(arg, tuple):
         return tuple(wrap_tables(x) for x in arg)
     return table.Table(implementation = arg) if isinstance(arg, AbstractTableImpl) else arg
+

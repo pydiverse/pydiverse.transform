@@ -1,27 +1,59 @@
 import uuid
+from typing import Generic, TYPE_CHECKING, TypeVar
 
-from .expressions.expression import SymbolicExpression
+if TYPE_CHECKING:
+    # noinspection PyUnresolvedReferences
+    from pdtransform.core.table_impl import AbstractTableImpl
 
 
 def generate_col_uuid():
     return uuid.uuid1()
 
 
-class Column(SymbolicExpression):
+ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
 
-    __slots__ = ('_name', '_table', '_dtype', '_uuid')
 
-    _name: str
-    _table: object
-    _dtype: str
-    _uuid: uuid.UUID
+class Column(Generic[ImplT]):
+    __slots__ = ('name', 'table', 'dtype', 'uuid')
 
-    def __init__(self, name, table, dtype: str, uuid: uuid.UUID = None):
-        self._name = name
-        self._table = table
-        self._dtype = dtype
-        self._uuid = uuid or generate_col_uuid()
-        super().__init__()
+    def __init__(self, name: str, table: ImplT, dtype: str, uuid: uuid.UUID = None):
+        self.name = name
+        self.table = table
+        self.dtype = dtype
+        self.uuid = uuid or generate_col_uuid()
 
     def __repr__(self):
-        return f'<{self._table.name}.{self._name}({self._dtype})>'
+        return f'<{self.table.name}.{self.name}({self.dtype})>'
+
+
+class LambdaColumn:
+    """Anonymous Column
+
+    A lambda column is a column without an associated table or UUID. This means
+    that it can be used to reference columns in the same pipe as it was created.
+
+    Example:
+      The following fails because `table.a` gets referenced before it gets created.
+        table >> mutate(a = table.x) >> mutate(b = table.a)
+      Instead you can use a lambda column to achieve this:
+        table >> mutate(a = table.x) >> mutate(b = λ.a)
+    """
+
+    __slots__ = ('name')
+
+    def __init__(self, name: str):
+        self.name = name
+
+    def __repr__(self):
+        return f'<λ.{self.name}>'
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.name == other.name
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(('λ', self.name))

@@ -1,11 +1,9 @@
 import copy
-import uuid
 import typing
+import uuid
 
-from .column import Column
-from .expressions.expression import SymbolicExpression
-from .expressions.lambda_column import LambdaColumn
-from .expressions.operator_registry import OperatorRegistry
+from .column import Column, LambdaColumn
+from .expressions import OperatorRegistry, SymbolicExpression
 from .utils import bidict, ordered_set
 
 
@@ -56,9 +54,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         # Init Values
         for name, col in columns.items():
             self.selects.add(name)
-            self.named_cols.fwd[name] = col._uuid
-            self.col_expr[col._uuid] = col
-            self.col_dtype[col._uuid] = col._dtype
+            self.named_cols.fwd[name] = col.uuid
+            self.col_expr[col.uuid] = col
+            self.col_dtype[col.uuid] = col.dtype
 
     def copy(self):
         c = copy.copy(self)
@@ -79,7 +77,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         for name in self.selects:
             yield (name, self.named_cols.fwd[name])
 
-    def resolve_lambda_cols(self, expr: SymbolicExpression):
+    def resolve_lambda_cols(self, expr: typing.Any):
         raise NotImplementedError
 
     #### Verb Callbacks ####
