@@ -132,7 +132,7 @@ class PandasTableImpl(EagerTableImpl):
         self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort', inplace = True)
 
 
-class PandasExpressionTranslator(Translator):
+class PandasExpressionTranslator(Translator[PandasTableImpl]):
 
     def _translate(self, expr):
         if isinstance(expr, Column):
@@ -155,7 +155,7 @@ class PandasExpressionTranslator(Translator):
         raise NotImplementedError(expr, type(expr))
 
 
-class PandasJoinTranslator(Translator):
+class PandasJoinTranslator(Translator[PandasTableImpl]):
     """
     This translator takes a conjunction (AND) of equality checks and returns
     a tuple of tuple where the inner tuple contains the left and right column

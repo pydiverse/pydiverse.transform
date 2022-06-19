@@ -1,15 +1,22 @@
 from collections import namedtuple
-from pdtransform import core
-from pdtransform.core.expressions import SymbolicExpression, FunctionCall
+from typing import Generic, TYPE_CHECKING, TypeVar
 
+from pdtransform.core.expressions import FunctionCall, SymbolicExpression
+
+if TYPE_CHECKING:
+    # noinspection PyUnresolvedReferences
+    from pdtransform.core.table_impl import AbstractTableImpl
 
 # Basic container to store value and associated type metadata
 TypedValue = namedtuple('TypedValue', ['value', 'dtype'])
 
-class Translator:
+ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
 
-    def __init__(self, backend: 'core.AbstractTableImpl'):
-         self.backend = backend
+
+class Translator(Generic[ImplT]):
+
+    def __init__(self, backend: ImplT):
+        self.backend = backend
 
     def translate(self, expr):
         """ Translate an expression recursively. """
@@ -25,6 +32,7 @@ def bottom_up_replace(expr: SymbolicExpression, _replace):
     #       and replaced with something less hacky.
 
     replaced = dict()
+
     def replace(expr):
         if expr in replaced:
             return replaced[expr]

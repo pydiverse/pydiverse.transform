@@ -186,7 +186,7 @@ class SQLTableImpl(LazyTableImpl):
         )
 
 
-class SQLExpressionTranslator(Translator):
+class SQLExpressionTranslator(Translator[SQLTableImpl]):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
