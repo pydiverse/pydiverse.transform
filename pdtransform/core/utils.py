@@ -1,4 +1,27 @@
-class bidict:
+from collections.abc import (
+    MutableSet,
+    MutableMapping,
+
+    Mapping,
+    ItemsView,
+    KeysView,
+    ValuesView,
+)
+from typing import (
+    TypeVar,
+    Iterable,
+    Generic,
+)
+
+
+#### bidict ####
+
+
+KT = TypeVar('KT')
+VT = TypeVar('VT')
+
+
+class bidict(Generic[KT, VT]):
     """
     Bidirectional Dictionary
     All keys and values must be unique (bijective one to one mapping).
@@ -7,7 +30,7 @@ class bidict:
     To go from value to key use `bidict.bwd`.
     """
 
-    def __init__(self, seq = None, /, *, fwd = None, bwd = None):
+    def __init__(self, seq: Mapping[KT, VT] = None, /, *, fwd = None, bwd = None):
         if fwd is not None and bwd is not None:
             self.__fwd = fwd
             self.__bwd = bwd
@@ -20,8 +43,8 @@ class bidict:
         if len(self.__fwd) != len(self.__bwd) != len(seq):
             raise ValueError(f"Input sequence contains duplicate key value pairs. Mapping must be unique.")
 
-        self.fwd = _BidictInterface(self.__fwd, self.__bwd)
-        self.bwd = _BidictInterface(self.__bwd, self.__fwd)
+        self.fwd = _BidictInterface(self.__fwd, self.__bwd)  # type: _BidictInterface[KT, VT]
+        self.bwd = _BidictInterface(self.__bwd, self.__fwd)  # type: _BidictInterface[VT, KT]
 
     def __copy__(self):
         return bidict(
@@ -29,13 +52,20 @@ class bidict:
             bwd = self.__bwd.copy()
         )
 
+    def __len__(self):
+        return len(self.__fwd)
 
-class _BidictInterface:
-    def __init__(self, fwd: dict, bwd: dict):
+    def clear(self):
+        self.__fwd.clear()
+        self.__bwd.clear()
+
+
+class _BidictInterface(MutableMapping[KT, VT]):
+    def __init__(self, fwd: dict[KT, VT], bwd: dict[VT, KT]):
         self.__fwd = fwd
         self.__bwd = bwd
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: KT, value: VT):
         if key in self.__fwd:
             fwd_value = self.__fwd[key]
             del self.__bwd[fwd_value]
@@ -44,25 +74,64 @@ class _BidictInterface:
         self.__fwd[key] = value
         self.__bwd[value] = key
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: KT) -> VT:
         return self.__fwd[key]
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: KT):
         value = self.__fwd[key]
         del self.__fwd[key]
         del self.__bwd[value]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable[KT]:
         yield from self.__fwd.__iter__()
 
-    def __contains__(self, item):
+    def __len__(self) -> int:
+        return len(self.__fwd)
+
+    def __contains__(self, item) -> bool:
         return item in self.__fwd
 
-    def items(self):
+    def items(self) -> ItemsView[KT, VT]:
         return self.__fwd.items()
 
-    def keys(self):
+    def keys(self) -> KeysView[KT]:
         return self.__fwd.keys()
 
-    def values(self):
+    def values(self) -> ValuesView[VT]:
         return self.__fwd.values()
+
+
+#### ordered set ####
+
+
+T = TypeVar('T')
+
+
+class ordered_set(MutableSet[T]):
+
+    def __init__(self, values: Iterable[T] = tuple()):
+        self.__data = {v: None for v in values}
+
+    def __contains__(self, item: T) -> bool:
+        return item in self.__data
+
+    def __iter__(self) -> Iterable[T]:
+        yield from self.__data.keys()
+
+    def __len__(self) -> int:
+        return len(self.__data)
+
+    def __repr__(self):
+        return '{' + ', '.join(self) + '}'
+
+    def __copy__(self):
+        return self.__class__(self)
+
+    def add(self, value: T) -> None:
+        self.__data[value] = None
+
+    def discard(self, value: T) -> None:
+        del self.__data[value]
+
+    def clear(self) -> None:
+        self.__data.clear()

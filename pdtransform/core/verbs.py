@@ -4,6 +4,7 @@ from .expressions import SymbolicExpression
 from .expressions.expression import iterate_over_expr, FunctionCall
 from .expressions.lambda_column import LambdaColumn
 from .table_impl import AbstractTableImpl
+from .utils import ordered_set
 
 
 def check_is_cols_subset(superset: set[Column], subset: set[Column], function_name: str):
@@ -63,7 +64,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
             selects.append(col._name)
     # SELECT
     new_tbl = tbl.copy()
-    new_tbl.selects = { name: None for name in selects }
+    new_tbl.selects = ordered_set(selects)
     new_tbl.select(*args)
     return new_tbl
 
@@ -76,7 +77,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     new_tbl = tbl.copy()
     for name, expr in kwargs.items():
         uid = generate_col_uuid()
-        new_tbl.selects[name] = None
+        new_tbl.selects.add(name)
         new_tbl.named_cols.fwd[name] = uid
         new_tbl.col_expr[uid] = expr
 
@@ -107,17 +108,16 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     new_left = left.copy()
 
     # Update selects
-    right_renamed_selects = { k + '_' + right.name: v for k, v in right.selects.items() }
+    right_renamed_selects = ordered_set(name + '_' + right.name for name in right.selects)
     right_renamed_cols = { k + '_' + right.name: v for k, v in right.named_cols.fwd.items() }
 
-    for k, v in right_renamed_selects.items():
-        if k in new_left.selects:
-            raise Exception
-        new_left.selects[k] = v
+    if not new_left.selects.isdisjoint(right_renamed_selects):
+        raise ValueError('Ambiguous column names: ' + ', '.join(new_left.selects & right_renamed_selects))
+    new_left.selects |= right_renamed_selects
 
     for k,v in right_renamed_cols.items():
         if k in new_left.named_cols.fwd:
-            raise Exception
+            raise ValueError
         new_left.named_cols.fwd[k] = v
 
     new_left.col_expr.update(right.col_expr)

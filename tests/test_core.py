@@ -3,6 +3,7 @@ import pytest
 from pdtransform import λ
 from pdtransform.core import Table, AbstractTableImpl, Column
 from pdtransform.core.dispatchers import inverse_partial, verb, wrap_tables, unwrap_tables
+from pdtransform.core.utils import bidict, ordered_set
 from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange
 
 
@@ -164,6 +165,72 @@ class TestBuiltinVerbs:
             tbl1 >> arrange(tbl1.col1 * 4)
 
 
+class TestDataStructures:
+
+    def test_bidict(self):
+        d = bidict({'a': 1, 'b': 2, 'c': 3})
+
+        assert len(d) == 3
+        assert tuple(d.fwd.keys()) == ('a', 'b', 'c')
+        assert tuple(d.fwd.values()) == (1, 2, 3)
+
+        assert tuple(d.fwd.keys()) == tuple(d.bwd.values())
+        assert tuple(d.bwd.keys()) == tuple(d.fwd.values())
+
+        d.fwd['d'] = 4
+        d.bwd[4] = 'x'
+
+        assert tuple(d.fwd.keys()) == ('a', 'b', 'c', 'x')
+        assert tuple(d.fwd.values()) == (1, 2, 3, 4)
+        assert tuple(d.fwd.keys()) == tuple(d.bwd.values())
+        assert tuple(d.bwd.keys()) == tuple(d.fwd.values())
+
+        assert 'x' in d.fwd
+        assert 'd' not in d.fwd
+
+        d.clear()
+
+        assert len(d) == 0
+        assert len(d.fwd.items()) == len(d.fwd) == 0
+        assert len(d.bwd.items()) == len(d.bwd) == 0
+
+        with pytest.raises(ValueError):
+            bidict({'a': 1, 'b': 1})
+
+    def test_ordered_set(self):
+        s = ordered_set([0, 1, 2])
+        assert list(s) == [0, 1, 2]
+
+        s.add(1)  # Already in set -> Noop
+        assert list(s) == [0, 1, 2]
+        s.add(3)  # Not in set -> add to the end
+        assert list(s) == [0, 1, 2, 3]
+
+        s.remove(1)
+        assert list(s) == [0, 2, 3]
+        s.add(1)
+        assert list(s) == [0, 2, 3, 1]
+
+        assert 1 in s
+        assert 4 not in s
+        assert len(s) == 4
+
+        s.clear()
+        assert len(s) == 0
+        assert list(s) == []
+
+        # Set Operations
+
+        s1 = ordered_set([0, 1, 2, 3])
+        s2 = ordered_set([5, 4, 3, 2])
+
+        assert not s1.isdisjoint(s2)
+        assert list(s1 | s2) == [0, 1, 2, 3, 5, 4]
+        assert list(s1 ^ s2) == [0, 1, 5, 4]
+        assert list(s1 & s2) == [3, 2]
+        assert list(s1 - s2) == [0, 1]
+
+
 class MockTableImpl(AbstractTableImpl):
     def __init__(self, name, col_names):
         super().__init__(name, {
@@ -175,5 +242,5 @@ class MockTableImpl(AbstractTableImpl):
         return expr
 
     def collect(self):
-        return list(self.selects.keys())
+        return list(self.selects)
 

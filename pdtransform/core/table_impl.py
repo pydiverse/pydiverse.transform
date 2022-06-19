@@ -4,8 +4,9 @@ import typing
 
 from .column import Column
 from .expressions.expression import SymbolicExpression
+from .expressions.lambda_column import LambdaColumn
 from .expressions.operator_registry import OperatorRegistry
-from .utils import bidict
+from .utils import bidict, ordered_set
 
 
 class _TableImplMeta(type):
@@ -41,18 +42,20 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         self.columns = columns
         self.available_columns = set(self.columns.values())  # The set of all columns that are accessible to this table. These are the columns that can be used in a symbolic expression.
 
-        # selects: Set of selected names. (This is implemented using a dict with None value to preserve the order)
+        # selects: Ordered set of selected names.
         # named_cols: Map from name to column uuid containing all columns that have been named.
         # col_expr: Map from uuid to the `SymbolicExpression` that corresponds to this column.
         # col_dtype: Map from uuid to the datatype of the corresponding column. It is the responsibility of the backend to keep track of this information.
-        self.selects = {}           # type: dict[str: None]
-        self.named_cols = bidict()  # type: bidict[str: uuid.UUID]
-        self.col_expr = {}          # type: dict[uuid.UUID: SymbolicExpression]
-        self.col_dtype = {}         # type: dict[uuid.UUID: str]
+        self.selects = ordered_set()  # type: ordered_set[str]
+        self.named_cols = bidict()    # type: bidict[str: uuid.UUID]
+        self.col_expr = {}            # type: dict[uuid.UUID: SymbolicExpression]
+        self.col_dtype = {}           # type: dict[uuid.UUID: str]
+
+        self.grouped_by = []          # type: list[Column | LambdaColumn]
 
         # Init Values
         for name, col in columns.items():
-            self.selects[name] = None
+            self.selects.add(name)
             self.named_cols.fwd[name] = col._uuid
             self.col_expr[col._uuid] = col
             self.col_dtype[col._uuid] = col._dtype
@@ -61,7 +64,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         c = copy.copy(self)
         # Copy containers
         for k, v in self.__dict__.items():
-            if isinstance(v, (list, dict, set, bidict)):
+            if isinstance(v, (list, dict, set, bidict, ordered_set)):
                 c.__dict__[k] = copy.copy(v)
 
         return c
@@ -73,7 +76,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         raise KeyError(f"Table '{self.name}' has not column named '{name}'.")
 
     def selected_cols(self) -> typing.Iterable[tuple[str, uuid.UUID]]:
-        for name in self.selects.keys():
+        for name in self.selects:
             yield (name, self.named_cols.fwd[name])
 
     def resolve_lambda_cols(self, expr: SymbolicExpression):
