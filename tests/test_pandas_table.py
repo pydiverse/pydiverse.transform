@@ -4,6 +4,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
+from pdtransform.core.dispatchers import Pipeable
 from pdtransform.core.table import Table
 from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange, alias
 from pdtransform.eager.pandas_table import PandasTableImpl
@@ -45,15 +46,28 @@ def tbl_left():
 def tbl_right():
     return Table(PandasTableImpl('df_right', df_right.copy()))
 
+def assert_not_inplace(tbl: Table[PandasTableImpl], operation: Pipeable):
+    """
+    Operations should not happen in-place. They should always return a new dataframe.
+    """
+    initial = tbl._impl.df.copy()
+    tbl >> operation
+    after = tbl._impl.df
+
+    assert_frame_equal(initial, after)
+
 
 class TestPandasTable:
 
     def test_select(self, tbl1):
+        assert_not_inplace(tbl1, select(tbl1.col1))
         assert_frame_equal(tbl1 >> select(tbl1.col1) >> collect(), df1[['col1']])
         assert_frame_equal(tbl1 >> select(tbl1.col2) >> collect(), df1[['col2']])
         assert_frame_equal(tbl1 >> select() >> collect(), df1[[]])
 
     def test_mutate(self, tbl1):
+        assert_not_inplace(tbl1, mutate(x = tbl1.col1))
+
         assert_frame_equal(
             tbl1 >> mutate(col1times2 = tbl1.col1 * 2) >> collect(),
             pd.DataFrame({
@@ -71,6 +85,8 @@ class TestPandasTable:
         )
 
     def test_join(self, tbl_left, tbl_right):
+        assert_not_inplace(tbl_left, join(tbl_right, tbl_left.a == tbl_right.b, 'left'))
+
         assert_frame_equal(
             tbl_left >> join(tbl_right, tbl_left.a == tbl_right.b, 'left') >> select(tbl_left.a, tbl_right.b) >> collect(),
             pd.DataFrame({
@@ -96,6 +112,8 @@ class TestPandasTable:
         )
 
     def test_filter(self, tbl1, tbl2):
+        assert_not_inplace(tbl1, filter(tbl1.col1 == 3))
+
         # Simple filter expressions
         assert_frame_equal(
             tbl1 >> filter() >> collect(),
@@ -127,6 +145,8 @@ class TestPandasTable:
         )
 
     def test_arrange(self, tbl2):
+        assert_not_inplace(tbl2, arrange(tbl2.col2))
+
         assert_frame_equal(
             tbl2 >> arrange(tbl2.col3) >> select(tbl2.col3) >> collect(),
             df2[['col3']].sort_values('col3', ascending = True, kind = 'mergesort')
@@ -153,6 +173,8 @@ class TestPandasTable:
         )
 
     def test_alias(self, tbl1, tbl2):
+        assert_not_inplace(tbl1, alias('tblxxx'))
+
         x = tbl2 >> alias('x')
         assert(x._impl.name == 'x')
 
