@@ -89,6 +89,9 @@ class OperatorRegistry:
         '__gt__', '__ge__',
     }
 
+    # Set containing all operators that have been defined across all registries.
+    ALL_REGISTERED_OPS = set()  # type: set[str]
+
     def __init__(self, name, super_registry = None):
         self.name = name
         self.super_registry = super_registry
@@ -110,6 +113,7 @@ class OperatorRegistry:
 
         self.implementations[name] = OperatorImplementationStore(name)
         self.check_super[name] = check_super
+        self.ALL_REGISTERED_OPS.add(name)
 
     def add_implementation(self, func, name, signature):
         if name not in self.implementations:

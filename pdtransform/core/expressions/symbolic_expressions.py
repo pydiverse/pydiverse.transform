@@ -36,6 +36,12 @@ class SymbolicExpression(Generic[T]):
     def __repr__(self):
         return f'<Sym: {self._}>'
 
+    def __dir__(self):
+        # TODO: Instead of displaying all available operators, translate the
+        #       expression and according to the dtype and backend only display
+        #       the operators that actually are available.
+        return sorted(OperatorRegistry.ALL_REGISTERED_OPS)
+
     def _repr_html_(self):
         html = f"<pre>Symbolic Expression:\n{escape(repr(self._))}</pre>"
 
