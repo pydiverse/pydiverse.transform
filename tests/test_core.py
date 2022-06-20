@@ -3,6 +3,7 @@ import pytest
 from pdtransform import λ
 from pdtransform.core import Table, AbstractTableImpl, Column
 from pdtransform.core.dispatchers import inverse_partial, verb, wrap_tables, unwrap_tables
+from pdtransform.core.expressions import Translator
 from pdtransform.core.utils import bidict, ordered_set
 from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange
 
@@ -73,8 +74,8 @@ class TestDispatchers:
         assert 5 >> add_10 >> subtract(5) == 10
 
     def test_unwrap_tables(self):
-        impl_1 = AbstractTableImpl('impl_1', dict())
-        impl_2 = AbstractTableImpl('impl_2', dict())
+        impl_1 = MockTableImpl('impl_1', dict())
+        impl_2 = MockTableImpl('impl_2', dict())
         tbl_1 = Table(impl_1)
         tbl_2 = Table(impl_2)
 
@@ -91,8 +92,8 @@ class TestDispatchers:
         assert unwrap_tables( {tbl_1: tbl_1, 15: (15, tbl_2)} ) == {tbl_1: impl_1, 15: (15, impl_2)}
 
     def test_wrap_tables(self):
-        impl_1 = AbstractTableImpl('impl_1', dict())
-        impl_2 = AbstractTableImpl('impl_2', dict())
+        impl_1 = MockTableImpl('impl_1', dict())
+        impl_2 = MockTableImpl('impl_2', dict())
         tbl_1 = Table(impl_1)
         tbl_2 = Table(impl_2)
 
@@ -247,4 +248,7 @@ class MockTableImpl(AbstractTableImpl):
 
     def collect(self):
         return list(self.selects)
+
+    class ExpressionTranslator(Translator):
+        pass
 

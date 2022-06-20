@@ -15,7 +15,6 @@ class SQLTableImpl(LazyTableImpl):
     def __init__(self, engine, table):
         self.engine = sqlalchemy.create_engine(engine) if isinstance(engine, str) else engine
         self.tbl = self._create_table(table, self.engine)
-        self.translator = SQLExpressionTranslator(self)
         # backend = self.engine.url.get_backend_name()
 
         super().__init__(
@@ -36,11 +35,6 @@ class SQLTableImpl(LazyTableImpl):
         self.group_bys = []    # type: list[SymbolicExpression]
         self.having = []       # type: list[SymbolicExpression]
         self.order_bys = []    # type: list[OrderByDescriptor]
-
-    def copy(self):
-        c = super().copy()
-        c.translator = SQLExpressionTranslator(c)
-        return c
 
     @staticmethod
     def _create_table(tbl, engine = None):
@@ -187,35 +181,38 @@ class SQLTableImpl(LazyTableImpl):
         )
 
 
-class SQLExpressionTranslator(Translator[SQLTableImpl]):
+    #### EXPRESSIONS ####
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-    def _translate(self, expr):
-        if isinstance(expr, Column):
-            # Can either be a base SQL column, or a reference to an expression
-            if expr.uuid in self.backend.sql_columns:
-                return TypedValue(self.backend.sql_columns[expr.uuid], expr.dtype)
-            return self.translate(self.backend.col_expr[expr.uuid])
+    class ExpressionTranslator(Translator['SQLTableImpl', TypedValue]):
 
-        if isinstance(expr, FunctionCall):
-            arguments = [arg.value for arg in expr.args]
-            signature = tuple(arg.dtype for arg in expr.args)
-            implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
-            return TypedValue(implementation(*arguments), implementation.rtype)
+        def _translate(self, expr):
+            if isinstance(expr, Column):
+                # Can either be a base SQL column, or a reference to an expression
+                if expr.uuid in self.backend.sql_columns:
+                    return TypedValue(self.backend.sql_columns[expr.uuid], expr.dtype)
+                return self.translate(self.backend.col_expr[expr.uuid])
 
-        # Literals
-        if isinstance(expr, int):
-            return TypedValue(expr, 'int')
-        if isinstance(expr, float):
-            return TypedValue(expr, 'float')
-        if isinstance(expr, str):
-            return TypedValue(expr, 'str')
-        if isinstance(expr, bool):
-            return TypedValue(expr, 'bool')
+            if isinstance(expr, FunctionCall):
+                arguments = [arg.value for arg in expr.args]
+                signature = tuple(arg.dtype for arg in expr.args)
+                implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
+                return TypedValue(implementation(*arguments), implementation.rtype)
 
-        raise NotImplementedError(expr, type(expr))
+            if isinstance(expr, TypedValue):
+                return expr
+
+            # Literals
+            if isinstance(expr, int):
+                return TypedValue(expr, 'int')
+            if isinstance(expr, float):
+                return TypedValue(expr, 'float')
+            if isinstance(expr, str):
+                return TypedValue(expr, 'str')
+            if isinstance(expr, bool):
+                return TypedValue(expr, 'bool')
+
+            raise NotImplementedError(expr, type(expr))
 
 
 from sqlalchemy import func as sqlfunc

@@ -15,8 +15,7 @@ class PandasTableImpl(EagerTableImpl):
 
     def __init__(self, name: str, df: pd.DataFrame):
         self.df = df
-        self.translator = PandasExpressionTranslator(self)
-        self.join_translator = PandasJoinTranslator(self)
+        self.join_translator = self.JoinTranslator(self)
 
         cols = self.df.dtypes.items()
         super().__init__(
@@ -59,12 +58,6 @@ class PandasTableImpl(EagerTableImpl):
         }
 
         return kind_map.get(dtype.kind, str(dtype))
-
-    def copy(self):
-        c = super().copy()
-        # Must create a new translator, so that it can access the current df.
-        c.translator = PandasExpressionTranslator(c)
-        return c
 
     #### Verb Operations ####
 
@@ -132,47 +125,53 @@ class PandasTableImpl(EagerTableImpl):
         self.df = self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort')
 
 
-class PandasExpressionTranslator(Translator[PandasTableImpl]):
-
-    def _translate(self, expr):
-        if isinstance(expr, Column):
-            df_col_name = self.backend.df_name_mapping[expr.uuid]
-            df_col = self.backend.df[df_col_name]
-            return TypedValue(df_col, expr.dtype)
-
-        if isinstance(expr, FunctionCall):
-            arguments = [arg.value for arg in expr.args]
-            signature = tuple(arg.dtype for arg in expr.args)
-            implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
-            return TypedValue(implementation(*arguments), implementation.rtype)
-
-        # Literals
-        if isinstance(expr, int):
-            return TypedValue(expr, 'int')
-        if isinstance(expr, str):
-            return TypedValue(expr, 'str')
-
-        raise NotImplementedError(expr, type(expr))
+    #### EXPRESSIONS ####
 
 
-class PandasJoinTranslator(Translator[PandasTableImpl]):
-    """
-    This translator takes a conjunction (AND) of equality checks and returns
-    a tuple of tuple where the inner tuple contains the left and right column
-    of the equality checks.
-    """
-    def _translate(self, expr):
-        if isinstance(expr, Column):
-            return expr
-        if isinstance(expr, FunctionCall):
-            if expr.operator == '__eq__':
-                c1 = expr.args[0]
-                c2 = expr.args[1]
-                assert(isinstance(c1, Column) and isinstance(c2, Column))
-                return ((c1, c2),)
-            if expr.operator == '__and__':
-                return tuple(itertools.chain(*expr.args))
-        raise Exception(f'Invalid ON clause element: {expr}. Only a conjunction of equalities is supported by pandas (ands of equals).')
+    class ExpressionTranslator(Translator['PandasTableImpl', TypedValue]):
+
+        def _translate(self, expr):
+            if isinstance(expr, Column):
+                df_col_name = self.backend.df_name_mapping[expr.uuid]
+                df_col = self.backend.df[df_col_name]
+                return TypedValue(df_col, expr.dtype)
+
+            if isinstance(expr, FunctionCall):
+                arguments = [arg.value for arg in expr.args]
+                signature = tuple(arg.dtype for arg in expr.args)
+                implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
+                return TypedValue(implementation(*arguments), implementation.rtype)
+
+            if isinstance(expr, TypedValue):
+                return expr
+
+            # Literals
+            if isinstance(expr, int):
+                return TypedValue(expr, 'int')
+            if isinstance(expr, str):
+                return TypedValue(expr, 'str')
+
+            raise NotImplementedError(expr, type(expr))
+
+
+    class JoinTranslator(Translator['PandasTableImpl', tuple]):
+        """
+        This translator takes a conjunction (AND) of equality checks and returns
+        a tuple of tuple where the inner tuple contains the left and right column
+        of the equality checks.
+        """
+        def _translate(self, expr):
+            if isinstance(expr, Column):
+                return expr
+            if isinstance(expr, FunctionCall):
+                if expr.operator == '__eq__':
+                    c1 = expr.args[0]
+                    c2 = expr.args[1]
+                    assert(isinstance(c1, Column) and isinstance(c2, Column))
+                    return ((c1, c2),)
+                if expr.operator == '__and__':
+                    return tuple(itertools.chain(*expr.args))
+            raise Exception(f'Invalid ON clause element: {expr}. Only a conjunction of equalities is supported by pandas (ands of equals).')
 
 
 

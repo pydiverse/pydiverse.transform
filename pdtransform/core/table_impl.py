@@ -4,6 +4,7 @@ import uuid
 
 from .column import Column, LambdaColumn
 from .expressions import OperatorRegistry, SymbolicExpression
+from .expressions.translator import Translator, TypedValue
 from .utils import bidict, ordered_set
 
 
@@ -30,6 +31,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
     operator_registry: OperatorRegistry
 
+    # Inner Class
+    ExpressionTranslator: typing.Type[Translator['AbstractTableImpl', TypedValue]]
+
     def __init__(
             self,
             name: str,
@@ -38,6 +42,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
         self.name = name
         self.columns = columns
+        self.translator = self.ExpressionTranslator(self)
 
         # selects: Ordered set of selected names.
         # named_cols: Map from name to column uuid containing all columns that have been named.
@@ -64,6 +69,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             if isinstance(v, (list, dict, set, bidict, ordered_set)):
                 c.__dict__[k] = copy.copy(v)
 
+        # Must create a new translator, so that it can access the current df.
+        c.translator = self.ExpressionTranslator(c)
         return c
 
     def get_col(self, name: str):
