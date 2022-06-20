@@ -88,6 +88,17 @@ class TestSQLTable:
             })
         )
 
+        # Check proper column referencing
+        t = tbl1 >> mutate(col2 = tbl1.col1, col1 = tbl1.col2) >> select()
+        assert_frame_equal(
+            t >> mutate(x = t.col1, y = t.col2) >> collect(),
+            tbl1 >> select() >> mutate(x = tbl1.col2, y = tbl1.col1) >> collect()
+        )
+        assert_frame_equal(
+            t >> mutate(x = tbl1.col1, y = tbl1.col2) >> collect(),
+            tbl1 >> select() >> mutate(x = tbl1.col1, y = tbl1.col2) >> collect()
+        )
+
     def test_join(self, tbl_left, tbl_right):
         assert_frame_equal(
             tbl_left >> join(tbl_right, tbl_left.a == tbl_right.b, 'left') >> select(tbl_left.a, tbl_right.b) >> collect(),

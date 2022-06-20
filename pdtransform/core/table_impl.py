@@ -38,7 +38,6 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
         self.name = name
         self.columns = columns
-        self.available_columns = set(self.columns.values())  # The set of all columns that are accessible to this table. These are the columns that can be used in a symbolic expression.
 
         # selects: Ordered set of selected names.
         # named_cols: Map from name to column uuid containing all columns that have been named.
@@ -69,8 +68,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
     def get_col(self, name: str):
         """Getter used by `Table.__getattr__`"""
-        if name in self.columns:
-            return self.columns[name]
+        if uuid := self.named_cols.fwd.get(name, None):
+            return Column(name, self, self.col_dtype.get(uuid), uuid)
         raise KeyError(f"Table '{self.name}' has not column named '{name}'.")
 
     def selected_cols(self) -> typing.Iterable[tuple[str, uuid.UUID]]:

@@ -1,4 +1,5 @@
-from typing import Any
+from collections import ChainMap
+from typing import Any, Iterable
 
 from .column import Column, LambdaColumn, generate_col_uuid
 from .dispatchers import builtin_verb
@@ -9,12 +10,17 @@ from .table_impl import AbstractTableImpl
 from .utils import ordered_set
 
 
-def check_is_cols_subset(superset: set[Column], subset: set[Column], function_name: str):
-    if subset.issubset(superset):
-        return
-    missing_columns = subset - superset
-    missing_columns_str = ", ".join(map(lambda x: str(x), missing_columns))
-    raise ValueError(f"Can't access column(s) {missing_columns_str} in {function_name}() because they aren't avaiable in the input.")
+def check_cols_available(tables: AbstractTableImpl | Iterable[AbstractTableImpl], columns: set[Column], function_name: str):
+    if isinstance(tables, AbstractTableImpl):
+        tables = (tables, )
+    available_columns = ChainMap(*(table.col_expr for table in tables))
+    missing_columns = []
+    for col in columns:
+        if col.uuid not in available_columns:
+            missing_columns.append(col)
+    if missing_columns:
+        missing_columns_str = ", ".join(map(lambda x: str(x), missing_columns))
+        raise ValueError(f"Can't access column(s) {missing_columns_str} in {function_name}() because they aren't available in the input.")
 
 def check_lambdas_valid(tbl: AbstractTableImpl, *expressions):
     lambdas = []
@@ -51,7 +57,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
         raise NotImplementedError
 
     # Validate input
-    check_is_cols_subset(tbl.available_columns, cols_in_expressions(args), 'select')
+    check_cols_available(tbl, cols_in_expressions(args), 'select')
     check_lambdas_valid(tbl, *args)
 
     for col in args:
@@ -73,7 +79,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
 @builtin_verb()
 def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     # Check args only contains valid columns
-    check_is_cols_subset(tbl.available_columns, cols_in_expressions(kwargs.values()), 'mutate')
+    check_cols_available(tbl, cols_in_expressions(kwargs.values()), 'mutate')
     kwargs = {k: tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 
     new_tbl = tbl.copy()
@@ -90,17 +96,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
 def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpression, how: str):
     # TODO: Also allow on to be a dictionary
     # Check args only contains valid columns
-    on_cols = cols_in_expression(on)
-    available_cols = left.available_columns | right.available_columns
-    check_is_cols_subset(available_cols, on_cols, 'join')
-
-
-    # Check for name collisions
-    if ambiguous_cols := ({str(c) for c in left.available_columns}
-                        & {str(c) for c in right.available_columns}):
-        ambiguous_cols_str = ', '.join(ambiguous_cols)
-        raise ValueError(f'Ambiguous column name(s): {ambiguous_cols_str}. '
-                         'Make sure that all tables in the join have unique names.')
+    check_cols_available((left, right), cols_in_expression(on), 'join')
 
     if how not in ('inner', 'left', 'outer'):
         raise ValueError(f"Join type must be one of 'inner', 'left' or 'outer' (value provided: {how=})")
@@ -113,18 +109,19 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     right_renamed_selects = ordered_set(name + '_' + right.name for name in right.selects)
     right_renamed_cols = { k + '_' + right.name: v for k, v in right.named_cols.fwd.items() }
 
-    if not new_left.selects.isdisjoint(right_renamed_selects):
-        raise ValueError('Ambiguous column names: ' + ', '.join(new_left.selects & right_renamed_selects))
+    # Check for collisions
+    # TODO: Review...
+    if ambiguous_column_names := new_left.selects & right_renamed_selects:
+        raise ValueError('Ambiguous column names: ' + ', '.join(ambiguous_column_names))
+    if ambiguous_column_names := set(new_left.named_cols.fwd.keys()) & right_renamed_cols.keys():
+        raise ValueError('Ambiguous column names: ' + ', '.join(ambiguous_column_names))
+    if ambiguous_column_uuids := set(new_left.named_cols.fwd.values()) & set(right_renamed_cols.values()):
+        raise ValueError('Ambiguous column uuids: ' + ', '.join(map(str, ambiguous_column_uuids)))
+
     new_left.selects |= right_renamed_selects
-
-    for k,v in right_renamed_cols.items():
-        if k in new_left.named_cols.fwd:
-            raise ValueError
-        new_left.named_cols.fwd[k] = v
-
+    new_left.named_cols.fwd.update(right_renamed_cols)
     new_left.col_expr.update(right.col_expr)
     new_left.col_dtype.update(right.col_dtype)
-    new_left.available_columns.update(right.available_columns)
 
     # By resolving lambdas this late, we enable the user to use lambda columns
     # to reference mutated columns from the right side of the join.
@@ -138,8 +135,7 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
 @builtin_verb()
 def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
     # TODO: Type check expression
-    condition_cols = cols_in_expressions(args)
-    check_is_cols_subset(tbl.available_columns, condition_cols, 'filter')
+    check_cols_available(tbl, cols_in_expressions(args), 'filter')
     args = [tbl.resolve_lambda_cols(arg) for arg in args]
 
     new_tbl = tbl.copy()
@@ -149,7 +145,7 @@ def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
 @builtin_verb()
 def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     # Validate Input
-    check_is_cols_subset(tbl.available_columns, cols_in_expressions(args), 'select')
+    check_cols_available(tbl, cols_in_expressions(args), 'arrange')
     check_lambdas_valid(tbl, *args)
 
     # Determine if ascending or descending

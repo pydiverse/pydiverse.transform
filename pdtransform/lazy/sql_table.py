@@ -194,14 +194,16 @@ class SQLExpressionTranslator(Translator[SQLTableImpl]):
 
     def _translate(self, expr):
         if isinstance(expr, Column):
-            return TypedValue(self.backend.sql_columns[expr.uuid], expr.dtype)
+            # Can either be a base SQL column, or a reference to an expression
+            if expr.uuid in self.backend.sql_columns:
+                return TypedValue(self.backend.sql_columns[expr.uuid], expr.dtype)
+            return self.translate(self.backend.col_expr[expr.uuid])
 
         if isinstance(expr, FunctionCall):
             arguments = [arg.value for arg in expr.args]
             signature = tuple(arg.dtype for arg in expr.args)
             implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
             return TypedValue(implementation(*arguments), implementation.rtype)
-
 
         # Literals
         if isinstance(expr, int):

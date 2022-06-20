@@ -25,6 +25,18 @@ class Column(Generic[ImplT]):
     def __repr__(self):
         return f'<{self.table.name}.{self.name}({self.dtype})>'
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        # TODO: Determine what is the correct way to compare
+        return (self.name == other.name and self.uuid == other.uuid)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.uuid)
+
 
 class LambdaColumn:
     """Anonymous Column

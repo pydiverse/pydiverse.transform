@@ -129,10 +129,10 @@ class TestBuiltinVerbs:
         with pytest.raises(ValueError):
             tbl1 >> mutate(x = tbl2.col1)
 
-        tbl1 >> mutate(x = tbl1.col1 + tbl1.col2)
+        t = tbl1 >> mutate(x = tbl1.col1 + tbl1.col2)
+        t >> mutate(y = t.x)
 
     def test_join(self, tbl1, tbl2):
-        assert (tbl1 >> join(tbl2, tbl1.col1 == tbl2.col1, 'left'))._impl.available_columns == tbl1._impl.available_columns | tbl2._impl.available_columns
         assert len(tbl1 >> join(tbl2, tbl1.col1 == tbl2.col1, 'left') >> collect()) == 5
 
         assert len(tbl1 >> select() >> join(tbl2, tbl1.col1 == tbl2.col1, 'left') >> collect()) == 3
@@ -142,6 +142,10 @@ class TestBuiltinVerbs:
         with pytest.raises(ValueError, match='Ambiguous'):
             # self join without alias
             tbl1 >> join(tbl1, tbl1.col1 == tbl1.col1, 'inner')
+
+        # Test that joined columns are accessible
+        t = tbl1 >> join(tbl2, tbl1.col1 == tbl2.col1, 'left')
+        t >> select(t.col1, t.col1_mock2)
 
     def test_filter(self, tbl1, tbl2):
         tbl1 >> filter()
