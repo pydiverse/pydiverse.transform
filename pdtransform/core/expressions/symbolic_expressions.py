@@ -1,6 +1,8 @@
+from html import escape
 from typing import Any, Generic, TypeVar
 
-from . import expressions
+from pdtransform.core import column
+from . import expressions, utils, translator
 from .operator_registry import OperatorRegistry
 
 T = TypeVar('T')
@@ -20,6 +22,12 @@ class SymbolicExpression(Generic[T]):
         self._ = underlying
 
     def __getattr__(self, item):
+        if item.startswith('_') and item.endswith('_') and len(item) >= 3:
+            # Attribute names can't begin and end with an underscore because
+            # IPython calls hasattr() to select the correct pretty printing
+            # function. Instead of hard coding a specific list, just throw
+            # an exception for all attributes that match the general pattern.
+            raise AttributeError(f"Invalid attribute {item}. Attributes can't begin and end with an underscore.")
         return SymbolAttribute(item, self)
 
     def __getitem__(self, item):
@@ -27,6 +35,34 @@ class SymbolicExpression(Generic[T]):
 
     def __repr__(self):
         return f'<Sym: {self._}>'
+
+    def _repr_html_(self):
+        html = f"<pre>Symbolic Expression:\n{escape(repr(self._))}</pre>"
+
+        try:
+            # Get Backend
+            backend = None
+            for item in utils.iterate_over_expr(self._):
+                if isinstance(item, column.Column):
+                    if backend is None:
+                        backend = type(item.table)
+                    elif type(item.table) != backend:
+                        raise Exception(f"Can't mix different backends: {backend}, {type(item.table)}")
+            if backend is None:
+                raise ValueError('Failed to determine backend.')
+
+            # Translate each column in the context of its own table
+            base_translation = translator.bottom_up_replace(self._, lambda e: e.table.translator.translate(e) if isinstance(e, column.Column) else e)
+            # Evaluate the function calls on the shared backend
+            result = backend.ExpressionTranslator(backend).translate(base_translation)
+            value_repr = backend._html_repr_expr(result.value)
+            html += f"dtype: <code>{escape(result.dtype)}</code></br></br>"
+            html += f"<pre>{escape(value_repr)}</pre>"
+        except Exception as e:
+            html += f"</br><pre>Failed to get evaluate due to an exception:\n" \
+                    f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
+
+        return html
 
 
 class SymbolAttribute:
@@ -42,6 +78,13 @@ class SymbolAttribute:
 
     def __hash__(self):
         raise Exception(f"Nope... You probably didn't want to do this. Did you misspell the attribute name '{self.__name}' of '{self.__on}'? Maybe you forgot a leading underscore.")
+
+
+class ReprHTMLTranslator(translator.Translator):
+    def _translate(self, expr):
+        if isinstance(expr, column.Column):
+            return expr.table.translator.translate(expr)
+        return expr
 
 
 def unwrap_symbolic_expressions(arg: Any = None):

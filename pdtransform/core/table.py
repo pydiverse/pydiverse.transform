@@ -1,5 +1,6 @@
 import itertools
 from typing import Generic, Iterable, TypeVar
+from html import escape
 
 import pdtransform.core.verbs as verbs
 from pdtransform.core.column import Column, LambdaColumn
@@ -39,9 +40,6 @@ class Table(Generic[ImplT]):
     def __getattr__(self, name) -> SymbolicExpression[Column]:
         return SymbolicExpression(self._impl.get_col(name))
 
-    def __dir__(self):
-        return itertools.chain(self._impl.columns.keys(), ('_impl', ))
-
     def __iter__(self) -> Iterable[SymbolicExpression[LambdaColumn]]:
         return iter(SymbolicExpression(LambdaColumn(name)) for name, _ in self._impl.selected_cols())
 
@@ -53,3 +51,15 @@ class Table(Generic[ImplT]):
 
     def __hash__(self):
         return hash(self._impl)
+
+    def __dir__(self):
+        return sorted(self._impl.named_cols.fwd.keys())
+
+    def _repr_html_(self) -> str | None:
+        html = f"Table <code>{self._impl.name}</code> using <code>{self._impl.__class__.__name__}</code> backend:</br>"
+        try:
+            html += (self >> verbs.collect())._repr_html_()
+        except Exception as e:
+            html += f"</br><pre>Failed to collect table due to an exception:\n" \
+                    f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
+        return html

@@ -1,4 +1,4 @@
-from .expressions import FunctionCall
+from . import expressions
 
 
 def iterate_over_expr(expr):
@@ -7,6 +7,6 @@ def iterate_over_expr(expr):
     """
 
     yield expr
-    if isinstance(expr, FunctionCall):
+    if isinstance(expr, expressions.FunctionCall):
         for child in expr.iter_children():
             yield from iterate_over_expr(child)

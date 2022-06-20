@@ -77,7 +77,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         """Getter used by `Table.__getattr__`"""
         if uuid := self.named_cols.fwd.get(name, None):
             return Column(name, self, self.col_dtype.get(uuid), uuid)
-        raise KeyError(f"Table '{self.name}' has not column named '{name}'.")
+        # Must return AttributeError, else `hasattr` doesn't work on Table instances.
+        raise AttributeError(f"Table '{self.name}' has not column named '{name}'.")
 
     def selected_cols(self) -> typing.Iterable[tuple[str, uuid.UUID]]:
         for name in self.selects:
@@ -85,6 +86,14 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
     def resolve_lambda_cols(self, expr: typing.Any):
         raise NotImplementedError
+
+    @classmethod
+    def _html_repr_expr(cls, expr):
+        """
+        Return an appropriate string to display an expression from this backend.
+        This is mainly used to IPython.
+        """
+        return repr(expr)
 
     #### Verb Callbacks ####
 

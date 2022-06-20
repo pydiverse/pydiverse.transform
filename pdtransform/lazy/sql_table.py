@@ -36,6 +36,12 @@ class SQLTableImpl(LazyTableImpl):
         self.having = []       # type: list[SymbolicExpression]
         self.order_bys = []    # type: list[OrderByDescriptor]
 
+    @classmethod
+    def _html_repr_expr(cls, expr):
+        if isinstance(expr, sqlalchemy.sql.expression.ColumnElement):
+            return str(expr.compile(compile_kwargs = {'literal_binds': True}))
+        return super()._html_repr_expr(expr)
+
     @staticmethod
     def _create_table(tbl, engine = None):
         """Return a sqlalchemy.Table

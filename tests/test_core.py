@@ -24,7 +24,7 @@ class TestTable:
         assert tbl1.col1 == tbl1._impl.columns['col1']
         assert tbl1.col2 == tbl1._impl.columns['col2']
 
-        with pytest.raises(KeyError, match = 'colXXX'):
+        with pytest.raises(AttributeError, match = 'colXXX'):
             _ = tbl1.colXXX
 
     def test_getitem(self, tbl1):
@@ -46,6 +46,10 @@ class TestTable:
         assert list(tbl2 >> select(tbl2.col2)) == [λ.col2]
 
         assert list(tbl1 >> join(tbl2 >> select(tbl2.col3), tbl1.col1 == tbl2.col2, 'left')) == [λ.col1, λ.col2, λ.col3_mock2]
+
+    def test_dir(self, tbl1):
+        assert dir(tbl1) == ['col1', 'col2']
+        assert dir(tbl1 >> mutate(x = tbl1.col1)) == ['col1', 'col2', 'x']
 
 
 class TestDispatchers:
