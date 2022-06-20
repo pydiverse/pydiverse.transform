@@ -38,7 +38,7 @@ class SymbolAttribute:
         return SymbolAttribute(self.__name + '.' + item, self.__on)
 
     def __call__(self, *args, **kwargs):
-        return expressions.FunctionCall(self.__name, self.__on, *args, **kwargs)
+        return SymbolicExpression(expressions.FunctionCall(self.__name, self.__on, *args, **kwargs))
 
     def __hash__(self):
         raise Exception(f"Nope... You probably didn't want to do this. Did you misspell the attribute name '{self.__name}' of '{self.__on}'? Maybe you forgot a leading underscore.")
