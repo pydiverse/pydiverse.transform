@@ -3,7 +3,7 @@ import typing
 import uuid
 
 from .column import Column, LambdaColumn
-from .expressions import OperatorRegistry, SymbolicExpression
+from .expressions import FunctionCall, OperatorRegistry, SymbolicExpression
 from .expressions.translator import Translator, TypedValue
 from .utils import bidict, ordered_set
 
@@ -49,12 +49,12 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         # named_cols: Map from name to column uuid containing all columns that have been named.
         # col_expr: Map from uuid to the `SymbolicExpression` that corresponds to this column.
         # col_dtype: Map from uuid to the datatype of the corresponding column. It is the responsibility of the backend to keep track of this information.
-        self.selects = ordered_set()  # type: ordered_set[str]
-        self.named_cols = bidict()    # type: bidict[str: uuid.UUID]
-        self.col_expr = {}            # type: dict[uuid.UUID: SymbolicExpression]
-        self.col_dtype = {}           # type: dict[uuid.UUID: str]
+        self.selects = ordered_set()       # type: ordered_set[str]
+        self.named_cols = bidict()         # type: bidict[str: uuid.UUID]
+        self.col_expr = {}                 # type: dict[uuid.UUID: SymbolicExpression]
+        self.col_dtype = {}                # type: dict[uuid.UUID: str]
 
-        self.grouped_by = []          # type: list[Column | LambdaColumn]
+        self.grouped_by = ordered_set()    # type: ordered_set[Column]
 
         # Init Values
         for name, col in columns.items():
@@ -118,6 +118,15 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         ...
 
     def arrange(self, ordering: list[tuple[SymbolicExpression, bool]]):
+        ...
+
+    def group_by(self, *args):
+        ...
+
+    def ungroup(self, *args):
+        ...
+
+    def summarise(self, **kwargs):
         ...
 
     #### Symbolic Operators ####

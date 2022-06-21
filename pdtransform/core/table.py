@@ -1,4 +1,3 @@
-import itertools
 from typing import Generic, Iterable, TypeVar
 from html import escape
 
@@ -58,6 +57,7 @@ class Table(Generic[ImplT]):
     def _repr_html_(self) -> str | None:
         html = f"Table <code>{self._impl.name}</code> using <code>{self._impl.__class__.__name__}</code> backend:</br>"
         try:
+            # TODO: For lazy backend only show preview (eg. take first 20 rows)
             html += (self >> verbs.collect())._repr_html_()
         except Exception as e:
             html += f"</br><pre>Failed to collect table due to an exception:\n" \

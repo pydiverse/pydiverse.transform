@@ -110,6 +110,11 @@ class SQLTableImpl(LazyTableImpl):
             assert(where_dtype == 'bool')
             select = select.where(where)
 
+        # GROUP BY
+        if self.group_bys:
+            group_bys, group_by_dtypes = zip(*(self.translator.translate(group_by) for group_by in self.group_bys))
+            select = select.group_by(*group_bys)
+
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
         named_cols = { name: self.col_expr[uuid] for name, uuid in self.selected_cols() }
@@ -131,6 +136,7 @@ class SQLTableImpl(LazyTableImpl):
     #### Verb Operations ####
 
     def alias(self, name):
+        # TODO: If the table has not been modified, a simple `.alias()` would produce nicer queries.
         subquery = self.build_query().subquery(name=name)
         return self.__class__(self.engine, subquery)
 
@@ -179,6 +185,17 @@ class SQLTableImpl(LazyTableImpl):
         order_by = [OrderByDescriptor(col, ascending, False) for col, ascending in ordering]
         self.order_bys = order_by + self.order_bys
 
+    def summarise(self, **kwargs):
+        # Also: Because we reduce the number of rows in the output to one per group, only summarised data and the
+        # group keys will be available after the group by -> clear selection and throw away everything that isn't a
+        # summarised value or a grouping key.
+
+        if self.group_bys and self.group_bys != list(self.grouped_by):
+            # TODO: Implement automatic summarise subqueries
+            raise NotImplementedError("Can't yet automatically make subqueries.")
+
+        self.group_bys = list(self.grouped_by)
+
     def query_string(self):
         query = self.build_query()
         return query.compile(
@@ -186,9 +203,7 @@ class SQLTableImpl(LazyTableImpl):
             compile_kwargs = {"literal_binds": True}
         )
 
-
     #### EXPRESSIONS ####
-
 
     class ExpressionTranslator(Translator['SQLTableImpl', TypedValue]):
 
@@ -221,6 +236,9 @@ class SQLTableImpl(LazyTableImpl):
             raise NotImplementedError(expr, type(expr))
 
 
+#### BACKEND SPECIFIC OPERATORS ################################################
+
+
 from sqlalchemy import func as sqlfunc
 from sqlalchemy import sql
 
@@ -233,3 +251,21 @@ def _floordiv(x, y):
 def _floordiv(x, y):
     return _floordiv(y, x)
 
+#### Summarising Functions ####
+
+@SQLTableImpl.op('mean', 'int |> float')
+@SQLTableImpl.op('mean', 'float |> float')
+def _mean(x):
+    return sqlfunc.avg(x)
+
+@SQLTableImpl.op('min', 'int |> float')
+@SQLTableImpl.op('min', 'float |> float')
+@SQLTableImpl.op('min', 'str |> str')
+def _min(x):
+    return sqlfunc.min(x)
+
+@SQLTableImpl.op('max', 'int |> float')
+@SQLTableImpl.op('max', 'float |> float')
+@SQLTableImpl.op('max', 'str |> str')
+def _max(x):
+    return sqlfunc.max(x)

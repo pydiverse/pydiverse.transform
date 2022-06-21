@@ -167,3 +167,65 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     new_tbl = tbl.copy()
     new_tbl.arrange(ordering)
     return new_tbl
+
+@builtin_verb()
+def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add = False):
+    # Validate Input
+    check_cols_available(tbl, cols_in_expressions(args), 'group_by')
+    check_lambdas_valid(tbl, *args)
+
+    # WARNING: Depending on the SQL backend, you might only be allowed to reference columns
+    if not args:
+        raise ValueError("Expected columns to group by, but none were specified. To remove the grouping use the ungroup verb instead.")
+    for col in args:
+        if not isinstance(col, (Column, LambdaColumn)):
+            raise ValueError(f"Arguments to group_by verb must be of type 'Column' or 'LambdaColumn' and not '{type(col)}'.")
+
+    args = [tbl.resolve_lambda_cols(arg) for arg in args]
+
+    new_tbl = tbl.copy()
+    if add:
+        new_tbl.grouped_by |= ordered_set(args)
+    else:
+        new_tbl.grouped_by = ordered_set(args)
+    new_tbl.group_by(*args)
+    return new_tbl
+
+@builtin_verb()
+def ungroup(tbl: AbstractTableImpl):
+    """ Remove all groupings from table. """
+    new_tbl = tbl.copy()
+    new_tbl.grouped_by.clear()
+    new_tbl.ungroup()
+    return new_tbl
+
+@builtin_verb()
+def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
+    # Validate Input
+    check_cols_available(tbl, cols_in_expressions(kwargs.values()), 'summarise')
+    kwargs = {k: tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
+
+    # TODO: Validate that the functions are actually aggregating functions.
+    ...
+
+    # TODO: If it is a summary on the same grouping level as a previous summary
+    #       operation, then don't reset the selects.
+    # Update selects -> grouping cols + kwargs
+    new_tbl = tbl.copy()
+    selects = []
+
+    # TODO: Can they be unselected? -> Check backends
+    for col in new_tbl.grouped_by:
+        selects.append(new_tbl.named_cols.bwd[col.uuid])
+
+    for name, expr in kwargs.items():
+        if name in selects:
+            raise ValueError(f"Column with name '{name}' already in select. The new summarised columns must have a different name than the grouping columns.")
+        uid = generate_col_uuid()
+        selects.append(name)
+        new_tbl.named_cols.fwd[name] = uid
+        new_tbl.col_expr[uid] = expr
+
+    new_tbl.selects = ordered_set(selects)
+    new_tbl.summarise(**kwargs)
+    return new_tbl

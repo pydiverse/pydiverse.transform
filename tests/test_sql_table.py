@@ -6,7 +6,7 @@ from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
 from pdtransform.core.table import Table
-from pdtransform.core.verbs import alias, arrange, collect, filter, join, mutate, select
+from pdtransform.core.verbs import alias, arrange, collect, filter, group_by, join, mutate, select, summarise, ungroup
 from pdtransform.lazy.sql_table import SQLTableImpl
 from pdtransform.lazy.verbs import show_query
 
@@ -19,6 +19,14 @@ df2 = pd.DataFrame({
     'col1': [1, 2, 2, 4, 5, 6],
     'col2': [2, 2, 0, 0, 2, None],
     'col3': [0.0, 0.1, 0.2, 0.3, 0.01, 0.02],
+})
+
+df3 = pd.DataFrame({
+    'col1': [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2],
+    'col2': [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+    'col3': [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+    'col4': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11],
+    'col5': list('abcdefghijkl')
 })
 
 df_left = pd.DataFrame({
@@ -35,6 +43,7 @@ def engine():
     engine = sqlalchemy.create_engine('sqlite:///:memory:')
     df1.to_sql('df1', engine, index = False, if_exists = 'replace')
     df2.to_sql('df2', engine, index = False, if_exists = 'replace')
+    df3.to_sql('df3', engine, index = False, if_exists = 'replace')
     df_left.to_sql('df_left', engine, index = False, if_exists = 'replace')
     df_right.to_sql('df_right', engine, index = False, if_exists = 'replace')
     return engine
@@ -46,6 +55,11 @@ def tbl1(engine):
 @pytest.fixture
 def tbl2(engine):
     return Table(SQLTableImpl(engine, 'df2'))
+
+@pytest.fixture
+def tbl3(engine):
+    return Table(SQLTableImpl(engine, 'df3'))
+
 
 @pytest.fixture
 def tbl_left(engine):
@@ -182,6 +196,54 @@ class TestSQLTable:
         assert_frame_equal(
             tbl2 >> arrange(--tbl2.col3) >> collect(),
             tbl2 >> arrange(tbl2.col3) >> collect()
+        )
+
+    def test_summarise(self, tbl3):
+        assert_frame_equal(
+            tbl3 >> summarise(mean = tbl3.col1.mean(), max = tbl3.col4.max()) >> collect(),
+            pd.DataFrame({
+                'mean': [1.0],
+                'max': [11]
+            })
+        )
+
+        assert_frame_equal(
+            tbl3 >> group_by(tbl3.col1) >> summarise(mean = tbl3.col4.mean()) >> collect(),
+            pd.DataFrame({
+                'col1': [0, 1, 2],
+                'mean': [1.5, 5.5, 9.5]
+            })
+        )
+
+        assert_frame_equal(
+            tbl3 >> summarise(mean = tbl3.col4.mean()) >> mutate(mean_2x = λ.mean * 2) >> collect(),
+            pd.DataFrame({
+                'mean': [5.5],
+                'mean_2x': [11.0]
+            })
+        )
+
+    def test_group_by(self, tbl3):
+        # Grouping doesn't change the result
+        assert_frame_equal(
+            tbl3 >> group_by(tbl3.col1) >> collect(),
+            tbl3 >> collect()
+        )
+        assert_frame_equal(
+            tbl3 >> summarise(mean4 = tbl3.col4.mean()) >> group_by(tbl3.col1) >> collect(),
+            tbl3 >> summarise(mean4 = tbl3.col4.mean()) >> collect()
+        )
+
+        # Groupings can be added
+        assert_frame_equal(
+            tbl3 >> group_by(tbl3.col1) >> group_by(tbl3.col2, add=True) >> summarise(mean3 = tbl3.col3.mean(), mean4 = tbl3.col4.mean()) >> collect(),
+            tbl3 >> group_by(tbl3.col1, tbl3.col2) >> summarise(mean3 = tbl3.col3.mean(), mean4 = tbl3.col4.mean()) >> collect()
+        )
+
+        # Ungroup doesn't change the result
+        assert_frame_equal(
+            tbl3 >> group_by(tbl3.col1) >> summarise(mean4 = tbl3.col4.mean()) >> ungroup() >> collect(),
+            tbl3 >> group_by(tbl3.col1) >> summarise(mean4 = tbl3.col4.mean()) >> collect()
         )
 
     def test_alias(self, tbl1, tbl2):
