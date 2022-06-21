@@ -1,5 +1,3 @@
-from pdtransform.core.column import Column, LambdaColumn
-from pdtransform.core.expressions import Translator
 from pdtransform.core.table_impl import AbstractTableImpl
 
 
@@ -9,30 +7,4 @@ def uuid_to_str(_uuid):
 
 
 class EagerTableImpl(AbstractTableImpl):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.lambda_translator = EagerLambdaTranslator(self)
-
-    def copy(self):
-        c = super().copy()
-        c.lambda_translator = EagerLambdaTranslator(c)
-        return c
-
-    def resolve_lambda_cols(self, expr):
-        return self.lambda_translator.translate(expr)
-
-
-class EagerLambdaTranslator(Translator):
-    def _translate(self, expr):
-        # Resolve lambda and return Column object
-        if isinstance(expr, LambdaColumn):
-            uuid = self.backend.named_cols.fwd[expr.name]
-            dtype = self.backend.col_dtype[uuid]
-
-            return Column(
-                name = 'λ_' + expr.name,
-                table = self.backend,
-                dtype = dtype,
-                uuid = uuid
-            )
-        return expr
+    pass

@@ -43,6 +43,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         self.name = name
         self.columns = columns
         self.translator = self.ExpressionTranslator(self)
+        self.lambda_translator = self.LambdaTranslator(self)
 
         # selects: Ordered set of selected names.
         # named_cols: Map from name to column uuid containing all columns that have been named.
@@ -71,6 +72,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
         # Must create a new translator, so that it can access the current df.
         c.translator = self.ExpressionTranslator(c)
+        c.lambda_translator = self.LambdaTranslator(c)
         return c
 
     def get_col(self, name: str):
@@ -85,7 +87,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             yield (name, self.named_cols.fwd[name])
 
     def resolve_lambda_cols(self, expr: typing.Any):
-        raise NotImplementedError
+        return self.lambda_translator.translate(expr)
 
     @classmethod
     def _html_repr_expr(cls, expr):
@@ -139,6 +141,24 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             return func
         return decorator
 
+    #### Expressions ####
+
+    class LambdaTranslator(Translator):
+        def _translate(self, expr):
+            # Resolve lambda and return Column object
+            if isinstance(expr, LambdaColumn):
+                if expr.name not in self.backend.named_cols.fwd:
+                    raise ValueError(f"Invalid lambda column '{expr.name}. No column with this name found for table '{self.backend.named_cols}'.'")
+                uuid = self.backend.named_cols.fwd[expr.name]
+                dtype = self.backend.col_dtype.get(uuid)
+
+                return Column(
+                    name = expr.name,
+                    table = self.backend,
+                    dtype = dtype,
+                    uuid = uuid
+                )
+            return expr
 
 #### ARITHMETIC OPERATORS ######################################################
 
