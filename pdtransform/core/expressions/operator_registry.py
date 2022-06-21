@@ -50,13 +50,15 @@ class TypedOperatorImpl:
     name: str
     func: typing.Callable
     rtype: str
+    f_type: str
 
     @classmethod
     def from_operator_impl(cls, impl: OperatorImpl, rtype: str):
         return cls(
             name = impl.name,
             func = impl.func,
-            rtype = rtype
+            rtype = rtype,
+            f_type = impl.signature.f_type
         )
 
     def __call__(self, *args, **kwargs):
@@ -96,6 +98,7 @@ class OperatorRegistry:
         self.name = name
         self.super_registry = super_registry
         self.implementations = dict()  # type: dict[str, 'OperationImplementationStore']
+        self.f_types = dict()  # type: dict[str, str]
         self.check_super = dict()  # type: dict[str, bool]
 
     def register_op(self, name: str, check_super: bool = False):
@@ -111,6 +114,15 @@ class OperatorRegistry:
         if name in self.implementations:
             warnings.warn(f"Operator '{name}' already registered in operator registry '{self.name}'. All previous implementation will be deleted.")
 
+        if self.check_super:
+            super_f_type = None
+            s = self.super_registry
+            while s is not None and super_f_type is None:
+                super_f_type = s.f_types.get(name, None)
+                s = s.super_registry
+            if super_f_type:
+                self.f_types[name] = super_f_type
+
         self.implementations[name] = OperatorImplementationStore(name)
         self.check_super[name] = check_super
         self.ALL_REGISTERED_OPS.add(name)
@@ -121,6 +133,13 @@ class OperatorRegistry:
             self.register_op(name, check_super = True)
 
         signature = OperatorSignature.parse(signature)
+
+        if expected_f_type := self.f_types.get(name):
+            if signature.f_type != expected_f_type:
+                raise ValueError(f"Inconsistent function type for operator '{name}'. Expected {expected_f_type} but got {signature.f_type} instead.")
+        else:
+            self.f_types[name] = signature.f_type
+
         implementation_store = self.implementations[name]
         implementation_store.add_implementation(OperatorImpl(func, name, signature))
 
@@ -140,8 +159,10 @@ class OperatorSignature:
     """
     Specification:
 
-        signature ::= arguments "->" rtype
-        arguments :: (dtype ",")* terminal_arg
+        signature ::= scalar_func | aggregate_func
+        scalar_func ::= arguments "->" rtype
+        aggregate_func ::= arguments "|>" rtype
+        arguments ::= (dtype ",")* terminal_arg
         terminal_arg ::= dtype | vararg
         vararg ::= dtype "..."
         rtype ::= dtype
@@ -153,6 +174,9 @@ class OperatorSignature:
         Function that takes two integers and returns an integer:
             int, int -> int
 
+        Aggregate function that takes in a set of integers and returns a single integer:
+            int |> int
+
         Templated argument (templates consist of single uppercase characters):
             T, T -> T
             T, U -> bool
@@ -160,14 +184,22 @@ class OperatorSignature:
         Variable number of arguments:
             int... -> int
 
+
     TODO: Extend syntax.
         - Nullability:         int? -> bool
     """
 
-    def __init__(self, args: tuple[str], rtype: str):
+    def __init__(self, args: tuple[str], rtype: str, f_type: str):
+        """
+        :param args: Tuple of argument types.
+        :param rtype: The return type.
+        :param f_type: Function type. Can either be 's' or 'a' which stands for
+                       scalar and aggregate respectively.
+        """
         assert(len(args) > 0)
         self.args = args
         self.rtype = rtype
+        self.f_type = f_type
 
     @classmethod
     def parse(cls, signature: str) -> 'OperatorSignature':
@@ -178,7 +210,21 @@ class OperatorSignature:
             types = [t for t in types if t]
             return types
 
-        arg_sig, r_sig = signature.split('->')
+        # Get function type
+        f_type = None
+        arrow = None
+        if '->' in signature:
+            f_type = 's'
+            arrow = '->'
+        if '|>' in signature:
+            if arrow is not None: raise ValueError('Invalid signature: two different types of arrows.')
+            f_type = 'a'
+            arrow = '|>'
+
+        if arrow is None:
+            raise ValueError('Invalid signature: arrow missing.')
+
+        arg_sig, r_sig = signature.split(arrow)
         args = parse_cstypes(arg_sig)
         rtype = parse_cstypes(r_sig)
 
@@ -216,19 +262,21 @@ class OperatorSignature:
 
         return OperatorSignature(
             args = tuple(args),
-            rtype = rtype
+            rtype = rtype,
+            f_type = f_type
         )
 
     def __repr__(self):
-        return f"{ ', '.join(self.args)} -> {self.rtype}"
+        arrow = {'s': '->', 'a': '|>'}
+        return f"{ ', '.join(self.args)} {arrow[self.f_type]} {self.rtype}"
 
     def __hash__(self):
-        return hash((self.args, self.rtype))
+        return hash((self.args, self.rtype, self.f_type))
 
     def __eq__(self, other):
         if not isinstance(other, OperatorSignature):
             return False
-        return self.args == other.args and self.rtype == other.rtype
+        return self.args == other.args and self.rtype == other.rtype and self.f_type == other.f_type
 
 
 def is_template_type(s: str) -> bool:

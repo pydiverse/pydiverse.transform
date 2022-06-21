@@ -42,6 +42,17 @@ class TestOperatorSignature:
         with pytest.raises(ValueError):
             OperatorSignature.parse('int, str -> int...')
 
+    def test_parse_f_type(self):
+        assert OperatorSignature.parse('int -> int').f_type == 's'
+        assert OperatorSignature.parse('int |> int').f_type == 'a'
+
+        with pytest.raises(ValueError):
+            OperatorSignature.parse('int -|> int')
+        with pytest.raises(ValueError):
+            OperatorSignature.parse('int ->> int')
+        with pytest.raises(ValueError):
+            OperatorSignature.parse('int |>|> int')
+
 
 class TestOperatorRegistry:
 
@@ -97,9 +108,9 @@ class TestOperatorRegistry:
         with pytest.raises(ValueError, match = 'already defined.'):
             reg.add_implementation(4, 'y', 'int, T, U -> U')
 
-        assert reg.get_implementation('y', ('str', )) == TypedOperatorImpl('y', 1, 'str')
-        assert reg.get_implementation('y', ('int', 'int', 'float')) == TypedOperatorImpl('y', 2, 'int')
-        assert reg.get_implementation('y', ('str', 'int', 'float')) == TypedOperatorImpl('y', 3, 'float')
+        assert reg.get_implementation('y', ('str', )) == TypedOperatorImpl('y', 1, 'str', 's')
+        assert reg.get_implementation('y', ('int', 'int', 'float')) == TypedOperatorImpl('y', 2, 'int', 's')
+        assert reg.get_implementation('y', ('str', 'int', 'float')) == TypedOperatorImpl('y', 3, 'float', 's')
 
     def test_vararg(self):
         reg = OperatorRegistry('TestRegistry')
@@ -110,4 +121,11 @@ class TestOperatorRegistry:
         assert reg.get_implementation('x', ('int',)).func == 1
         assert reg.get_implementation('x', ('int', 'int')).func == 2
         assert reg.get_implementation('x', ('int', 'int', 'int')).func == 2
-        assert reg.get_implementation('x', ('int', 'str', 'str')) == TypedOperatorImpl('x', 3, 'str')
+        assert reg.get_implementation('x', ('int', 'str', 'str')) == TypedOperatorImpl('x', 3, 'str', 's')
+
+    def test_f_type(self):
+        reg = OperatorRegistry('TestRegistry')
+        reg.add_implementation(1, 'x', 'int -> int')
+
+        with pytest.raises(ValueError):
+            reg.add_implementation(1, 'x', 'int |> int')
