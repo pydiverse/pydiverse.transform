@@ -21,8 +21,8 @@ def tbl2():
 class TestTable:
 
     def test_getattr(self, tbl1):
-        assert tbl1.col1 == tbl1._impl.columns['col1']
-        assert tbl1.col2 == tbl1._impl.columns['col2']
+        assert tbl1.col1._.name == 'col1'
+        assert tbl1.col2._.table == tbl1._impl
 
         with pytest.raises(AttributeError, match = 'colXXX'):
             _ = tbl1.colXXX
@@ -238,6 +238,14 @@ class TestDataStructures:
         assert list(s1 ^ s2) == [0, 1, 5, 4]
         assert list(s1 & s2) == [3, 2]
         assert list(s1 - s2) == [0, 1]
+
+        # Pop order
+
+        s = ordered_set([0, 1, 2, 3])
+        assert s.pop() == 0
+        assert s.pop() == 1
+        assert s.pop_back() == 3
+        assert s.pop_back() == 2
 
 
 class MockTableImpl(AbstractTableImpl):

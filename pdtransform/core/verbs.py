@@ -7,13 +7,13 @@ from .expressions import FunctionCall
 from .expressions import SymbolicExpression
 from .expressions.utils import iterate_over_expr
 from .table_impl import AbstractTableImpl
-from .utils import ordered_set
+from .utils import ordered_set, bidict
 
 
 def check_cols_available(tables: AbstractTableImpl | Iterable[AbstractTableImpl], columns: set[Column], function_name: str):
     if isinstance(tables, AbstractTableImpl):
         tables = (tables, )
-    available_columns = ChainMap(*(table.col_expr for table in tables))
+    available_columns = ChainMap(*(table.available_cols for table in tables))
     missing_columns = []
     for col in columns:
         if col.uuid not in available_columns:
@@ -87,6 +87,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         uid = generate_col_uuid()
         new_tbl.selects.add(name)
         new_tbl.named_cols.fwd[name] = uid
+        new_tbl.available_cols.add(uid)
         new_tbl.col_expr[uid] = expr
 
     new_tbl.mutate(**kwargs)
@@ -120,6 +121,7 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
 
     new_left.selects |= right_renamed_selects
     new_left.named_cols.fwd.update(right_renamed_cols)
+    new_left.available_cols.update(right.available_cols)
     new_left.col_expr.update(right.col_expr)
     new_left.col_dtype.update(right.col_dtype)
 
@@ -203,29 +205,51 @@ def ungroup(tbl: AbstractTableImpl):
 def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     # Validate Input
     check_cols_available(tbl, cols_in_expressions(kwargs.values()), 'summarise')
-    kwargs = {k: tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
+
+    new_tbl = tbl.copy()
+    new_tbl.pre_summarise()
+
+    kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 
     # TODO: Validate that the functions are actually aggregating functions.
     ...
 
-    # TODO: If it is a summary on the same grouping level as a previous summary
-    #       operation, then don't reset the selects.
-    # Update selects -> grouping cols + kwargs
-    new_tbl = tbl.copy()
-    selects = []
+    # Calculate state for new table
+    selects = ordered_set()
+    named_cols = bidict()
+    available_cols = set()
+    col_expr = {}
 
-    # TODO: Can they be unselected? -> Check backends
-    for col in new_tbl.grouped_by:
-        selects.append(new_tbl.named_cols.bwd[col.uuid])
+    # Add grouping cols to beginning of select.
+    for col in tbl.grouped_by:
+        selects.add(tbl.named_cols.bwd[col.uuid])
+        available_cols.add(col.uuid)
+        named_cols.fwd[col.name] = col.uuid
 
+    # Add summarizing cols to the end of the select.
     for name, expr in kwargs.items():
         if name in selects:
             raise ValueError(f"Column with name '{name}' already in select. The new summarised columns must have a different name than the grouping columns.")
         uid = generate_col_uuid()
-        selects.append(name)
-        new_tbl.named_cols.fwd[name] = uid
-        new_tbl.col_expr[uid] = expr
+        selects.add(name)
+        named_cols.fwd[name] = uid
+        available_cols.add(uid)
+        col_expr[uid] = expr
 
+    # Update new_tbl
     new_tbl.selects = ordered_set(selects)
+    new_tbl.named_cols = named_cols
+    new_tbl.available_cols = available_cols
+    new_tbl.col_expr.update(col_expr)
     new_tbl.summarise(**kwargs)
+
+    # Reduce the grouping level by one -> drop last
+    if len(new_tbl.grouped_by):
+        new_tbl.grouped_by.pop_back()
+
+    if len(new_tbl.grouped_by):
+        new_tbl.group_by(*new_tbl.grouped_by)
+    else:
+        new_tbl.ungroup()
+
     return new_tbl

@@ -135,3 +135,11 @@ class ordered_set(MutableSet[T]):
 
     def clear(self) -> None:
         self.__data.clear()
+
+    def pop_back(self) -> None:
+        """Return the popped value.Raise KeyError if empty."""
+        if len(self) == 0:
+            raise KeyError('Ordered set is empty.')
+        back = next(reversed(self.__data.keys()))
+        self.discard(back)
+        return back

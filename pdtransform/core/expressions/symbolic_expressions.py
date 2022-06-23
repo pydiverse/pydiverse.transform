@@ -87,9 +87,9 @@ class SymbolAttribute:
 
 
 class ReprHTMLTranslator(translator.Translator):
-    def _translate(self, expr):
+    def _translate(self, expr, **kwargs):
         if isinstance(expr, column.Column):
-            return expr.table.translator.translate(expr)
+            return expr.table.translator.translate(expr, **kwargs)
         return expr
 
 

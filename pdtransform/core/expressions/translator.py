@@ -26,11 +26,11 @@ class Translator(Generic[ImplT, T]):
     def __init__(self, backend: ImplT):
         self.backend = backend
 
-    def translate(self, expr) -> T:
+    def translate(self, expr, **kwargs) -> T:
         """ Translate an expression recursively. """
-        return bottom_up_replace(expr, self._translate)
+        return bottom_up_replace(expr, lambda e: self._translate(e, **kwargs))
 
-    def _translate(self, expr) -> T:
+    def _translate(self, expr, **kwargs) -> T:
         """ Translate an expression non recursively. """
         raise NotImplementedError
 

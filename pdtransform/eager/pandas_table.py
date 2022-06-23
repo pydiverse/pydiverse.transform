@@ -4,6 +4,7 @@ import operator
 
 import numpy as np
 import pandas as pd
+from pandas.core.groupby import DataFrameGroupBy
 
 from pdtransform.core.column import Column
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
@@ -12,29 +13,33 @@ from .eager_table import EagerTableImpl, uuid_to_str
 
 
 class PandasTableImpl(EagerTableImpl):
+    """Pandas backend
+
+    Attributes:
+        df: The current, eager dataframe. It's columns get renamed to prevent
+            name collisions and it also contains all columns that have been
+            computed at some point. This allows for a more lazy style API.
+    """
 
     def __init__(self, name: str, df: pd.DataFrame):
         self.df = df
         self.join_translator = self.JoinTranslator(self)
 
-        cols = self.df.dtypes.items()
-        super().__init__(
-            name = name,
-            columns = {
-                name: Column(name = name, table = self, dtype = self._convert_dtype(dtype))
-                for name, dtype in cols
-            }
-        )
+        columns = {
+            name: Column(name = name, table = self, dtype = self._convert_dtype(dtype))
+            for name, dtype in self.df.dtypes.items()
+        }
+        super().__init__(name = name, columns = columns)
 
         # Rename columns
         self.df_name_mapping = {
             col.uuid: f'{self.name}_{col.name}_' + uuid_to_str(col.uuid)
-            for col in self.columns.values()
+            for col in columns.values()
         }  # type: dict[uuid.UUID: str]
 
         self.df = self.df.rename(columns = {
             name: self.df_name_mapping[col.uuid]
-            for name, col in self.columns.items()
+            for name, col in columns.items()
         })
 
     def _convert_dtype(self, dtype: np.dtype) -> str:
@@ -69,6 +74,13 @@ class PandasTableImpl(EagerTableImpl):
         # SELECT -> Apply mask
         selected_cols_name_map = { self.df_name_mapping[uuid]: name for name, uuid in self.selected_cols() }
         masked_df = self.df[[*selected_cols_name_map.keys()]]
+
+        # rename columns from internal naming scheme to external names
+        # pandas doesn't support .rename for grouped dataframes -> get underlying df
+        if isinstance(masked_df, DataFrameGroupBy):
+            assert self.grouped_by
+            masked_df = masked_df.obj
+
         return masked_df.rename(columns = selected_cols_name_map)
 
     def mutate(self, **kwargs):
@@ -124,13 +136,42 @@ class PandasTableImpl(EagerTableImpl):
         cols = [self.df_name_mapping[col.uuid] for col in cols]
         self.df = self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort')
 
+    def group_by(self, *args):
+        grouping_cols_names = [self.df_name_mapping[col.uuid] for col in self.grouped_by]
+        self.df = self.df.groupby(by = list(grouping_cols_names))
+
+    def ungroup(self):
+        if isinstance(self.df, DataFrameGroupBy):
+            self.df = self.df.obj
+
+    def summarise(self, **kwargs):
+        translated_values = {}
+        for name, expr in kwargs.items():
+            uuid = self.named_cols.fwd[name]
+            typed_value = self.translator.translate(expr)
+
+            internal_name = f'{self.name}_summarise_{name}_{uuid_to_str(uuid)}'
+            self.df_name_mapping[uuid] = internal_name
+
+            translated_values[internal_name] = typed_value.value
+            self.col_dtype[uuid] = typed_value.dtype
+
+        # Grouped Dataframe requires different operations compared to ungrouped df.
+        if self.grouped_by:
+            # grouped dataframe
+            columns = { k: v.rename(k) for k, v in translated_values.items() }
+            self.df = pd.concat(columns, axis = 'columns').reset_index()
+        else:
+            # ungruped dataframe
+            self.df = pd.DataFrame(translated_values, index = [0])
+
 
     #### EXPRESSIONS ####
 
 
     class ExpressionTranslator(Translator['PandasTableImpl', TypedValue]):
 
-        def _translate(self, expr):
+        def _translate(self, expr, **kwargs):
             if isinstance(expr, Column):
                 df_col_name = self.backend.df_name_mapping[expr.uuid]
                 df_col = self.backend.df[df_col_name]
@@ -160,7 +201,7 @@ class PandasTableImpl(EagerTableImpl):
         a tuple of tuple where the inner tuple contains the left and right column
         of the equality checks.
         """
-        def _translate(self, expr):
+        def _translate(self, expr, **kwargs):
             if isinstance(expr, Column):
                 return expr
             if isinstance(expr, FunctionCall):
@@ -174,7 +215,25 @@ class PandasTableImpl(EagerTableImpl):
             raise Exception(f'Invalid ON clause element: {expr}. Only a conjunction of equalities is supported by pandas (ands of equals).')
 
 
+#### BACKEND SPECIFIC OPERATORS ################################################
 
-@PandasTableImpl.register_op('str.strip', 'object -> object')
-def _str_strip(x: pd.Series):
-    return x.str.strip()
+...
+
+#### Summarising Functions ####
+
+@PandasTableImpl.op('mean', 'int |> float')
+@PandasTableImpl.op('mean', 'float |> float')
+def _mean(x):
+    return x.mean()
+
+@PandasTableImpl.op('min', 'int |> float')
+@PandasTableImpl.op('min', 'float |> float')
+@PandasTableImpl.op('min', 'str |> str')
+def _min(x):
+    return x.min()
+
+@PandasTableImpl.op('max', 'int |> float')
+@PandasTableImpl.op('max', 'float |> float')
+@PandasTableImpl.op('max', 'str |> str')
+def _max(x):
+    return x.max()

@@ -14,27 +14,16 @@ class SQLTableImpl(LazyTableImpl):
 
     def __init__(self, engine, table):
         self.engine = sqlalchemy.create_engine(engine) if isinstance(engine, str) else engine
-        self.tbl = self._create_table(table, self.engine)
+        tbl = self._create_table(table, self.engine)
         # backend = self.engine.url.get_backend_name()
 
-        super().__init__(
-            name = self.tbl.name,
-            columns = {
-                col.name: Column(name = col.name, table = self, dtype = self._convert_dtype(col.type))
-                for col in self.tbl.columns
-            }
-        )
+        columns = {
+            col.name: Column(name = col.name, table = self, dtype = self._convert_dtype(col.type))
+            for col in tbl.columns
+        }
 
-        self.sql_columns = {
-            col.uuid: self.tbl.columns[col.name]
-            for col in self.columns.values()
-        }  # from uuid to sqlalchemy column
-
-        self.joins = []        # type: list[JoinDescriptor]
-        self.wheres = []       # type: list[SymbolicExpression]
-        self.group_bys = []    # type: list[SymbolicExpression]
-        self.having = []       # type: list[SymbolicExpression]
-        self.order_bys = []    # type: list[OrderByDescriptor]
+        self.replace_tbl(tbl, columns)
+        super().__init__(name = self.tbl.name, columns = columns)
 
     @classmethod
     def _html_repr_expr(cls, expr):
@@ -83,6 +72,20 @@ class SQLTableImpl(LazyTableImpl):
         if pytype == float: return 'float'
         raise NotImplementedError(f"Invalid dtype {dtype}.")
 
+    def replace_tbl(self, new_tbl, columns: dict[str: Column]):
+        self.tbl = new_tbl
+
+        self.sql_columns = {
+            col.uuid: self.tbl.columns[col.name]
+            for col in columns.values()
+        }  # from uuid to sqlalchemy column
+
+        self.joins = []         # type: list[JoinDescriptor]
+        self.wheres = []        # type: list[SymbolicExpression]
+        self.group_bys = []     # type: list[SymbolicExpression]
+        self.having = []        # type: list[SymbolicExpression]
+        self.order_bys = []     # type: list[OrderByDescriptor]
+
     def build_query(self):
         # Validate current state
         if len(self.selects) == 0:
@@ -117,8 +120,10 @@ class SQLTableImpl(LazyTableImpl):
 
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
-        named_cols = { name: self.col_expr[uuid] for name, uuid in self.selected_cols() }
-        s = [self.translator.translate(col).value.label(name) for name, col in named_cols.items() ]
+        named_cols = { (name, uuid): self.col_expr[uuid] for name, uuid in self.selected_cols() }
+        typed_selects = { (name, uuid): self.translator.translate(col) for (name, uuid), col in named_cols.items() }
+        self.col_dtype.update({ uuid: v.dtype for (_, uuid), v in typed_selects.items() })
+        s = [ v.value.label(name) for (name, _), v in typed_selects.items() ]
         select = select.with_only_columns(s)
 
         # ORDER BY
@@ -185,6 +190,18 @@ class SQLTableImpl(LazyTableImpl):
         order_by = [OrderByDescriptor(col, ascending, False) for col, ascending in ordering]
         self.order_bys = order_by + self.order_bys
 
+    def pre_summarise(self, **kwargs):
+        # TODO: Replace with better detection of subquery
+        if self.group_bys and self.group_bys != list(self.grouped_by):
+            # Must make a subquery
+            subquery = self.build_query()
+            columns = {
+                name: self.get_col(name)
+                for name in self.selects
+            }
+
+            self.replace_tbl(subquery, columns)
+
     def summarise(self, **kwargs):
         # Also: Because we reduce the number of rows in the output to one per group, only summarised data and the
         # group keys will be available after the group by -> clear selection and throw away everything that isn't a
@@ -192,7 +209,9 @@ class SQLTableImpl(LazyTableImpl):
 
         if self.group_bys and self.group_bys != list(self.grouped_by):
             # TODO: Implement automatic summarise subqueries
-            raise NotImplementedError("Can't yet automatically make subqueries.")
+            subquery = self.build_query().subquery()
+            self.__init__(self.engine, subquery)
+            # raise NotImplementedError("Can't yet automatically make subqueries.")
 
         self.group_bys = list(self.grouped_by)
 
@@ -207,7 +226,7 @@ class SQLTableImpl(LazyTableImpl):
 
     class ExpressionTranslator(Translator['SQLTableImpl', TypedValue]):
 
-        def _translate(self, expr):
+        def _translate(self, expr, **kwargs):
             if isinstance(expr, Column):
                 # Can either be a base SQL column, or a reference to an expression
                 if expr.uuid in self.backend.sql_columns:

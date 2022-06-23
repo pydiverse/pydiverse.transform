@@ -27,6 +27,24 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     """
     Base class from which all table backend implementations are derived from.
     It tracks various metadata that is relevant for all backends.
+
+    Attributes:
+        name: The name of the table.
+
+        selects: Ordered set of selected names.
+        named_cols: Map from name to column uuid containing all columns that
+            have been named.
+        available_cols: Set of UUIDs that can be referenced in symbolic
+            expressions. This set gets used to validate verb inputs. It usually
+            contains the same uuids as the col_exprs. Only a summarising
+            operation resets this.
+        col_expr: Map from uuid to the `SymbolicExpression` that corresponds
+            to this column.
+        col_dtype: Map from uuid to the datatype of the corresponding column.
+            It is the responsibility of the backend to keep track of
+            this information.
+
+        grouped_by: Ordered set of columns by which the table is grouped by.
     """
 
     operator_registry: OperatorRegistry
@@ -41,16 +59,12 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         ):
 
         self.name = name
-        self.columns = columns
         self.translator = self.ExpressionTranslator(self)
         self.lambda_translator = self.LambdaTranslator(self)
 
-        # selects: Ordered set of selected names.
-        # named_cols: Map from name to column uuid containing all columns that have been named.
-        # col_expr: Map from uuid to the `SymbolicExpression` that corresponds to this column.
-        # col_dtype: Map from uuid to the datatype of the corresponding column. It is the responsibility of the backend to keep track of this information.
         self.selects = ordered_set()       # type: ordered_set[str]
         self.named_cols = bidict()         # type: bidict[str: uuid.UUID]
+        self.available_cols = set()        # type: set[uuid.UUID]
         self.col_expr = {}                 # type: dict[uuid.UUID: SymbolicExpression]
         self.col_dtype = {}                # type: dict[uuid.UUID: str]
 
@@ -60,6 +74,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         for name, col in columns.items():
             self.selects.add(name)
             self.named_cols.fwd[name] = col.uuid
+            self.available_cols.add(col.uuid)
             self.col_expr[col.uuid] = col
             self.col_dtype[col.uuid] = col.dtype
 
@@ -126,6 +141,10 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def ungroup(self, *args):
         ...
 
+    def pre_summarise(self, **kwargs):
+        """Gives the backend a chance to create a subquery"""
+        ...
+
     def summarise(self, **kwargs):
         ...
 
@@ -153,7 +172,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     #### Expressions ####
 
     class LambdaTranslator(Translator):
-        def _translate(self, expr):
+        def _translate(self, expr, **kwargs):
             # Resolve lambda and return Column object
             if isinstance(expr, LambdaColumn):
                 if expr.name not in self.backend.named_cols.fwd:

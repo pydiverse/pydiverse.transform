@@ -230,7 +230,7 @@ class TestSQLTable:
             tbl3 >> collect()
         )
         assert_frame_equal(
-            tbl3 >> summarise(mean4 = tbl3.col4.mean()) >> group_by(tbl3.col1) >> collect(),
+            tbl3 >> summarise(mean4 = tbl3.col4.mean()) >> group_by(λ.mean4) >> collect(),
             tbl3 >> summarise(mean4 = tbl3.col4.mean()) >> collect()
         )
 
