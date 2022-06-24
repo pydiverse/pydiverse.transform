@@ -190,8 +190,12 @@ class PandasTableImpl(EagerTableImpl):
             # Literals
             if isinstance(expr, int):
                 return TypedValue(expr, 'int')
+            if isinstance(expr, float):
+                return TypedValue(expr, 'float')
             if isinstance(expr, str):
                 return TypedValue(expr, 'str')
+            if isinstance(expr, bool):
+                return TypedValue(expr, 'bool')
 
             raise NotImplementedError(expr, type(expr))
 

@@ -97,7 +97,9 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
 
 @builtin_verb()
 def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpression, how: str):
-    # TODO: Also allow on to be a dictionary
+    if left.grouped_by or right.grouped_by:
+        raise ValueError(f"Can't join grouped tables. You first have to ungroup them.")
+
     # Check args only contains valid columns
     check_cols_available((left, right), cols_in_expression(on), 'join')
 
@@ -152,6 +154,9 @@ def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
 
 @builtin_verb()
 def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
+    if len(args) == 0:
+        return tbl
+
     # Validate Input
     check_cols_available(tbl, cols_in_expressions(args), 'arrange')
     check_lambdas_valid(tbl, *args)
