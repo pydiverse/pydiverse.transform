@@ -1,3 +1,4 @@
+import functools
 from collections import ChainMap
 from typing import Any, Iterable
 
@@ -134,6 +135,10 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
 
     new_left.join(right, on, how)
     return new_left
+
+inner_join = functools.partial(join, how='inner')
+left_join = functools.partial(join, how='left')
+outer_join = functools.partial(join, how='outer')
 
 @builtin_verb()
 def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
