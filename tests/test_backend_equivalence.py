@@ -357,7 +357,7 @@ class TestGroupBy:
         assert_result_equal(
             df3_x, df3_y,
             lambda t:
-            t >> group_by(t.col1) >> filter(t.col2 >= 2)
+            t >> group_by(t.col1) >> filter(t.col3 >= 2)
         )
 
     @tables(['df3'])

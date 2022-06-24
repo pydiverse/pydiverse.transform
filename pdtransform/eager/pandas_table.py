@@ -71,12 +71,9 @@ class PandasTableImpl(EagerTableImpl):
         return self.__class__(name, self.collect())
 
     def collect(self) -> pd.DataFrame:
-        # If df is grouped -> convert to ungrouped
-        df = self.df.obj if isinstance(self.df, DataFrameGroupBy) else self.df
-
         # SELECT -> Apply mask
         selected_cols_name_map = { self.df_name_mapping[uuid]: name for name, uuid in self.selected_cols() }
-        masked_df = df[[*selected_cols_name_map.keys()]]
+        masked_df = self.df[[*selected_cols_name_map.keys()]]
 
         # rename columns from internal naming scheme to external names
         return masked_df.rename(columns = selected_cols_name_map)
@@ -134,41 +131,30 @@ class PandasTableImpl(EagerTableImpl):
         cols = [self.df_name_mapping[col.uuid] for col in cols]
         self.df = self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort')
 
-    def group_by(self, *args):
-        if isinstance(self.df, DataFrameGroupBy):
-            self.df = self.df.obj
-
-        grouping_cols_names = [self.df_name_mapping[col.uuid] for col in self.grouped_by]
-        self.df = self.df.groupby(by = list(grouping_cols_names))
-
-    def ungroup(self):
-        if isinstance(self.df, DataFrameGroupBy):
-            self.df = self.df.obj
-
     def summarise(self, **kwargs):
         translated_values = {}
-        for name, expr in kwargs.items():
-            uuid = self.named_cols.fwd[name]
-            typed_value = self.translator.translate(expr)
 
-            internal_name = f'{self.name}_summarise_{name}_{uuid_to_str(uuid)}'
-            self.df_name_mapping[uuid] = internal_name
+        with self.grouped_df():
+            for name, expr in kwargs.items():
+                uuid = self.named_cols.fwd[name]
+                typed_value = self.translator.translate(expr)
 
-            translated_values[internal_name] = typed_value.value
-            self.col_dtype[uuid] = typed_value.dtype
+                internal_name = f'{self.name}_summarise_{name}_{uuid_to_str(uuid)}'
+                self.df_name_mapping[uuid] = internal_name
 
-        # Grouped Dataframe requires different operations compared to ungrouped df.
-        if self.grouped_by:
-            # grouped dataframe
-            columns = { k: v.rename(k) for k, v in translated_values.items() }
-            self.df = pd.concat(columns, axis = 'columns').reset_index()
-        else:
-            # ungruped dataframe
-            self.df = pd.DataFrame(translated_values, index = [0])
+                translated_values[internal_name] = typed_value.value
+                self.col_dtype[uuid] = typed_value.dtype
 
+            # Grouped Dataframe requires different operations compared to ungrouped df.
+            if self.grouped_by:
+                # grouped dataframe
+                columns = { k: v.rename(k) for k, v in translated_values.items() }
+                self.df = pd.concat(columns, axis = 'columns').reset_index()
+            else:
+                # ungruped dataframe
+                self.df = pd.DataFrame(translated_values, index = [0])
 
     #### EXPRESSIONS ####
-
 
     class ExpressionTranslator(Translator['PandasTableImpl', TypedValue]):
 
@@ -199,7 +185,6 @@ class PandasTableImpl(EagerTableImpl):
 
             raise NotImplementedError(expr, type(expr))
 
-
     class JoinTranslator(Translator['PandasTableImpl', tuple]):
         """
         This translator takes a conjunction (AND) of equality checks and returns
@@ -218,6 +203,30 @@ class PandasTableImpl(EagerTableImpl):
                 if expr.operator == '__and__':
                     return tuple(itertools.chain(*expr.args))
             raise Exception(f'Invalid ON clause element: {expr}. Only a conjunction of equalities is supported by pandas (ands of equals).')
+
+    #### GROUPING HELPER ####
+
+    class GroupByContextManager:
+        def __init__(self, tbl: 'PandasTableImpl'):
+            self.tbl = tbl
+
+        def __enter__(self):
+            if self.tbl.grouped_by:
+                grouping_cols_names = [self.tbl.df_name_mapping[col.uuid] for col in self.tbl.grouped_by]
+                self.tbl.df = self.tbl.df.groupby(by = list(grouping_cols_names))
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if isinstance(self.tbl.df, DataFrameGroupBy):
+                self.tbl.df = self.tbl.df.obj
+
+    def grouped_df(self):
+        """Temporarily replaces self.df with a grouped dataframe.
+
+        This function returns a context manager which takes self.df and groups
+        it according to self.grouped_by while inside the context. When exiting
+        the context, self.df gets ungrouped again.
+        """
+        return self.GroupByContextManager(self)
 
 
 #### BACKEND SPECIFIC OPERATORS ################################################
