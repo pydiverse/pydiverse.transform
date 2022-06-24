@@ -71,16 +71,14 @@ class PandasTableImpl(EagerTableImpl):
         return self.__class__(name, self.collect())
 
     def collect(self) -> pd.DataFrame:
+        # If df is grouped -> convert to ungrouped
+        df = self.df.obj if isinstance(self.df, DataFrameGroupBy) else self.df
+
         # SELECT -> Apply mask
         selected_cols_name_map = { self.df_name_mapping[uuid]: name for name, uuid in self.selected_cols() }
-        masked_df = self.df[[*selected_cols_name_map.keys()]]
+        masked_df = df[[*selected_cols_name_map.keys()]]
 
         # rename columns from internal naming scheme to external names
-        # pandas doesn't support .rename for grouped dataframes -> get underlying df
-        if isinstance(masked_df, DataFrameGroupBy):
-            assert self.grouped_by
-            masked_df = masked_df.obj
-
         return masked_df.rename(columns = selected_cols_name_map)
 
     def mutate(self, **kwargs):
@@ -137,6 +135,9 @@ class PandasTableImpl(EagerTableImpl):
         self.df = self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort')
 
     def group_by(self, *args):
+        if isinstance(self.df, DataFrameGroupBy):
+            self.df = self.df.obj
+
         grouping_cols_names = [self.df_name_mapping[col.uuid] for col in self.grouped_by]
         self.df = self.df.groupby(by = list(grouping_cols_names))
 

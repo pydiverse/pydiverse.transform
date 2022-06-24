@@ -70,6 +70,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
             selects.append(tbl.named_cols.bwd[col.uuid])
         elif isinstance(col, LambdaColumn):
             selects.append(col.name)
+
     # SELECT
     new_tbl = tbl.copy()
     new_tbl.selects = ordered_set(selects)
