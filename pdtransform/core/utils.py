@@ -136,6 +136,9 @@ class ordered_set(MutableSet[T]):
     def clear(self) -> None:
         self.__data.clear()
 
+    def copy(self):
+        return self.__copy__()
+
     def pop_back(self) -> None:
         """Return the popped value.Raise KeyError if empty."""
         if len(self) == 0:

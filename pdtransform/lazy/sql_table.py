@@ -82,7 +82,6 @@ class SQLTableImpl(LazyTableImpl):
 
         self.joins = []         # type: list[JoinDescriptor]
         self.wheres = []        # type: list[SymbolicExpression]
-        self.group_bys = []     # type: list[SymbolicExpression]
         self.having = []        # type: list[SymbolicExpression]
         self.order_bys = []     # type: list[OrderByDescriptor]
 
@@ -114,8 +113,8 @@ class SQLTableImpl(LazyTableImpl):
             select = select.where(where)
 
         # GROUP BY
-        if self.group_bys:
-            group_bys, group_by_dtypes = zip(*(self.translator.translate(group_by) for group_by in self.group_bys))
+        if self.intrinsic_grouped_by:
+            group_bys, group_by_dtypes = zip(*(self.translator.translate(group_by) for group_by in self.intrinsic_grouped_by))
             select = select.group_by(*group_bys)
 
         # SELECT
@@ -191,8 +190,9 @@ class SQLTableImpl(LazyTableImpl):
         self.order_bys = order_by + self.order_bys
 
     def pre_summarise(self, **kwargs):
-        # TODO: Replace with better detection of subquery
-        if self.group_bys and self.group_bys != list(self.grouped_by):
+        # If the grouping level is different from the grouping level of the
+        # tbl object, then we must make a subquery.
+        if self.intrinsic_grouped_by and self.grouped_by != self.intrinsic_grouped_by:
             # Must make a subquery
             subquery = self.build_query()
             columns = {
@@ -207,7 +207,7 @@ class SQLTableImpl(LazyTableImpl):
         # group keys will be available after the group by -> clear selection and throw away everything that isn't a
         # summarised value or a grouping key.
 
-        if self.group_bys and self.group_bys != list(self.grouped_by):
+        if self.intrinsic_grouped_by and self.intrinsic_grouped_by != self.grouped_by:
             # TODO: Implement automatic summarise subqueries
             subquery = self.build_query().subquery()
             self.__init__(self.engine, subquery)

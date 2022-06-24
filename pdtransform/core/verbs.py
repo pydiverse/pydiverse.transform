@@ -241,6 +241,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     new_tbl.named_cols = named_cols
     new_tbl.available_cols = available_cols
     new_tbl.col_expr.update(col_expr)
+    new_tbl.intrinsic_grouped_by = new_tbl.grouped_by.copy()
     new_tbl.summarise(**kwargs)
 
     # Reduce the grouping level by one -> drop last

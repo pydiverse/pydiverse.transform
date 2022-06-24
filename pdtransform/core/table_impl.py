@@ -45,6 +45,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             this information.
 
         grouped_by: Ordered set of columns by which the table is grouped by.
+        intrinsic_grouped_by: Ordered set of columns representing the underlying
+            grouping level of the table. This gets set when performing a
+            summarising operation.
     """
 
     operator_registry: OperatorRegistry
@@ -68,7 +71,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         self.col_expr = {}                 # type: dict[uuid.UUID: SymbolicExpression]
         self.col_dtype = {}                # type: dict[uuid.UUID: str]
 
-        self.grouped_by = ordered_set()    # type: ordered_set[Column]
+        self.grouped_by = ordered_set()             # type: ordered_set[Column]
+        self.intrinsic_grouped_by = ordered_set()   # type: ordered_set[Column]
 
         # Init Values
         for name, col in columns.items():
