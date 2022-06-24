@@ -117,6 +117,14 @@ class SQLTableImpl(LazyTableImpl):
             group_bys, group_by_dtypes = zip(*(self.translator.translate(group_by) for group_by in self.intrinsic_grouped_by))
             select = select.group_by(*group_bys)
 
+        # HAVING
+        if self.having:
+            # Combine havings using ands
+            combined_having = functools.reduce(operator.and_, map(SymbolicExpression, self.having))._
+            having, having_dtype = self.translator.translate(combined_having)
+            assert(having_dtype == 'bool')
+            select = select.having(having)
+
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
         named_cols = { (name, uuid): self.col_expr[uuid] for name, uuid in self.selected_cols() }
@@ -183,13 +191,22 @@ class SQLTableImpl(LazyTableImpl):
         self.sql_columns.update(right.sql_columns)
 
     def filter(self, *args):
-        self.wheres.extend(args)
+        if self.intrinsic_grouped_by:
+            self.having.extend(args)
+        else:
+            self.wheres.extend(args)
 
     def arrange(self, ordering):
         order_by = [OrderByDescriptor(col, ascending, False) for col, ascending in ordering]
         self.order_bys = order_by + self.order_bys
 
     def pre_summarise(self, **kwargs):
+        # The result of the aggregate is always ordered according to the
+        # grouping columns. We must clear the order_bys so that the order
+        # is consistent with eager execution. We can do this because aggregate
+        # functions are independent of the order.
+        self.order_bys.clear()
+
         # If the grouping level is different from the grouping level of the
         # tbl object, then we must make a subquery.
         if self.intrinsic_grouped_by and self.grouped_by != self.intrinsic_grouped_by:
@@ -201,19 +218,6 @@ class SQLTableImpl(LazyTableImpl):
             }
 
             self.replace_tbl(subquery, columns)
-
-    def summarise(self, **kwargs):
-        # Also: Because we reduce the number of rows in the output to one per group, only summarised data and the
-        # group keys will be available after the group by -> clear selection and throw away everything that isn't a
-        # summarised value or a grouping key.
-
-        if self.intrinsic_grouped_by and self.intrinsic_grouped_by != self.grouped_by:
-            # TODO: Implement automatic summarise subqueries
-            subquery = self.build_query().subquery()
-            self.__init__(self.engine, subquery)
-            # raise NotImplementedError("Can't yet automatically make subqueries.")
-
-        self.group_bys = list(self.grouped_by)
 
     def query_string(self):
         query = self.build_query()

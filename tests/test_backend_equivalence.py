@@ -422,4 +422,26 @@ class TestSummarise:
             t >> group_by(t.col1, t.col2) >> summarise(mean3 = t.col3.mean()) >> mutate(x10 = λ.mean3 * 10)
         )
 
+    @tables(['df3'])
+    def test_filter(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> summarise(mean3 = t.col3.mean()) >> filter(λ.mean3 <= 2.0)
+        )
+
+    @tables(['df3'])
+    def test_arrange(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> summarise(mean3 = t.col3.mean()) >> arrange(λ.mean3)
+        )
+
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> arrange(-t.col4) >> group_by(t.col1, t.col2) >> summarise(mean3 = t.col3.mean()) >> arrange(λ.mean3)
+        )
+
     # TODO: Implement more test cases or summarise verb
