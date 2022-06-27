@@ -53,7 +53,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     operator_registry: OperatorRegistry
 
     # Inner Class
-    ExpressionTranslator: typing.Type[Translator['AbstractTableImpl', TypedValue]]
+    ExpressionCompiler: typing.Type[Translator['AbstractTableImpl', TypedValue[typing.Callable]]]
 
     def __init__(
             self,
@@ -62,7 +62,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         ):
 
         self.name = name
-        self.translator = self.ExpressionTranslator(self)
+        self.compiler = self.ExpressionCompiler(self)
         self.lambda_translator = self.LambdaTranslator(self)
 
         self.selects = ordered_set()       # type: ordered_set[str]
@@ -70,6 +70,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         self.available_cols = set()        # type: set[uuid.UUID]
         self.col_expr = {}                 # type: dict[uuid.UUID: SymbolicExpression]
         self.col_dtype = {}                # type: dict[uuid.UUID: str]
+        self.compiled_expr = {}            # type: dict[uuid.UUID: typing.Callable[[*typing.Any], TypedValue]]
 
         self.grouped_by = ordered_set()             # type: ordered_set[Column]
         self.intrinsic_grouped_by = ordered_set()   # type: ordered_set[Column]
@@ -81,6 +82,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self.available_cols.add(col.uuid)
             self.col_expr[col.uuid] = col
             self.col_dtype[col.uuid] = col.dtype
+            self.compiled_expr[col.uuid] = self.compiler.translate(col).value
 
     def copy(self):
         c = copy.copy(self)
@@ -90,7 +92,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 c.__dict__[k] = copy.copy(v)
 
         # Must create a new translator, so that it can access the current df.
-        c.translator = self.ExpressionTranslator(c)
+        c.compiler = self.ExpressionCompiler(c)
         c.lambda_translator = self.LambdaTranslator(c)
         return c
 

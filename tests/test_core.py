@@ -4,6 +4,7 @@ from pdtransform import λ
 from pdtransform.core import Table, AbstractTableImpl, Column
 from pdtransform.core.dispatchers import inverse_partial, verb, wrap_tables, unwrap_tables
 from pdtransform.core.expressions import Translator
+from pdtransform.core.expressions.translator import TypedValue
 from pdtransform.core.utils import bidict, ordered_set
 from pdtransform.core.verbs import collect, select, mutate, join, filter, arrange
 
@@ -261,6 +262,6 @@ class MockTableImpl(AbstractTableImpl):
     def collect(self):
         return list(self.selects)
 
-    class ExpressionTranslator(Translator):
-        pass
-
+    class ExpressionCompiler(Translator):
+        def _translate(self, expr, **kwargs):
+            return TypedValue(None, None)

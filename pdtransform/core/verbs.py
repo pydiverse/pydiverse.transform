@@ -52,7 +52,6 @@ def collect(tbl: AbstractTableImpl):
 
 @builtin_verb()
 def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
-    # TODO: Allow ore complex expressions in args (eg not expressions)
     # >> select(...)    ->   Select all columns
     if len(args) == 1 and args[0] is Ellipsis:
         raise NotImplementedError
@@ -92,6 +91,10 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         new_tbl.available_cols.add(uid)
         new_tbl.col_expr[uid] = expr
 
+        compiled, dtype = tbl.compiler.translate(expr)
+        new_tbl.compiled_expr[uid] = compiled
+        new_tbl.col_dtype[uid] = dtype
+
     new_tbl.mutate(**kwargs)
     return new_tbl
 
@@ -128,6 +131,7 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     new_left.available_cols.update(right.available_cols)
     new_left.col_expr.update(right.col_expr)
     new_left.col_dtype.update(right.col_dtype)
+    new_left.compiled_expr.update(right.compiled_expr)
 
     # By resolving lambdas this late, we enable the user to use lambda columns
     # to reference mutated columns from the right side of the join.
@@ -230,6 +234,8 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     named_cols = bidict()
     available_cols = set()
     col_expr = {}
+    col_dtype = {}
+    compiled_expr = {}
 
     # Add grouping cols to beginning of select.
     for col in tbl.grouped_by:
@@ -247,11 +253,17 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         available_cols.add(uid)
         col_expr[uid] = expr
 
+        compiled, dtype = new_tbl.compiler.translate(expr)
+        compiled_expr[uid] = compiled
+        col_dtype[uid] = dtype
+
     # Update new_tbl
     new_tbl.selects = ordered_set(selects)
     new_tbl.named_cols = named_cols
     new_tbl.available_cols = available_cols
     new_tbl.col_expr.update(col_expr)
+    new_tbl.col_dtype.update(col_dtype)
+    new_tbl.compiled_expr.update(compiled_expr)
     new_tbl.intrinsic_grouped_by = new_tbl.grouped_by.copy()
     new_tbl.summarise(**kwargs)
 

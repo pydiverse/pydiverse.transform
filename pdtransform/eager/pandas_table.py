@@ -1,6 +1,7 @@
 import functools
 import itertools
 import operator
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -29,11 +30,10 @@ class PandasTableImpl(EagerTableImpl):
             name: Column(name = name, table = self, dtype = self._convert_dtype(dtype))
             for name, dtype in self.df.dtypes.items()
         }
-        super().__init__(name = name, columns = columns)
 
         # Rename columns
         self.df_name_mapping = {
-            col.uuid: f'{self.name}_{col.name}_' + uuid_to_str(col.uuid)
+            col.uuid: f'{name}_{col.name}_' + uuid_to_str(col.uuid)
             for col in columns.values()
         }  # type: dict[uuid.UUID: str]
 
@@ -41,6 +41,8 @@ class PandasTableImpl(EagerTableImpl):
             name: self.df_name_mapping[col.uuid]
             for name, col in columns.items()
         })
+
+        super().__init__(name = name, columns = columns)
 
     def _convert_dtype(self, dtype: np.dtype) -> str:
         # b  boolean
@@ -80,16 +82,17 @@ class PandasTableImpl(EagerTableImpl):
 
     def mutate(self, **kwargs):
         uuid_kwargs = { self.named_cols.fwd[k]: (k, v) for k, v in kwargs.items() }
-        self.df_name_mapping.update({uuid: f'{self.name}_mutate_{name}_' + uuid_to_str(uuid) for uuid, (name, _) in uuid_kwargs.items() })
-        typed_cols = { uuid: self.translator.translate(expr) for uuid, (_, expr) in uuid_kwargs.items() }
+        self.df_name_mapping.update({
+            uuid: f'{self.name}_mutate_{name}_' + uuid_to_str(uuid)
+            for uuid, (name, _) in uuid_kwargs.items()
+        })
 
         # Update Dataframe
-        cols = {self.df_name_mapping[uuid]: v.value for uuid, v in typed_cols.items()}
+        cols = {
+            self.df_name_mapping[uuid]: self.compiled_expr[uuid](self.df)
+            for uuid in uuid_kwargs.keys()
+        }
         self.df = self.df.assign(**cols)
-
-        # And update dtype metadata
-        cols_dtypes = { uuid: v.dtype for uuid, v in typed_cols.items() }
-        self.col_dtype.update(cols_dtypes)
 
     def join(self, right: 'PandasTableImpl', on: SymbolicExpression, how: str):
         """
@@ -121,9 +124,10 @@ class PandasTableImpl(EagerTableImpl):
         if not args:
             return
 
-        condition, cond_type = self.translator.translate(functools.reduce(operator.and_, args))
-        assert(cond_type == 'bool')
+        compiled, dtype = self.compiler.translate(functools.reduce(operator.and_, args))
+        assert(dtype == 'bool')
 
+        condition = compiled(self.df)
         self.df = self.df.loc[condition]
 
     def arrange(self, ordering: list[tuple[SymbolicExpression, bool]]):
@@ -134,54 +138,59 @@ class PandasTableImpl(EagerTableImpl):
     def summarise(self, **kwargs):
         translated_values = {}
 
-        with self.grouped_df():
-            for name, expr in kwargs.items():
-                uuid = self.named_cols.fwd[name]
-                typed_value = self.translator.translate(expr)
+        grouped_df = self.grouped_df()
+        for name, expr in kwargs.items():
+            uuid = self.named_cols.fwd[name]
+            internal_name = f'{self.name}_summarise_{name}_{uuid_to_str(uuid)}'
+            self.df_name_mapping[uuid] = internal_name
 
-                internal_name = f'{self.name}_summarise_{name}_{uuid_to_str(uuid)}'
-                self.df_name_mapping[uuid] = internal_name
+            compiled = self.compiled_expr[uuid]
+            translated_values[internal_name] = compiled(grouped_df)
 
-                translated_values[internal_name] = typed_value.value
-                self.col_dtype[uuid] = typed_value.dtype
-
-            # Grouped Dataframe requires different operations compared to ungrouped df.
-            if self.grouped_by:
-                # grouped dataframe
-                columns = { k: v.rename(k) for k, v in translated_values.items() }
-                self.df = pd.concat(columns, axis = 'columns').reset_index()
-            else:
-                # ungruped dataframe
-                self.df = pd.DataFrame(translated_values, index = [0])
+        # Grouped Dataframe requires different operations compared to ungrouped df.
+        if self.grouped_by:
+            # grouped dataframe
+            columns = { k: v.rename(k) for k, v in translated_values.items() }
+            self.df = pd.concat(columns, axis = 'columns').reset_index()
+        else:
+            # ungruped dataframe
+            self.df = pd.DataFrame(translated_values, index = [0])
 
     #### EXPRESSIONS ####
 
-    class ExpressionTranslator(Translator['PandasTableImpl', TypedValue]):
+    class ExpressionCompiler(Translator['PandasTableImpl', TypedValue[Callable[[pd.DataFrame], pd.Series]]]):
 
         def _translate(self, expr, **kwargs):
             if isinstance(expr, Column):
                 df_col_name = self.backend.df_name_mapping[expr.uuid]
-                df_col = self.backend.df[df_col_name]
+                def df_col(df):
+                    return df[df_col_name]
                 return TypedValue(df_col, expr.dtype)
 
             if isinstance(expr, FunctionCall):
                 arguments = [arg.value for arg in expr.args]
                 signature = tuple(arg.dtype for arg in expr.args)
                 implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
-                return TypedValue(implementation(*arguments), implementation.rtype)
+
+                def value(df):
+                    return implementation(*(arg(df) for arg in arguments))
+                return TypedValue(value, implementation.rtype)
 
             if isinstance(expr, TypedValue):
                 return expr
 
             # Literals
+            def literal_func(_):
+                return expr
+
             if isinstance(expr, int):
-                return TypedValue(expr, 'int')
+                return TypedValue(literal_func, 'int')
             if isinstance(expr, float):
-                return TypedValue(expr, 'float')
+                return TypedValue(literal_func, 'float')
             if isinstance(expr, str):
-                return TypedValue(expr, 'str')
+                return TypedValue(literal_func, 'str')
             if isinstance(expr, bool):
-                return TypedValue(expr, 'bool')
+                return TypedValue(literal_func, 'bool')
 
             raise NotImplementedError(expr, type(expr))
 
@@ -206,27 +215,11 @@ class PandasTableImpl(EagerTableImpl):
 
     #### GROUPING HELPER ####
 
-    class GroupByContextManager:
-        def __init__(self, tbl: 'PandasTableImpl'):
-            self.tbl = tbl
-
-        def __enter__(self):
-            if self.tbl.grouped_by:
-                grouping_cols_names = [self.tbl.df_name_mapping[col.uuid] for col in self.tbl.grouped_by]
-                self.tbl.df = self.tbl.df.groupby(by = list(grouping_cols_names))
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            if isinstance(self.tbl.df, DataFrameGroupBy):
-                self.tbl.df = self.tbl.df.obj
-
     def grouped_df(self):
-        """Temporarily replaces self.df with a grouped dataframe.
-
-        This function returns a context manager which takes self.df and groups
-        it according to self.grouped_by while inside the context. When exiting
-        the context, self.df gets ungrouped again.
-        """
-        return self.GroupByContextManager(self)
+        if self.grouped_by:
+            grouping_cols_names = [self.df_name_mapping[col.uuid] for col in self.grouped_by]
+            return self.df.groupby(by = list(grouping_cols_names))
+        return self.df
 
 
 #### BACKEND SPECIFIC OPERATORS ################################################

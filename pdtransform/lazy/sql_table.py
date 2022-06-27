@@ -1,8 +1,11 @@
 import functools
 import operator
+import uuid
 from functools import reduce
+from typing import Callable
 
 import sqlalchemy
+from sqlalchemy import sql
 
 from pdtransform.core.column import Column
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
@@ -80,6 +83,12 @@ class SQLTableImpl(LazyTableImpl):
             for col in columns.values()
         }  # from uuid to sqlalchemy column
 
+        if hasattr(self, 'compiled_expr'):
+            self.compiled_expr = {
+                col.uuid: self.compiler.translate(col).value
+                for col in columns.values()
+            }
+
         self.joins = []         # type: list[JoinDescriptor]
         self.wheres = []        # type: list[SymbolicExpression]
         self.having = []        # type: list[SymbolicExpression]
@@ -96,7 +105,9 @@ class SQLTableImpl(LazyTableImpl):
         # FROM
         if self.joins:
             for join in self.joins:
-                on = self.translator.translate(join.on).value
+                compiled, _ = self.compiler.translate(join.on)
+                on = compiled(self.sql_columns)
+
                 select = select.join(
                     join.right.tbl,
                     onclause = on,
@@ -108,36 +119,40 @@ class SQLTableImpl(LazyTableImpl):
         if self.wheres:
             # Combine wheres using ands
             combined_where = functools.reduce(operator.and_, map(SymbolicExpression, self.wheres))._
-            where, where_dtype = self.translator.translate(combined_where)
+            compiled, where_dtype = self.compiler.translate(combined_where)
             assert(where_dtype == 'bool')
+            where = compiled(self.sql_columns)
             select = select.where(where)
 
         # GROUP BY
         if self.intrinsic_grouped_by:
-            group_bys, group_by_dtypes = zip(*(self.translator.translate(group_by) for group_by in self.intrinsic_grouped_by))
+            compiled_gb, group_by_dtypes = zip(*(self.compiler.translate(group_by) for group_by in self.intrinsic_grouped_by))
+            group_bys = (compiled(self.sql_columns) for compiled in compiled_gb)
             select = select.group_by(*group_bys)
 
         # HAVING
         if self.having:
             # Combine havings using ands
             combined_having = functools.reduce(operator.and_, map(SymbolicExpression, self.having))._
-            having, having_dtype = self.translator.translate(combined_having)
+            compiled, having_dtype = self.compiler.translate(combined_having)
             assert(having_dtype == 'bool')
+            having = compiled(self.sql_columns)
             select = select.having(having)
 
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
-        named_cols = { (name, uuid): self.col_expr[uuid] for name, uuid in self.selected_cols() }
-        typed_selects = { (name, uuid): self.translator.translate(col) for (name, uuid), col in named_cols.items() }
-        self.col_dtype.update({ uuid: v.dtype for (_, uuid), v in typed_selects.items() })
-        s = [ v.value.label(name) for (name, _), v in typed_selects.items() ]
+        s = [
+            self.compiled_expr[uuid](self.sql_columns).label(name)
+            for name, uuid in self.selected_cols()
+        ]
         select = select.with_only_columns(s)
 
         # ORDER BY
         if self.order_bys:
             o = []
             for o_by in self.order_bys:
-                col = self.translator.translate(o_by.order).value
+                compiled, _ = self.compiler.translate(o_by.order)
+                col = compiled(self.sql_columns)
                 col = col.asc() if o_by.asc else col.desc()
                 col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
                 o.append(col)
@@ -228,33 +243,42 @@ class SQLTableImpl(LazyTableImpl):
 
     #### EXPRESSIONS ####
 
-    class ExpressionTranslator(Translator['SQLTableImpl', TypedValue]):
+    class ExpressionCompiler(Translator['SQLTableImpl', TypedValue[Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]]]):
 
         def _translate(self, expr, **kwargs):
             if isinstance(expr, Column):
                 # Can either be a base SQL column, or a reference to an expression
                 if expr.uuid in self.backend.sql_columns:
-                    return TypedValue(self.backend.sql_columns[expr.uuid], expr.dtype)
-                return self.translate(self.backend.col_expr[expr.uuid])
+                    def sql_col(cols):
+                        return cols[expr.uuid]
+                    return TypedValue(sql_col, expr.dtype)
+
+                if expr.uuid in self.backend.compiled_expr:
+                    return TypedValue(self.backend.compiled_expr[expr.uuid], self.backend.col_dtype[expr.uuid])
+
+                raise Exception
 
             if isinstance(expr, FunctionCall):
                 arguments = [arg.value for arg in expr.args]
                 signature = tuple(arg.dtype for arg in expr.args)
                 implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
-                return TypedValue(implementation(*arguments), implementation.rtype)
 
-            if isinstance(expr, TypedValue):
-                return expr
+                def value(cols):
+                    return implementation(*(arg(cols) for arg in arguments))
+                return TypedValue(value, implementation.rtype)
 
             # Literals
+            def literal_func(_):
+                return expr
+
             if isinstance(expr, int):
-                return TypedValue(expr, 'int')
+                return TypedValue(literal_func, 'int')
             if isinstance(expr, float):
-                return TypedValue(expr, 'float')
+                return TypedValue(literal_func, 'float')
             if isinstance(expr, str):
-                return TypedValue(expr, 'str')
+                return TypedValue(literal_func, 'str')
             if isinstance(expr, bool):
-                return TypedValue(expr, 'bool')
+                return TypedValue(literal_func, 'bool')
 
             raise NotImplementedError(expr, type(expr))
 
@@ -263,7 +287,6 @@ class SQLTableImpl(LazyTableImpl):
 
 
 from sqlalchemy import func as sqlfunc
-from sqlalchemy import sql
 
 
 @SQLTableImpl.op('__floordiv__', 'int, int -> int')

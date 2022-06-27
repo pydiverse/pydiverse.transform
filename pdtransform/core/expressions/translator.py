@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Generic, TYPE_CHECKING, TypeVar
+from typing import Any, Generic, TYPE_CHECKING, TypeVar, Callable
 
 from pdtransform.core.expressions import expressions
 
@@ -7,18 +7,17 @@ if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
     from pdtransform.core.table_impl import AbstractTableImpl
 
+ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
+T = TypeVar('T')
+
 # Basic container to store value and associated type metadata
 @dataclass(slots = True)
-class TypedValue:
-    value: Any
+class TypedValue(Generic[T]):
+    value: T
     dtype: str
 
     def __iter__(self):
         return iter((self.value, self.dtype))
-
-
-ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
-T = TypeVar('T')
 
 
 class Translator(Generic[ImplT, T]):
