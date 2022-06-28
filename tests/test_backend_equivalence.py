@@ -444,4 +444,65 @@ class TestSummarise:
             t >> arrange(-t.col4) >> group_by(t.col1, t.col2) >> summarise(mean3 = t.col3.mean()) >> arrange(λ.mean3)
         )
 
-    # TODO: Implement more test cases or summarise verb
+    # TODO: Implement more test cases for summarise verb
+
+
+class TestWindowFunction:
+
+    @tables(['df3'])
+    def test_simple_ungrouped(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> mutate(min = t.col4.min(), max = t.col4.max(), mean = t.col4.mean())
+        )
+
+    @tables(['df3'])
+    def test_simple_grouped(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1) >> mutate(min = t.col4.min(), max = t.col4.max(), mean = t.col4.mean())
+        )
+
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> mutate(min = t.col4.min(), max = t.col4.max(), mean = t.col4.mean())
+        )
+
+    @tables(['df3'])
+    def test_chained(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1) >> mutate(min = t.col4.min()) >> mutate(max = t.col4.max(), mean = t.col4.mean())
+        )
+
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1) >> mutate(min = t.col4.min(), max = t.col4.max()) >> mutate(span = λ.max - λ.min)
+        )
+
+    @tables(['df3'])
+    def test_nested(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1) >> mutate(range = t.col4.max() - 10) >> ungroup() >> mutate(range_mean = λ.range.mean())
+        )
+
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> mutate(x = λ.col4.max()) >> mutate(y = λ.x.min() * 1) >> mutate(z = λ.y.mean()) >> mutate(w = λ.x / λ.y),
+            exception = ValueError
+        )
+
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> mutate(x = (λ.col4.max().min() + λ.col2.mean()).max()),
+            exception = ValueError
+        )
