@@ -326,7 +326,7 @@ class TestSQLTable:
         # Check if it worked...
         assert_frame_equal(
             (
-                tl >> join(tr, λ.a == λ.b_df_right, 'left') >> show_query() >> collect()
+                tl >> join(tr, λ.a == λ.b_df_right, 'left') >> collect()
             ),
             (tbl_left
                 >> mutate(a = (tbl_left.a * 2) % 3)
@@ -335,7 +335,6 @@ class TestSQLTable:
                         λ.a == λ.b_df_right,
                         'left'
                     )
-                >> show_query()
                 >> collect()
             )
         )

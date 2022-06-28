@@ -406,6 +406,12 @@ class TestSummarise:
             t >> group_by(t.col1, t.col2) >> summarise(mean3 = t.col3.mean()) >> summarise(mean_of_mean3 = λ.mean3.mean())
         )
 
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> mutate(k = (λ.col1 + λ.col2) * λ.col4) >> group_by(λ.k) >> summarise(x = λ.col4.mean()) >> summarise(y = λ.k.mean())
+        )
+
     @tables(['df3'])
     def test_nested(self, df3_x, df3_y):
         assert_result_equal(
@@ -452,6 +458,15 @@ class TestSummarise:
             df3_x, df3_y,
             lambda t:
             t >> arrange(-t.col4) >> group_by(t.col1, t.col2) >> summarise(mean3 = t.col3.mean()) >> arrange(λ.mean3)
+        )
+
+    @tables(['df3'])
+    def test_intermediate_select(self, df3_x, df3_y):
+        # Check that subqueries happen transparently
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> summarise(x = t.col4.mean()) >> mutate(x2 = λ.x * 2) >> select() >> summarise(y = (λ.x - λ.x2).min())
         )
 
     # TODO: Implement more test cases for summarise verb
@@ -507,7 +522,7 @@ class TestWindowFunction:
             df3_x, df3_y,
             lambda t:
             t >> mutate(x = λ.col4.max()) >> mutate(y = λ.x.min() * 1) >> mutate(z = λ.y.mean()) >> mutate(w = λ.x / λ.y),
-            exception = ValueError
+            check_dtype = False
         )
 
         assert_result_equal(
@@ -515,4 +530,28 @@ class TestWindowFunction:
             lambda t:
             t >> mutate(x = (λ.col4.max().min() + λ.col2.mean()).max()),
             exception = ValueError
+        )
+
+    @tables(['df3'])
+    def test_summarise(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> mutate(range = t.col4.max() - t.col4.min()) >> summarise(mean_range = λ.range.mean())
+        )
+
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> summarise(range = t.col4.max() - t.col4.min()) >> mutate(mean_range = λ.range.mean())
+        )
+
+
+    @tables(['df3'])
+    def test_intermediate_select(self, df3_x, df3_y):
+        # Check that subqueries happen transparently
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> mutate(x = t.col4.mean()) >> select() >> mutate(y = λ.x.min()) >> select() >> mutate(z = (λ.x - λ.y).mean())
         )
