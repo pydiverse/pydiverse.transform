@@ -407,6 +407,16 @@ class TestSummarise:
         )
 
     @tables(['df3'])
+    def test_nested(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1, t.col2) >> summarise(mean_of_mean3 = t.col3.mean().mean()),
+            exception = ValueError
+        )
+
+
+    @tables(['df3'])
     def test_select(self, df3_x, df3_y):
         assert_result_equal(
             df3_x, df3_y,
