@@ -7,7 +7,7 @@ from .dispatchers import builtin_verb
 from .expressions import FunctionCall
 from .expressions import SymbolicExpression
 from .expressions.utils import iterate_over_expr
-from .table_impl import AbstractTableImpl
+from .table_impl import AbstractTableImpl, ColumnMetaData
 from .utils import ordered_set, bidict
 
 
@@ -89,11 +89,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         new_tbl.selects.add(name)
         new_tbl.named_cols.fwd[name] = uid
         new_tbl.available_cols.add(uid)
-        new_tbl.col_expr[uid] = expr
-
-        compiled, dtype = tbl.compiler.translate(expr, verb='mutate')
-        new_tbl.compiled_expr[uid] = compiled
-        new_tbl.col_dtype[uid] = dtype
+        new_tbl.cols[uid] = ColumnMetaData.from_expr(uid, expr, new_tbl, verb='mutate')
 
     new_tbl.mutate(**kwargs)
     return new_tbl
@@ -129,9 +125,7 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     new_left.selects |= right_renamed_selects
     new_left.named_cols.fwd.update(right_renamed_cols)
     new_left.available_cols.update(right.available_cols)
-    new_left.col_expr.update(right.col_expr)
-    new_left.col_dtype.update(right.col_dtype)
-    new_left.compiled_expr.update(right.compiled_expr)
+    new_left.cols.update(right.cols)
 
     # By resolving lambdas this late, we enable the user to use lambda columns
     # to reference mutated columns from the right side of the join.
@@ -233,9 +227,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     selects = ordered_set()
     named_cols = bidict()
     available_cols = set()
-    col_expr = {}
-    col_dtype = {}
-    compiled_expr = {}
+    cols = {}
 
     # Add grouping cols to beginning of select.
     for col in tbl.grouped_by:
@@ -251,19 +243,13 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         selects.add(name)
         named_cols.fwd[name] = uid
         available_cols.add(uid)
-        col_expr[uid] = expr
-
-        compiled, dtype = new_tbl.compiler.translate(expr, verb='summarise')
-        compiled_expr[uid] = compiled
-        col_dtype[uid] = dtype
+        cols[uid] = ColumnMetaData.from_expr(uid, expr, new_tbl, verb='summarise')
 
     # Update new_tbl
     new_tbl.selects = ordered_set(selects)
     new_tbl.named_cols = named_cols
     new_tbl.available_cols = available_cols
-    new_tbl.col_expr.update(col_expr)
-    new_tbl.col_dtype.update(col_dtype)
-    new_tbl.compiled_expr.update(compiled_expr)
+    new_tbl.cols.update(cols)
     new_tbl.intrinsic_grouped_by = new_tbl.grouped_by.copy()
     new_tbl.summarise(**kwargs)
 

@@ -11,6 +11,7 @@ from pdtransform.core.column import Column
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 from pdtransform.core.expressions.translator import Translator, TypedValue
 from .lazy_table import JoinDescriptor, LazyTableImpl, OrderByDescriptor
+from ..core.table_impl import ColumnMetaData
 
 
 class SQLTableImpl(LazyTableImpl):
@@ -83,12 +84,10 @@ class SQLTableImpl(LazyTableImpl):
             for col in columns.values()
         }  # from uuid to sqlalchemy column
 
-        if hasattr(self, 'compiled_expr'):
+        if hasattr(self, 'cols'):
             # TODO: Clean up... This feels a bit hacky
-            self.compiled_expr = {
-                col.uuid: self.compiler.translate(col).value
-                for col in columns.values()
-            }
+            for col in columns.values():
+                self.cols[col.uuid] = ColumnMetaData.from_expr(col.uuid, col, self)
 
         self.joins = []         # type: list[JoinDescriptor]
         self.wheres = []        # type: list[SymbolicExpression]
@@ -143,7 +142,7 @@ class SQLTableImpl(LazyTableImpl):
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
         s = [
-            self.compiled_expr[uuid](self.sql_columns).label(name)
+            self.cols[uuid].compiled(self.sql_columns).label(name)
             for name, uuid in self.selected_cols()
         ]
         select = select.with_only_columns(s)
@@ -225,6 +224,8 @@ class SQLTableImpl(LazyTableImpl):
 
         # If the grouping level is different from the grouping level of the
         # tbl object, then we must make a subquery.
+        # Alternatively, if one of the input columns is a window function, we
+        # also must make a subquery.
         if self.intrinsic_grouped_by and self.grouped_by != self.intrinsic_grouped_by:
             # Must make a subquery
             subquery = self.build_query()
@@ -252,10 +253,10 @@ class SQLTableImpl(LazyTableImpl):
                 if expr.uuid in self.backend.sql_columns:
                     def sql_col(cols):
                         return cols[expr.uuid]
-                    return TypedValue(sql_col, expr.dtype)
+                    return TypedValue(sql_col, expr.dtype, 's')
 
-                if expr.uuid in self.backend.compiled_expr:
-                    return TypedValue(self.backend.compiled_expr[expr.uuid], self.backend.col_dtype[expr.uuid])
+                if col := self.backend.cols.get(expr.uuid):
+                    return TypedValue(col.compiled, col.dtype, col.ftype)
 
                 raise Exception
 
@@ -267,7 +268,7 @@ class SQLTableImpl(LazyTableImpl):
                 def value(cols):
                     return implementation(*(arg(cols) for arg in arguments))
 
-                if implementation.f_type == 'a' and verb == 'mutate':
+                if implementation.ftype == 'a' and verb == 'mutate':
                     # Aggregate function in mutate verb -> window function
                     compiled_gb = [self.translate(group_by).value for group_by in self.backend.grouped_by]
                     def over_value(cols):
@@ -275,9 +276,12 @@ class SQLTableImpl(LazyTableImpl):
                         return value(cols).over(
                             partition_by = sql.expression.ClauseList(*partition_bys)
                         )
-                    return TypedValue(over_value, implementation.rtype)
+
+                    ftype = self.backend._get_func_ftype(expr.args, implementation, 'w')
+                    return TypedValue(over_value, implementation.rtype, ftype)
                 else:
-                    return TypedValue(value, implementation.rtype)
+                    ftype = self.backend._get_func_ftype(expr.args, implementation)
+                    return TypedValue(value, implementation.rtype, ftype)
 
             # Literals
             def literal_func(_):

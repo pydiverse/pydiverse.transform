@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Generic, TYPE_CHECKING, TypeVar, Callable
+from typing import Generic, TYPE_CHECKING, TypeVar
 
 from pdtransform.core.expressions import expressions
 
@@ -15,6 +15,7 @@ T = TypeVar('T')
 class TypedValue(Generic[T]):
     value: T
     dtype: str
+    ftype: str = 's'  # One of 's', 'a' or 'w'
 
     def __iter__(self):
         return iter((self.value, self.dtype))
@@ -27,7 +28,11 @@ class Translator(Generic[ImplT, T]):
 
     def translate(self, expr, **kwargs) -> T:
         """ Translate an expression recursively. """
-        return bottom_up_replace(expr, lambda e: self._translate(e, **kwargs))
+        try:
+            return bottom_up_replace(expr, lambda e: self._translate(e, **kwargs))
+        except Exception as e:
+            raise ValueError(f"An exception occured while trying to translate the expression '{expr}':\n"
+                            f"{e}") from e
 
     def _translate(self, expr, **kwargs) -> T:
         """ Translate an expression non recursively. """

@@ -42,9 +42,9 @@ class TestOperatorSignature:
         with pytest.raises(ValueError):
             OperatorSignature.parse('int, str -> int...')
 
-    def test_parse_f_type(self):
-        assert OperatorSignature.parse('int -> int').f_type == 's'
-        assert OperatorSignature.parse('int |> int').f_type == 'a'
+    def test_parse_ftype(self):
+        assert OperatorSignature.parse('int -> int').ftype == 's'
+        assert OperatorSignature.parse('int |> int').ftype == 'a'
 
         with pytest.raises(ValueError):
             OperatorSignature.parse('int -|> int')

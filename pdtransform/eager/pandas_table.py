@@ -91,14 +91,14 @@ class PandasTableImpl(EagerTableImpl):
             # Window Functions
             gdf = self.grouped_df()
             cols_transforms = {
-                self.df_name_mapping[uuid]: self.compiled_expr[uuid]
+                self.df_name_mapping[uuid]: self.cols[uuid].compiled
                 for uuid in uuid_kwargs.keys()
             }
             self.df = gdf.apply(lambda x: x.assign(**{k: v(x) for k, v in cols_transforms.items()}))
         else:
             # Normal Functions
             cols = {
-                self.df_name_mapping[uuid]: self.compiled_expr[uuid](self.df)
+                self.df_name_mapping[uuid]: self.cols[uuid].compiled(self.df)
                 for uuid in uuid_kwargs.keys()
             }
             self.df = self.df.assign(**cols)
@@ -111,9 +111,9 @@ class PandasTableImpl(EagerTableImpl):
         # Parse ON condition
         on_cols = []
         for col1, col2 in self.join_translator.translate(on):
-            if col1.uuid in self.col_expr and col2.uuid in right.col_expr:
+            if col1.uuid in self.cols and col2.uuid in right.cols:
                 on_cols.append((col1, col2))
-            elif col2.uuid in self.col_expr and col1.uuid in right.col_expr:
+            elif col2.uuid in self.cols and col1.uuid in right.cols:
                 on_cols.append((col2, col1))
             else:
                 raise Exception
@@ -153,7 +153,7 @@ class PandasTableImpl(EagerTableImpl):
             internal_name = f'{self.name}_summarise_{name}_{uuid_to_str(uuid)}'
             self.df_name_mapping[uuid] = internal_name
 
-            compiled = self.compiled_expr[uuid]
+            compiled = self.cols[uuid].compiled
             translated_values[internal_name] = compiled(grouped_df)
 
         # Grouped Dataframe requires different operations compared to ungrouped df.

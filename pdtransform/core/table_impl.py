@@ -1,9 +1,11 @@
 import copy
+import dataclasses
 import typing
 import uuid
 
 from .column import Column, LambdaColumn
-from .expressions import FunctionCall, OperatorRegistry, SymbolicExpression
+from .expressions import OperatorRegistry, SymbolicExpression
+from .expressions.operator_registry import TypedOperatorImpl
 from .expressions.translator import Translator, TypedValue
 from .utils import bidict, ordered_set
 
@@ -68,9 +70,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         self.selects = ordered_set()       # type: ordered_set[str]
         self.named_cols = bidict()         # type: bidict[str: uuid.UUID]
         self.available_cols = set()        # type: set[uuid.UUID]
-        self.col_expr = {}                 # type: dict[uuid.UUID: SymbolicExpression]
-        self.col_dtype = {}                # type: dict[uuid.UUID: str]
-        self.compiled_expr = {}            # type: dict[uuid.UUID: typing.Callable[[*typing.Any], TypedValue]]
+        self.cols = {}                     # type: dict[uuid.UUID: ColumnMetaData]
 
         self.grouped_by = ordered_set()             # type: ordered_set[Column]
         self.intrinsic_grouped_by = ordered_set()   # type: ordered_set[Column]
@@ -80,9 +80,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self.selects.add(name)
             self.named_cols.fwd[name] = col.uuid
             self.available_cols.add(col.uuid)
-            self.col_expr[col.uuid] = col
-            self.col_dtype[col.uuid] = col.dtype
-            self.compiled_expr[col.uuid] = self.compiler.translate(col).value
+            self.cols[col.uuid] = ColumnMetaData.from_expr(col.uuid, col, self)
 
     def copy(self):
         c = copy.copy(self)
@@ -99,7 +97,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def get_col(self, name: str):
         """Getter used by `Table.__getattr__`"""
         if uuid := self.named_cols.fwd.get(name, None):
-            return Column(name, self, self.col_dtype.get(uuid), uuid)
+            return self.cols[uuid].as_column(name, self)
         # Must return AttributeError, else `hasattr` doesn't work on Table instances.
         raise AttributeError(f"Table '{self.name}' has not column named '{name}'.")
 
@@ -184,15 +182,76 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 if expr.name not in self.backend.named_cols.fwd:
                     raise ValueError(f"Invalid lambda column '{expr.name}. No column with this name found for table '{self.backend.named_cols}'.'")
                 uuid = self.backend.named_cols.fwd[expr.name]
-                dtype = self.backend.col_dtype.get(uuid)
-
-                return Column(
-                    name = expr.name,
-                    table = self.backend,
-                    dtype = dtype,
-                    uuid = uuid
-                )
+                return self.backend.cols[uuid].as_column(expr.name, self.backend)
             return expr
+
+    #### Helpers ####
+
+    def _get_func_ftype(self, args, implementation: TypedOperatorImpl, override_ftype: str = None) -> str:
+        """
+        Get the ftype based on a function implementation and the arguments.
+
+            s(s) -> s       a(s) -> a       w(s) -> w
+            s(a) -> a       a(a) -> Err     w(a) -> w
+            s(w) -> w       a(w) -> Err     w(w) -> Err
+
+        If the implementation ftype is incompatible with the arguments, this
+        function raises an Exception.
+        """
+        ftypes = [arg.ftype for arg in args]
+        impl_ftype = override_ftype or implementation.ftype
+
+        if impl_ftype == 's':
+            if 'w' in ftypes:
+                return 'w'
+            if 'a' in ftypes:
+                return 'a'
+            return 's'
+
+        if impl_ftype == 'a':
+            if 'w' in ftypes:
+                raise ValueError(f"Can't nest a window function inside an aggregate function ({implementation.name}).")
+            if 'a' in ftypes:
+                raise ValueError(f"Can't nest an aggregate function inside an aggregate function ({implementation.name}).")
+            return 'a'
+
+        if impl_ftype == 'w':
+            if 'w' in ftypes:
+                raise ValueError(f"Can't nest a window function inside a window function ({implementation.name}).")
+            return 'w'
+
+
+
+@dataclasses.dataclass
+class ColumnMetaData:
+    uuid: uuid.UUID
+    expr: typing.Any
+    compiled: typing.Callable[[typing.Any], TypedValue]
+    dtype: str
+    ftype: str
+
+    @classmethod
+    def from_expr(cls, uuid, expr, table: AbstractTableImpl, **kwargs):
+        v = table.compiler.translate(expr, **kwargs)
+        return cls(
+            uuid = uuid,
+            expr = expr,
+            compiled = v.value,
+            dtype = v.dtype,
+            ftype = v.ftype,
+        )
+
+    def __hash__(self):
+        return hash(self.uuid)
+
+    def as_column(self, name, table: AbstractTableImpl):
+        return Column(
+            name,
+            table,
+            self.dtype,
+            self.uuid
+        )
+
 
 #### ARITHMETIC OPERATORS ######################################################
 
