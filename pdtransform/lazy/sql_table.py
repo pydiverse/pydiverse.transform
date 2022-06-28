@@ -8,10 +8,10 @@ import sqlalchemy
 from sqlalchemy import sql
 
 from pdtransform.core.column import Column
-from pdtransform.core.expressions import FunctionCall, SymbolicExpression
+from pdtransform.core.expressions import FunctionCall, SymbolicExpression, iterate_over_expr
 from pdtransform.core.expressions.translator import Translator, TypedValue
+from pdtransform.core.table_impl import ColumnMetaData
 from .lazy_table import JoinDescriptor, LazyTableImpl, OrderByDescriptor
-from ..core.table_impl import ColumnMetaData
 
 
 class SQLTableImpl(LazyTableImpl):
@@ -174,6 +174,31 @@ class SQLTableImpl(LazyTableImpl):
             sql_db = _FixedSqlDatabase(conn)
             return sql_db.read_sql(compiled)
 
+    def pre_mutate(self, **kwargs):
+        requires_subquery = any(
+            self.cols[c.uuid].ftype == 'w'
+            for v in kwargs.values()
+            for c in iterate_over_expr(self.resolve_lambda_cols(v)) if isinstance(c, Column)
+        )
+
+        if requires_subquery:
+            # TODO: It would be nice if this could be done without having to select all columns.
+            #       As a potential challenge for the hackathon I propose a mean of even creating the subqueries lazyly.
+            #       This means that we could perform some kind of query optimization before submitting the actual query.
+            #       Eg: Instead of selecting all possible columns, only select those that actually get used.
+            #       This also applies to the pre_summarise function.
+
+            columns = {
+                name: self.cols[uuid].as_column(name, self)
+                for name, uuid in self.named_cols.fwd.items()
+            }
+            original_selects = self.selects
+            self.selects = self.selects | columns.keys()
+            subquery = self.build_query()
+
+            self.replace_tbl(subquery, columns)
+            self.selects = original_selects
+
     def join(self, right, on, how):
         super().join(right, on, how)
 
@@ -223,16 +248,21 @@ class SQLTableImpl(LazyTableImpl):
         self.order_bys.clear()
 
         # If the grouping level is different from the grouping level of the
-        # tbl object, then we must make a subquery.
-        # Alternatively, if one of the input columns is a window function, we
-        # also must make a subquery.
-        if self.intrinsic_grouped_by and self.grouped_by != self.intrinsic_grouped_by:
-            # Must make a subquery
-            subquery = self.build_query()
+        # tbl object, or if on of the input columns is a window or aggregate
+        # function, we must make a subquery.
+        requires_subquery = (bool(self.intrinsic_grouped_by) and self.grouped_by != self.intrinsic_grouped_by) or any(
+            self.cols[c.uuid].ftype in ('w', 'a')
+            for v in kwargs.values()
+            for c in iterate_over_expr(self.resolve_lambda_cols(v)) if isinstance(c, Column)
+        )
+
+        if requires_subquery:
             columns = {
-                name: self.get_col(name)
-                for name in self.selects
+                name: self.cols[uuid].as_column(name, self)
+                for name, uuid in self.named_cols.fwd.items()
             }
+            self.selects |= columns.keys()
+            subquery = self.build_query()
 
             self.replace_tbl(subquery, columns)
 

@@ -81,9 +81,11 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
 def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     # Check args only contains valid columns
     check_cols_available(tbl, cols_in_expressions(kwargs.values()), 'mutate')
-    kwargs = {k: tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 
     new_tbl = tbl.copy()
+    new_tbl.pre_mutate(**kwargs)
+    kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
+
     for name, expr in kwargs.items():
         uid = generate_col_uuid()
         new_tbl.selects.add(name)
@@ -216,7 +218,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     check_cols_available(tbl, cols_in_expressions(kwargs.values()), 'summarise')
 
     new_tbl = tbl.copy()
-    new_tbl.pre_summarise()
+    new_tbl.pre_summarise(**kwargs)
 
     kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 

@@ -154,22 +154,23 @@ class PandasTableImpl(EagerTableImpl):
             self.df_name_mapping[uuid] = internal_name
 
             compiled = self.cols[uuid].compiled
-            translated_values[internal_name] = compiled(grouped_df)
+            if self.grouped_by:
+                translated_values[internal_name] = grouped_df.apply(compiled)
+            else:
+                translated_values[internal_name] = compiled(grouped_df)
 
         # Grouped Dataframe requires different operations compared to ungrouped df.
         if self.grouped_by:
-            # grouped dataframe
             columns = { k: v.rename(k) for k, v in translated_values.items() }
             self.df = pd.concat(columns, axis = 'columns').reset_index()
         else:
-            # ungruped dataframe
             self.df = pd.DataFrame(translated_values, index = [0])
 
     #### EXPRESSIONS ####
 
     class ExpressionCompiler(Translator['PandasTableImpl', TypedValue[Callable[[pd.DataFrame], pd.Series]]]):
 
-        def _translate(self, expr, **kwargs):
+        def _translate(self, expr, verb=None, **kwargs):
             if isinstance(expr, Column):
                 df_col_name = self.backend.df_name_mapping[expr.uuid]
                 def df_col(df):
@@ -183,7 +184,10 @@ class PandasTableImpl(EagerTableImpl):
 
                 def value(df):
                     return implementation(*(arg(df) for arg in arguments))
-                return TypedValue(value, implementation.rtype)
+
+                override_impl_ftype = 'w' if implementation.ftype == 'a' and verb == 'mutate' else None
+                ftype = self.backend._get_func_ftype(expr.args, implementation, override_impl_ftype)
+                return TypedValue(value, implementation.rtype, ftype)
 
             if isinstance(expr, TypedValue):
                 return expr

@@ -127,6 +127,10 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def select(self, *args):
         ...
 
+    def pre_mutate(self, **kwargs):
+        """Gives the backend a chance to create a subquery"""
+        ...
+
     def mutate(self, **kwargs):
         ...
 
