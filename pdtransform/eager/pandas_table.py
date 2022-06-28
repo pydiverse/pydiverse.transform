@@ -5,7 +5,6 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from pandas.core.groupby import DataFrameGroupBy
 
 from pdtransform.core.column import Column
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
@@ -88,11 +87,21 @@ class PandasTableImpl(EagerTableImpl):
         })
 
         # Update Dataframe
-        cols = {
-            self.df_name_mapping[uuid]: self.compiled_expr[uuid](self.df)
-            for uuid in uuid_kwargs.keys()
-        }
-        self.df = self.df.assign(**cols)
+        if self.grouped_by:
+            # Window Functions
+            gdf = self.grouped_df()
+            cols_transforms = {
+                self.df_name_mapping[uuid]: self.compiled_expr[uuid]
+                for uuid in uuid_kwargs.keys()
+            }
+            self.df = gdf.apply(lambda x: x.assign(**{k: v(x) for k, v in cols_transforms.items()}))
+        else:
+            # Normal Functions
+            cols = {
+                self.df_name_mapping[uuid]: self.compiled_expr[uuid](self.df)
+                for uuid in uuid_kwargs.keys()
+            }
+            self.df = self.df.assign(**cols)
 
     def join(self, right: 'PandasTableImpl', on: SymbolicExpression, how: str):
         """

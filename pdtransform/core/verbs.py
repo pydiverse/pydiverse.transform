@@ -91,7 +91,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         new_tbl.available_cols.add(uid)
         new_tbl.col_expr[uid] = expr
 
-        compiled, dtype = tbl.compiler.translate(expr)
+        compiled, dtype = tbl.compiler.translate(expr, verb='mutate')
         new_tbl.compiled_expr[uid] = compiled
         new_tbl.col_dtype[uid] = dtype
 
@@ -253,7 +253,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         available_cols.add(uid)
         col_expr[uid] = expr
 
-        compiled, dtype = new_tbl.compiler.translate(expr)
+        compiled, dtype = new_tbl.compiler.translate(expr, verb='summarise')
         compiled_expr[uid] = compiled
         col_dtype[uid] = dtype
 

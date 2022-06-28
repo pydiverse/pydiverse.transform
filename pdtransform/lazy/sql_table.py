@@ -84,6 +84,7 @@ class SQLTableImpl(LazyTableImpl):
         }  # from uuid to sqlalchemy column
 
         if hasattr(self, 'compiled_expr'):
+            # TODO: Clean up... This feels a bit hacky
             self.compiled_expr = {
                 col.uuid: self.compiler.translate(col).value
                 for col in columns.values()
@@ -245,7 +246,7 @@ class SQLTableImpl(LazyTableImpl):
 
     class ExpressionCompiler(Translator['SQLTableImpl', TypedValue[Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]]]):
 
-        def _translate(self, expr, **kwargs):
+        def _translate(self, expr, verb=None, **kwargs):
             if isinstance(expr, Column):
                 # Can either be a base SQL column, or a reference to an expression
                 if expr.uuid in self.backend.sql_columns:
@@ -265,7 +266,18 @@ class SQLTableImpl(LazyTableImpl):
 
                 def value(cols):
                     return implementation(*(arg(cols) for arg in arguments))
-                return TypedValue(value, implementation.rtype)
+
+                if implementation.f_type == 'a' and verb == 'mutate':
+                    # Aggregate function in mutate verb -> window function
+                    compiled_gb = [self.translate(group_by).value for group_by in self.backend.grouped_by]
+                    def over_value(cols):
+                        partition_bys = (compiled(cols) for compiled in compiled_gb)
+                        return value(cols).over(
+                            partition_by = sql.expression.ClauseList(*partition_bys)
+                        )
+                    return TypedValue(over_value, implementation.rtype)
+                else:
+                    return TypedValue(value, implementation.rtype)
 
             # Literals
             def literal_func(_):
