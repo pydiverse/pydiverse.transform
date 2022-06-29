@@ -2,7 +2,7 @@ import pytest
 
 from pdtransform import λ
 from pdtransform.core import Table, AbstractTableImpl, Column
-from pdtransform.core.dispatchers import inverse_partial, verb, wrap_tables, unwrap_tables
+from pdtransform.core.dispatchers import inverse_partial, verb, col_to_table, wrap_tables, unwrap_tables
 from pdtransform.core.expressions import Translator
 from pdtransform.core.expressions.translator import TypedValue
 from pdtransform.core.utils import bidict, ordered_set
@@ -80,6 +80,15 @@ class TestDispatchers:
 
         assert 5 >> subtract(3) == 2
         assert 5 >> add_10 >> subtract(5) == 10
+
+    def test_col_to_table(self, tbl1):
+        assert col_to_table(15) == 15
+        assert col_to_table(tbl1) == tbl1
+
+        c1_tbl = col_to_table(tbl1.col1._)
+        assert isinstance(c1_tbl, AbstractTableImpl)
+        assert c1_tbl.available_cols == { tbl1.col1._.uuid }
+        assert list(c1_tbl.named_cols.fwd) == ['col1']
 
     def test_unwrap_tables(self):
         impl_1 = MockTableImpl('impl_1', dict())
@@ -176,6 +185,15 @@ class TestBuiltinVerbs:
 
         with pytest.raises(ValueError):
             tbl1 >> arrange(tbl1.col1 * 4)
+
+    def test_col_pipeable(self, tbl1, tbl2):
+        result = tbl1.col1 >> mutate(x = tbl1.col1 * 2)
+
+        assert result._impl.selects == ordered_set(['col1', 'x'])
+        assert list(result._impl.named_cols.fwd) == ['col1', 'x']
+
+        with pytest.raises(ValueError):
+            (tbl1.col1 + 2) >> mutate(x = 1)
 
 
 class TestDataStructures:

@@ -1,9 +1,10 @@
 from functools import partial, reduce, wraps
 from typing import Any
 
-from pdtransform.core import table
+from pdtransform.core import table, column, verbs
 from pdtransform.core.expressions import unwrap_symbolic_expressions
 from pdtransform.core.table_impl import AbstractTableImpl
+from pdtransform.core.utils import bidict
 
 
 class Pipeable:
@@ -64,11 +65,13 @@ def builtin_verb(backends = None):
     def wrap_and_unwrap(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            args = unwrap_tables(args)
+            args = list(args)
             args = unwrap_symbolic_expressions(args)
+            if len(args): args[0] = col_to_table(args[0])
+            args = unwrap_tables(args)
 
-            kwargs = unwrap_tables(kwargs)
             kwargs = unwrap_symbolic_expressions(kwargs)
+            kwargs = unwrap_tables(kwargs)
 
             return wrap_tables(func(*args, **kwargs))
         return wrapper
@@ -97,6 +100,33 @@ def builtin_verb(backends = None):
     return decorator
 
 # Helper
+
+def col_to_table(arg: Any = None):
+    """
+    Takes a single argument and if it is a column, replaces it with a table
+    implementation that only contains that one column.
+
+    This allows for more eager style code where you perform operations on
+    columns like with the following example::
+
+        def get_c(b, tB):
+            tC = b >> left_join(tB, b == tB.b)
+            return tC[tB.c]
+        feature_col = get_c(tblA.b, tblB)
+
+    """
+
+    if isinstance(arg, column.Column):
+        tbl = (arg.table >> verbs.select(arg))._impl  # type: AbstractTableImpl
+        col = tbl.get_col(arg)
+
+        tbl.available_cols = { col.uuid }
+        tbl.named_cols = bidict({ col.name: col.uuid })
+        return tbl
+    elif isinstance(arg, column.LambdaColumn):
+        raise ValueError
+
+    return arg
 
 def unwrap_tables(arg: Any = None):
     """

@@ -40,14 +40,29 @@ def cols_in_expressions(expressions) -> set[Column]:
         return set()
     return set.union(*(cols_in_expression(e) for e in expressions))
 
+def validate_table_args(*tables):
+    if len(tables) == 0:
+        return
+
+    for table in tables:
+        if not isinstance(table, AbstractTableImpl):
+            raise ValueError(f'Expected a TableImpl but got {type(table)} instead.')
+
+    backend = type(tables[0])
+    for table in tables:
+        if type(table) != backend:
+            raise ValueError(f"Can't mix tables with different backends. Expected '{backend}' but found '{type(table)}'.")
+
 
 @builtin_verb()
 def alias(tbl: AbstractTableImpl, name: str):
     """Creates a new table object with a different name."""
+    validate_table_args(tbl)
     return tbl.alias(name)
 
 @builtin_verb()
 def collect(tbl: AbstractTableImpl):
+    validate_table_args(tbl)
     return tbl.collect()
 
 @builtin_verb()
@@ -57,6 +72,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
         raise NotImplementedError
 
     # Validate input
+    validate_table_args(tbl)
     check_cols_available(tbl, cols_in_expressions(args), 'select')
     check_lambdas_valid(tbl, *args)
 
@@ -79,7 +95,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
 
 @builtin_verb()
 def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
-    # Check args only contains valid columns
+    validate_table_args(tbl)
     check_cols_available(tbl, cols_in_expressions(kwargs.values()), 'mutate')
 
     new_tbl = tbl.copy()
@@ -98,6 +114,8 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
 
 @builtin_verb()
 def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpression, how: str):
+    validate_table_args(left, right)
+
     if left.grouped_by or right.grouped_by:
         raise ValueError(f"Can't join grouped tables. You first have to ungroup them.")
 
@@ -145,6 +163,7 @@ outer_join = functools.partial(join, how='outer')
 @builtin_verb()
 def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
     # TODO: Type check expression
+    validate_table_args(tbl)
     check_cols_available(tbl, cols_in_expressions(args), 'filter')
     args = [tbl.resolve_lambda_cols(arg) for arg in args]
 
@@ -158,6 +177,7 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
         return tbl
 
     # Validate Input
+    validate_table_args(tbl)
     check_cols_available(tbl, cols_in_expressions(args), 'arrange')
     check_lambdas_valid(tbl, *args)
 
@@ -184,6 +204,7 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
 @builtin_verb()
 def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add = False):
     # Validate Input
+    validate_table_args(tbl)
     check_cols_available(tbl, cols_in_expressions(args), 'group_by')
     check_lambdas_valid(tbl, *args)
 
@@ -207,6 +228,8 @@ def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add = False):
 @builtin_verb()
 def ungroup(tbl: AbstractTableImpl):
     """ Remove all groupings from table. """
+    validate_table_args(tbl)
+
     new_tbl = tbl.copy()
     new_tbl.grouped_by.clear()
     new_tbl.ungroup()
@@ -215,6 +238,7 @@ def ungroup(tbl: AbstractTableImpl):
 @builtin_verb()
 def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     # Validate Input
+    validate_table_args(tbl)
     check_cols_available(tbl, cols_in_expressions(kwargs.values()), 'summarise')
 
     new_tbl = tbl.copy()
