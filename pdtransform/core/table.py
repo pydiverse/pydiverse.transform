@@ -17,6 +17,8 @@ class Table(Generic[ImplT]):
         self._impl = implementation
 
     def __getitem__(self, key) -> SymbolicExpression[Column]:
+        if isinstance(key, SymbolicExpression):
+            key = key._
         return SymbolicExpression(self._impl.get_col(key))
 
     def __setitem__(self, col, expr):

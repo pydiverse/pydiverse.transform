@@ -94,12 +94,24 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         c.lambda_translator = self.LambdaTranslator(c)
         return c
 
-    def get_col(self, name: str):
+    def get_col(self, key: str | Column | LambdaColumn):
         """Getter used by `Table.__getattr__`"""
-        if uuid := self.named_cols.fwd.get(name, None):
-            return self.cols[uuid].as_column(name, self)
-        # Must return AttributeError, else `hasattr` doesn't work on Table instances.
-        raise AttributeError(f"Table '{self.name}' has not column named '{name}'.")
+
+        if isinstance(key, LambdaColumn):
+            key = key.name
+
+        if isinstance(key, str):
+            if uuid := self.named_cols.fwd.get(key, None):
+                return self.cols[uuid].as_column(key, self)
+            # Must return AttributeError, else `hasattr` doesn't work on Table instances.
+            raise AttributeError(f"Table '{self.name}' has not column named '{key}'.")
+
+        if isinstance(key, Column):
+            uuid = key.uuid
+            if uuid in self.available_cols:
+                name = self.named_cols.bwd[uuid]
+                return self.cols[uuid].as_column(name, self)
+            raise KeyError(f"Table '{self.name}' has no column that matches '{key}'.")
 
     def selected_cols(self) -> typing.Iterable[tuple[str, uuid.UUID]]:
         for name in self.selects:

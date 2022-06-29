@@ -32,6 +32,9 @@ class TestTable:
         assert tbl1.col1._ == tbl1['col1']._
         assert tbl1.col2._ == tbl1['col2']._
 
+        assert tbl1.col2._ == tbl1[tbl1.col2]._
+        assert tbl1.col2._ == tbl1[λ.col2]._
+
     def test_setitem(self, tbl1):
         tbl1['col1'] = 1
         tbl1[tbl1.col1] = 1
