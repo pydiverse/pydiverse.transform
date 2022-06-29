@@ -57,11 +57,21 @@ class SymbolicExpression(Generic[T]):
             if backend is None:
                 raise ValueError('Failed to determine backend.')
 
-            # Translate each column in the context of its own table
-            base_translation = translator.bottom_up_replace(self._, lambda e: e.table.translator.translate(e) if isinstance(e, column.Column) else e)
+            # Bind the correct function arguments to each column in the expression
+            def base_replacer(expr):
+                if isinstance(expr, column.Column):
+                    tbl = expr.table
+                    translated = tbl.compiler.translate(expr)
+                    translated.value = tbl._bind_values_to_compiled_expr(translated.value)
+                    return translated
+                return expr
+            base_translation = translator.bottom_up_replace(self._, base_replacer)
+
             # Evaluate the function calls on the shared backend
-            result = backend.ExpressionTranslator(backend).translate(base_translation)
-            value_repr = backend._html_repr_expr(result.value)
+            result = backend.ExpressionCompiler(backend).translate(base_translation)
+            value = result.value(None)
+
+            value_repr = backend._html_repr_expr(value)
             html += f"dtype: <code>{escape(result.dtype)}</code></br></br>"
             html += f"<pre>{escape(value_repr)}</pre>"
         except Exception as e:

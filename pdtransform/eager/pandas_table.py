@@ -65,6 +65,9 @@ class PandasTableImpl(EagerTableImpl):
 
         return kind_map.get(dtype.kind, str(dtype))
 
+    def _bind_values_to_compiled_expr(self, compiled):
+        return lambda x: compiled(self.df)
+
     #### Verb Operations ####
 
     def alias(self, name):
@@ -190,6 +193,7 @@ class PandasTableImpl(EagerTableImpl):
                 return TypedValue(value, implementation.rtype, ftype)
 
             if isinstance(expr, TypedValue):
+                # For iPython formatting
                 return expr
 
             # Literals

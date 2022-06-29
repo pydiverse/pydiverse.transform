@@ -29,6 +29,9 @@ class SQLTableImpl(LazyTableImpl):
         self.replace_tbl(tbl, columns)
         super().__init__(name = self.tbl.name, columns = columns)
 
+    def _bind_values_to_compiled_expr(self, compiled):
+        return lambda _: compiled(self.sql_columns)
+
     @classmethod
     def _html_repr_expr(cls, expr):
         if isinstance(expr, sqlalchemy.sql.expression.ColumnElement):
@@ -312,6 +315,10 @@ class SQLTableImpl(LazyTableImpl):
                 else:
                     ftype = self.backend._get_func_ftype(expr.args, implementation)
                     return TypedValue(value, implementation.rtype, ftype)
+
+            if isinstance(expr, TypedValue):
+                # For iPython formatting
+                return expr
 
             # Literals
             def literal_func(_):
