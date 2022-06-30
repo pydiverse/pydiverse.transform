@@ -273,7 +273,7 @@ class TestDataStructures:
 class MockTableImpl(AbstractTableImpl):
     def __init__(self, name, col_names):
         super().__init__(name, {
-            name: Column(name, self, 'int')  # TODO: it should be possible to specify the dtype
+            name: Column(name, self, 'int')
             for name in col_names
         })
 
@@ -283,6 +283,6 @@ class MockTableImpl(AbstractTableImpl):
     def collect(self):
         return list(self.selects)
 
-    class ExpressionCompiler(Translator):
+    class ExpressionCompiler(AbstractTableImpl.ExpressionCompiler):
         def _translate(self, expr, **kwargs):
             return TypedValue(None, None)

@@ -278,62 +278,37 @@ class SQLTableImpl(LazyTableImpl):
 
     #### EXPRESSIONS ####
 
-    class ExpressionCompiler(Translator['SQLTableImpl', TypedValue[Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]]]):
+    class ExpressionCompiler(LazyTableImpl.ExpressionCompiler['SQLTableImpl', TypedValue[Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]]]):
 
-        def _translate(self, expr, verb=None, **kwargs):
-            if isinstance(expr, Column):
-                # Can either be a base SQL column, or a reference to an expression
-                if expr.uuid in self.backend.sql_columns:
-                    def sql_col(cols):
-                        return cols[expr.uuid]
-                    return TypedValue(sql_col, expr.dtype, 's')
+        def _translate_col(self, expr, **kwargs):
+            # Can either be a base SQL column, or a reference to an expression
+            if expr.uuid in self.backend.sql_columns:
+                def sql_col(cols):
+                    return cols[expr.uuid]
+                return TypedValue(sql_col, expr.dtype, 's')
 
-                if col := self.backend.cols.get(expr.uuid):
-                    return TypedValue(col.compiled, col.dtype, col.ftype)
+            col = self.backend.cols[expr.uuid]
+            return TypedValue(col.compiled, col.dtype, col.ftype)
 
-                raise Exception
+        def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
+            def value(cols):
+                return implementation(*(arg(cols) for arg in arguments))
 
-            if isinstance(expr, FunctionCall):
-                arguments = [arg.value for arg in expr.args]
-                signature = tuple(arg.dtype for arg in expr.args)
-                implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
+            if implementation.ftype == 'a' and verb == 'mutate':
+                # Aggregate function in mutate verb -> window function
+                compiled_gb = [self.translate(group_by).value for group_by in self.backend.grouped_by]
 
-                def value(cols):
-                    return implementation(*(arg(cols) for arg in arguments))
+                def over_value(cols):
+                    partition_bys = (compiled(cols) for compiled in compiled_gb)
+                    return value(cols).over(
+                        partition_by = sql.expression.ClauseList(*partition_bys)
+                    )
 
-                if implementation.ftype == 'a' and verb == 'mutate':
-                    # Aggregate function in mutate verb -> window function
-                    compiled_gb = [self.translate(group_by).value for group_by in self.backend.grouped_by]
-                    def over_value(cols):
-                        partition_bys = (compiled(cols) for compiled in compiled_gb)
-                        return value(cols).over(
-                            partition_by = sql.expression.ClauseList(*partition_bys)
-                        )
-
-                    ftype = self.backend._get_func_ftype(expr.args, implementation, 'w')
-                    return TypedValue(over_value, implementation.rtype, ftype)
-                else:
-                    ftype = self.backend._get_func_ftype(expr.args, implementation)
-                    return TypedValue(value, implementation.rtype, ftype)
-
-            if isinstance(expr, TypedValue):
-                # For iPython formatting
-                return expr
-
-            # Literals
-            def literal_func(_):
-                return expr
-
-            if isinstance(expr, int):
-                return TypedValue(literal_func, 'int')
-            if isinstance(expr, float):
-                return TypedValue(literal_func, 'float')
-            if isinstance(expr, str):
-                return TypedValue(literal_func, 'str')
-            if isinstance(expr, bool):
-                return TypedValue(literal_func, 'bool')
-
-            raise NotImplementedError(expr, type(expr))
+                ftype = self.backend._get_func_ftype(expr.args, implementation, 'w')
+                return TypedValue(over_value, implementation.rtype, ftype)
+            else:
+                ftype = self.backend._get_func_ftype(expr.args, implementation)
+                return TypedValue(value, implementation.rtype, ftype)
 
 
 #### BACKEND SPECIFIC OPERATORS ################################################

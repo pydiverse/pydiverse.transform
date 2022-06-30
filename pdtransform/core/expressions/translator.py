@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Generic, TYPE_CHECKING, TypeVar
 
-from pdtransform.core.expressions import expressions
+from pdtransform.core import column
+from pdtransform.core.expressions import expressions, operator_registry
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -21,11 +22,7 @@ class TypedValue(Generic[T]):
         return iter((self.value, self.dtype))
 
 
-class Translator(Generic[ImplT, T]):
-
-    def __init__(self, backend: ImplT):
-        self.backend = backend
-
+class Translator(Generic[T]):
     def translate(self, expr, **kwargs) -> T:
         """ Translate an expression recursively. """
         try:
@@ -36,6 +33,43 @@ class Translator(Generic[ImplT, T]):
 
     def _translate(self, expr, **kwargs) -> T:
         """ Translate an expression non recursively. """
+        raise NotImplementedError
+
+
+class DelegatingTranslator(Generic[T], Translator[T]):
+    """
+    Translator that dispatches to different translate functions based on
+    the type of the expression.
+    """
+
+    def __init__(self, operator_registry: operator_registry.OperatorRegistry):
+        self.operator_registry = operator_registry
+
+    def _translate(self, expr, **kwargs):
+        if isinstance(expr, column.Column):
+            return self._translate_col(expr, **kwargs)
+
+        if isinstance(expr, expressions.FunctionCall):
+            arguments = [arg.value for arg in expr.args]
+            signature = tuple(arg.dtype for arg in expr.args)
+            implementation = self.operator_registry.get_implementation(expr.operator, signature)
+            return self._translate_function(expr, arguments, implementation, **kwargs)
+
+        if literal_result := self._translate_literal(expr, **kwargs):
+            return literal_result
+
+        raise NotImplementedError(f"Couldn't find a way to translate object of type {type(expr)} with value {expr}.")
+
+    def _translate_col(self, expr: 'column.Column', **kwargs) -> T:
+        raise NotImplementedError
+
+    def _translate_function(
+            self, expr: 'expressions.FunctionCall',
+            arguments: list, implementation: operator_registry.TypedOperatorImpl,
+            **kwargs) -> T:
+        raise NotImplementedError
+
+    def _translate_literal(self, expr, **kwargs) -> T:
         raise NotImplementedError
 
 

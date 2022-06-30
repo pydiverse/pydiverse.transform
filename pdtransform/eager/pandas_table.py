@@ -23,7 +23,7 @@ class PandasTableImpl(EagerTableImpl):
 
     def __init__(self, name: str, df: pd.DataFrame):
         self.df = df
-        self.join_translator = self.JoinTranslator(self)
+        self.join_translator = self.JoinTranslator()
 
         columns = {
             name: Column(name = name, table = self, dtype = self._convert_dtype(dtype))
@@ -171,47 +171,24 @@ class PandasTableImpl(EagerTableImpl):
 
     #### EXPRESSIONS ####
 
-    class ExpressionCompiler(Translator['PandasTableImpl', TypedValue[Callable[[pd.DataFrame], pd.Series]]]):
+    class ExpressionCompiler(EagerTableImpl.ExpressionCompiler['PandasTableImpl', TypedValue[Callable[[pd.DataFrame], pd.Series]]]):
 
-        def _translate(self, expr, verb=None, **kwargs):
-            if isinstance(expr, Column):
-                df_col_name = self.backend.df_name_mapping[expr.uuid]
-                def df_col(df):
-                    return df[df_col_name]
-                return TypedValue(df_col, expr.dtype)
+        def _translate_col(self, expr, **kwargs):
+            df_col_name = self.backend.df_name_mapping[expr.uuid]
+            def df_col(df):
+                return df[df_col_name]
+            return TypedValue(df_col, expr.dtype)
 
-            if isinstance(expr, FunctionCall):
-                arguments = [arg.value for arg in expr.args]
-                signature = tuple(arg.dtype for arg in expr.args)
-                implementation = self.backend.operator_registry.get_implementation(expr.operator, signature)
+        def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
+            def value(df):
+                return implementation(*(arg(df) for arg in arguments))
 
-                def value(df):
-                    return implementation(*(arg(df) for arg in arguments))
+            override_impl_ftype = 'w' if implementation.ftype == 'a' and verb == 'mutate' else None
+            ftype = self.backend._get_func_ftype(expr.args, implementation, override_impl_ftype)
+            return TypedValue(value, implementation.rtype, ftype)
 
-                override_impl_ftype = 'w' if implementation.ftype == 'a' and verb == 'mutate' else None
-                ftype = self.backend._get_func_ftype(expr.args, implementation, override_impl_ftype)
-                return TypedValue(value, implementation.rtype, ftype)
 
-            if isinstance(expr, TypedValue):
-                # For iPython formatting
-                return expr
-
-            # Literals
-            def literal_func(_):
-                return expr
-
-            if isinstance(expr, int):
-                return TypedValue(literal_func, 'int')
-            if isinstance(expr, float):
-                return TypedValue(literal_func, 'float')
-            if isinstance(expr, str):
-                return TypedValue(literal_func, 'str')
-            if isinstance(expr, bool):
-                return TypedValue(literal_func, 'bool')
-
-            raise NotImplementedError(expr, type(expr))
-
-    class JoinTranslator(Translator['PandasTableImpl', tuple]):
+    class JoinTranslator(Translator[tuple]):
         """
         This translator takes a conjunction (AND) of equality checks and returns
         a tuple of tuple where the inner tuple contains the left and right column

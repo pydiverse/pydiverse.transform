@@ -1,13 +1,17 @@
 import copy
 import dataclasses
-import typing
 import uuid
+from typing import Generic, Any, TypeVar, Iterable, Callable, TYPE_CHECKING
 
 from .column import Column, LambdaColumn
-from .expressions import OperatorRegistry, SymbolicExpression
-from .expressions.operator_registry import TypedOperatorImpl
-from .expressions.translator import Translator, TypedValue
+from .expressions.operator_registry import OperatorRegistry, TypedOperatorImpl
+from .expressions.translator import Translator, DelegatingTranslator, TypedValue
 from .utils import bidict, ordered_set
+
+
+if TYPE_CHECKING:
+    # noinspection PyUnresolvedReferences
+    from pdtransform.core.expressions import SymbolicExpression
 
 
 class _TableImplMeta(type):
@@ -25,6 +29,8 @@ class _TableImplMeta(type):
         return c
 
 
+ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
+ExprCompT = TypeVar('ExprCompT', bound = 'TypedValue')
 class AbstractTableImpl(metaclass=_TableImplMeta):
     """
     Base class from which all table backend implementations are derived from.
@@ -53,9 +59,6 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     """
 
     operator_registry: OperatorRegistry
-
-    # Inner Class
-    ExpressionCompiler: typing.Type[Translator['AbstractTableImpl', TypedValue[typing.Callable]]]
 
     def __init__(
             self,
@@ -113,11 +116,11 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 return self.cols[uuid].as_column(name, self)
             raise KeyError(f"Table '{self.name}' has no column that matches '{key}'.")
 
-    def selected_cols(self) -> typing.Iterable[tuple[str, uuid.UUID]]:
+    def selected_cols(self) -> Iterable[tuple[str, uuid.UUID]]:
         for name in self.selects:
             yield (name, self.named_cols.fwd[name])
 
-    def resolve_lambda_cols(self, expr: typing.Any):
+    def resolve_lambda_cols(self, expr: Any):
         return self.lambda_translator.translate(expr)
 
     def _bind_values_to_compiled_expr(self, compiled):
@@ -162,7 +165,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def filter(self, *args):
         ...
 
-    def arrange(self, ordering: list[tuple[SymbolicExpression, bool]]):
+    def arrange(self, ordering: 'list[tuple[SymbolicExpression, bool]]'):
         ...
 
     def group_by(self, *args):
@@ -201,7 +204,42 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
     #### Expressions ####
 
+    class ExpressionCompiler(Generic[ImplT, ExprCompT], DelegatingTranslator[ExprCompT]):
+        """
+        Class convert an expression into a function that, when provided with
+        the appropriate arguments, evaluates the expression.
+
+        The reason we can't just eagerly evaluate the expression is because for
+        grouped data we often have to use the split-apply-combine strategy.
+        """
+
+        def __init__(self, backend: ImplT):
+            self.backend = backend
+            super().__init__(backend.operator_registry)
+
+        def _translate_literal(self, expr, **kwargs):
+            def literal_func(*args):
+                return expr
+
+            if isinstance(expr, int):
+                return TypedValue(literal_func, 'int')
+            if isinstance(expr, float):
+                return TypedValue(literal_func, 'float')
+            if isinstance(expr, str):
+                return TypedValue(literal_func, 'str')
+            if isinstance(expr, bool):
+                return TypedValue(literal_func, 'bool')
+
     class LambdaTranslator(Translator):
+        """
+        Translator that takes an expression and replaces all LambdaColumns
+        inside it with the corresponding Column instance.
+        """
+
+        def __init__(self, backend: ImplT):
+            self.backend = backend
+            super().__init__()
+
         def _translate(self, expr, **kwargs):
             # Resolve lambda and return Column object
             if isinstance(expr, LambdaColumn):
@@ -249,12 +287,11 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             return 'w'
 
 
-
 @dataclasses.dataclass
 class ColumnMetaData:
     uuid: uuid.UUID
-    expr: typing.Any
-    compiled: typing.Callable[[typing.Any], TypedValue]
+    expr: Any
+    compiled: Callable[[Any], TypedValue]
     dtype: str
     ftype: str
 
