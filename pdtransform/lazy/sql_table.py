@@ -337,7 +337,6 @@ class SQLTableImpl(LazyTableImpl):
             def sql_col(cols):
                 return expr.typed_value.value
 
-            print(expr.typed_value)
             return TypedValue(sql_col, expr.typed_value.dtype, expr.typed_value.ftype)
 
         def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
@@ -385,10 +384,13 @@ class SQLTableImpl(LazyTableImpl):
 
         def _translate_function(self, expr, arguments, implementation, **kwargs):
             # Aggregate function -> window function
-            override_ftype = 'w' if implementation.ftype == 'a' else None
-
             value = implementation(*arguments)
+            override_ftype = 'w' if implementation.ftype == 'a' else None
             ftype = SQLTableImpl._get_func_ftype(expr.args, implementation, override_ftype)
+
+            if implementation.ftype == 'a':
+                value = value.over()
+
             return TypedValue(value, implementation.rtype, ftype)
 
 
