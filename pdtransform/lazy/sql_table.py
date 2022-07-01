@@ -33,13 +33,13 @@ class SQLTableImpl(LazyTableImpl):
             can be used by the other table and produces the same result.
     """
 
-    def __init__(self, engine, table):
+    def __init__(self, engine, table, _dtype_hints: dict[str, str] = None):
         self.engine = sqlalchemy.create_engine(engine) if isinstance(engine, str) else engine
         tbl = self._create_table(table, self.engine)
         # backend = self.engine.url.get_backend_name()
 
         columns = {
-            col.name: Column(name = col.name, table = self, dtype = self._convert_dtype(col.type))
+            col.name: Column(name = col.name, table = self, dtype = self._get_dtype(col, hints=_dtype_hints))
             for col in tbl.columns
         }
 
@@ -99,13 +99,28 @@ class SQLTableImpl(LazyTableImpl):
         )
 
     @staticmethod
-    def _convert_dtype(dtype: sqlalchemy.sql.sqltypes.TypeEngine) -> str:
-        pytype = dtype.python_type
-        if pytype == int: return 'int'
-        if pytype == str: return 'str'
-        if pytype == bool: return 'bool'
-        if pytype == float: return 'float'
-        raise NotImplementedError(f"Invalid dtype {dtype}.")
+    def _get_dtype(col: sqlalchemy.Column, hints: dict[str, str] = None) -> str:
+        """Determine the dtype of a column.
+
+        :param col: The sqlalchemy column object.
+        :param hints: In some situations sqlalchemy can't determine the dtype of
+            a column. Instead of throwing an exception we can use these type
+            hints as a fallback.
+        :return: Appropriate dtype string.
+        """
+
+        try:
+            pytype = col.type.python_type
+            if pytype == int: return 'int'
+            if pytype == str: return 'str'
+            if pytype == bool: return 'bool'
+            if pytype == float: return 'float'
+            raise NotImplementedError(f"Invalid type {col.type}.")
+        except NotImplementedError as e:
+            if hints is not None:
+                if dtype := hints.get(col.name):
+                    return dtype
+            raise e
 
     def replace_tbl(self, new_tbl, columns: dict[str: Column]):
         self.tbl = new_tbl
@@ -201,7 +216,10 @@ class SQLTableImpl(LazyTableImpl):
 
         # TODO: If the table has not been modified, a simple `.alias()` would produce nicer queries.
         subquery = self.build_query().subquery(name=name)
-        return self.__class__(self.engine, subquery)
+        # In some situations sqlalchemy fails to determine the datatype of a column.
+        # To circumvent this, we can pass on the information we know.
+        dtype_hints = { name: self.cols[self.named_cols.fwd[name]].dtype for name in self.selects }
+        return self.__class__(self.engine, subquery, _dtype_hints = dtype_hints)
 
     def collect(self):
         compiled = self.build_query()
