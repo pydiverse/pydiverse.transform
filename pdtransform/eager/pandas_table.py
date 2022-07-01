@@ -282,7 +282,7 @@ class PandasTableImpl(EagerTableImpl):
     def grouped_df(self):
         if self.grouped_by:
             grouping_cols_names = [self.df_name_mapping[col.uuid] for col in self.grouped_by]
-            return self.df.groupby(by = list(grouping_cols_names))
+            return self.df.groupby(by = list(grouping_cols_names), dropna=False)
         return self.df
 
 
