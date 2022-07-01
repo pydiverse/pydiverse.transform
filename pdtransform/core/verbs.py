@@ -55,7 +55,7 @@ def validate_table_args(*tables):
 
 
 @builtin_verb()
-def alias(tbl: AbstractTableImpl, name: str):
+def alias(tbl: AbstractTableImpl, name: str=None):
     """Creates a new table object with a different name."""
     validate_table_args(tbl)
     return tbl.alias(name)

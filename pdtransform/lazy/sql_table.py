@@ -194,7 +194,11 @@ class SQLTableImpl(LazyTableImpl):
 
     #### Verb Operations ####
 
-    def alias(self, name):
+    def alias(self, name=None):
+        if name is None:
+            suffix = format(uuid.uuid1().int % 0x7FFFFFFF, 'X')
+            name = f"{self.name}_{suffix}"
+
         # TODO: If the table has not been modified, a simple `.alias()` would produce nicer queries.
         subquery = self.build_query().subquery(name=name)
         return self.__class__(self.engine, subquery)

@@ -84,9 +84,10 @@ class PandasTableImpl(EagerTableImpl):
 
     #### Verb Operations ####
 
-    def alias(self, name):
+    def alias(self, name=None):
         # Creating a new table object also acts like a garbage collecting mechanism.
-        return self.__class__(name, self.collect())
+        new_name = name or self.name
+        return self.__class__(new_name, self.collect())
 
     def collect(self) -> pd.DataFrame:
         # SELECT -> Apply mask
