@@ -291,7 +291,18 @@ class SQLTableImpl(LazyTableImpl):
         self.alignment_hash = generate_alignment_hash()
 
         if self.intrinsic_grouped_by:
-            self.having.extend(args)
+            for arg in args:
+                # If a condition involves only grouping columns, it can be
+                # moved into the wheres instead of the havings.
+                only_grouping_cols = all(
+                    col in self.intrinsic_grouped_by
+                    for col in iterate_over_expr(arg, expand_literal_col = True)
+                    if isinstance(col, Column))
+
+                if only_grouping_cols:
+                    self.wheres.append(arg)
+                else:
+                    self.having.append(arg)
         else:
             self.wheres.extend(args)
 
