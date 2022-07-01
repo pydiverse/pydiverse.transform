@@ -1,7 +1,7 @@
 from typing import Generic, Iterable, TypeVar
 from html import escape
 
-import pdtransform.core.verbs as verbs
+from pdtransform.core import verbs
 from pdtransform.core.column import Column, LambdaColumn
 from pdtransform.core.expressions import SymbolicExpression
 from pdtransform.core.table_impl import AbstractTableImpl

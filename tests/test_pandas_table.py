@@ -4,6 +4,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
+from pdtransform.core.alignment import aligned, eval_aligned
 from pdtransform.core.dispatchers import Pipeable
 from pdtransform.core.table import Table
 from pdtransform.core.verbs import alias, arrange, collect, filter, join, mutate, select, summarise, group_by, ungroup
@@ -331,3 +332,66 @@ class TestPandasTable:
                 >> collect()
              )
         )
+
+
+class TestPandasAligned:
+
+    def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):
+        # No exception with correct length
+        eval_aligned(tbl_left.a + tbl_left.a)
+        eval_aligned(tbl_left.a + tbl_right.b)
+
+        with pytest.raises(ValueError):
+            eval_aligned(tbl1.col1 + tbl3.col1)
+
+        # Test aggregate functions still work
+        eval_aligned(tbl1.col1 + tbl3.col1.mean())
+
+        # Test that `with_` argument gets enforced
+        eval_aligned(tbl1.col1 + tbl1.col1, with_ = tbl1)
+        eval_aligned(tbl_left.a * 2, with_ = tbl_left)
+        eval_aligned(tbl_left.a * 2, with_ = tbl_right)  # Same length
+        eval_aligned(tbl1.col1.mean(), with_ = tbl_left)  # Aggregate is aligned with everything
+
+        with pytest.raises(ValueError):
+            eval_aligned(tbl3.col1 * 2, with_ = tbl1)
+
+    def test_aligned_decorator(self, tbl1, tbl3, tbl_left, tbl_right):
+        @aligned(with_ = 'a')
+        def f(a, b):
+            return a + b
+
+        f(tbl3.col1, tbl3.col2)
+        f(tbl_left.a, tbl_right.b)
+
+        with pytest.raises(ValueError):
+            f(tbl1.col1, tbl3.col1)
+
+        # Bad Alignment of return type
+        @aligned(with_ = 'a')
+        def f(a, b):
+            return a.mean() + b
+
+        with pytest.raises(ValueError):
+            f(tbl1.col1, tbl3.col1)
+
+        # Invalid with_ argument
+        with pytest.raises(Exception):
+            aligned(with_ = 'x')(lambda a: 0)
+
+    def test_col_addition(self, tbl_left, tbl_right):
+        @aligned(with_='a')
+        def f(a, b):
+            return a + b
+
+        assert_frame_equal(
+            tbl_left >> mutate(x = f(tbl_left.a, tbl_right.b)) >> select(λ.x) >> collect(),
+            pd.DataFrame({'x': (df_left['a'] + df_right['b']) })
+        )
+
+        with pytest.raises(ValueError):
+            f(tbl_left.a, (tbl_right >> filter(λ.b == 2)).b)
+
+        with pytest.raises(ValueError):
+            x = f(tbl_left.a, tbl_right.b)
+            tbl_left >> filter(λ.a <= 3) >> mutate(x = x)

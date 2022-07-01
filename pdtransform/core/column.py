@@ -1,9 +1,10 @@
 import uuid
-from typing import Generic, TYPE_CHECKING, TypeVar
+from typing import Any, Generic, TYPE_CHECKING, TypeVar, Type
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
     from pdtransform.core.table_impl import AbstractTableImpl
+    from pdtransform.core.expressions.translator import TypedValue
 
 
 def generate_col_uuid():
@@ -11,6 +12,7 @@ def generate_col_uuid():
 
 
 ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
+LiteralT = TypeVar('LiteralT')
 
 
 class Column(Generic[ImplT]):
@@ -28,7 +30,6 @@ class Column(Generic[ImplT]):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        # TODO: Determine what is the correct way to compare
         return (self.name == other.name and self.uuid == other.uuid)
 
     def __ne__(self, other):
@@ -69,3 +70,27 @@ class LambdaColumn:
 
     def __hash__(self):
         return hash(('λ', self.name))
+
+
+class LiteralColumn(Generic[LiteralT]):
+    __slots__ = ('typed_value', 'expr', 'backend')
+
+    def __init__(
+            self, typed_value: 'TypedValue[LiteralT]', expr: Any,
+            backend: 'Type[AbstractTableImpl]'):
+        self.typed_value = typed_value
+        self.expr = expr
+        self.backend = backend
+
+    def __repr__(self):
+        return f'<Lit: {self.expr} ({self.typed_value.dtype})>'
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return (self.typed_value == other.typed_value
+                and self.expr == other.expr
+                and self.backend == other.backend)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)

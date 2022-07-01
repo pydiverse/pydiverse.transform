@@ -45,9 +45,15 @@ class DelegatingTranslator(Generic[T], Translator[T]):
     def __init__(self, operator_registry: operator_registry.OperatorRegistry):
         self.operator_registry = operator_registry
 
-    def _translate(self, expr, **kwargs):
+    def _translate(self, expr, accept_literal_col=True, **kwargs):
         if isinstance(expr, column.Column):
             return self._translate_col(expr, **kwargs)
+
+        if isinstance(expr, column.LiteralColumn):
+            if accept_literal_col:
+                return self._translate_literal_col(expr, **kwargs)
+            else:
+                raise ValueError("Literal columns aren't allowed in this context.")
 
         if isinstance(expr, expressions.FunctionCall):
             arguments = [arg.value for arg in expr.args]
@@ -61,6 +67,9 @@ class DelegatingTranslator(Generic[T], Translator[T]):
         raise NotImplementedError(f"Couldn't find a way to translate object of type {type(expr)} with value {expr}.")
 
     def _translate_col(self, expr: 'column.Column', **kwargs) -> T:
+        raise NotImplementedError
+
+    def _translate_literal_col(self, expr: 'column.LiteralColumn', **kwargs) -> T:
         raise NotImplementedError
 
     def _translate_function(

@@ -7,14 +7,30 @@ from typing import Callable
 import sqlalchemy
 from sqlalchemy import sql
 
-from pdtransform.core.column import Column
-from pdtransform.core.expressions import FunctionCall, SymbolicExpression, iterate_over_expr
-from pdtransform.core.expressions.translator import Translator, TypedValue
+from pdtransform.core.column import Column, LiteralColumn
+from pdtransform.core.expressions import SymbolicExpression, iterate_over_expr
+from pdtransform.core.expressions.translator import TypedValue
 from pdtransform.core.table_impl import ColumnMetaData
 from .lazy_table import JoinDescriptor, LazyTableImpl, OrderByDescriptor
 
 
 class SQLTableImpl(LazyTableImpl):
+    """SQL backend
+
+    Attributes:
+        tbl: The underlying SQLAlchemy table object.
+        engine: The SQLAlchemy engine.
+        sql_columns: A dict mapping from uuids to SQLAlchemy column objects
+            (only those contained in `tbl`).
+
+        alignment_hash: A hash value that allows checking if two tables are
+            'aligned'. In the case of SQL this means that two tables NUST NOT
+            share the same alignment hash unless they were derived from the
+            same table(s) and are guaranteed to have the same number of columns
+            in the same order. In other words: Two tables MUST only have the
+            same alignment hash if a literal column derived from one of them
+            can be used by the other table and produces the same result.
+    """
 
     def __init__(self, engine, table):
         self.engine = sqlalchemy.create_engine(engine) if isinstance(engine, str) else engine
@@ -29,8 +45,19 @@ class SQLTableImpl(LazyTableImpl):
         self.replace_tbl(tbl, columns)
         super().__init__(name = self.tbl.name, columns = columns)
 
-    def _bind_values_to_compiled_expr(self, compiled):
-        return lambda _: compiled(self.sql_columns)
+    def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
+        if isinstance(col, Column):
+            if not isinstance(col.table, type(self)):
+                return False
+            return col.table.alignment_hash == self.alignment_hash
+
+        if isinstance(col, LiteralColumn):
+            return all(
+                self.is_aligned_with(atom)
+                for atom in iterate_over_expr(col.expr, expand_literal_col = True)
+                if isinstance(atom, Column))
+
+        raise ValueError
 
     @classmethod
     def _html_repr_expr(cls, expr):
@@ -81,6 +108,7 @@ class SQLTableImpl(LazyTableImpl):
 
     def replace_tbl(self, new_tbl, columns: dict[str: Column]):
         self.tbl = new_tbl
+        self.alignment_hash = generate_alignment_hash()
 
         self.sql_columns = {
             col.uuid: self.tbl.columns[col.name]
@@ -203,7 +231,7 @@ class SQLTableImpl(LazyTableImpl):
             self.selects = original_selects
 
     def join(self, right, on, how):
-        super().join(right, on, how)
+        self.alignment_hash = generate_alignment_hash()
 
         # If right has joins already, merging them becomes extremely difficult
         # This is because the ON clauses could contain NULL checks in which case
@@ -234,12 +262,16 @@ class SQLTableImpl(LazyTableImpl):
         self.sql_columns.update(right.sql_columns)
 
     def filter(self, *args):
+        self.alignment_hash = generate_alignment_hash()
+
         if self.intrinsic_grouped_by:
             self.having.extend(args)
         else:
             self.wheres.extend(args)
 
     def arrange(self, ordering):
+        self.alignment_hash = generate_alignment_hash()
+
         order_by = [OrderByDescriptor(col, ascending, False) for col, ascending in ordering]
         self.order_bys = order_by + self.order_bys
 
@@ -269,6 +301,9 @@ class SQLTableImpl(LazyTableImpl):
 
             self.replace_tbl(subquery, columns)
 
+    def summarise(self, **kwargs):
+        self.alignment_hash = generate_alignment_hash()
+
     def query_string(self):
         query = self.build_query()
         return query.compile(
@@ -290,6 +325,17 @@ class SQLTableImpl(LazyTableImpl):
             col = self.backend.cols[expr.uuid]
             return TypedValue(col.compiled, col.dtype, col.ftype)
 
+        def _translate_literal_col(self, expr, **kwargs):
+            if not self.backend.is_aligned_with(expr):
+                raise ValueError(f"Literal column isn't aligned with this table. "
+                                 f"Literal Column: {expr}")
+
+            def sql_col(cols):
+                return expr.typed_value.value
+
+            print(expr.typed_value)
+            return TypedValue(sql_col, expr.typed_value.dtype, expr.typed_value.ftype)
+
         def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
             def value(cols):
                 return implementation(*(arg(cols) for arg in arguments))
@@ -309,6 +355,45 @@ class SQLTableImpl(LazyTableImpl):
             else:
                 ftype = self.backend._get_func_ftype(expr.args, implementation)
                 return TypedValue(value, implementation.rtype, ftype)
+
+    class AlignedExpressionEvaluator(LazyTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]):
+
+        def translate(self, expr, check_alignment=True, **kwargs):
+            if check_alignment:
+                alignment_hashes = { col.table.alignment_hash for col in iterate_over_expr(expr, expand_literal_col = True) if isinstance(col, Column) }
+                if len(alignment_hashes) >= 2:
+                    raise ValueError("Expression contains columns from different tables that aren't aligned.")
+
+            return super().translate(expr, check_alignment=check_alignment, **kwargs)
+
+        def _translate_col(self, expr, **kwargs):
+            backend = expr.table
+            if expr.uuid in backend.sql_columns:
+                sql_col = backend.sql_columns[expr.uuid]
+                return TypedValue(sql_col, expr.dtype, 's')
+
+            col = backend.cols[expr.uuid]
+            return TypedValue(col.compiled(backend.sql_columns), col.dtype, col.ftype)
+
+        def _translate_literal_col(self, expr, **kwargs):
+            assert issubclass(expr.backend, SQLTableImpl)
+            return expr.typed_value
+
+        def _translate_function(self, expr, arguments, implementation, **kwargs):
+            # Aggregate function -> window function
+            override_ftype = 'w' if implementation.ftype == 'a' else None
+
+            value = implementation(*arguments)
+            ftype = SQLTableImpl._get_func_ftype(expr.args, implementation, override_ftype)
+            return TypedValue(value, implementation.rtype, ftype)
+
+
+def generate_alignment_hash():
+    # It should be possible to have an alternative hash value that
+    # is a bit more lenient -> If the same set of operations get applied
+    # to a table in two different orders that produce the same table
+    # object, their hash could also be equal.
+    return uuid.uuid1()
 
 
 #### BACKEND SPECIFIC OPERATORS ################################################

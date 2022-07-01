@@ -1,9 +1,8 @@
 from html import escape
 from typing import Any, Generic, TypeVar
 
-from pdtransform.core import column
-from . import expressions, utils, translator
-from .operator_registry import OperatorRegistry
+from pdtransform.core import column, alignment
+from . import expressions, translator, operator_registry, utils
 
 T = TypeVar('T')
 class SymbolicExpression(Generic[T]):
@@ -40,39 +39,17 @@ class SymbolicExpression(Generic[T]):
         # TODO: Instead of displaying all available operators, translate the
         #       expression and according to the dtype and backend only display
         #       the operators that actually are available.
-        return sorted(OperatorRegistry.ALL_REGISTERED_OPS)
+        return sorted(operator_registry.OperatorRegistry.ALL_REGISTERED_OPS)
 
     def _repr_html_(self):
         html = f"<pre>Symbolic Expression:\n{escape(repr(self._))}</pre>"
 
         try:
-            # Get Backend
-            backend = None
-            for item in utils.iterate_over_expr(self._):
-                if isinstance(item, column.Column):
-                    if backend is None:
-                        backend = type(item.table)
-                    elif type(item.table) != backend:
-                        raise Exception(f"Can't mix different backends: {backend}, {type(item.table)}")
-            if backend is None:
-                raise ValueError('Failed to determine backend.')
+            result = alignment.eval_aligned(self._, check_alignment=False)._
+            backend = utils.determine_expr_backend(self._)
 
-            # Bind the correct function arguments to each column in the expression
-            def base_replacer(expr):
-                if isinstance(expr, column.Column):
-                    tbl = expr.table
-                    translated = tbl.compiler.translate(expr)
-                    translated.value = tbl._bind_values_to_compiled_expr(translated.value)
-                    return translated
-                return expr
-            base_translation = translator.bottom_up_replace(self._, base_replacer)
-
-            # Evaluate the function calls on the shared backend
-            result = backend.ExpressionCompiler(backend).translate(base_translation)
-            value = result.value(None)
-
-            value_repr = backend._html_repr_expr(value)
-            html += f"dtype: <code>{escape(result.dtype)}</code></br></br>"
+            value_repr = backend._html_repr_expr(result.typed_value.value)
+            html += f"dtype: <code>{escape(result.typed_value.dtype)}</code></br></br>"
             html += f"<pre>{escape(value_repr)}</pre>"
         except Exception as e:
             html += f"</br><pre>Failed to get evaluate due to an exception:\n" \
@@ -129,6 +106,6 @@ def create_operator(op):
     def impl(*args, **kwargs):
         return SymbolicExpression(expressions.FunctionCall(op, *args, **kwargs))
     return impl
-for dunder in OperatorRegistry.SUPPORTED_DUNDER:
+for dunder in operator_registry.OperatorRegistry.SUPPORTED_DUNDER:
     setattr(SymbolicExpression, dunder, create_operator(dunder))
 del create_operator

@@ -5,6 +5,7 @@ import sqlalchemy
 from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
+from pdtransform.core.alignment import aligned, eval_aligned
 from pdtransform.core.table import Table
 from pdtransform.core.verbs import alias, arrange, collect, filter, group_by, join, mutate, select, summarise, ungroup
 from pdtransform.lazy.sql_table import SQLTableImpl
@@ -339,3 +340,86 @@ class TestSQLTable:
             )
         )
 
+
+class TestSQLAligned:
+
+    def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):
+        # Columns must be from same table
+        eval_aligned(tbl_left.a + tbl_left.a)
+        eval_aligned(tbl3.col1 + tbl3.col2)
+
+        # Derived columns are also OK
+        tbl1_mutate = tbl1 >> mutate(x = tbl1.col1 * 2)
+        eval_aligned(tbl1.col1 + tbl1_mutate.x)
+
+
+        with pytest.raises(ValueError):
+            eval_aligned(tbl1.col1 + tbl3.col1)
+        with pytest.raises(ValueError):
+            eval_aligned(tbl_left.a + tbl_right.b)
+        with pytest.raises(ValueError):
+            eval_aligned(tbl1.col1 + tbl3.col1.mean())
+        with pytest.raises(ValueError):
+            tbl1_joined = tbl1 >> join(tbl3, tbl1.col1 == tbl3.col1, how='left')
+            eval_aligned(tbl1.col1 + tbl1_joined.col1)
+
+        # Test that `with_` argument gets enforced
+        eval_aligned(tbl1.col1 + tbl1.col1, with_ = tbl1)
+        eval_aligned(tbl_left.a * 2, with_ = tbl_left)
+        eval_aligned(tbl1.col1, with_ = tbl1_mutate)
+
+        with pytest.raises(ValueError):
+            eval_aligned(tbl1.col1.mean(), with_ = tbl_left)
+
+        with pytest.raises(ValueError):
+            eval_aligned(tbl3.col1 * 2, with_ = tbl1)
+
+        with pytest.raises(ValueError):
+            eval_aligned(tbl_left.a, with_ = tbl_right)
+
+    def test_aligned_decorator(self, tbl1, tbl3, tbl_left, tbl_right):
+        @aligned(with_ = 'a')
+        def f(a, b):
+            return a + b
+
+        f(tbl3.col1, tbl3.col2)
+        f(tbl_right.b, tbl_right.c)
+
+        with pytest.raises(ValueError):
+            f(tbl1.col1, tbl3.col1)
+
+        with pytest.raises(ValueError):
+            f(tbl_left.a, tbl_right.b)
+
+        # Check with_ parameter gets enforced
+        @aligned(with_ = 'a')
+        def f(a, b):
+            return b
+
+        f(tbl1.col1, tbl1.col2)
+        with pytest.raises(ValueError):
+            f(tbl1.col1, tbl3.col1)
+
+        # Invalid with_ argument
+        with pytest.raises(Exception):
+            aligned(with_ = 'x')(lambda a: 0)
+
+    def test_col_addition(self, tbl3):
+        @aligned(with_='a')
+        def f(a, b):
+            return a + b
+
+        assert_frame_equal(
+            tbl3 >> mutate(x = f(tbl3.col1, tbl3.col2)) >> select(λ.x) >> collect(),
+            pd.DataFrame({'x': [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3]})
+        )
+
+        # Test if it also works with derived tables
+        tbl3_mutate = tbl3 >> mutate(x = tbl3.col1 * 2)
+        tbl3 >> mutate(x = f(tbl3_mutate.col1, tbl3_mutate.x))
+
+        with pytest.raises(ValueError):
+            tbl3 >> arrange(λ.col1) >> mutate(x = f(tbl3.col1, tbl3.col2))
+
+        with pytest.raises(ValueError):
+            tbl3 >> filter(λ.col1 == 1) >> mutate(x = f(tbl3.col1, tbl3.col2))

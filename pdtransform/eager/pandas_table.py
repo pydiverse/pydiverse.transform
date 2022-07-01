@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from pdtransform.core.column import Column
+from pdtransform.core.column import Column, LiteralColumn
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 from pdtransform.core.expressions.translator import Translator, TypedValue
 from .eager_table import EagerTableImpl, uuid_to_str
@@ -17,7 +17,7 @@ class PandasTableImpl(EagerTableImpl):
 
     Attributes:
         df: The current, eager dataframe. It's columns get renamed to prevent
-            name collisions and it also contains all columns that have been
+            name collisions, and it also contains all columns that have been
             computed at some point. This allows for a more lazy style API.
     """
 
@@ -65,8 +65,22 @@ class PandasTableImpl(EagerTableImpl):
 
         return kind_map.get(dtype.kind, str(dtype))
 
-    def _bind_values_to_compiled_expr(self, compiled):
-        return lambda x: compiled(self.df)
+    def is_aligned_with(self, col) -> bool:
+        len_self = len(self.df.index)
+
+        if isinstance(col, Column):
+            if not isinstance(col.table, type(self)):
+                return False
+            return len(col.table.df.index) == len_self
+
+        if isinstance(col, LiteralColumn):
+            if not issubclass(col.backend, type(self)):
+                return False
+            if isinstance(col.typed_value.value, pd.Series):
+                return len(col.typed_value.value) == len_self
+            return True  # A constant value (eg int, float, str...)
+
+        raise ValueError
 
     #### Verb Operations ####
 
@@ -179,6 +193,28 @@ class PandasTableImpl(EagerTableImpl):
                 return df[df_col_name]
             return TypedValue(df_col, expr.dtype)
 
+        def _translate_literal_col(self, expr, **kwargs):
+            if not self.backend.is_aligned_with(expr):
+                raise ValueError(f"Literal column isn't aligned with this table. "
+                                 f"Literal Column: {expr}")
+
+            def value(df):
+                literal_value = expr.typed_value.value
+                if isinstance(literal_value, pd.Series):
+                    literal_len = len(literal_value.index)
+                    if len(df.index) != literal_len:
+                        raise ValueError(f"Literal column isn't aligned with this table. "
+                                         f"Make sure that they have the same length ({len(df.index)} vs {literal_len}). "
+                                         f"This might be the case if you are using literal columns inside a window function.\n"
+                                         f"Literal Column: {expr}")
+
+                    series = literal_value.copy()
+                    series.index = df.index
+                    return series
+                return literal_value
+
+            return TypedValue(value, expr.typed_value.dtype, expr.typed_value.ftype)
+
         def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
             def value(df):
                 return implementation(*(arg(df) for arg in arguments))
@@ -187,6 +223,35 @@ class PandasTableImpl(EagerTableImpl):
             ftype = self.backend._get_func_ftype(expr.args, implementation, override_impl_ftype)
             return TypedValue(value, implementation.rtype, ftype)
 
+    class AlignedExpressionEvaluator(EagerTableImpl.AlignedExpressionEvaluator[TypedValue[pd.Series]]):
+
+        def _translate_col(self, expr, **kwargs):
+            df_col_name = expr.table.df_name_mapping[expr.uuid]
+            series = expr.table.df[df_col_name]
+            dtype = expr.table.cols[expr.uuid].dtype
+            return TypedValue(series, dtype)
+
+        def _translate_literal_col(self, expr, **kwargs):
+            assert issubclass(expr.backend, PandasTableImpl)
+            return expr.typed_value
+
+        def _translate_function(self, expr, arguments, implementation, **kwargs):
+            # Drop index to evaluate aligned
+            # TODO: Maybe we can somehow restore the index at the end.
+            arguments = [arg.reset_index(drop = True) if isinstance(arg, pd.Series) else arg for arg in arguments]
+
+            # Check that they have the same length
+            series_lengths = { len(arg.index) for arg in arguments if isinstance(arg, pd.Series) }
+            if len(series_lengths) >= 2:
+                arg_lengths = [len(arg.index) if isinstance(arg, pd.Series) else 1 for arg in arguments]
+                raise ValueError(f"Arguments for function {expr.operator} aren't aligned. Specifically, the inputs are of lenght {arg_lengths}. Instead they must either all be of the same length or of length 1.")
+
+            value = implementation(*arguments)
+            return TypedValue(value, implementation.rtype)
+            # TODO: Decide if ftype should be overwritten.
+            # override_impl_ftype = 'w' if implementation.ftype == 'a' else None
+            # ftype = PandasTableImpl._get_func_ftype(expr.args, implementation, override_impl_ftype)
+            # return TypedValue(value, implementation.rtype, ftype)
 
     class JoinTranslator(Translator[tuple]):
         """
@@ -194,6 +259,7 @@ class PandasTableImpl(EagerTableImpl):
         a tuple of tuple where the inner tuple contains the left and right column
         of the equality checks.
         """
+
         def _translate(self, expr, **kwargs):
             if isinstance(expr, Column):
                 return expr
