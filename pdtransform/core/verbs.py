@@ -113,7 +113,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     return new_tbl
 
 @builtin_verb()
-def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpression, how: str):
+def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpression, how: str, *, validate: str = None):
     validate_table_args(left, right)
 
     if left.grouped_by or right.grouped_by:
@@ -123,7 +123,11 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     check_cols_available((left, right), cols_in_expression(on), 'join')
 
     if how not in ('inner', 'left', 'outer'):
-        raise ValueError(f"Join type must be one of 'inner', 'left' or 'outer' (value provided: {how=})")
+        raise ValueError(f"Join type must be one of 'inner', 'left' or 'outer' (value provided: {how})")
+
+    # TODO:  Decide on validation options.
+    if validate not in (None, '1:?'):
+        raise ValueError(f"Validate must be either None or '1:?' (value provided: {validate}).")
 
     # Construct new table
     # JOIN -> Merge the left and right table
@@ -153,7 +157,7 @@ def join(left: AbstractTableImpl, right: AbstractTableImpl, on: SymbolicExpressi
     check_lambdas_valid(new_left, on)
     on = new_left.resolve_lambda_cols(on)
 
-    new_left.join(right, on, how)
+    new_left.join(right, on, how, validate=validate)
     return new_left
 
 inner_join = functools.partial(join, how='inner')

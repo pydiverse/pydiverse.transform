@@ -1,6 +1,7 @@
 import functools
 import operator
 import uuid
+import warnings
 from functools import reduce
 from typing import Callable
 
@@ -230,7 +231,7 @@ class SQLTableImpl(LazyTableImpl):
             self.replace_tbl(subquery, columns)
             self.selects = original_selects
 
-    def join(self, right, on, how):
+    def join(self, right, on, how, *, validate=None):
         self.alignment_hash = generate_alignment_hash()
 
         # If right has joins already, merging them becomes extremely difficult
@@ -255,6 +256,9 @@ class SQLTableImpl(LazyTableImpl):
                 raise ValueError("Filters can't precede outer joins. Wrap the left side in a subquery to fix this.")
             if right.wheres:
                 raise ValueError("Filters can't precede outer joins. Wrap the right side in a subquery to fix this.")
+
+        if validate is not None:
+            warnings.warn("SQL table backend ignores join validation argument.")
 
         descriptor = JoinDescriptor(right, on, how)
         self.joins.append(descriptor)

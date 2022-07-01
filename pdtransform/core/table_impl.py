@@ -159,7 +159,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def mutate(self, **kwargs):
         ...
 
-    def join(self, right, on, how):
+    def join(self, right, on, how, *, validate: str = None):
         ...
 
     def filter(self, *args):

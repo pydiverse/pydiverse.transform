@@ -120,7 +120,7 @@ class PandasTableImpl(EagerTableImpl):
             }
             self.df = self.df.assign(**cols)
 
-    def join(self, right: 'PandasTableImpl', on: SymbolicExpression, how: str):
+    def join(self, right: 'PandasTableImpl', on: SymbolicExpression, how: str, *, validate=None):
         """
         :param on: Symbolic expression consisting of anded column equality checks.
         """
@@ -135,16 +135,21 @@ class PandasTableImpl(EagerTableImpl):
             else:
                 raise Exception
 
-        # Do joining -> Look at siuba implementation
-        if how is None:
-            raise Exception("Must specify how argument")
+        if validate is not None:
+            validate = {
+                '1:?': '1:1'
+            }[validate]
 
+        # Perform Join
         left_on, right_on = zip(*on_cols)
         left_on  = [self.df_name_mapping[col.uuid] for col in left_on]
         right_on = [right.df_name_mapping[col.uuid] for col in right_on]
 
         self.df_name_mapping.update(right.df_name_mapping)
-        self.df = self.df.merge(right.df, how = how, left_on = left_on, right_on = right_on)
+        self.df = self.df.merge(
+            right.df, how = how,
+            left_on = left_on, right_on = right_on,
+            validate = validate)
 
     def filter(self, *args: SymbolicExpression):
         if not args:
