@@ -1,6 +1,7 @@
 import copy
 import dataclasses
 import uuid
+import warnings
 from typing import Generic, Any, TypeVar, Iterable, Callable, TYPE_CHECKING
 
 from .column import Column, LambdaColumn, LiteralColumn
@@ -159,7 +160,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def mutate(self, **kwargs):
         ...
 
-    def join(self, right, on, how, *, validate: str = None):
+    def join(self, right, on, how, *, validate=None):
         ...
 
     def filter(self, *args):
@@ -269,7 +270,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     #### Helpers ####
 
     @classmethod
-    def _get_func_ftype(cls, args, implementation: TypedOperatorImpl, override_ftype: str = None) -> str:
+    def _get_func_ftype(
+            cls, args, implementation: TypedOperatorImpl,
+            override_ftype: str = None, strict=False) -> str:
         """
         Get the ftype based on a function implementation and the arguments.
 
@@ -293,14 +296,17 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
         if impl_ftype == 'a':
             if 'w' in ftypes:
-                raise ValueError(f"Can't nest a window function inside an aggregate function ({implementation.name}).")
+                if strict: raise ValueError(f"Can't nest a window function inside an aggregate function ({implementation.name}).")
+                else: warnings.warn(f"Nesting a window function inside an aggregate function is not supported by SQL backend.")
             if 'a' in ftypes:
-                raise ValueError(f"Can't nest an aggregate function inside an aggregate function ({implementation.name}).")
+                if strict: raise ValueError(f"Can't nest an aggregate function inside an aggregate function ({implementation.name}).")
+                else: warnings.warn(f"Nesting an aggregate function inside an aggregate function is not supported by SQL backend.")
             return 'a'
 
         if impl_ftype == 'w':
             if 'w' in ftypes:
-                raise ValueError(f"Can't nest a window function inside a window function ({implementation.name}).")
+                if strict: raise ValueError(f"Can't nest a window function inside a window function ({implementation.name}).")
+                else: warnings.warn(f"Nesting a window function inside a window function is not supported by SQL backend.")
             return 'w'
 
 

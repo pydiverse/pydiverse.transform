@@ -353,10 +353,10 @@ class SQLTableImpl(LazyTableImpl):
                         partition_by = sql.expression.ClauseList(*partition_bys)
                     )
 
-                ftype = self.backend._get_func_ftype(expr.args, implementation, 'w')
+                ftype = self.backend._get_func_ftype(expr.args, implementation, 'w', strict = True)
                 return TypedValue(over_value, implementation.rtype, ftype)
             else:
-                ftype = self.backend._get_func_ftype(expr.args, implementation)
+                ftype = self.backend._get_func_ftype(expr.args, implementation, strict = True)
                 return TypedValue(value, implementation.rtype, ftype)
 
     class AlignedExpressionEvaluator(LazyTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]):
@@ -386,7 +386,7 @@ class SQLTableImpl(LazyTableImpl):
             # Aggregate function -> window function
             value = implementation(*arguments)
             override_ftype = 'w' if implementation.ftype == 'a' else None
-            ftype = SQLTableImpl._get_func_ftype(expr.args, implementation, override_ftype)
+            ftype = SQLTableImpl._get_func_ftype(expr.args, implementation, override_ftype, strict = True)
 
             if implementation.ftype == 'a':
                 value = value.over()

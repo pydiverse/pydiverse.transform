@@ -252,11 +252,9 @@ class PandasTableImpl(EagerTableImpl):
                 raise ValueError(f"Arguments for function {expr.operator} aren't aligned. Specifically, the inputs are of lenght {arg_lengths}. Instead they must either all be of the same length or of length 1.")
 
             value = implementation(*arguments)
-            return TypedValue(value, implementation.rtype)
-            # TODO: Decide if ftype should be overwritten.
-            # override_impl_ftype = 'w' if implementation.ftype == 'a' else None
-            # ftype = PandasTableImpl._get_func_ftype(expr.args, implementation, override_impl_ftype)
-            # return TypedValue(value, implementation.rtype, ftype)
+            override_impl_ftype = 'w' if implementation.ftype == 'a' else None
+            ftype = PandasTableImpl._get_func_ftype(expr.args, implementation, override_impl_ftype)
+            return TypedValue(value, implementation.rtype, ftype)
 
     class JoinTranslator(Translator[tuple]):
         """

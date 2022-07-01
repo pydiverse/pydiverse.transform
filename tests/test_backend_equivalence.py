@@ -1,4 +1,5 @@
 import itertools
+import warnings
 from collections import defaultdict
 
 import numpy as np
@@ -88,20 +89,34 @@ def tables(names: list[str]):
     return pytest.mark.parametrize(param_names, params)
 
 
-def assert_result_equal(x, y, pipe_factory, exception = None, **kwargs):
+def assert_result_equal(
+        x, y, pipe_factory, *,
+        exception = None, may_throw = False,
+        **kwargs):
     if not isinstance(x, (list, tuple)):
         x = (x,)
         y = (y,)
 
-    if exception:
+    if exception and not may_throw:
         with pytest.raises(exception):
             pipe_factory(*x) >> collect()
         with pytest.raises(exception):
             pipe_factory(*y) >> collect()
         return
     else:
-        dfx = (pipe_factory(*x) >> collect()).reset_index(drop = True)
-        dfy = (pipe_factory(*y) >> collect()).reset_index(drop = True)
+        try:
+            dfx = (pipe_factory(*x) >> collect()).reset_index(drop = True)
+            dfy = (pipe_factory(*y) >> collect()).reset_index(drop = True)
+        except Exception as e:
+            if may_throw:
+                if exception is not None:
+                    if isinstance(exception, type): exception = (exception, )
+                    if not isinstance(e, exception):
+                        raise Exception(f'Raised the wrong type of exception: {type(e)} instead of {exception}.') from e
+                warnings.warn(f"An exception was thrown:\n{e}")
+                return
+            else:
+                raise e
 
     try:
         assert_frame_equal(dfx, dfy, **kwargs)
@@ -455,7 +470,8 @@ class TestSummarise:
             df3_x, df3_y,
             lambda t:
             t >> group_by(t.col1, t.col2) >> summarise(mean_of_mean3 = t.col3.mean().mean()),
-            exception = ValueError
+            exception = ValueError,
+            may_throw = True
         )
 
 
@@ -566,7 +582,8 @@ class TestWindowFunction:
             df3_x, df3_y,
             lambda t:
             t >> mutate(x = (λ.col4.max().min() + λ.col2.mean()).max()),
-            exception = ValueError
+            exception = ValueError,
+            may_throw = True
         )
 
     @tables(['df3'])
