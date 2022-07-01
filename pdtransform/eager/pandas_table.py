@@ -288,7 +288,16 @@ class PandasTableImpl(EagerTableImpl):
 
 #### BACKEND SPECIFIC OPERATORS ################################################
 
-...
+@PandasTableImpl.op('__round__', 'int -> int')
+@PandasTableImpl.op('__round__', 'int, int -> int')
+def _round(x, decimals=0):
+    # Int is already rounded
+    return x
+
+@PandasTableImpl.op('__round__', 'float -> float')
+@PandasTableImpl.op('__round__', 'float, int -> float')
+def _round(x, decimals=0):
+    return x.round(decimals=decimals)
 
 #### Summarising Functions ####
 
@@ -308,3 +317,12 @@ def _min(x):
 @PandasTableImpl.op('max', 'str |> str')
 def _max(x):
     return x.max()
+
+@PandasTableImpl.op('sum', 'int |> float')
+@PandasTableImpl.op('sum', 'float |> float')
+def _sum(x):
+    return x.sum()
+
+@PandasTableImpl.op('count', 'T |> int')
+def _count(x):
+    return len(x)

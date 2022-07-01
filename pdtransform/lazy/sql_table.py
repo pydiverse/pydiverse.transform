@@ -449,6 +449,20 @@ def _floordiv(x, y):
 def _floordiv(x, y):
     return _floordiv(y, x)
 
+@SQLTableImpl.op('__round__', 'int -> int')
+@SQLTableImpl.op('__round__', 'int, int -> int')
+def _round(x, decimals=0):
+    # Int is already rounded
+    return x
+
+@SQLTableImpl.op('__round__', 'float -> float')
+@SQLTableImpl.op('__round__', 'float, int -> float')
+def _round(x, decimals=0):
+    # For some reason SQLite doesn't like negative values
+    if decimals <= 0:
+        return sqlfunc.round(x / (10 ** -decimals)) * (10 ** -decimals)
+    return sqlfunc.round(x, decimals)
+
 #### Summarising Functions ####
 
 @SQLTableImpl.op('mean', 'int |> float')
@@ -467,3 +481,13 @@ def _min(x):
 @SQLTableImpl.op('max', 'str |> str')
 def _max(x):
     return sqlfunc.max(x)
+
+@SQLTableImpl.op('sum', 'int |> float')
+@SQLTableImpl.op('sum', 'float |> float')
+def _sum(x):
+    return sqlfunc.sum(x)
+
+@SQLTableImpl.op('count', 'T |> int')
+def _count(x):
+    # TODO: Implement a count method that doesn't take an argument
+    return sqlfunc.count()
