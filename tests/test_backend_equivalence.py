@@ -211,6 +211,13 @@ class TestMutate:
             t >> mutate(col1 = t.col2, col2 = t.col1) >> mutate(col1 = t.col2, col2 = λ.col3, col3 = λ.col2)
         )
 
+    @tables(['df1'])
+    def test_literals(self, df1_x, df1_y):
+        assert_result_equal(df1_x, df1_y, lambda t: t >> mutate(x = 1))
+        assert_result_equal(df1_x, df1_y, lambda t: t >> mutate(x = 1.1))
+        assert_result_equal(df1_x, df1_y, lambda t: t >> mutate(x = True))
+        assert_result_equal(df1_x, df1_y, lambda t: t >> mutate(x = 'test'))
+
 
 class TestJoin:
 

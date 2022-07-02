@@ -188,10 +188,12 @@ class SQLTableImpl(LazyTableImpl):
 
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
-        s = [
-            self.cols[uuid].compiled(self.sql_columns).label(name)
-            for name, uuid in self.selected_cols()
-        ]
+        s = []
+        for name, uuid in self.selected_cols():
+            sql_col = self.cols[uuid].compiled(self.sql_columns)
+            if not isinstance(sql_col, sql.ColumnElement):
+                sql_col = sql.literal(sql_col)
+            s.append(sql_col.label(name))
         select = select.with_only_columns(s)
 
         # ORDER BY
