@@ -45,7 +45,7 @@ class Table(Generic[ImplT]):
         return iter(SymbolicExpression(LambdaColumn(name)) for name, _ in self._impl.selected_cols())
 
     def __eq__(self, other):
-        return isinstance(other, self.__class__) and self._impl == other._impl
+        return isinstance(other, type(self)) and self._impl == other._impl
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -56,8 +56,17 @@ class Table(Generic[ImplT]):
     def __dir__(self):
         return sorted(self._impl.named_cols.fwd.keys())
 
+    def __str__(self):
+        try:
+            return f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n\n" \
+                   f"{self >> verbs.collect()}"
+        except Exception as e:
+            return f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n" \
+                   f"Failed to collect table due to an exception:\n" \
+                   f"{type(e).__name__}: {str(e)}"
+
     def _repr_html_(self) -> str | None:
-        html = f"Table <code>{self._impl.name}</code> using <code>{self._impl.__class__.__name__}</code> backend:</br>"
+        html = f"Table <code>{self._impl.name}</code> using <code>{type(self._impl).__name__}</code> backend:</br>"
         try:
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
             html += (self >> verbs.collect())._repr_html_()
@@ -65,3 +74,6 @@ class Table(Generic[ImplT]):
             html += f"</br><pre>Failed to collect table due to an exception:\n" \
                     f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
         return html
+
+    def _repr_pretty_(self, p, cycle):
+        p.text(str(self) if not cycle else '...')

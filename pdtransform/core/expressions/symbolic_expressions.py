@@ -32,14 +32,27 @@ class SymbolicExpression(Generic[T]):
     def __getitem__(self, item):
         return SymbolicExpression(expressions.FunctionCall('__getitem__', self, item))
 
-    def __repr__(self):
-        return f'<Sym: {self._}>'
-
     def __dir__(self):
         # TODO: Instead of displaying all available operators, translate the
         #       expression and according to the dtype and backend only display
         #       the operators that actually are available.
         return sorted(operator_registry.OperatorRegistry.ALL_REGISTERED_OPS)
+
+    def __str__(self):
+        try:
+            result = alignment.eval_aligned(self._, check_alignment = False)._
+
+            dtype = result.typed_value.dtype
+            value = result.typed_value.value
+            return f"Symbolic Expression: {repr(self._)}\ndtype: {dtype}\n\n" \
+                   f"{str(value)}"
+        except Exception as e:
+            return f"Symbolic Expression: {repr(self._)}\n" \
+                   f"Failed to get evaluate due to an exception:\n" \
+                   f"{type(e).__name__}: {str(e)}"
+
+    def __repr__(self):
+        return f'<Sym: {self._}>'
 
     def _repr_html_(self):
         html = f"<pre>Symbolic Expression:\n{escape(repr(self._))}</pre>"
@@ -56,6 +69,9 @@ class SymbolicExpression(Generic[T]):
                     f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
 
         return html
+
+    def _repr_pretty_(self, p, cycle):
+        p.text(str(self) if not cycle else '...')
 
 
 class SymbolAttribute:
