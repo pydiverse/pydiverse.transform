@@ -38,6 +38,14 @@ class SymbolicExpression(Generic[T]):
         #       the operators that actually are available.
         return sorted(operator_registry.OperatorRegistry.ALL_REGISTERED_OPS)
 
+    # __contains__, __iter__ and __bool__ are all invalid on s-expressions
+    __contains__ = None
+    __iter__ = None
+
+    def __bool__(self):
+        raise TypeError("Symbolic expressions can't be converted to True/False, "
+                        "or used with these keywords: not, and, or.")
+
     def __str__(self):
         try:
             result = alignment.eval_aligned(self._, check_alignment = False)._

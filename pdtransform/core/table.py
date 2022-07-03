@@ -56,6 +56,15 @@ class Table(Generic[ImplT]):
     def __dir__(self):
         return sorted(self._impl.named_cols.fwd.keys())
 
+    def __contains__(self, item):
+        if isinstance(item, SymbolicExpression):
+            item = item._
+        if isinstance(item, LambdaColumn):
+            return item.name in self._impl.named_cols.fwd
+        if isinstance(item, Column):
+            return item.uuid in self._impl.available_cols
+        return False
+
     def __str__(self):
         try:
             return f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n\n" \

@@ -44,16 +44,35 @@ class TestTable:
         assert len(list(tbl1)) == len(list(tbl1._impl.selected_cols()))
         assert len(list(tbl2)) == len(list(tbl2._impl.selected_cols()))
 
-        assert list(tbl1) == [λ.col1, λ.col2]
-        assert list(tbl2) == [λ.col1, λ.col2, λ.col3]
+        assert repr(list(tbl1)) == repr([λ.col1, λ.col2])
+        assert repr(list(tbl2)) == repr([λ.col1, λ.col2, λ.col3])
 
-        assert list(tbl2 >> select(tbl2.col2)) == [λ.col2]
+        assert repr(list(tbl2 >> select(tbl2.col2))) == repr([λ.col2])
 
-        assert list(tbl1 >> join(tbl2 >> select(tbl2.col3), tbl1.col1 == tbl2.col2, 'left')) == [λ.col1, λ.col2, λ.col3_mock2]
+        assert repr(list(tbl1 >> join(tbl2 >> select(tbl2.col3), tbl1.col1 == tbl2.col2, 'left'))) == repr([λ.col1, λ.col2, λ.col3_mock2])
 
     def test_dir(self, tbl1):
         assert dir(tbl1) == ['col1', 'col2']
         assert dir(tbl1 >> mutate(x = tbl1.col1)) == ['col1', 'col2', 'x']
+
+    def test_contains(self, tbl1, tbl2):
+        assert tbl1.col1 in tbl1
+        assert tbl1.col2 in tbl1
+
+        assert tbl1.col1 not in tbl2
+        assert tbl1.col2 not in tbl2
+
+        assert λ.col1 in tbl1
+        assert λ.col2 in tbl1
+        assert λ.col3 not in tbl1
+
+        assert λ.col1 in tbl2
+        assert λ.col2 in tbl2
+        assert λ.col3 in tbl2
+        assert λ.col4 not in tbl2
+
+        assert all(col in tbl1 for col in tbl1)
+        assert all(col in tbl2 for col in tbl2)
 
 
 class TestDispatchers:

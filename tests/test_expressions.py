@@ -1,3 +1,5 @@
+import pytest
+
 from pdtransform import λ
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 
@@ -27,3 +29,13 @@ class TestExpressions:
     def test_lambda_col(self):
         compare_sexpr(λ.something, λ['something'])
         compare_sexpr(λ.something.chained(), λ['something'].chained())
+
+    def test_banned_methods(self):
+        s1 = SymbolicExpression(1)
+
+        with pytest.raises(TypeError):
+            bool(s1)
+        with pytest.raises(TypeError):
+            _ = s1 in s1
+        with pytest.raises(TypeError):
+            _ = iter(s1)
