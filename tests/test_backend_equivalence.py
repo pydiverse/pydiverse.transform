@@ -119,7 +119,7 @@ def assert_result_equal(
                 raise e
 
     try:
-        assert_frame_equal(dfx, dfy, **kwargs)
+        assert_frame_equal(dfx, dfy, check_dtype=False, **kwargs)
     except Exception as e:
         print('First dataframe:')
         print(dfx)
@@ -311,9 +311,7 @@ class TestFilter:
         assert_result_equal(
             df3_x, df3_y,
             lambda t:
-            t >> filter(t.col1 == 0) >> filter(t.col2 == 2) >> filter(t.col4 < 2),
-
-            check_dtype = False
+            t >> filter(t.col1 == 0) >> filter(t.col2 == 2) >> filter(t.col4 < 2)
         )
 
 
@@ -581,8 +579,7 @@ class TestWindowFunction:
         assert_result_equal(
             df3_x, df3_y,
             lambda t:
-            t >> mutate(x = λ.col4.max()) >> mutate(y = λ.x.min() * 1) >> mutate(z = λ.y.mean()) >> mutate(w = λ.x / λ.y),
-            check_dtype = False
+            t >> mutate(x = λ.col4.max()) >> mutate(y = λ.x.min() * 1) >> mutate(z = λ.y.mean()) >> mutate(w = λ.x / λ.y)
         )
 
         assert_result_equal(

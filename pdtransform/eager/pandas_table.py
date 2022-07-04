@@ -22,7 +22,7 @@ class PandasTableImpl(EagerTableImpl):
     """
 
     def __init__(self, name: str, df: pd.DataFrame):
-        self.df = df
+        self.df = df.convert_dtypes()
         self.join_translator = self.JoinTranslator()
 
         columns = {
@@ -44,26 +44,17 @@ class PandasTableImpl(EagerTableImpl):
         super().__init__(name = name, columns = columns)
 
     def _convert_dtype(self, dtype: np.dtype) -> str:
-        # b  boolean
-        # i  signed integer
-        # u  unsigned integer
-        # f  floating-point
-        # c  complex floating-point
-        # m  timedelta
-        # M  datetime
-        # O  object
-        # S  (byte-)string
-        # U  Unicode
-        # V  void
+        type = dtype.type
+        if issubclass(type, np.integer):
+            return 'int'
+        if issubclass(type, np.floating):
+            return 'float'
+        if issubclass(type, np.bool_):
+            return 'bool'
+        if issubclass(type, str):
+            return 'str'
 
-        kind_map = {
-            'b': 'bool',
-            'i': 'int',
-            'f': 'float',
-            'O': 'object',  # TODO: Determine actual type
-        }
-
-        return kind_map.get(dtype.kind, str(dtype))
+        raise NotImplementedError(f"Invalid type {dtype}.")
 
     def is_aligned_with(self, col) -> bool:
         len_self = len(self.df.index)

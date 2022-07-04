@@ -228,7 +228,7 @@ class SQLTableImpl(LazyTableImpl):
         with self.engine.connect() as conn:
             from siuba.sql.utils import _FixedSqlDatabase
             sql_db = _FixedSqlDatabase(conn)
-            return sql_db.read_sql(compiled)
+            return sql_db.read_sql(compiled).convert_dtypes()
 
     def pre_mutate(self, **kwargs):
         requires_subquery = any(
