@@ -4,7 +4,7 @@ import pytest
 
 from pdtransform import λ
 from pdtransform.core.alignment import aligned, eval_aligned
-from pdtransform.core.dispatchers import Pipeable
+from pdtransform.core.dispatchers import Pipeable, verb
 from pdtransform.core.table import Table
 from pdtransform.core.verbs import *
 from pdtransform.eager.pandas_table import PandasTableImpl
@@ -342,6 +342,20 @@ class TestPandasTable:
                     )
 
              )
+        )
+
+    def test_custom_verb(self, tbl1):
+        @verb
+        def double_col1(tbl):
+            tbl[λ.col1] = λ.col1 * 2
+            return tbl
+
+        # Custom verb should not mutate input object
+        assert_not_inplace(tbl1, double_col1())
+
+        assert_equal(
+            tbl1 >> double_col1(),
+            tbl1 >> mutate(col1 = λ.col1 * 2)
         )
 
 

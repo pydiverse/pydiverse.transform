@@ -1,3 +1,4 @@
+import copy
 from functools import partial, reduce, wraps
 from typing import Any
 
@@ -56,10 +57,21 @@ class inverse_partial(partial):
 
 
 def verb(func):
+    def copy_tables(arg: Any = None):
+        return traverse(arg, lambda x: copy.copy(x) if isinstance(x, table.Table) else x)
+
     @wraps(func)
     def wrapper(*args, **kwargs):
-        f = inverse_partial(func, *args, **kwargs)  # Apply arguments
+        # Copy Table objects to prevent mutating them
+        # This can be the case if the user uses __setitem__ inside the verb
+        def f(*args, **kwargs):
+            args = copy_tables(args)
+            kwargs = copy_tables(kwargs)
+            return func(*args, **kwargs)
+
+        f = inverse_partial(f, *args, **kwargs)  # Bind arguments
         return Pipeable(f)
+
     return wrapper
 
 
@@ -85,7 +97,7 @@ def builtin_verb(backends = None):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            assert (len(args) > 0)
+            assert len(args) > 0
             impl = args[0]._impl
             if isinstance(impl, backends):
                 return func(*args, **kwargs)
@@ -98,9 +110,9 @@ def builtin_verb(backends = None):
         def wrapper(*args, **kwargs):
             f = func
             f = wrap_and_unwrap(f)  # Convert from Table to Impl and back
-            f = check_backend(f)    # Check type of backend
-            f = verb(f)             # Turn into pipable object
-            return f(*args, **kwargs)
+            f = check_backend(f)  # Check type of backend
+            f = inverse_partial(f, *args, **kwargs)  # Bind arguments
+            return Pipeable(f)  # Make pipeable
 
         return wrapper
 
