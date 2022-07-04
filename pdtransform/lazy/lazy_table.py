@@ -21,8 +21,5 @@ class OrderByDescriptor:
 
 
 class LazyTableImpl(AbstractTableImpl):
-    """Base class for lazy backends
-    """
-
-    def query_string(self) -> str:
-        raise NotImplementedError
+    """ Base class for lazy backends. """
+    pass

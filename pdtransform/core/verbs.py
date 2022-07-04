@@ -11,6 +11,19 @@ from .table_impl import AbstractTableImpl, ColumnMetaData
 from .utils import ordered_set, bidict
 
 
+__all__ = [
+    'alias',
+    'collect',
+    'build_query', 'show_query',
+
+    'select', 'mutate',
+    'join', 'left_join', 'inner_join', 'outer_join',
+    'filter',
+    'arrange',
+    'group_by', 'ungroup', 'summarise',
+]
+
+
 def check_cols_available(tables: AbstractTableImpl | Iterable[AbstractTableImpl], columns: set[Column], function_name: str):
     if isinstance(tables, AbstractTableImpl):
         tables = (tables, )
@@ -64,6 +77,19 @@ def alias(tbl: AbstractTableImpl, name: str=None):
 def collect(tbl: AbstractTableImpl):
     validate_table_args(tbl)
     return tbl.collect()
+
+@builtin_verb()
+def build_query(tbl: AbstractTableImpl):
+    return tbl.build_query()
+
+@builtin_verb()
+def show_query(tbl: AbstractTableImpl):
+    if query := tbl.build_query():
+        print(query)
+    else:
+        print(f"No query to show for {type(tbl).__name__}")
+
+    return tbl
 
 @builtin_verb()
 def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):

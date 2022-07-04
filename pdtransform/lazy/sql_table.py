@@ -141,7 +141,7 @@ class SQLTableImpl(LazyTableImpl):
         self.having = []        # type: list[SymbolicExpression]
         self.order_bys = []     # type: list[OrderByDescriptor]
 
-    def build_query(self):
+    def build_select(self) -> sql.Select:
         # Validate current state
         if len(self.selects) == 0:
             raise ValueError("Can't execute a SQL query without any SELECT statements.")
@@ -217,18 +217,25 @@ class SQLTableImpl(LazyTableImpl):
             name = f"{self.name}_{suffix}"
 
         # TODO: If the table has not been modified, a simple `.alias()` would produce nicer queries.
-        subquery = self.build_query().subquery(name=name)
+        subquery = self.build_select().subquery(name=name)
         # In some situations sqlalchemy fails to determine the datatype of a column.
         # To circumvent this, we can pass on the information we know.
         dtype_hints = { name: self.cols[self.named_cols.fwd[name]].dtype for name in self.selects }
         return self.__class__(self.engine, subquery, _dtype_hints = dtype_hints)
 
     def collect(self):
-        compiled = self.build_query()
+        select = self.build_select()
         with self.engine.connect() as conn:
             from siuba.sql.utils import _FixedSqlDatabase
             sql_db = _FixedSqlDatabase(conn)
-            return sql_db.read_sql(compiled).convert_dtypes()
+            return sql_db.read_sql(select).convert_dtypes()
+
+    def build_query(self) -> str:
+        query = self.build_select()
+        return str(query.compile(
+            dialect = self.engine.dialect,
+            compile_kwargs = {"literal_binds": True}
+        ))
 
     def pre_mutate(self, **kwargs):
         requires_subquery = any(
@@ -250,7 +257,7 @@ class SQLTableImpl(LazyTableImpl):
             }
             original_selects = self.selects
             self.selects = self.selects | columns.keys()
-            subquery = self.build_query()
+            subquery = self.build_select()
 
             self.replace_tbl(subquery, columns)
             self.selects = original_selects
@@ -336,19 +343,12 @@ class SQLTableImpl(LazyTableImpl):
                 for name, uuid in self.named_cols.fwd.items()
             }
             self.selects |= columns.keys()
-            subquery = self.build_query()
+            subquery = self.build_select()
 
             self.replace_tbl(subquery, columns)
 
     def summarise(self, **kwargs):
         self.alignment_hash = generate_alignment_hash()
-
-    def query_string(self):
-        query = self.build_query()
-        return query.compile(
-            dialect = self.engine.dialect,
-            compile_kwargs = {"literal_binds": True}
-        )
 
     #### EXPRESSIONS ####
 

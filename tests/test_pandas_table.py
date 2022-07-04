@@ -6,10 +6,9 @@ from pdtransform import λ
 from pdtransform.core.alignment import aligned, eval_aligned
 from pdtransform.core.dispatchers import Pipeable
 from pdtransform.core.table import Table
-from pdtransform.core.verbs import alias, arrange, collect, filter, join, mutate, select, summarise, group_by, ungroup
+from pdtransform.core.verbs import *
 from pdtransform.eager.pandas_table import PandasTableImpl
 from pdtransform.util.testing import assert_equal
-
 
 df1 = pd.DataFrame({
     'col1': [1, 2, 3, 4],
@@ -80,6 +79,9 @@ class TestPandasTable:
         assert tbl2.col1._.dtype == 'int'
         assert tbl2.col2._.dtype == 'int'
         assert tbl2.col3._.dtype == 'float'
+
+    def test_build_query(self, tbl1):
+        assert (tbl1 >> build_query()) is None
 
     def test_select(self, tbl1):
         assert_not_inplace(tbl1, select(tbl1.col1))

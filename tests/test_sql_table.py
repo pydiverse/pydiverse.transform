@@ -1,15 +1,12 @@
-import numpy as np
 import pandas as pd
 import pytest
 import sqlalchemy
-from pandas.testing import assert_frame_equal
 
 from pdtransform import λ
 from pdtransform.core.alignment import aligned, eval_aligned
 from pdtransform.core.table import Table
-from pdtransform.core.verbs import alias, arrange, collect, filter, group_by, join, mutate, select, summarise, ungroup
+from pdtransform.core.verbs import *
 from pdtransform.lazy.sql_table import SQLTableImpl
-from pdtransform.lazy.verbs import show_query
 from pdtransform.util.testing import assert_equal
 
 df1 = pd.DataFrame({
@@ -72,6 +69,11 @@ def tbl_right(engine):
     return Table(SQLTableImpl(engine, 'df_right'))
 
 class TestSQLTable:
+
+    def test_build_query(self, tbl1):
+        query_str = tbl1 >> build_query()
+        expected_out = 'SELECT df1.col1 AS col1, df1.col2 AS col2 FROM df1'
+        assert query_str.lower().split() == expected_out.lower().split()
 
     def test_show_query(self, tbl1, capfd):
         tbl1 >> show_query()

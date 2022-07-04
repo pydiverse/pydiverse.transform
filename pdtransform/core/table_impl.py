@@ -150,6 +150,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def collect(self):
         ...
 
+    def build_query(self):
+        ...
+
     def select(self, *args):
         ...
 

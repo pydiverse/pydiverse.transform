@@ -69,7 +69,7 @@ class Table(Generic[ImplT]):
 
     def __str__(self):
         try:
-            return f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n\n" \
+            return f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n" \
                    f"{self >> verbs.collect()}"
         except Exception as e:
             return f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n" \
