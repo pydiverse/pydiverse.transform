@@ -44,12 +44,13 @@ class TestTable:
         assert len(list(tbl1)) == len(list(tbl1._impl.selected_cols()))
         assert len(list(tbl2)) == len(list(tbl2._impl.selected_cols()))
 
-        assert repr(list(tbl1)) == repr([λ.col1, λ.col2])
-        assert repr(list(tbl2)) == repr([λ.col1, λ.col2, λ.col3])
+        assert repr(list(tbl1)) == repr([tbl1.col1, tbl1.col2])
+        assert repr(list(tbl2)) == repr([tbl2.col1, tbl2.col2, tbl2.col3])
 
-        assert repr(list(tbl2 >> select(tbl2.col2))) == repr([λ.col2])
+        assert repr(list(tbl2 >> select(tbl2.col2))) == repr([tbl2.col2])
 
-        assert repr(list(tbl1 >> join(tbl2 >> select(tbl2.col3), tbl1.col1 == tbl2.col2, 'left'))) == repr([λ.col1, λ.col2, λ.col3_mock2])
+        joined = tbl1 >> join(tbl2 >> select(tbl2.col3), tbl1.col1 == tbl2.col2, 'left')
+        assert repr(list(joined)) == repr([tbl1.col1, tbl1.col2, joined.col3_mock2])
 
     def test_dir(self, tbl1):
         assert dir(tbl1) == ['col1', 'col2']

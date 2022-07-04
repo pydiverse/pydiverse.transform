@@ -41,8 +41,10 @@ class Table(Generic[ImplT]):
     def __getattr__(self, name) -> SymbolicExpression[Column]:
         return SymbolicExpression(self._impl.get_col(name))
 
-    def __iter__(self) -> Iterable[SymbolicExpression[LambdaColumn]]:
-        return iter(SymbolicExpression(LambdaColumn(name)) for name, _ in self._impl.selected_cols())
+    def __iter__(self) -> Iterable[SymbolicExpression[Column]]:
+        # Capture current state (this allows modifying the table inside a loop)
+        cols = [SymbolicExpression(self._impl.get_col(name)) for name, _ in self._impl.selected_cols()]
+        return iter(cols)
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and self._impl == other._impl
