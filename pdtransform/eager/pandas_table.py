@@ -290,6 +290,10 @@ def _round(x, decimals=0):
 def _round(x, decimals=0):
     return x.round(decimals=decimals)
 
+@PandasTableImpl.op('strip', 'str -> str')
+def _strip(x):
+    return x.str.strip()
+
 #### Summarising Functions ####
 
 @PandasTableImpl.op('mean', 'int |> float')
@@ -317,3 +321,8 @@ def _sum(x):
 @PandasTableImpl.op('count', 'T |> int')
 def _count(x):
     return len(x)
+
+@PandasTableImpl.op('join', 'str |> str')
+@PandasTableImpl.op('join', 'str, str |> str')
+def _join(x, sep: str = ''):
+    return sep.join(x)

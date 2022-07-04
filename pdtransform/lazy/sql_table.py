@@ -465,6 +465,10 @@ def _round(x, decimals=0):
         return sqlfunc.round(x / (10 ** -decimals)) * (10 ** -decimals)
     return sqlfunc.round(x, decimals)
 
+@SQLTableImpl.op('strip', 'str -> str')
+def _strip(x):
+    return sqlfunc.trim(x)
+
 #### Summarising Functions ####
 
 @SQLTableImpl.op('mean', 'int |> float')
@@ -493,3 +497,8 @@ def _sum(x):
 def _count(x):
     # TODO: Implement a count method that doesn't take an argument
     return sqlfunc.count()
+
+@SQLTableImpl.op('join', 'str |> str')
+@SQLTableImpl.op('join', 'str, str |> str')
+def _join(x, sep: str = ''):
+    return sqlfunc.group_concat(x, sep)
