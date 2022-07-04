@@ -2,9 +2,12 @@ from html import escape
 from typing import Any, Generic, TypeVar
 
 from pdtransform.core import column, alignment
-from . import expressions, translator, operator_registry, utils
+from pdtransform.core.util import traverse
+from . import expressions, translator, operator_registry, util
 
 T = TypeVar('T')
+
+
 class SymbolicExpression(Generic[T]):
     """
     Base class to represent a symbolic expression. It can be manipulated using
@@ -67,7 +70,7 @@ class SymbolicExpression(Generic[T]):
 
         try:
             result = alignment.eval_aligned(self._, check_alignment=False)._
-            backend = utils.determine_expr_backend(self._)
+            backend = util.determine_expr_backend(self._)
 
             value_repr = backend._html_repr_expr(result.typed_value.value)
             html += f"dtype: <code>{escape(result.typed_value.dtype)}</code></br></br>"
@@ -108,19 +111,7 @@ def unwrap_symbolic_expressions(arg: Any = None):
     """
     Replaces all symbolic expressions in the input with their underlying value.
     """
-
-    # Potential alternative approach: Iterate over object like deepcopy does
-
-    if isinstance(arg, list):
-        return [unwrap_symbolic_expressions(x) for x in arg]
-    if isinstance(arg, tuple):
-        if type(arg) != tuple:
-            raise Exception  # This is the case with named tuples for example
-        return tuple(unwrap_symbolic_expressions(x) for x in arg)
-    if isinstance(arg, dict):
-        return { k: unwrap_symbolic_expressions(v) for k, v in arg.items() }
-    return arg._ if isinstance(arg, SymbolicExpression) else arg
-
+    return traverse(arg, lambda x: x._ if isinstance(x, SymbolicExpression) else x)
 
 
 # Add all supported dunder methods to `SymbolicExpression`.

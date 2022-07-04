@@ -1,7 +1,7 @@
 import inspect
 
 from pdtransform.core import table, table_impl, column
-from pdtransform.core.expressions import symbolic_expressions, utils
+from pdtransform.core.expressions import symbolic_expressions, util
 
 
 def aligned(*, with_: str):
@@ -53,7 +53,7 @@ def eval_aligned(
     expr = sexpr._ if isinstance(sexpr, symbolic_expressions.SymbolicExpression) else sexpr
 
     # Determine Backend
-    backend = utils.determine_expr_backend(expr)
+    backend = util.determine_expr_backend(expr)
     if backend is None:
         # TODO: Handle this case. Should return some value...
         raise NotImplementedError

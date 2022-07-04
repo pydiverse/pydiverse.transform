@@ -4,7 +4,7 @@ from typing import Any
 from pdtransform.core import table, column, verbs
 from pdtransform.core.expressions import unwrap_symbolic_expressions
 from pdtransform.core.table_impl import AbstractTableImpl
-from pdtransform.core.utils import bidict
+from pdtransform.core.util import bidict, traverse
 
 
 class Pipeable:
@@ -48,6 +48,7 @@ class inverse_partial(partial):
     that gets called with `x(0)` is equivalent to calling `x(0, 1, 2)` on the non
     decorated function.
     """
+
     def __call__(self, /, *args, **keywords):
         keywords = {**self.keywords, **keywords}
         #                   ↙ *args moved to front.
@@ -60,6 +61,7 @@ def verb(func):
         f = inverse_partial(func, *args, **kwargs)  # Apply arguments
         return Pipeable(f)
     return wrapper
+
 
 def builtin_verb(backends = None):
     def wrap_and_unwrap(func):
@@ -74,18 +76,21 @@ def builtin_verb(backends = None):
             kwargs = unwrap_tables(kwargs)
 
             return wrap_tables(func(*args, **kwargs))
+
         return wrapper
 
     def check_backend(func):
         if backends is None:
             return func
+
         @wraps(func)
         def wrapper(*args, **kwargs):
-            assert(len(args) > 0)
+            assert (len(args) > 0)
             impl = args[0]._impl
             if isinstance(impl, backends):
                 return func(*args, **kwargs)
             raise TypeError(f"Backend {impl} not supported for verb '{func.__name__}'.")
+
         return wrapper
 
     def decorator(func):
@@ -96,10 +101,14 @@ def builtin_verb(backends = None):
             f = check_backend(f)    # Check type of backend
             f = verb(f)             # Turn into pipable object
             return f(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
+
 # Helper
+
 
 def col_to_table(arg: Any = None):
     """
@@ -120,35 +129,26 @@ def col_to_table(arg: Any = None):
         tbl = (arg.table >> verbs.select(arg))._impl  # type: AbstractTableImpl
         col = tbl.get_col(arg)
 
-        tbl.available_cols = { col.uuid }
-        tbl.named_cols = bidict({ col.name: col.uuid })
+        tbl.available_cols = {col.uuid}
+        tbl.named_cols = bidict({col.name: col.uuid})
         return tbl
     elif isinstance(arg, column.LambdaColumn):
         raise ValueError
 
     return arg
 
+
 def unwrap_tables(arg: Any = None):
     """
     Takes an instance or collection of `Table` objects and replaces them with
     their implementation.
     """
-    if isinstance(arg, list):
-        return [unwrap_tables(x) for x in arg]
-    if isinstance(arg, tuple):
-        return tuple(unwrap_tables(x) for x in arg)
-    if isinstance(arg, dict):
-        return { k: unwrap_tables(v) for k, v in arg.items() }
-    return arg._impl if isinstance(arg, table.Table) else arg
+    return traverse(arg, lambda x: x._impl if isinstance(x, table.Table) else x)
+
 
 def wrap_tables(arg: Any = None):
     """
     Takes an instance or collection of `AbstractTableImpl` objects and wraps
     them in a `Table` object. This is an inverse to the `unwrap_tables` function.
     """
-    if isinstance(arg, list):
-        return [wrap_tables(x) for x in arg]
-    if isinstance(arg, tuple):
-        return tuple(wrap_tables(x) for x in arg)
-    return table.Table(implementation = arg) if isinstance(arg, AbstractTableImpl) else arg
-
+    return traverse(arg, lambda x: table.Table(x) if isinstance(x, AbstractTableImpl) else x)

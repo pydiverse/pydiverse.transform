@@ -6,10 +6,9 @@ from .column import Column, LambdaColumn, generate_col_uuid
 from .dispatchers import builtin_verb
 from .expressions import FunctionCall
 from .expressions import SymbolicExpression
-from .expressions.utils import iterate_over_expr
+from .expressions.util import iterate_over_expr
 from .table_impl import AbstractTableImpl, ColumnMetaData
-from .utils import ordered_set, bidict
-
+from .util import bidict, ordered_set
 
 __all__ = [
     'alias',

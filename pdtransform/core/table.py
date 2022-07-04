@@ -67,6 +67,10 @@ class Table(Generic[ImplT]):
             return item.uuid in self._impl.available_cols
         return False
 
+    def __copy__(self):
+        impl_copy = self._impl.copy()
+        return self.__class__(impl_copy)
+
     def __str__(self):
         try:
             return f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n" \

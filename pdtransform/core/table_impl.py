@@ -4,11 +4,10 @@ import uuid
 import warnings
 from typing import Generic, Any, TypeVar, Iterable, Callable, TYPE_CHECKING
 
+from pdtransform.core.util import bidict, ordered_set
 from .column import Column, LambdaColumn, LiteralColumn
 from .expressions.operator_registry import OperatorRegistry, TypedOperatorImpl
 from .expressions.translator import Translator, DelegatingTranslator, TypedValue
-from .utils import bidict, ordered_set
-
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
