@@ -226,7 +226,12 @@ class SQLTableImpl(LazyTableImpl):
     def collect(self):
         select = self.build_select()
         with self.engine.connect() as conn:
-            from siuba.sql.utils import _FixedSqlDatabase
+            # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
+            # Taken from siuba
+            from pandas.io import sql as _pd_sql
+            class _FixedSqlDatabase(_pd_sql.SQLDatabase):
+                def execute(self, *args, **kwargs):
+                    return self.connectable.execute(*args, **kwargs)
             sql_db = _FixedSqlDatabase(conn)
             return sql_db.read_sql(select).convert_dtypes()
 
