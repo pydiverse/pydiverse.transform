@@ -420,3 +420,61 @@ class TestPandasAligned:
         with pytest.raises(ValueError):
             x = f(tbl_left.a, tbl_right.b)
             tbl_left >> filter(λ.a <= 3) >> mutate(x = x)
+
+
+class TestPrintAndRepr:
+
+    def test_table_str(self, tbl1):
+        # Table: df1, backend: PandasTableImpl
+        #    col1 col2
+        # 0     1    a
+        # 1     2    b
+        # 2     3    c
+        # 3     4    d
+
+        tbl_str = str(tbl1)
+
+        assert 'df1' in tbl_str
+        assert 'PandasTableImpl' in tbl_str
+        assert str(df1) in tbl_str
+
+    def test_table_repr_html(self, tbl1):
+        # jupyter html
+        assert 'exception' not in tbl1._repr_html_()
+
+    def test_col_str(self, tbl1):
+        # Symbolic Expression: <df1.col1(int)>
+        # dtype: int
+        #
+        # 0    1
+        # 1    2
+        # 2    3
+        # 3    4
+        # Name: df1_col1_XXXXXXXX, dtype: Int64
+
+        col1_str = str(tbl1.col1)
+        series = tbl1._impl.df[tbl1._impl.df_name_mapping[tbl1.col1._.uuid]]
+
+        assert str(series) in col1_str
+        assert 'exception' not in col1_str
+
+    def test_col_html_repr(self, tbl1):
+        assert 'exception' not in tbl1.col1._repr_html_()
+
+    def test_expr_str(self, tbl1):
+        expr_str = str(tbl1.col1 * 2)
+        assert 'exception' not in expr_str
+
+    def test_expr_html_repr(self, tbl1):
+        assert 'exception' not in (tbl1.col1 * 2)._repr_html_()
+
+    def test_lambda_str(self, tbl1):
+        assert 'exception' in str(λ.col)
+        assert 'exception' in str(λ.col1 + tbl1.col1)
+
+    def test_eval_expr_str(self, tbl_left, tbl_right):
+        valid = tbl_left.a + tbl_right.b
+        invalid = tbl_left.a + (tbl_right >> filter(λ.b == 2)).b
+
+        assert 'exception' not in str(valid)
+        assert 'exception' in str(invalid)

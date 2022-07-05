@@ -100,13 +100,6 @@ class SymbolAttribute:
         raise Exception(f"Nope... You probably didn't want to do this. Did you misspell the attribute name '{self.__name}' of '{self.__on}'? Maybe you forgot a leading underscore.")
 
 
-class ReprHTMLTranslator(translator.Translator):
-    def _translate(self, expr, **kwargs):
-        if isinstance(expr, column.Column):
-            return expr.table.translator.translate(expr, **kwargs)
-        return expr
-
-
 def unwrap_symbolic_expressions(arg: Any = None):
     """
     Replaces all symbolic expressions in the input with their underlying value.
