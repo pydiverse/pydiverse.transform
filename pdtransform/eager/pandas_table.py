@@ -301,19 +301,19 @@ def _strip(x):
 def _mean(x):
     return x.mean()
 
-@PandasTableImpl.op('min', 'int |> float')
+@PandasTableImpl.op('min', 'int |> int')
 @PandasTableImpl.op('min', 'float |> float')
 @PandasTableImpl.op('min', 'str |> str')
 def _min(x):
     return x.min()
 
-@PandasTableImpl.op('max', 'int |> float')
+@PandasTableImpl.op('max', 'int |> int')
 @PandasTableImpl.op('max', 'float |> float')
 @PandasTableImpl.op('max', 'str |> str')
 def _max(x):
     return x.max()
 
-@PandasTableImpl.op('sum', 'int |> float')
+@PandasTableImpl.op('sum', 'int |> int')
 @PandasTableImpl.op('sum', 'float |> float')
 def _sum(x):
     return x.sum()

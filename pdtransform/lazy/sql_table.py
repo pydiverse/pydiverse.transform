@@ -459,16 +459,18 @@ def _floordiv(x, y):
 @SQLTableImpl.op('__round__', 'int -> int')
 @SQLTableImpl.op('__round__', 'int, int -> int')
 def _round(x, decimals=0):
-    # Int is already rounded
-    return x
+    if decimals >= 0:
+        # Int is already rounded
+        return x
+    return sql.cast(x / (10 ** -decimals)) * (10 ** -decimals)
 
 @SQLTableImpl.op('__round__', 'float -> float')
 @SQLTableImpl.op('__round__', 'float, int -> float')
 def _round(x, decimals=0):
-    # For some reason SQLite doesn't like negative values
-    if decimals <= 0:
-        return sqlfunc.round(x / (10 ** -decimals)) * (10 ** -decimals)
-    return sqlfunc.round(x, decimals)
+    if decimals >= 0:
+        return sqlfunc.round(x, decimals)
+    # For some reason SQLite doesn't like negative decimals values
+    return sqlfunc.round(x / (10 ** -decimals)) * (10 ** -decimals)
 
 @SQLTableImpl.op('strip', 'str -> str')
 def _strip(x):
@@ -481,19 +483,19 @@ def _strip(x):
 def _mean(x):
     return sqlfunc.avg(x)
 
-@SQLTableImpl.op('min', 'int |> float')
+@SQLTableImpl.op('min', 'int |> int')
 @SQLTableImpl.op('min', 'float |> float')
 @SQLTableImpl.op('min', 'str |> str')
 def _min(x):
     return sqlfunc.min(x)
 
-@SQLTableImpl.op('max', 'int |> float')
+@SQLTableImpl.op('max', 'int |> int')
 @SQLTableImpl.op('max', 'float |> float')
 @SQLTableImpl.op('max', 'str |> str')
 def _max(x):
     return sqlfunc.max(x)
 
-@SQLTableImpl.op('sum', 'int |> float')
+@SQLTableImpl.op('sum', 'int |> int')
 @SQLTableImpl.op('sum', 'float |> float')
 def _sum(x):
     return sqlfunc.sum(x)
