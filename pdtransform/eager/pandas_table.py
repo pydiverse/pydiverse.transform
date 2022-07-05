@@ -6,10 +6,18 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
+import pandas.core.dtypes.dtypes
+import pandas.core.dtypes.cast
+
 from pdtransform.core.column import Column, LiteralColumn
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 from pdtransform.core.expressions.translator import Translator, TypedValue
 from .eager_table import EagerTableImpl, uuid_to_str
+
+
+__all__ = [
+    'PandasTableImpl',
+]
 
 
 class PandasTableImpl(EagerTableImpl):
@@ -22,7 +30,7 @@ class PandasTableImpl(EagerTableImpl):
     """
 
     def __init__(self, name: str, df: pd.DataFrame):
-        self.df = df.convert_dtypes()
+        self.df = fast_pd_convert_dtypes(df)
         self.join_translator = self.JoinTranslator()
 
         columns = {
@@ -104,6 +112,7 @@ class PandasTableImpl(EagerTableImpl):
                 for uuid in uuid_kwargs.keys()
             }
             self.df = gdf.apply(lambda x: x.assign(**{k: v(x) for k, v in cols_transforms.items()}))
+            self.df = fast_pd_convert_dtypes(self.df)
         else:
             # Normal Functions
             cols = {
@@ -111,6 +120,7 @@ class PandasTableImpl(EagerTableImpl):
                 for uuid in uuid_kwargs.keys()
             }
             self.df = self.df.assign(**cols)
+            self.df = fast_pd_convert_dtypes(self.df)
 
     def join(self, right: 'PandasTableImpl', on: SymbolicExpression, how: str, *, validate=None):
         """
@@ -175,10 +185,13 @@ class PandasTableImpl(EagerTableImpl):
 
         # Grouped Dataframe requires different operations compared to ungrouped df.
         if self.grouped_by:
-            columns = { k: v.rename(k) for k, v in translated_values.items() }
-            self.df = pd.concat(columns, axis = 'columns').reset_index()
+            columns = {
+                k: fast_pd_convert_dtypes(v.rename(k))
+                for k, v in translated_values.items()
+            }
+            self.df = pd.concat(columns, axis = 'columns', copy = False).reset_index()
         else:
-            self.df = pd.DataFrame(translated_values, index = [0])
+            self.df = fast_pd_convert_dtypes(pd.DataFrame(translated_values, index = [0]))
 
     #### EXPRESSIONS ####
 
@@ -275,6 +288,39 @@ class PandasTableImpl(EagerTableImpl):
             grouping_cols_names = [self.df_name_mapping[col.uuid] for col in self.grouped_by]
             return self.df.groupby(by = list(grouping_cols_names), dropna=False)
         return self.df
+
+
+def fast_pd_convert_dtypes(obj: pd._typing.NDFrameT, **kwargs) -> pd._typing.NDFrameT:
+    """
+    Faster alternative to the pandas `DataFrame.convert_dtypes` method.
+    Unlike the builtin version, this function tries to minimize unnecessary
+    copy operations.
+
+    As long as all columns are already of the nullable pandas types, this
+    function is a noop.
+    """
+
+    if obj.ndim == 1:
+        if isinstance(obj.dtype, pd.core.dtypes.dtypes.ExtensionDtype):
+            return obj
+
+        inferred_dtype = pandas.core.dtypes.cast.convert_dtypes(obj._values, **kwargs)
+        result = obj.astype(inferred_dtype)
+        return result
+
+    if not all(isinstance(dtype, pd.core.dtypes.dtypes.ExtensionDtype) for dtype in obj.dtypes):
+        results = [
+            fast_pd_convert_dtypes(col, **kwargs)
+            for col_name, col in obj.items()
+        ]
+
+        if len(results) > 0:
+            result = pd.concat(results, axis = 1, copy = False, keys = obj.columns)
+            result = obj._constructor(result)
+            result = result.__finalize__(obj, method = "convert_dtypes")
+            return result
+
+    return obj
 
 
 #### BACKEND SPECIFIC OPERATORS ################################################
