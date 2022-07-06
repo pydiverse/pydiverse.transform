@@ -372,3 +372,10 @@ def _count(x):
 @PandasTableImpl.op('join', 'str, str |> str')
 def _join(x, sep: str = ''):
     return sep.join(x)
+
+#### Window Functions ####
+
+@PandasTableImpl.op('shift', 'T, int => T')
+@PandasTableImpl.op('shift', 'T, int, T => T')
+def _shift(x: pd.Series, by, empty_value=None):
+    return x.shift(by, fill_value = empty_value)

@@ -385,19 +385,50 @@ class SQLTableImpl(LazyTableImpl):
 
             if implementation.ftype == 'a' and verb == 'mutate':
                 # Aggregate function in mutate verb -> window function
-                compiled_gb = [self.translate(group_by).value for group_by in self.backend.grouped_by]
+                over_value = self.over_clause(value, partition_by = True, order_by = False)
+                ftype = self.backend._get_func_ftype(expr.args, implementation, 'w', strict = True)
+                return TypedValue(over_value, implementation.rtype, ftype)
+            elif implementation.ftype == 'w':
+                if verb != 'mutate':
+                    raise Exception('nope. not allowed')
 
-                def over_value(cols):
-                    partition_bys = (compiled(cols) for compiled in compiled_gb)
-                    return value(cols).over(
-                        partition_by = sql.expression.ClauseList(*partition_bys)
-                    )
-
+                over_value = self.over_clause(value, partition_by = True, order_by = True)
                 ftype = self.backend._get_func_ftype(expr.args, implementation, 'w', strict = True)
                 return TypedValue(over_value, implementation.rtype, ftype)
             else:
                 ftype = self.backend._get_func_ftype(expr.args, implementation, strict = True)
                 return TypedValue(value, implementation.rtype, ftype)
+
+        def over_clause(self, value: Callable, *, partition_by: bool, order_by: bool):
+            if partition_by:
+                compiled_pb = [self.translate(group_by).value for group_by in self.backend.grouped_by]
+            if order_by:
+                def order_by_clause_generator(ordering: OrderByDescriptor):
+                    compiled, _ = self.translate(ordering.order)
+                    def clause(*args, **kwargs):
+                        col = compiled(*args, **kwargs)
+                        col = col.asc() if ordering.asc else col.desc()
+                        col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
+                        return col
+                    return clause
+
+                compiled_ob = [order_by_clause_generator(o_by) for o_by in self.backend.order_bys]
+
+            def over_value(*args, **kwargs):
+                pb, ob = None, None
+                if partition_by:
+                    pb = sql.expression.ClauseList(*(compiled(*args, **kwargs) for compiled in compiled_pb))
+                if order_by:
+                    ob = sql.expression.ClauseList(*(compiled(*args, **kwargs) for compiled in compiled_ob))
+
+                v = value(*args, **kwargs)
+                return v.over(
+                    partition_by = pb,
+                    order_by = ob,
+                )
+
+            return over_value
+
 
     class AlignedExpressionEvaluator(LazyTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]):
 
@@ -430,6 +461,8 @@ class SQLTableImpl(LazyTableImpl):
 
             if implementation.ftype == 'a':
                 value = value.over()
+            if implementation.ftype == 'w':
+                raise NotImplementedError('How to handle window functions?')
 
             return TypedValue(value, implementation.rtype, ftype)
 
@@ -474,38 +507,51 @@ def _round(x, decimals=0):
 
 @SQLTableImpl.op('strip', 'str -> str')
 def _strip(x):
-    return sqlfunc.trim(x)
+    return sqlfunc.TRIM(x)
 
 #### Summarising Functions ####
 
 @SQLTableImpl.op('mean', 'int |> float')
 @SQLTableImpl.op('mean', 'float |> float')
 def _mean(x):
-    return sqlfunc.avg(x)
+    return sqlfunc.AVG(x)
 
 @SQLTableImpl.op('min', 'int |> int')
 @SQLTableImpl.op('min', 'float |> float')
 @SQLTableImpl.op('min', 'str |> str')
 def _min(x):
-    return sqlfunc.min(x)
+    return sqlfunc.MIN(x)
 
 @SQLTableImpl.op('max', 'int |> int')
 @SQLTableImpl.op('max', 'float |> float')
 @SQLTableImpl.op('max', 'str |> str')
 def _max(x):
-    return sqlfunc.max(x)
+    return sqlfunc.MAX(x)
 
 @SQLTableImpl.op('sum', 'int |> int')
 @SQLTableImpl.op('sum', 'float |> float')
 def _sum(x):
-    return sqlfunc.sum(x)
+    return sqlfunc.SUM(x)
 
 @SQLTableImpl.op('count', 'T |> int')
 def _count(x):
     # TODO: Implement a count method that doesn't take an argument
-    return sqlfunc.count()
+    return sqlfunc.COUNT()
 
 @SQLTableImpl.op('join', 'str |> str')
 @SQLTableImpl.op('join', 'str, str |> str')
 def _join(x, sep: str = ''):
-    return sqlfunc.group_concat(x, sep)
+    return sqlfunc.GROUP_CONCAT(x, sep)
+
+#### Window Functions ####
+
+@SQLTableImpl.op('shift', 'T, int => T')
+@SQLTableImpl.op('shift', 'T, int, T => T')
+def _shift(x, by, empty_value=None):
+    if by == 0:
+        return x
+    if by > 0:
+        return sqlfunc.LAG(x, by, empty_value)
+    if by < 0:
+        return sqlfunc.LEAD(x, -by, empty_value)
+    raise Exception

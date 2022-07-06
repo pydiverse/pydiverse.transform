@@ -23,7 +23,7 @@ class OperatorImpl:
         # - Find match with the least number templates in the signature
         # - From those take the one with the least number of different templates
         # - From those take the one where the first template appears latest
-        # - From those take the one that isn't a vararg or has the most number of arguments.
+        # - From those take the one that isn't a vararg or has the most arguments.
         # - From those take the one that was defined first
 
         num_templates = 0
@@ -162,6 +162,7 @@ class OperatorSignature:
         signature ::= scalar_func | aggregate_func
         scalar_func ::= arguments "->" rtype
         aggregate_func ::= arguments "|>" rtype
+        window_func ::= arguments "=>" rtype
         arguments ::= (dtype ",")* terminal_arg
         terminal_arg ::= dtype | vararg
         vararg ::= dtype "..."
@@ -184,17 +185,14 @@ class OperatorSignature:
         Variable number of arguments:
             int... -> int
 
-
-    TODO: Extend syntax.
-        - Nullability:         int? -> bool
     """
 
     def __init__(self, args: tuple[str], rtype: str, ftype: str):
         """
         :param args: Tuple of argument types.
         :param rtype: The return type.
-        :param ftype: Function type. Can either be 's' or 'a' which stands for
-                       scalar and aggregate respectively.
+        :param ftype: Function type. Can either be 's', 'a' or 'w' which stand
+            for scalar, aggregate and window respectively.
         """
         assert(len(args) > 0)
         self.args = args
@@ -220,6 +218,11 @@ class OperatorSignature:
             if arrow is not None: raise ValueError('Invalid signature: two different types of arrows.')
             ftype = 'a'
             arrow = '|>'
+        if '=>' in signature:
+            if arrow is not None: raise ValueError('Invalid signature: two different types of arrows.')
+            ftype = 'w'
+            arrow = '=>'
+
 
         if arrow is None:
             raise ValueError('Invalid signature: arrow missing.')
@@ -267,7 +270,7 @@ class OperatorSignature:
         )
 
     def __repr__(self):
-        arrow = {'s': '->', 'a': '|>'}
+        arrow = {'s': '->', 'a': '|>', 'w': '=>'}
         return f"{ ', '.join(self.args)} {arrow[self.ftype]} {self.rtype}"
 
     def __hash__(self):

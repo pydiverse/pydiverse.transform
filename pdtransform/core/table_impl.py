@@ -187,15 +187,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     #### Symbolic Operators ####
 
     @classmethod
-    def register_blank_op(cls, name):
+    def register_op(cls, name, *, check_super: bool):
         """Register operator without providing an implementation."""
-        cls.operator_registry.register_op(name, check_super = False)
-
-    @classmethod
-    def register_op(cls, name, signature):
-        """Decorator: Register operator and add implementation."""
-        cls.register_blank_op(name)
-        return cls.op(name, signature)
+        cls.operator_registry.register_op(name, check_super = check_super)
 
     @classmethod
     def op(cls, name, signature):
