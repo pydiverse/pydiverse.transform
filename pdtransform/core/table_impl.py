@@ -4,10 +4,11 @@ import uuid
 import warnings
 from typing import Generic, Any, TypeVar, Iterable, Callable, TYPE_CHECKING
 
+from pdtransform.core.ops.registry import OperatorRegistry, OperatorRegistrationContextManager
 from pdtransform.core.util import bidict, ordered_set
 from .column import Column, LambdaColumn, LiteralColumn
-from .expressions.operator_registry import OperatorRegistry, TypedOperatorImpl
 from .expressions.translator import Translator, DelegatingTranslator, TypedValue
+from .ops import Operator, OPType
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -19,6 +20,7 @@ class _TableImplMeta(type):
     Metaclass that adds an appropriate operator_registry attribute to each class
     in the table implementation class hierarchy.
     """
+
     def __new__(cls, name, bases, attrs, **kwargs):
         c = super().__new__(cls, name, bases, attrs, **kwargs)
 
@@ -32,7 +34,9 @@ class _TableImplMeta(type):
 ImplT = TypeVar('ImplT', bound = 'AbstractTableImpl')
 ExprCompT = TypeVar('ExprCompT', bound = 'TypedValue')
 AlignedT = TypeVar('AlignedT', bound = 'TypedValue')
-class AbstractTableImpl(metaclass=_TableImplMeta):
+
+
+class AbstractTableImpl(metaclass = _TableImplMeta):
     """
     Base class from which all table backend implementations are derived from.
     It tracks various metadata that is relevant for all backends.
@@ -65,19 +69,19 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self,
             name: str,
             columns: dict[str, Column],
-        ):
+    ):
 
         self.name = name
         self.compiler = self.ExpressionCompiler(self)
         self.lambda_translator = self.LambdaTranslator(self)
 
-        self.selects = ordered_set()       # type: ordered_set[str]
-        self.named_cols = bidict()         # type: bidict[str: uuid.UUID]
-        self.available_cols = set()        # type: set[uuid.UUID]
-        self.cols = {}                     # type: dict[uuid.UUID: ColumnMetaData]
+        self.selects = ordered_set()  # type: ordered_set[str]
+        self.named_cols = bidict()  # type: bidict[str: uuid.UUID]
+        self.available_cols = set()  # type: set[uuid.UUID]
+        self.cols = {}  # type: dict[uuid.UUID: ColumnMetaData]
 
-        self.grouped_by = ordered_set()             # type: ordered_set[Column]
-        self.intrinsic_grouped_by = ordered_set()   # type: ordered_set[Column]
+        self.grouped_by = ordered_set()  # type: ordered_set[Column]
+        self.intrinsic_grouped_by = ordered_set()  # type: ordered_set[Column]
 
         # Init Values
         for name, col in columns.items():
@@ -143,7 +147,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
     #### Verb Callbacks ####
 
-    def alias(self, name=None) -> 'AbstractTableImpl':
+    def alias(self, name = None) -> 'AbstractTableImpl':
         ...
 
     def collect(self):
@@ -162,7 +166,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def mutate(self, **kwargs):
         ...
 
-    def join(self, right, on, how, *, validate=None):
+    def join(self, right, on, how, *, validate = None):
         ...
 
     def filter(self, *args):
@@ -187,17 +191,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     #### Symbolic Operators ####
 
     @classmethod
-    def register_op(cls, name, *, check_super: bool):
-        """Register operator without providing an implementation."""
-        cls.operator_registry.register_op(name, check_super = check_super)
-
-    @classmethod
-    def op(cls, name, signature):
-        """Decorator: Add operator implementation."""
-        def decorator(func):
-            cls.operator_registry.add_implementation(func, name, signature)
-            return func
-        return decorator
+    def op(cls, operator: Operator, **kwargs) -> OperatorRegistrationContextManager:
+        return OperatorRegistrationContextManager(cls.operator_registry, operator, **kwargs)
 
     #### Expressions ####
 
@@ -258,7 +253,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             # Resolve lambda and return Column object
             if isinstance(expr, LambdaColumn):
                 if expr.name not in self.backend.named_cols.fwd:
-                    raise ValueError(f"Invalid lambda column '{expr.name}. No column with this name found for table '{self.backend.named_cols}'.'")
+                    raise ValueError(
+                        f"Invalid lambda column '{expr.name}. No column with this name found for table '{self.backend.named_cols}'.'")
                 uuid = self.backend.named_cols.fwd[expr.name]
                 return self.backend.cols[uuid].as_column(expr.name, self.backend)
             return expr
@@ -266,44 +262,54 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     #### Helpers ####
 
     @classmethod
-    def _get_func_ftype(
-            cls, args, implementation: TypedOperatorImpl,
-            override_ftype: str = None, strict=False) -> str:
+    def _get_op_ftype(
+            cls, args, operator: Operator,
+            override_ftype: OPType = None, strict = False) -> OPType:
         """
         Get the ftype based on a function implementation and the arguments.
 
-            s(s) -> s       a(s) -> a       w(s) -> w
-            s(a) -> a       a(a) -> Err     w(a) -> w
-            s(w) -> w       a(w) -> Err     w(w) -> Err
+            e(e) -> e       a(e) -> a       w(e) -> w
+            e(a) -> a       a(a) -> Err     w(a) -> w
+            e(w) -> w       a(w) -> Err     w(w) -> Err
 
         If the implementation ftype is incompatible with the arguments, this
         function raises an Exception.
         """
 
         ftypes = [arg.ftype for arg in args]
-        impl_ftype = override_ftype or implementation.ftype
+        op_ftype = override_ftype or operator.ftype
 
-        if impl_ftype == 's':
-            if 'w' in ftypes:
-                return 'w'
-            if 'a' in ftypes:
-                return 'a'
-            return 's'
+        if op_ftype == OPType.EWISE:
+            if OPType.WINDOW in ftypes:
+                return OPType.WINDOW
+            if OPType.AGGREGATE in ftypes:
+                return OPType.AGGREGATE
+            return op_ftype
 
-        if impl_ftype == 'a':
-            if 'w' in ftypes:
-                if strict: raise ValueError(f"Can't nest a window function inside an aggregate function ({implementation.name}).")
-                else: warnings.warn(f"Nesting a window function inside an aggregate function is not supported by SQL backend.")
-            if 'a' in ftypes:
-                if strict: raise ValueError(f"Can't nest an aggregate function inside an aggregate function ({implementation.name}).")
-                else: warnings.warn(f"Nesting an aggregate function inside an aggregate function is not supported by SQL backend.")
-            return 'a'
+        if op_ftype == OPType.AGGREGATE:
+            if OPType.WINDOW in ftypes:
+                if strict:
+                    raise ValueError(f"Can't nest a window function inside an aggregate function ({operator.name}).")
+                else:
+                    warnings.warn(
+                        f"Nesting a window function inside an aggregate function is not supported by SQL backend.")
+            if OPType.AGGREGATE in ftypes:
+                if strict:
+                    raise ValueError(
+                        f"Can't nest an aggregate function inside an aggregate function ({operator.name}).")
+                else:
+                    warnings.warn(
+                        f"Nesting an aggregate function inside an aggregate function is not supported by SQL backend.")
+            return op_ftype
 
-        if impl_ftype == 'w':
-            if 'w' in ftypes:
-                if strict: raise ValueError(f"Can't nest a window function inside a window function ({implementation.name}).")
-                else: warnings.warn(f"Nesting a window function inside a window function is not supported by SQL backend.")
-            return 'w'
+        if op_ftype == OPType.WINDOW:
+            if OPType.WINDOW in ftypes:
+                if strict:
+                    raise ValueError(f"Can't nest a window function inside a window function ({operator.name}).")
+                else:
+                    warnings.warn(
+                        f"Nesting a window function inside a window function is not supported by SQL backend.")
+            return op_ftype
 
 
 @dataclasses.dataclass
@@ -340,140 +346,155 @@ class ColumnMetaData:
 #### ARITHMETIC OPERATORS ######################################################
 
 
-@AbstractTableImpl.op('__add__', 'int, int -> int')
-@AbstractTableImpl.op('__add__', 'int, float -> float')
-@AbstractTableImpl.op('__add__', 'float, int -> float')
-@AbstractTableImpl.op('__add__', 'float, float -> float')
-@AbstractTableImpl.op('__radd__', 'int, int -> int')
-@AbstractTableImpl.op('__radd__', 'int, float -> float')
-@AbstractTableImpl.op('__radd__', 'float, int -> float')
-@AbstractTableImpl.op('__radd__', 'float, float -> float')
-def _add(x, y):
-    return x + y
+from pdtransform.core import ops
 
-@AbstractTableImpl.op('__sub__', 'int, int -> int')
-@AbstractTableImpl.op('__sub__', 'int, float -> float')
-@AbstractTableImpl.op('__sub__', 'float, int -> float')
-@AbstractTableImpl.op('__sub__', 'float, float -> float')
-def _sub(x, y):
-    return x - y
+with AbstractTableImpl.op(ops.Add()) as op:
+    @op.auto
+    def _add(lhs, rhs):
+        return lhs + rhs
 
-@AbstractTableImpl.op('__rsub__', 'int, int -> int')
-@AbstractTableImpl.op('__rsub__', 'int, float -> float')
-@AbstractTableImpl.op('__rsub__', 'float, int -> float')
-@AbstractTableImpl.op('__rsub__', 'float, float -> float')
-def _rsub(x, y):
-    return y - x
+with AbstractTableImpl.op(ops.RAdd()) as op:
+    @op.auto
+    def _radd(rhs, lhs):
+        return lhs + rhs
 
-@AbstractTableImpl.op('__mul__', 'int, int -> int')
-@AbstractTableImpl.op('__mul__', 'int, float -> float')
-@AbstractTableImpl.op('__mul__', 'float, int -> float')
-@AbstractTableImpl.op('__mul__', 'float, float -> float')
-@AbstractTableImpl.op('__rmul__', 'int, int -> int')
-@AbstractTableImpl.op('__rmul__', 'int, float -> float')
-@AbstractTableImpl.op('__rmul__', 'float, int -> float')
-@AbstractTableImpl.op('__rmul__', 'float, float -> float')
-def _mul(x, y):
-    return x * y
+with AbstractTableImpl.op(ops.Sub()) as op:
+    @op.auto
+    def _sub(lhs, rhs):
+        return lhs - rhs
 
-@AbstractTableImpl.op('__truediv__', 'int, int -> float')
-@AbstractTableImpl.op('__truediv__', 'int, float -> float')
-@AbstractTableImpl.op('__truediv__', 'float, int -> float')
-@AbstractTableImpl.op('__truediv__', 'float, float -> float')
-def _truediv(x, y):
-    return x / y
+with AbstractTableImpl.op(ops.RSub()) as op:
+    @op.auto
+    def _rsub(rhs, lhs):
+        return lhs - rhs
 
-@AbstractTableImpl.op('__rtruediv__', 'int, int -> float')
-@AbstractTableImpl.op('__rtruediv__', 'int, float -> float')
-@AbstractTableImpl.op('__rtruediv__', 'float, int -> float')
-@AbstractTableImpl.op('__rtruediv__', 'float, float -> float')
-def _rtruediv(x, y):
-    return y / x
+with AbstractTableImpl.op(ops.Mul()) as op:
+    @op.auto
+    def _mul(lhs, rhs):
+        return lhs * rhs
 
-@AbstractTableImpl.op('__floordiv__', 'int, int -> int')
-def _floordiv(x, y):
-    return x // y
+with AbstractTableImpl.op(ops.RMul()) as op:
+    @op.auto
+    def _rmul(rhs, lhs):
+        return lhs * rhs
 
-@AbstractTableImpl.op('__rfloordiv__', 'int, int -> int')
-def _rfloordiv(x, y):
-    return y // x
+with AbstractTableImpl.op(ops.TrueDiv()) as op:
+    @op.auto
+    def _truediv(lhs, rhs):
+        return lhs / rhs
 
-@AbstractTableImpl.op('__pow__', 'int, int -> int')
-def _pow(x, y):
-    return x ** y
+with AbstractTableImpl.op(ops.RTrueDiv()) as op:
+    @op.auto
+    def _rtruediv(rhs, lhs):
+        return lhs / rhs
 
-@AbstractTableImpl.op('__rpow__', 'int, int -> int')
-def _rpow(x, y):
-    return y ** x
+with AbstractTableImpl.op(ops.FloorDiv()) as op:
+    @op.auto
+    def _floordiv(lhs, rhs):
+        return lhs // rhs
 
-@AbstractTableImpl.op('__mod__', 'int, int -> int')
-@AbstractTableImpl.op('__mod__', 'float, int -> float')
-def _mod(x, y):
-    return x % y
+with AbstractTableImpl.op(ops.RFloorDiv()) as op:
+    @op.auto
+    def _rfloordiv(rhs, lhs):
+        return lhs // rhs
 
-@AbstractTableImpl.op('__rmod__', 'int, int -> int')
-@AbstractTableImpl.op('__rmod__', 'int, float -> float')
-def _rmod(x, y):
-    return y % x
+with AbstractTableImpl.op(ops.Pow()) as op:
+    @op.auto
+    def _pow(lhs, rhs):
+        return lhs ** rhs
 
-@AbstractTableImpl.op('__neg__', 'int -> int')
-@AbstractTableImpl.op('__neg__', 'float -> float')
-def _neg(x):
-    return -x
+with AbstractTableImpl.op(ops.RPow()) as op:
+    @op.auto
+    def _rpow(rhs, lhs):
+        return lhs ** rhs
 
-@AbstractTableImpl.op('__pos__', 'int -> int')
-@AbstractTableImpl.op('__pos__', 'float -> float')
-def _pos(x):
-    return x
+with AbstractTableImpl.op(ops.Mod()) as op:
+    @op.auto
+    def _mod(lhs, rhs):
+        return lhs % rhs
 
+with AbstractTableImpl.op(ops.RMod()) as op:
+    @op.auto
+    def _rmod(rhs, lhs):
+        return lhs % rhs
+
+with AbstractTableImpl.op(ops.Neg()) as op:
+    @op.auto
+    def _neg(x):
+        return -x
+
+with AbstractTableImpl.op(ops.Pos()) as op:
+    @op.auto
+    def _pos(x):
+        return +x
 
 #### BINARY OPERATORS ##########################################################
 
 
-@AbstractTableImpl.op('__and__', 'bool, bool -> bool')
-@AbstractTableImpl.op('__rand__', 'bool, bool -> bool')
-def _and(x, y):
-    return x & y
+with AbstractTableImpl.op(ops.And()) as op:
+    @op.auto
+    def _and(lhs, rhs):
+        return lhs & rhs
 
-@AbstractTableImpl.op('__or__', 'bool, bool -> bool')
-@AbstractTableImpl.op('__ror__', 'bool, bool -> bool')
-def _or(x, y):
-    return x | y
+with AbstractTableImpl.op(ops.RAnd()) as op:
+    @op.auto
+    def _rand(rhs, lhs):
+        return lhs & rhs
 
-@AbstractTableImpl.op('__xor__', 'bool, bool -> bool')
-@AbstractTableImpl.op('__rxor__', 'bool, bool -> bool')
-def _xor(x, y):
-    return x ^ y
+with AbstractTableImpl.op(ops.Or()) as op:
+    @op.auto
+    def _or(lhs, rhs):
+        return lhs | rhs
 
-@AbstractTableImpl.op('__invert__', 'bool -> bool')
-def _invert(x):
-    return ~x
+with AbstractTableImpl.op(ops.ROr()) as op:
+    @op.auto
+    def _ror(rhs, lhs):
+        return lhs | rhs
 
+with AbstractTableImpl.op(ops.Xor()) as op:
+    @op.auto
+    def _xor(lhs, rhs):
+        return lhs ^ rhs
+
+with AbstractTableImpl.op(ops.RXor()) as op:
+    @op.auto
+    def _rxor(rhs, lhs):
+        return lhs ^ rhs
+
+with AbstractTableImpl.op(ops.Invert()) as op:
+    @op.auto
+    def _invert(x):
+        return ~x
 
 #### COMPARISON OPERATORS ######################################################
 
 
-@AbstractTableImpl.op('__lt__', 'T, T -> bool')
-def _lt(x, y):
-    return x < y
+with AbstractTableImpl.op(ops.Equal()) as op:
+    @op.auto
+    def _eq(lhs, rhs):
+        return lhs == rhs
 
-@AbstractTableImpl.op('__le__', 'T, T -> bool')
-def _le(x, y):
-    return x <= y
+with AbstractTableImpl.op(ops.NotEqual()) as op:
+    @op.auto
+    def _ne(lhs, rhs):
+        return lhs != rhs
 
-@AbstractTableImpl.op('__eq__', 'T, U -> bool')
-def _eq(x, y):
-    return x == y
+with AbstractTableImpl.op(ops.Less()) as op:
+    @op.auto
+    def _lt(lhs, rhs):
+        return lhs < rhs
 
-@AbstractTableImpl.op('__ne__', 'T, U -> bool')
-def _ne(x, y):
-    return x != y
+with AbstractTableImpl.op(ops.LessEqual()) as op:
+    @op.auto
+    def _le(lhs, rhs):
+        return lhs <= rhs
 
-@AbstractTableImpl.op('__gt__', 'T, T -> bool')
-def _gt(x, y):
-    return x > y
+with AbstractTableImpl.op(ops.Greater()) as op:
+    @op.auto
+    def _gt(lhs, rhs):
+        return lhs > rhs
 
-@AbstractTableImpl.op('__ge__', 'T, T -> bool')
-def _ge(x, y):
-    return x >= y
-
+with AbstractTableImpl.op(ops.GreaterEqual()) as op:
+    @op.auto
+    def _ge(lhs, rhs):
+        return lhs >= rhs

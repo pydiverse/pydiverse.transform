@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from typing import Generic, TYPE_CHECKING, TypeVar
 
 from pdtransform.core import column
-from pdtransform.core.expressions import expressions, operator_registry
+from pdtransform.core.expressions import expressions
+from pdtransform.core.ops import registry, OPType
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -16,7 +17,7 @@ T = TypeVar('T')
 class TypedValue(Generic[T]):
     value: T
     dtype: str
-    ftype: str = 's'  # One of 's', 'a' or 'w'
+    ftype: OPType = OPType.EWISE
 
     def __iter__(self):
         return iter((self.value, self.dtype))
@@ -42,7 +43,7 @@ class DelegatingTranslator(Generic[T], Translator[T]):
     the type of the expression.
     """
 
-    def __init__(self, operator_registry: operator_registry.OperatorRegistry):
+    def __init__(self, operator_registry: registry.OperatorRegistry):
         self.operator_registry = operator_registry
 
     def _translate(self, expr, accept_literal_col=True, **kwargs):
@@ -74,7 +75,7 @@ class DelegatingTranslator(Generic[T], Translator[T]):
 
     def _translate_function(
             self, expr: 'expressions.FunctionCall',
-            arguments: list, implementation: operator_registry.TypedOperatorImpl,
+            arguments: list, implementation: registry.TypedOperatorImpl,
             **kwargs) -> T:
         raise NotImplementedError
 

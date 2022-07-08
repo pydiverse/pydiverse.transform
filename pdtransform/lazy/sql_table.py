@@ -8,9 +8,11 @@ from typing import Callable
 import sqlalchemy
 from sqlalchemy import sql
 
+from pdtransform.core import ops
 from pdtransform.core.column import Column, LiteralColumn
 from pdtransform.core.expressions import SymbolicExpression, iterate_over_expr
 from pdtransform.core.expressions.translator import TypedValue
+from pdtransform.core.ops import OPType
 from pdtransform.core.table_impl import ColumnMetaData
 from .lazy_table import JoinDescriptor, LazyTableImpl, OrderByDescriptor
 
@@ -39,7 +41,7 @@ class SQLTableImpl(LazyTableImpl):
         # backend = self.engine.url.get_backend_name()
 
         columns = {
-            col.name: Column(name = col.name, table = self, dtype = self._get_dtype(col, hints=_dtype_hints))
+            col.name: Column(name = col.name, table = self, dtype = self._get_dtype(col, hints = _dtype_hints))
             for col in tbl.columns
         }
 
@@ -78,7 +80,7 @@ class SQLTableImpl(LazyTableImpl):
             return tbl
 
         if not isinstance(tbl, str):
-            raise ValueError("tbl must be a sqlalchemy Table or string, but was %s" %type(tbl))
+            raise ValueError("tbl must be a sqlalchemy Table or string, but was %s" % type(tbl))
 
         schema, table_name = tbl.split('.') if '.' in tbl else [None, tbl]
 
@@ -136,10 +138,10 @@ class SQLTableImpl(LazyTableImpl):
             for col in columns.values():
                 self.cols[col.uuid] = ColumnMetaData.from_expr(col.uuid, col, self)
 
-        self.joins = []         # type: list[JoinDescriptor]
-        self.wheres = []        # type: list[SymbolicExpression]
-        self.having = []        # type: list[SymbolicExpression]
-        self.order_bys = []     # type: list[OrderByDescriptor]
+        self.joins = []  # type: list[JoinDescriptor]
+        self.wheres = []  # type: list[SymbolicExpression]
+        self.having = []  # type: list[SymbolicExpression]
+        self.order_bys = []  # type: list[OrderByDescriptor]
 
     def build_select(self) -> sql.Select:
         # Validate current state
@@ -167,13 +169,14 @@ class SQLTableImpl(LazyTableImpl):
             # Combine wheres using ands
             combined_where = functools.reduce(operator.and_, map(SymbolicExpression, self.wheres))._
             compiled, where_dtype = self.compiler.translate(combined_where)
-            assert(where_dtype == 'bool')
+            assert (where_dtype == 'bool')
             where = compiled(self.sql_columns)
             select = select.where(where)
 
         # GROUP BY
         if self.intrinsic_grouped_by:
-            compiled_gb, group_by_dtypes = zip(*(self.compiler.translate(group_by) for group_by in self.intrinsic_grouped_by))
+            compiled_gb, group_by_dtypes = zip(
+                *(self.compiler.translate(group_by) for group_by in self.intrinsic_grouped_by))
             group_bys = (compiled(self.sql_columns) for compiled in compiled_gb)
             select = select.group_by(*group_bys)
 
@@ -182,7 +185,7 @@ class SQLTableImpl(LazyTableImpl):
             # Combine havings using ands
             combined_having = functools.reduce(operator.and_, map(SymbolicExpression, self.having))._
             compiled, having_dtype = self.compiler.translate(combined_having)
-            assert(having_dtype == 'bool')
+            assert (having_dtype == 'bool')
             having = compiled(self.sql_columns)
             select = select.having(having)
 
@@ -211,16 +214,16 @@ class SQLTableImpl(LazyTableImpl):
 
     #### Verb Operations ####
 
-    def alias(self, name=None):
+    def alias(self, name = None):
         if name is None:
             suffix = format(uuid.uuid1().int % 0x7FFFFFFF, 'X')
             name = f"{self.name}_{suffix}"
 
         # TODO: If the table has not been modified, a simple `.alias()` would produce nicer queries.
-        subquery = self.build_select().subquery(name=name)
+        subquery = self.build_select().subquery(name = name)
         # In some situations sqlalchemy fails to determine the datatype of a column.
         # To circumvent this, we can pass on the information we know.
-        dtype_hints = { name: self.cols[self.named_cols.fwd[name]].dtype for name in self.selects }
+        dtype_hints = {name: self.cols[self.named_cols.fwd[name]].dtype for name in self.selects}
         return self.__class__(self.engine, subquery, _dtype_hints = dtype_hints)
 
     def collect(self):
@@ -232,6 +235,7 @@ class SQLTableImpl(LazyTableImpl):
             class _FixedSqlDatabase(_pd_sql.SQLDatabase):
                 def execute(self, *args, **kwargs):
                     return self.connectable.execute(*args, **kwargs)
+
             sql_db = _FixedSqlDatabase(conn)
             return sql_db.read_sql(select).convert_dtypes()
 
@@ -244,7 +248,7 @@ class SQLTableImpl(LazyTableImpl):
 
     def pre_mutate(self, **kwargs):
         requires_subquery = any(
-            self.cols[c.uuid].ftype == 'w'
+            self.cols[c.uuid].ftype == OPType.WINDOW
             for v in kwargs.values()
             for c in iterate_over_expr(self.resolve_lambda_cols(v)) if isinstance(c, Column)
         )
@@ -267,7 +271,7 @@ class SQLTableImpl(LazyTableImpl):
             self.replace_tbl(subquery, columns)
             self.selects = original_selects
 
-    def join(self, right, on, how, *, validate=None):
+    def join(self, right, on, how, *, validate = None):
         self.alignment_hash = generate_alignment_hash()
 
         # If right has joins already, merging them becomes extremely difficult
@@ -337,7 +341,7 @@ class SQLTableImpl(LazyTableImpl):
         # tbl object, or if on of the input columns is a window or aggregate
         # function, we must make a subquery.
         requires_subquery = (bool(self.intrinsic_grouped_by) and self.grouped_by != self.intrinsic_grouped_by) or any(
-            self.cols[c.uuid].ftype in ('w', 'a')
+            self.cols[c.uuid].ftype in (OPType.AGGREGATE, OPType.WINDOW)
             for v in kwargs.values()
             for c in iterate_over_expr(self.resolve_lambda_cols(v)) if isinstance(c, Column)
         )
@@ -357,14 +361,16 @@ class SQLTableImpl(LazyTableImpl):
 
     #### EXPRESSIONS ####
 
-    class ExpressionCompiler(LazyTableImpl.ExpressionCompiler['SQLTableImpl', TypedValue[Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]]]):
+    class ExpressionCompiler(LazyTableImpl.ExpressionCompiler['SQLTableImpl', TypedValue[
+        Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]]]):
 
         def _translate_col(self, expr, **kwargs):
             # Can either be a base SQL column, or a reference to an expression
             if expr.uuid in self.backend.sql_columns:
                 def sql_col(cols):
                     return cols[expr.uuid]
-                return TypedValue(sql_col, expr.dtype, 's')
+
+                return TypedValue(sql_col, expr.dtype, OPType.EWISE)
 
             col = self.backend.cols[expr.uuid]
             return TypedValue(col.compiled, col.dtype, col.ftype)
@@ -379,24 +385,28 @@ class SQLTableImpl(LazyTableImpl):
 
             return TypedValue(sql_col, expr.typed_value.dtype, expr.typed_value.ftype)
 
-        def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
+        def _translate_function(self, expr, arguments, implementation, verb = None, **kwargs):
             def value(cols):
                 return implementation(*(arg(cols) for arg in arguments))
 
-            if implementation.ftype == 'a' and verb == 'mutate':
+            operator = implementation.operator
+
+            if operator.ftype == OPType.AGGREGATE and verb == 'mutate':
                 # Aggregate function in mutate verb -> window function
                 over_value = self.over_clause(value, partition_by = True, order_by = False)
-                ftype = self.backend._get_func_ftype(expr.args, implementation, 'w', strict = True)
+                ftype = self.backend._get_op_ftype(expr.args, operator, OPType.WINDOW, strict = True)
                 return TypedValue(over_value, implementation.rtype, ftype)
-            elif implementation.ftype == 'w':
+
+            elif operator.ftype == OPType.WINDOW:
                 if verb != 'mutate':
-                    raise Exception('nope. not allowed')
+                    raise ValueError('Window function are only allowed inside a mutate.')
 
                 over_value = self.over_clause(value, partition_by = True, order_by = True)
-                ftype = self.backend._get_func_ftype(expr.args, implementation, 'w', strict = True)
+                ftype = self.backend._get_op_ftype(expr.args, operator, strict = True)
                 return TypedValue(over_value, implementation.rtype, ftype)
+
             else:
-                ftype = self.backend._get_func_ftype(expr.args, implementation, strict = True)
+                ftype = self.backend._get_op_ftype(expr.args, operator, strict = True)
                 return TypedValue(value, implementation.rtype, ftype)
 
         def over_clause(self, value: Callable, *, partition_by: bool, order_by: bool):
@@ -405,11 +415,13 @@ class SQLTableImpl(LazyTableImpl):
             if order_by:
                 def order_by_clause_generator(ordering: OrderByDescriptor):
                     compiled, _ = self.translate(ordering.order)
+
                     def clause(*args, **kwargs):
                         col = compiled(*args, **kwargs)
                         col = col.asc() if ordering.asc else col.desc()
                         col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
                         return col
+
                     return clause
 
                 compiled_ob = [order_by_clause_generator(o_by) for o_by in self.backend.order_bys]
@@ -429,22 +441,22 @@ class SQLTableImpl(LazyTableImpl):
 
             return over_value
 
-
     class AlignedExpressionEvaluator(LazyTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]):
 
-        def translate(self, expr, check_alignment=True, **kwargs):
+        def translate(self, expr, check_alignment = True, **kwargs):
             if check_alignment:
-                alignment_hashes = { col.table.alignment_hash for col in iterate_over_expr(expr, expand_literal_col = True) if isinstance(col, Column) }
+                alignment_hashes = {col.table.alignment_hash for col in
+                                    iterate_over_expr(expr, expand_literal_col = True) if isinstance(col, Column)}
                 if len(alignment_hashes) >= 2:
                     raise ValueError("Expression contains columns from different tables that aren't aligned.")
 
-            return super().translate(expr, check_alignment=check_alignment, **kwargs)
+            return super().translate(expr, check_alignment = check_alignment, **kwargs)
 
         def _translate_col(self, expr, **kwargs):
             backend = expr.table
             if expr.uuid in backend.sql_columns:
                 sql_col = backend.sql_columns[expr.uuid]
-                return TypedValue(sql_col, expr.dtype, 's')
+                return TypedValue(sql_col, expr.dtype)
 
             col = backend.cols[expr.uuid]
             return TypedValue(col.compiled(backend.sql_columns), col.dtype, col.ftype)
@@ -456,12 +468,13 @@ class SQLTableImpl(LazyTableImpl):
         def _translate_function(self, expr, arguments, implementation, **kwargs):
             # Aggregate function -> window function
             value = implementation(*arguments)
-            override_ftype = 'w' if implementation.ftype == 'a' else None
-            ftype = SQLTableImpl._get_func_ftype(expr.args, implementation, override_ftype, strict = True)
+            operator = implementation.operator
+            override_ftype = OPType.WINDOW if operator.ftype == OPType.AGGREGATE else None
+            ftype = SQLTableImpl._get_op_ftype(expr.args, operator, override_ftype, strict = True)
 
-            if implementation.ftype == 'a':
+            if operator.ftype == OPType.AGGREGATE:
                 value = value.over()
-            if implementation.ftype == 'w':
+            if operator.ftype == OPType.WINDOW:
                 raise NotImplementedError('How to handle window functions?')
 
             return TypedValue(value, implementation.rtype, ftype)
@@ -480,78 +493,83 @@ def generate_alignment_hash():
 
 from sqlalchemy import func as sqlfunc
 
+with SQLTableImpl.op(ops.FloorDiv(), check_super = False) as op:
+    @op.auto
+    def _floordiv(lhs, rhs):
+        return sql.cast(lhs / rhs, sqlalchemy.types.Integer())
 
-@SQLTableImpl.op('__floordiv__', 'int, int -> int')
-def _floordiv(x, y):
-    return sql.cast(x / y, sqlalchemy.types.Integer())
+with SQLTableImpl.op(ops.RFloorDiv(), check_super = False) as op:
+    @op.auto
+    def _rfloordiv(rhs, lhs):
+        return _floordiv(lhs, rhs)
 
-@SQLTableImpl.op('__rfloordiv__', 'int, int -> int')
-def _floordiv(x, y):
-    return _floordiv(y, x)
+with SQLTableImpl.op(ops.Round()) as op:
+    @op.auto
+    def _round(x, decimals = 0):
+        # TODO: Don't round integers with decimals >= 0
+        if decimals >= 0:
+            return sqlfunc.round(x, decimals)
+        # For some reason SQLite doesn't like negative decimals values
+        return sqlfunc.round(x / (10 ** -decimals)) * (10 ** -decimals)
 
-@SQLTableImpl.op('__round__', 'int -> int')
-@SQLTableImpl.op('__round__', 'int, int -> int')
-def _round(x, decimals=0):
-    if decimals >= 0:
-        # Int is already rounded
-        return x
-    return sql.cast(x / (10 ** -decimals)) * (10 ** -decimals)
-
-@SQLTableImpl.op('__round__', 'float -> float')
-@SQLTableImpl.op('__round__', 'float, int -> float')
-def _round(x, decimals=0):
-    if decimals >= 0:
-        return sqlfunc.round(x, decimals)
-    # For some reason SQLite doesn't like negative decimals values
-    return sqlfunc.round(x / (10 ** -decimals)) * (10 ** -decimals)
-
-@SQLTableImpl.op('strip', 'str -> str')
-def _strip(x):
-    return sqlfunc.TRIM(x)
+with SQLTableImpl.op(ops.Strip()) as op:
+    @op.auto
+    def _strip(x):
+        return sqlfunc.TRIM(x)
 
 #### Summarising Functions ####
 
-@SQLTableImpl.op('mean', 'int |> float')
-@SQLTableImpl.op('mean', 'float |> float')
-def _mean(x):
-    return sqlfunc.AVG(x)
 
-@SQLTableImpl.op('min', 'int |> int')
-@SQLTableImpl.op('min', 'float |> float')
-@SQLTableImpl.op('min', 'str |> str')
-def _min(x):
-    return sqlfunc.MIN(x)
+with SQLTableImpl.op(ops.Mean()) as op:
+    @op.auto
+    def _mean(x):
+        return sqlfunc.AVG(x)
 
-@SQLTableImpl.op('max', 'int |> int')
-@SQLTableImpl.op('max', 'float |> float')
-@SQLTableImpl.op('max', 'str |> str')
-def _max(x):
-    return sqlfunc.MAX(x)
+with SQLTableImpl.op(ops.Min()) as op:
+    @op.auto
+    def _min(x):
+        return sqlfunc.MIN(x)
 
-@SQLTableImpl.op('sum', 'int |> int')
-@SQLTableImpl.op('sum', 'float |> float')
-def _sum(x):
-    return sqlfunc.SUM(x)
+with SQLTableImpl.op(ops.Max()) as op:
+    @op.auto
+    def _max(x):
+        return sqlfunc.MAX(x)
 
-@SQLTableImpl.op('count', 'T |> int')
-def _count(x):
-    # TODO: Implement a count method that doesn't take an argument
-    return sqlfunc.COUNT()
+with SQLTableImpl.op(ops.Sum()) as op:
+    @op.auto
+    def _sum(x):
+        return sqlfunc.SUM(x)
 
-@SQLTableImpl.op('join', 'str |> str')
-@SQLTableImpl.op('join', 'str, str |> str')
-def _join(x, sep: str = ''):
-    return sqlfunc.GROUP_CONCAT(x, sep)
+with SQLTableImpl.op(ops.StringJoin()) as op:
+    @op.auto
+    def _join(x, sep: str):
+        return sqlfunc.GROUP_CONCAT(x, sep)
+
+with SQLTableImpl.op(ops.Count()) as op:
+    @op.auto
+    def _count(x = None):
+        if x is None:
+            # Get the number of rows
+            return sqlfunc.COUNT()
+        else:
+            # Count non null values
+            return sqlfunc.COUNT(x)
 
 #### Window Functions ####
 
-@SQLTableImpl.op('shift', 'T, int => T')
-@SQLTableImpl.op('shift', 'T, int, T => T')
-def _shift(x, by, empty_value=None):
-    if by == 0:
-        return x
-    if by > 0:
-        return sqlfunc.LAG(x, by, empty_value)
-    if by < 0:
-        return sqlfunc.LEAD(x, -by, empty_value)
-    raise Exception
+
+with SQLTableImpl.op(ops.Shift()) as op:
+    @op.auto
+    def _shift(x, by, empty_value = None):
+        if by == 0:
+            return x
+        if by > 0:
+            return sqlfunc.LAG(x, by, empty_value)
+        if by < 0:
+            return sqlfunc.LEAD(x, -by, empty_value)
+        raise Exception
+
+with SQLTableImpl.op(ops.RowNumber()) as op:
+    @op.auto
+    def _row_number():
+        return sqlfunc.ROW_NUMBER()

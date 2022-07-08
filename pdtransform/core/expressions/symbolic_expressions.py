@@ -1,9 +1,10 @@
 from html import escape
 from typing import Any, Generic, TypeVar
 
-from pdtransform.core import column, alignment
+from pdtransform.core import alignment
 from pdtransform.core.util import traverse
-from . import expressions, translator, operator_registry, util
+from . import expressions, util
+from ..ops import registry
 
 T = TypeVar('T')
 
@@ -114,6 +115,6 @@ def create_operator(op):
     def impl(*args, **kwargs):
         return SymbolicExpression(expressions.FunctionCall(op, *args, **kwargs))
     return impl
-for dunder in operator_registry.OperatorRegistry.SUPPORTED_DUNDER:
+for dunder in registry.OperatorRegistry.SUPPORTED_DUNDER:
     setattr(SymbolicExpression, dunder, create_operator(dunder))
 del create_operator

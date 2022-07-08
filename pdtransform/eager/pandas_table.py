@@ -5,15 +5,15 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-
-import pandas.core.dtypes.dtypes
 import pandas.core.dtypes.cast
+import pandas.core.dtypes.dtypes
 
+from pdtransform.core import ops
 from pdtransform.core.column import Column, LiteralColumn
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 from pdtransform.core.expressions.translator import Translator, TypedValue
+from pdtransform.core.ops import OPType
 from .eager_table import EagerTableImpl, uuid_to_str
-
 
 __all__ = [
     'PandasTableImpl',
@@ -227,10 +227,20 @@ class PandasTableImpl(EagerTableImpl):
 
         def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
             def value(df):
-                return implementation(*(arg(df) for arg in arguments))
+                return implementation(
+                    *(arg(df) for arg in arguments),
+                    _tbl = self.backend,
+                    _df = df,
+                )
 
-            override_impl_ftype = 'w' if implementation.ftype == 'a' and verb == 'mutate' else None
-            ftype = self.backend._get_func_ftype(expr.args, implementation, override_impl_ftype)
+            operator = implementation.operator
+
+            if operator.ftype == OPType.WINDOW:
+                if verb != 'mutate':
+                    raise ValueError('Window function are only allowed inside a mutate.')
+
+            override_ftype = OPType.WINDOW if operator.ftype == OPType.AGGREGATE and verb == 'mutate' else None
+            ftype = self.backend._get_op_ftype(expr.args, operator, override_ftype)
             return TypedValue(value, implementation.rtype, ftype)
 
     class AlignedExpressionEvaluator(EagerTableImpl.AlignedExpressionEvaluator[TypedValue[pd.Series]]):
@@ -257,8 +267,9 @@ class PandasTableImpl(EagerTableImpl):
                 raise ValueError(f"Arguments for function {expr.operator} aren't aligned. Specifically, the inputs are of lenght {arg_lengths}. Instead they must either all be of the same length or of length 1.")
 
             value = implementation(*arguments)
-            override_impl_ftype = 'w' if implementation.ftype == 'a' else None
-            ftype = PandasTableImpl._get_func_ftype(expr.args, implementation, override_impl_ftype)
+            operator = implementation.operator
+            override_ftype = OPType.WINDOW if operator.ftype == OPType.AGGREGATE else None
+            ftype = PandasTableImpl._get_op_ftype(expr.args, operator, override_ftype)
             return TypedValue(value, implementation.rtype, ftype)
 
     class JoinTranslator(Translator[tuple]):
@@ -325,57 +336,63 @@ def fast_pd_convert_dtypes(obj: pd._typing.NDFrameT, **kwargs) -> pd._typing.NDF
 
 #### BACKEND SPECIFIC OPERATORS ################################################
 
-@PandasTableImpl.op('__round__', 'int -> int')
-@PandasTableImpl.op('__round__', 'int, int -> int')
-def _round(x, decimals=0):
-    # Int is already rounded
-    return x
 
-@PandasTableImpl.op('__round__', 'float -> float')
-@PandasTableImpl.op('__round__', 'float, int -> float')
-def _round(x, decimals=0):
-    return x.round(decimals=decimals)
+with PandasTableImpl.op(ops.Round()) as op:
+    @op.auto
+    def _round(x, decimals=0):
+        return x.round(decimals=decimals)
 
-@PandasTableImpl.op('strip', 'str -> str')
-def _strip(x):
-    return x.str.strip()
+with PandasTableImpl.op(ops.Strip()) as op:
+    @op.auto
+    def _strip(x):
+        return x.str.strip()
 
 #### Summarising Functions ####
 
-@PandasTableImpl.op('mean', 'int |> float')
-@PandasTableImpl.op('mean', 'float |> float')
-def _mean(x):
-    return x.mean()
+with PandasTableImpl.op(ops.Mean()) as op:
+    @op.auto
+    def _mean(x):
+        return x.mean()
 
-@PandasTableImpl.op('min', 'int |> int')
-@PandasTableImpl.op('min', 'float |> float')
-@PandasTableImpl.op('min', 'str |> str')
-def _min(x):
-    return x.min()
+with PandasTableImpl.op(ops.Min()) as op:
+    @op.auto
+    def _min(x):
+        return x.min()
 
-@PandasTableImpl.op('max', 'int |> int')
-@PandasTableImpl.op('max', 'float |> float')
-@PandasTableImpl.op('max', 'str |> str')
-def _max(x):
-    return x.max()
+with PandasTableImpl.op(ops.Max()) as op:
+    @op.auto
+    def _max(x):
+        return x.max()
 
-@PandasTableImpl.op('sum', 'int |> int')
-@PandasTableImpl.op('sum', 'float |> float')
-def _sum(x):
-    return x.sum()
+with PandasTableImpl.op(ops.Sum()) as op:
+    @op.auto
+    def _sum(x):
+        return x.sum()
 
-@PandasTableImpl.op('count', 'T |> int')
-def _count(x):
-    return len(x)
+with PandasTableImpl.op(ops.StringJoin()) as op:
+    @op.auto
+    def _join(x, sep):
+        return sep.join(x)
 
-@PandasTableImpl.op('join', 'str |> str')
-@PandasTableImpl.op('join', 'str, str |> str')
-def _join(x, sep: str = ''):
-    return sep.join(x)
+with PandasTableImpl.op(ops.Count()) as op:
+    @op.auto
+    def _count(x = None, *, _df):
+        if x is None:
+            # Get the length of df
+            return len(_df.index)
+        else:
+            # Count non null values
+            return x.count()
 
 #### Window Functions ####
 
-@PandasTableImpl.op('shift', 'T, int => T')
-@PandasTableImpl.op('shift', 'T, int, T => T')
-def _shift(x: pd.Series, by, empty_value=None):
-    return x.shift(by, fill_value = empty_value)
+with PandasTableImpl.op(ops.Shift()) as op:
+    @op.auto
+    def _shift(x: pd.Series, by, empty_value=None):
+        return x.shift(by, fill_value = empty_value)
+
+with PandasTableImpl.op(ops.RowNumber()) as op:
+    @op.auto
+    def _row_number(*, _df):
+        n = len(_df.index)
+        return pd.Series(np.arange(1, n + 1), index=_df.index)
