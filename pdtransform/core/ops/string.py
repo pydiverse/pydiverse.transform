@@ -1,9 +1,27 @@
-from .core import ElementWise, Unary
-
+from .core import ElementWise, Unary, OperatorExtension
+from .numeric import Add, RAdd
 
 __all__ = [
+    'StringAdd', 'StringRAdd',
     'Strip',
 ]
+
+
+class StringAdd(OperatorExtension):
+    operator = Add
+    signatures = [
+        'str, str -> str'
+    ]
+
+
+class StringRAdd(OperatorExtension):
+    operator = RAdd
+    signatures = [
+        'str, str -> str'
+    ]
+
+
+####
 
 
 class StringUnary(ElementWise, Unary):

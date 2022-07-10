@@ -6,12 +6,12 @@ class FunctionCall:
     AST node to represent a function / operator call.
     """
 
-    def __init__(self, operator: str, *args, **kwargs):
+    def __init__(self, name: str, *args, **kwargs):
         # Unwrap all symbolic expressions in the input
         args = symbolic_expressions.unwrap_symbolic_expressions(args)
         kwargs = symbolic_expressions.unwrap_symbolic_expressions(kwargs)
 
-        self.operator = operator
+        self.name = name
         self.args = args
         self.kwargs = kwargs
 
@@ -21,7 +21,7 @@ class FunctionCall:
                ] + [
                    f'{k}={repr(v)}' for k, v in self.kwargs.items()
                ]
-        return f'{self.operator}({", ".join(args)})'
+        return f'{self.name}({", ".join(args)})'
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -33,7 +33,7 @@ class FunctionCall:
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash((self.operator, self.args, tuple(self.kwargs.items()) ))
+        return hash((self.name, self.args, tuple(self.kwargs.items())))
 
     def iter_children(self):
         yield from self.args

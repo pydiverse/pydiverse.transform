@@ -14,15 +14,7 @@ __all__ = [
 ]
 
 
-class Numeric(ElementWise):
-    def validate_signature(self, signature):
-        numeric_types = ('int', 'float')
-        assert (all((arg in numeric_types) for arg in signature.args)
-                and signature.rtype in numeric_types)
-        super().validate_signature(signature)
-
-
-class Add(Numeric, Binary):
+class Add(ElementWise, Binary):
     name = '__add__'
     signatures = [
         'int, int -> int',
@@ -36,7 +28,7 @@ class RAdd(Add):
     name = '__radd__'
 
 
-class Sub(Numeric, Binary):
+class Sub(ElementWise, Binary):
     name = '__sub__'
     signatures = [
         'int, int -> int',
@@ -50,7 +42,7 @@ class RSub(Sub):
     name = '__rsub__'
 
 
-class Mul(Numeric, Binary):
+class Mul(ElementWise, Binary):
     name = '__mul__'
     signatures = [
         'int, int -> int',
@@ -64,7 +56,7 @@ class RMul(Mul):
     name = '__rmul__'
 
 
-class TrueDiv(Numeric, Binary):
+class TrueDiv(ElementWise, Binary):
     name = '__truediv__'
     signatures = [
         'int, int -> float',
@@ -78,7 +70,7 @@ class RTrueDiv(TrueDiv):
     name = '__rtruediv__'
 
 
-class FloorDiv(Numeric, Binary):
+class FloorDiv(ElementWise, Binary):
     name = '__floordiv__'
     signatures = [
         'int, int -> int',
@@ -89,7 +81,7 @@ class RFloorDiv(FloorDiv):
     name = '__rfloordiv__'
 
 
-class Pow(Numeric, Binary):
+class Pow(ElementWise, Binary):
     name = '__pow__'
     signatures = [
         'int, int -> int',
@@ -100,7 +92,7 @@ class RPow(Pow):
     name = '__rpow__'
 
 
-class Mod(Numeric, Binary):
+class Mod(ElementWise, Binary):
     name = '__mod__'
     signatures = [
         'int, int -> int',
@@ -111,7 +103,7 @@ class RMod(Mod):
     name = '__rmod__'
 
 
-class Neg(Numeric, Unary):
+class Neg(ElementWise, Unary):
     name = '__neg__'
     signatures = [
         'int -> int',
@@ -119,7 +111,7 @@ class Neg(Numeric, Unary):
     ]
 
 
-class Pos(Numeric, Unary):
+class Pos(ElementWise, Unary):
     name = '__pos__'
     signatures = [
         'int -> int',
@@ -127,7 +119,7 @@ class Pos(Numeric, Unary):
     ]
 
 
-class Round(Numeric):
+class Round(ElementWise):
     name = '__round__'
     signatures = [
         'int -> int',

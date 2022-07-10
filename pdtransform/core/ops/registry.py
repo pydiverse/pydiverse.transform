@@ -5,7 +5,7 @@ import typing
 
 
 if typing.TYPE_CHECKING:
-    from pdtransform.core.ops import Operator
+    from pdtransform.core.ops import Operator, OperatorExtension
 
 
 class OperatorImpl:
@@ -137,17 +137,19 @@ class OperatorRegistry:
 
         if operator in self.registered_ops:
             raise ValueError(f"Operator {operator} ({name}) already registered in this operator registry '{self.name}'")
+        if name in self.implementations:
+            raise ValueError(f"Another operator with the name '{name}' has already been registered in this registry.")
 
-        if name not in self.implementations:
-            self.implementations[name] = OperatorImplementationStore(name)
-            self.check_super[name] = check_super
-        else:
-            # Different operator, same name
-            if check_super != self.check_super[name]:
-                raise Exception("Can't have different `check_super` values for different operators with the same name.")
+        self.implementations[name] = OperatorImplementationStore(operator)
+        self.check_super[name] = check_super
 
         self.registered_ops.add(operator)
         self.ALL_REGISTERED_OPS.add(name)
+
+    def get_operator(self, name: str) -> 'Operator | None':
+        if impl_store := self.implementations.get(name, None):
+            return impl_store.operator
+        return None
 
     def add_implementation(self, operator: 'Operator', impl: typing.Callable, signature: str):
         if operator not in self.registered_ops:
@@ -307,8 +309,8 @@ class OperatorImplementationStore:
         is_vararg: bool
 
 
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, operator: 'Operator'):
+        self.operator = operator
         self.root = self.TrieNode('ROOT', None, [], False)
 
     def add_implementation(self, operator: OperatorImpl):
@@ -435,3 +437,16 @@ class OperatorRegistrationContextManager:
             self.registry.add_implementation(self.operator, func, sig)
 
         return func
+
+    def extension(self, extension: 'typing.Type[OperatorExtension]'):
+        if extension.operator != type(self.operator):
+            raise ValueError(
+                f"Operator extension for '{extension.operator.__name__}' can't "
+                f"be applied to operator of type '{type(self.operator).__name__}'.")
+
+        def decorator(func):
+            for sig in extension.signatures:
+                self.registry.add_implementation(self.operator, func, sig)
+            return func
+        return decorator
+

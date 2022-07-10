@@ -213,7 +213,7 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     # Determine if ascending or descending
     def ordering_pealer(expr: Any):
         num_neg = 0
-        while isinstance(expr, FunctionCall) and expr.operator == '__neg__':
+        while isinstance(expr, FunctionCall) and expr.name == '__neg__':
             num_neg += 1
             expr = expr.args[0]
         return expr, num_neg % 2 == 0

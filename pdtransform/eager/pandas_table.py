@@ -264,7 +264,7 @@ class PandasTableImpl(EagerTableImpl):
             series_lengths = { len(arg.index) for arg in arguments if isinstance(arg, pd.Series) }
             if len(series_lengths) >= 2:
                 arg_lengths = [len(arg.index) if isinstance(arg, pd.Series) else 1 for arg in arguments]
-                raise ValueError(f"Arguments for function {expr.operator} aren't aligned. Specifically, the inputs are of lenght {arg_lengths}. Instead they must either all be of the same length or of length 1.")
+                raise ValueError(f"Arguments for function {expr.name} aren't aligned. Specifically, the inputs are of lenght {arg_lengths}. Instead they must either all be of the same length or of length 1.")
 
             value = implementation(*arguments)
             operator = implementation.operator
@@ -283,12 +283,12 @@ class PandasTableImpl(EagerTableImpl):
             if isinstance(expr, Column):
                 return expr
             if isinstance(expr, FunctionCall):
-                if expr.operator == '__eq__':
+                if expr.name == '__eq__':
                     c1 = expr.args[0]
                     c2 = expr.args[1]
                     assert(isinstance(c1, Column) and isinstance(c2, Column))
                     return ((c1, c2),)
-                if expr.operator == '__and__':
+                if expr.name == '__and__':
                     return tuple(itertools.chain(*expr.args))
             raise Exception(f'Invalid ON clause element: {expr}. Only a conjunction of equalities is supported by pandas (ands of equals).')
 

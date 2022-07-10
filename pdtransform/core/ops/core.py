@@ -1,4 +1,5 @@
 import enum
+import typing
 from collections import ChainMap
 
 from pdtransform.core.ops import registry
@@ -6,6 +7,8 @@ from pdtransform.core.ops import registry
 __all__ = [
     'OPType',
     'Operator',
+    'OperatorExtension',
+
     'Arity',
     'Unary',
     'Binary',
@@ -26,6 +29,10 @@ _OPERATOR_MISSING_ATTR = '_operator_missing_attr_'
 
 
 class Operator:
+    """
+    Base class to define an operator. All class level attributes that have the
+    value `NotImplemented` must be set or else the operator can't be initialized.
+    """
     name: str = NotImplemented
     ftype: OPType = NotImplemented
     signatures: list[str] = None
@@ -53,6 +60,23 @@ class Operator:
 
     def validate_signature(self, signature: registry.OperatorSignature) -> bool:
         pass
+
+
+class OperatorExtension:
+    """
+    An extension to an operator. Provides additional signatures.
+    """
+    operator: typing.Type[Operator] = NotImplemented
+    signatures: list[str] = NotImplemented
+
+    def __new__(cls, *args, **kwargs):
+        if cls.operator == NotImplemented or cls.signatures == NotImplemented:
+            raise NotImplementedError(
+                "Can't initialize operator extension. "
+                "Either the operator or signatures attribute is missing.")
+        if not issubclass(cls.operator, Operator):
+            raise TypeError
+        return super().__new__(cls, *args, **kwargs)
 
 
 # Arity

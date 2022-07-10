@@ -74,7 +74,6 @@ class SQLTableImpl(LazyTableImpl):
 
         Arguments:
             tbl: a sqlalchemy.Table or string of form 'table_name' or 'schema_name.table_name'.
-            source: a sqlalchemy engine, used to autoload columns.
         """
         if isinstance(tbl, sqlalchemy.sql.selectable.FromClause):
             return tbl

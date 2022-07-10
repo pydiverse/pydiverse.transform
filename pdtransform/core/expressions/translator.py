@@ -59,7 +59,7 @@ class DelegatingTranslator(Generic[T], Translator[T]):
         if isinstance(expr, expressions.FunctionCall):
             arguments = [arg.value for arg in expr.args]
             signature = tuple(arg.dtype for arg in expr.args)
-            implementation = self.operator_registry.get_implementation(expr.operator, signature)
+            implementation = self.operator_registry.get_implementation(expr.name, signature)
             return self._translate_function(expr, arguments, implementation, **kwargs)
 
         if literal_result := self._translate_literal(expr, **kwargs):
@@ -90,7 +90,7 @@ def bottom_up_replace(expr, replace):
     def clone(expr):
         if isinstance(expr, expressions.FunctionCall):
             f = expressions.FunctionCall(
-                expr.operator,
+                expr.name,
                 *(clone(arg) for arg in expr.args),
                 **{k: clone(v) for k, v in expr.kwargs.items()}
             )
