@@ -147,6 +147,33 @@ class TestPandasTable:
             })
         )
 
+    def test_join_order(self):
+        dfA     = pd.DataFrame({'a': [1, 2, 3, 4, 5, 6], 'b': [2, 1, 3, 4, 6, 5]}, index=[1, 1, 'x', 'y', 3, 'x'])
+        dfA_bad = pd.DataFrame({'a': [1, 2, 3, 4, 5, 6], 'b': [2, 1, 3, 4, 6, 6]})
+        dfB     = pd.DataFrame({'b': [3, 4, 1], 'c': [7, 8, 9]}, index=[0, 0, -1])
+        dfB_bad = pd.DataFrame({'b': [3, 4, 4], 'c': [7, 8, 9]})
+
+        tblA     = Table(PandasTableImpl('dfA', dfA))
+        tblA_bad = Table(PandasTableImpl('dfA_bad', dfA_bad))
+        tblB     = Table(PandasTableImpl('dfB', dfB))
+        tblB_bad = Table(PandasTableImpl('dfB_bad', dfB_bad))
+
+        # Preserve tblA index
+        pd.testing.assert_index_equal(
+            (tblA >> left_join(tblB, tblA.b == tblB.b, validate = '1:?') >> collect()).index,
+            dfA.index
+        )
+
+        pd.testing.assert_series_equal(
+            (tblA >> left_join(tblB, tblA.b == tblB.b, validate = '1:?') >> collect())['a'],
+            (tblA >> collect())['a']
+        )
+
+        with pytest.raises(Exception):
+            tblA >> left_join(tblB_bad, tblA.b == tblB_bad.b, validate='1:?')
+        with pytest.raises(Exception):
+            tblA_bad >> left_join(tblB, tblA_bad.b == tblB_bad.b, validate='1:?')
+
     def test_filter(self, tbl1, tbl2):
         assert_not_inplace(tbl1, filter(tbl1.col1 == 3))
 

@@ -140,9 +140,11 @@ class PandasTableImpl(EagerTableImpl):
                 raise Exception
 
         if validate is not None:
-            validate = {
+            pd_validate = {
                 '1:?': '1:1'
             }[validate]
+        else:
+            pd_validate = None
 
         # Perform Join
         left_on, right_on = zip(*on_cols)
@@ -150,10 +152,23 @@ class PandasTableImpl(EagerTableImpl):
         right_on = [right.df_name_mapping[col.uuid] for col in right_on]
 
         self.df_name_mapping.update(right.df_name_mapping)
-        self.df = self.df.merge(
-            right.df, how = how,
-            left_on = left_on, right_on = right_on,
-            validate = validate)
+
+        # TODO: Implement more merge operations that preserve the index / ordering.
+        if how == 'left' and validate == '1:?':
+            # Perform an order and index preserving join
+            original_index = self.df.index
+            tmp_df = self.df.reset_index(drop=True)
+            merged_df = tmp_df.merge(
+                right.df, how = how,
+                left_on = left_on, right_on = right_on,
+                validate = pd_validate).loc[tmp_df.index]
+            merged_df.index = original_index
+            self.df = merged_df
+        else:
+            self.df = self.df.merge(
+                right.df, how = how,
+                left_on = left_on, right_on = right_on,
+                validate = pd_validate)
 
     def filter(self, *args: SymbolicExpression):
         if not args:
