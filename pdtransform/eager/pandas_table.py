@@ -1,6 +1,7 @@
 import functools
 import itertools
 import operator
+import warnings
 from typing import Callable
 
 import numpy as np
@@ -13,6 +14,7 @@ from pdtransform.core.column import Column, LiteralColumn
 from pdtransform.core.expressions import FunctionCall, SymbolicExpression
 from pdtransform.core.expressions.translator import Translator, TypedValue
 from pdtransform.core.ops import OPType
+from pdtransform.core.util import OrderingDescriptor, translate_ordering
 from .eager_table import EagerTableImpl, uuid_to_str
 
 __all__ = [
@@ -163,10 +165,8 @@ class PandasTableImpl(EagerTableImpl):
         condition = compiled(self.df)
         self.df = self.df.loc[condition]
 
-    def arrange(self, ordering: list[tuple[SymbolicExpression, bool]]):
-        cols, ascending = zip(*ordering)
-        cols = [self.df_name_mapping[col.uuid] for col in cols]
-        self.df = self.df.sort_values(by = cols, ascending = ascending, kind = 'mergesort')
+    def arrange(self, ordering):
+        self.df = self.sort_df(self.df, ordering)
 
     def summarise(self, **kwargs):
         translated_values = {}
@@ -225,10 +225,10 @@ class PandasTableImpl(EagerTableImpl):
 
             return TypedValue(value, expr.typed_value.dtype, expr.typed_value.ftype)
 
-        def _translate_function(self, expr, arguments, implementation, verb=None, **kwargs):
+        def _translate_function(self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs):
             def value(df):
                 return implementation(
-                    *(arg(df) for arg in arguments),
+                    *(arg.value(df) for arg in op_args),
                     _tbl = self.backend,
                     _df = df,
                 )
@@ -238,10 +238,27 @@ class PandasTableImpl(EagerTableImpl):
             if operator.ftype == OPType.WINDOW:
                 if verb != 'mutate':
                     raise ValueError('Window function are only allowed inside a mutate.')
+                value = self.arranged_window(value, operator, context_kwargs)
 
             override_ftype = OPType.WINDOW if operator.ftype == OPType.AGGREGATE and verb == 'mutate' else None
-            ftype = self.backend._get_op_ftype(expr.args, operator, override_ftype)
+            ftype = self.backend._get_op_ftype(op_args, operator, override_ftype)
             return TypedValue(value, implementation.rtype, ftype)
+
+        def arranged_window(self, value: Callable, operator: 'ops.Operator', context_kwargs: dict):
+            arrange = context_kwargs.get('arrange')
+            if arrange is None:
+                warnings.warn("Argument 'arrange' is required with SQL backend.")
+                return value
+            ordering = translate_ordering(self.backend, arrange)
+
+            def arranged_value(df):
+                original_index = df.index
+                sorted_df = self.backend.sort_df(df, ordering)
+                v = value(sorted_df)
+                v_with_original_index = v.loc[original_index]
+                return v_with_original_index
+
+            return arranged_value
 
     class AlignedExpressionEvaluator(EagerTableImpl.AlignedExpressionEvaluator[TypedValue[pd.Series]]):
 
@@ -255,10 +272,12 @@ class PandasTableImpl(EagerTableImpl):
             assert issubclass(expr.backend, PandasTableImpl)
             return expr.typed_value
 
-        def _translate_function(self, expr, arguments, implementation, **kwargs):
+        def _translate_function(self, expr, implementation, op_args, context_kwargs, **kwargs):
             # Drop index to evaluate aligned
             # TODO: Maybe we can somehow restore the index at the end.
-            arguments = [arg.reset_index(drop = True) if isinstance(arg, pd.Series) else arg for arg in arguments]
+            arguments = [arg.value.reset_index(drop = True)
+                         if isinstance(arg.value, pd.Series)
+                         else arg.value for arg in op_args]
 
             # Check that they have the same length
             series_lengths = { len(arg.index) for arg in arguments if isinstance(arg, pd.Series) }
@@ -266,10 +285,19 @@ class PandasTableImpl(EagerTableImpl):
                 arg_lengths = [len(arg.index) if isinstance(arg, pd.Series) else 1 for arg in arguments]
                 raise ValueError(f"Arguments for function {expr.name} aren't aligned. Specifically, the inputs are of lenght {arg_lengths}. Instead they must either all be of the same length or of length 1.")
 
-            value = implementation(*arguments)
+            # Compute value
             operator = implementation.operator
+
+            if operator.ftype == OPType.WINDOW and 'arrange' in context_kwargs:
+                raise NotImplementedError(f"The 'arrange' argument for window functions currently is not supported for aligned expressions.")
+
+            value = implementation(
+                *arguments,
+                _tbl = None,
+                _df = None,
+            )
             override_ftype = OPType.WINDOW if operator.ftype == OPType.AGGREGATE else None
-            ftype = PandasTableImpl._get_op_ftype(expr.args, operator, override_ftype)
+            ftype = PandasTableImpl._get_op_ftype(op_args, operator, override_ftype)
             return TypedValue(value, implementation.rtype, ftype)
 
     class JoinTranslator(Translator[tuple]):
@@ -292,7 +320,29 @@ class PandasTableImpl(EagerTableImpl):
                     return tuple(itertools.chain(*expr.args))
             raise Exception(f'Invalid ON clause element: {expr}. Only a conjunction of equalities is supported by pandas (ands of equals).')
 
-    #### GROUPING HELPER ####
+    #### HELPERS ####
+
+    def sort_df(self, df, ordering: list[OrderingDescriptor]):
+        cols = [self.df_name_mapping[o.order.uuid] for o in ordering]
+        ascending = [o.asc for o in ordering]
+        nulls_first = [o.nulls_first for o in ordering]
+
+        if all(nulls_first):
+            na_position = 'first'
+        elif not any(nulls_first):
+            na_position = 'last'
+        else:
+            raise ValueError(
+                "Pandas sort can't handle different null positions (first / last) inside a single sort. "
+                "This can be resolved by splitting the ordering into multiple arranges."
+            )
+
+        return df.sort_values(
+            by = cols,
+            ascending = ascending,
+            kind = 'mergesort',
+            na_position = na_position,
+        )
 
     def grouped_df(self):
         if self.grouped_by:

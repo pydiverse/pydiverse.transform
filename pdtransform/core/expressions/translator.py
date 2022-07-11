@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import Generic, TYPE_CHECKING, TypeVar
+from typing import Generic, TYPE_CHECKING, TypeVar, Iterable, Any
 
 from pdtransform.core import column
 from pdtransform.core.expressions import expressions
-from pdtransform.core.ops import registry, OPType
+from pdtransform.core.ops import registry, OPType, Operator
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -46,6 +46,14 @@ class DelegatingTranslator(Generic[T], Translator[T]):
     def __init__(self, operator_registry: registry.OperatorRegistry):
         self.operator_registry = operator_registry
 
+    def translate(self, expr, **kwargs):
+        """ Translate an expression recursively. """
+        try:
+            return self._translate(expr, **kwargs)
+        except Exception as e:
+            raise ValueError(f"An exception occured while trying to translate the expression '{expr}':\n"
+                             f"{e}") from e
+
     def _translate(self, expr, accept_literal_col=True, **kwargs):
         if isinstance(expr, column.Column):
             return self._translate_col(expr, **kwargs)
@@ -57,10 +65,16 @@ class DelegatingTranslator(Generic[T], Translator[T]):
                 raise ValueError("Literal columns aren't allowed in this context.")
 
         if isinstance(expr, expressions.FunctionCall):
-            arguments = [arg.value for arg in expr.args]
-            signature = tuple(arg.dtype for arg in expr.args)
+            operator = self.operator_registry.get_operator(expr.name)
+            op_args, op_kwargs, context_kwargs = self.__translate_function_arguments(expr, operator, **kwargs)
+
+            if op_kwargs:
+                raise NotImplementedError
+
+            signature = tuple(arg.dtype for arg in op_args)
             implementation = self.operator_registry.get_implementation(expr.name, signature)
-            return self._translate_function(expr, arguments, implementation, **kwargs)
+
+            return self._translate_function(expr, implementation, op_args, context_kwargs, **kwargs)
 
         if literal_result := self._translate_literal(expr, **kwargs):
             return literal_result
@@ -74,28 +88,41 @@ class DelegatingTranslator(Generic[T], Translator[T]):
         raise NotImplementedError
 
     def _translate_function(
-            self, expr: 'expressions.FunctionCall',
-            arguments: list, implementation: registry.TypedOperatorImpl,
+            self,
+            expr: 'expressions.FunctionCall',
+            implementation: registry.TypedOperatorImpl,
+            op_args: Iterable[T],
+            context_kwargs: dict[str, Any],
             **kwargs) -> T:
         raise NotImplementedError
 
     def _translate_literal(self, expr, **kwargs) -> T:
         raise NotImplementedError
 
+    def __translate_function_arguments(self, expr: 'expressions.FunctionCall', operator: Operator, **kwargs):
+        op_args = [self._translate(arg, **kwargs) for arg in expr.args]
+        op_kwargs = {}
+        context_kwargs = {}
+
+        for k, v in expr.kwargs.items():
+            if k in operator.context_kwargs:
+                context_kwargs[k] = v
+            else:
+                op_kwargs[k] = self._translate(v, **kwargs)
+
+        return op_args, op_kwargs, context_kwargs
+
 
 def bottom_up_replace(expr, replace):
-    # TODO: This is bad... At some point this should be refactored
-    #       and replaced with something less hacky.
-
-    def clone(expr):
+    def transform(expr):
         if isinstance(expr, expressions.FunctionCall):
             f = expressions.FunctionCall(
                 expr.name,
-                *(clone(arg) for arg in expr.args),
-                **{k: clone(v) for k, v in expr.kwargs.items()}
+                *(transform(arg) for arg in expr.args),
+                **{k: transform(v) for k, v in expr.kwargs.items()}
             )
             return replace(f)
         else:
             return replace(expr)
 
-    return clone(expr)
+    return transform(expr)

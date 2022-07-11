@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from pdtransform import λ
+from pdtransform.core import functions as f
 from pdtransform.core.alignment import aligned, eval_aligned
 from pdtransform.core.dispatchers import Pipeable, verb
 from pdtransform.core.table import Table
@@ -274,6 +275,19 @@ class TestPandasTable:
         assert_equal(
             tbl2 >> join(x, tbl2.col1 == x.col1, 'left'),
             df2.merge(df2.rename(columns = {'col1': 'col1_x', 'col2': 'col2_x', 'col3': 'col3_x'}), how = 'left', left_on = 'col1', right_on = 'col1_x')
+        )
+
+    def test_window_functions(self, tbl3):
+        # Everything else should stay the same (index preserved)
+        assert_equal(
+            tbl3 >> mutate(x = f.row_number(arrange=[-λ.col4])) >> select(*tbl3),
+            df3
+        )
+
+        # Assert correct result
+        assert_equal(
+            (tbl3 >> group_by(λ.col2) >> select() >> mutate(x = f.row_number(arrange=[-λ.col4])) >> collect()),
+            pd.DataFrame({'x': [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]})
         )
 
     def test_lambda_column(self, tbl1, tbl2):

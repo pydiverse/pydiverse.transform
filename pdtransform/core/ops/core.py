@@ -32,10 +32,27 @@ class Operator:
     """
     Base class to define an operator. All class level attributes that have the
     value `NotImplemented` must be set or else the operator can't be initialized.
+
+    name:
+        The name of the operator. The main mechanism to access an operator is
+        using `(s-expression).operator_name(args)`.
+
+    ftype:
+        The operator type (function type). Can either be an element wise,
+        aggregate or window function.
+
+    signatures:
+        A list of default signatures for this operator.
+
+    context_kwargs:
+        A set of keyword argument names. Can later be used by the translator
+        to handle these keyword arguments specially.
+
     """
     name: str = NotImplemented
     ftype: OPType = NotImplemented
     signatures: list[str] = None
+    context_kwargs: set[str] = None
 
     def __new__(cls, *args, **kwargs):
         if not getattr(cls, _OPERATOR_VALID, False):
@@ -116,4 +133,6 @@ class Aggregate(Operator):
 
 class Window(Operator):
     ftype = OPType.WINDOW
-    # arrange: bool = NotImplemented
+    context_kwargs = {
+        'arrange',  # List[Column | LambdaColumn]
+    }

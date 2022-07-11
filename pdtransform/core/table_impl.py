@@ -9,6 +9,7 @@ from pdtransform.core.util import bidict, ordered_set
 from .column import Column, LambdaColumn, LiteralColumn
 from .expressions.translator import Translator, DelegatingTranslator, TypedValue
 from .ops import Operator, OPType
+from .util import OrderingDescriptor
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -172,7 +173,7 @@ class AbstractTableImpl(metaclass = _TableImplMeta):
     def filter(self, *args):
         ...
 
-    def arrange(self, ordering: 'list[tuple[SymbolicExpression, bool]]'):
+    def arrange(self, ordering: 'list[OrderingDescriptor]'):
         ...
 
     def group_by(self, *args):
@@ -254,7 +255,7 @@ class AbstractTableImpl(metaclass = _TableImplMeta):
             if isinstance(expr, LambdaColumn):
                 if expr.name not in self.backend.named_cols.fwd:
                     raise ValueError(
-                        f"Invalid lambda column '{expr.name}. No column with this name found for table '{self.backend.named_cols}'.'")
+                        f"Invalid lambda column '{expr.name}. No column with this name found for table '{self.backend.name}'.'")
                 uuid = self.backend.named_cols.fwd[expr.name]
                 return self.backend.cols[uuid].as_column(expr.name, self.backend)
             return expr

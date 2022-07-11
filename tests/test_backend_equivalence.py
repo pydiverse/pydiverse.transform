@@ -9,6 +9,7 @@ from pandas.testing import assert_frame_equal
 
 import pdtransform.core.dispatchers
 from pdtransform import λ
+from pdtransform.core import functions as f
 from pdtransform.core.table import Table
 from pdtransform.core.verbs import alias, arrange, collect, filter, group_by, join, mutate, select, summarise, ungroup
 from pdtransform.eager.pandas_table import PandasTableImpl
@@ -612,3 +613,19 @@ class TestWindowFunction:
             lambda t:
             t >> group_by(t.col1, t.col2) >> mutate(x = t.col4.mean()) >> select() >> mutate(y = λ.x.min()) >> select() >> mutate(z = (λ.x - λ.y).mean())
         )
+
+
+    @tables(['df3'])
+    def test_arrange_argument(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col1) >> mutate(x = λ.col4.shift(1, arrange=[-λ.col3])) >> full_sort() >> select(λ.x)
+        )
+
+        assert_result_equal(
+            df3_x, df3_y,
+            lambda t:
+            t >> group_by(t.col2) >> mutate(x = f.row_number(arrange=[-λ.col4])) >> full_sort() >> select(λ.x)
+        )
+

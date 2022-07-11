@@ -1,14 +1,13 @@
 import functools
 from collections import ChainMap
-from typing import Any, Iterable
+from typing import Iterable
 
 from .column import Column, LambdaColumn, generate_col_uuid
 from .dispatchers import builtin_verb
-from .expressions import FunctionCall
 from .expressions import SymbolicExpression
 from .expressions.util import iterate_over_expr
 from .table_impl import AbstractTableImpl, ColumnMetaData
-from .util import bidict, ordered_set
+from .util import bidict, ordered_set, translate_ordering
 
 __all__ = [
     'alias',
@@ -210,21 +209,7 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     check_cols_available(tbl, cols_in_expressions(args), 'arrange')
     check_lambdas_valid(tbl, *args)
 
-    # Determine if ascending or descending
-    def ordering_pealer(expr: Any):
-        num_neg = 0
-        while isinstance(expr, FunctionCall) and expr.name == '__neg__':
-            num_neg += 1
-            expr = expr.args[0]
-        return expr, num_neg % 2 == 0
-
-    ordering = []
-    for arg in args:
-        col, ascending = ordering_pealer(arg)
-        if not isinstance(col, (Column, LambdaColumn)):
-            raise ValueError(f"Arguments to select verb must be of type 'Column' or 'LambdaColumn' and not '{type(col)}'.")
-        col = tbl.resolve_lambda_cols(col)
-        ordering.append((col, ascending))
+    ordering = translate_ordering(tbl, args)
 
     new_tbl = tbl.copy()
     new_tbl.arrange(ordering)

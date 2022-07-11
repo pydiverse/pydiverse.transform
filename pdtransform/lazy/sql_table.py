@@ -14,7 +14,8 @@ from pdtransform.core.expressions import SymbolicExpression, iterate_over_expr
 from pdtransform.core.expressions.translator import TypedValue
 from pdtransform.core.ops import OPType
 from pdtransform.core.table_impl import ColumnMetaData
-from .lazy_table import JoinDescriptor, LazyTableImpl, OrderByDescriptor
+from pdtransform.core.util import OrderingDescriptor, translate_ordering
+from .lazy_table import JoinDescriptor, LazyTableImpl
 
 
 class SQLTableImpl(LazyTableImpl):
@@ -140,7 +141,7 @@ class SQLTableImpl(LazyTableImpl):
         self.joins = []  # type: list[JoinDescriptor]
         self.wheres = []  # type: list[SymbolicExpression]
         self.having = []  # type: list[SymbolicExpression]
-        self.order_bys = []  # type: list[OrderByDescriptor]
+        self.order_bys = []  # type: list[OrderingDescriptor]
 
     def build_select(self) -> sql.Select:
         # Validate current state
@@ -325,9 +326,7 @@ class SQLTableImpl(LazyTableImpl):
 
     def arrange(self, ordering):
         self.alignment_hash = generate_alignment_hash()
-
-        order_by = [OrderByDescriptor(col, ascending, False) for col, ascending in ordering]
-        self.order_bys = order_by + self.order_bys
+        self.order_bys = ordering + self.order_bys
 
     def pre_summarise(self, **kwargs):
         # The result of the aggregate is always ordered according to the
@@ -384,53 +383,66 @@ class SQLTableImpl(LazyTableImpl):
 
             return TypedValue(sql_col, expr.typed_value.dtype, expr.typed_value.ftype)
 
-        def _translate_function(self, expr, arguments, implementation, verb = None, **kwargs):
+        def _translate_function(self, expr, implementation, op_args, context_kwargs, verb = None, **kwargs):
             def value(cols):
-                return implementation(*(arg(cols) for arg in arguments))
+                return implementation(*(arg.value(cols) for arg in op_args))
 
             operator = implementation.operator
 
             if operator.ftype == OPType.AGGREGATE and verb == 'mutate':
                 # Aggregate function in mutate verb -> window function
-                over_value = self.over_clause(value, partition_by = True, order_by = False)
-                ftype = self.backend._get_op_ftype(expr.args, operator, OPType.WINDOW, strict = True)
+                over_value = self.over_clause(value, implementation.operator, context_kwargs)
+                ftype = self.backend._get_op_ftype(op_args, operator, OPType.WINDOW, strict = True)
                 return TypedValue(over_value, implementation.rtype, ftype)
 
             elif operator.ftype == OPType.WINDOW:
                 if verb != 'mutate':
                     raise ValueError('Window function are only allowed inside a mutate.')
 
-                over_value = self.over_clause(value, partition_by = True, order_by = True)
-                ftype = self.backend._get_op_ftype(expr.args, operator, strict = True)
+                over_value = self.over_clause(value, implementation.operator, context_kwargs)
+                ftype = self.backend._get_op_ftype(op_args, operator, strict = True)
                 return TypedValue(over_value, implementation.rtype, ftype)
 
             else:
-                ftype = self.backend._get_op_ftype(expr.args, operator, strict = True)
+                ftype = self.backend._get_op_ftype(op_args, operator, strict = True)
                 return TypedValue(value, implementation.rtype, ftype)
 
-        def over_clause(self, value: Callable, *, partition_by: bool, order_by: bool):
-            if partition_by:
-                compiled_pb = [self.translate(group_by).value for group_by in self.backend.grouped_by]
-            if order_by:
-                def order_by_clause_generator(ordering: OrderByDescriptor):
-                    compiled, _ = self.translate(ordering.order)
+        def over_clause(self, value: Callable, operator: 'ops.Operator', context_kwargs: dict):
+            if operator.ftype not in (OPType.AGGREGATE, OPType.WINDOW):
+                raise ValueError
 
-                    def clause(*args, **kwargs):
-                        col = compiled(*args, **kwargs)
-                        col = col.asc() if ordering.asc else col.desc()
-                        col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
-                        return col
+            wants_order_by = (operator.ftype == OPType.WINDOW)
 
-                    return clause
+            # PARTITION BY
+            compiled_pb = tuple(
+                self.translate(group_by).value for group_by in self.backend.grouped_by
+            )
 
-                compiled_ob = [order_by_clause_generator(o_by) for o_by in self.backend.order_bys]
+            # ORDER BY
+            def order_by_clause_generator(ordering: OrderingDescriptor):
+                compiled, _ = self.translate(ordering.order)
 
+                def clause(*args, **kwargs):
+                    col = compiled(*args, **kwargs)
+                    col = col.asc() if ordering.asc else col.desc()
+                    col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
+                    return col
+
+                return clause
+
+            if wants_order_by:
+                arrange = context_kwargs.get('arrange')
+                if not arrange:
+                    raise TypeError("Missing 'arrange' argument.")
+
+                ordering = translate_ordering(self.backend, arrange)
+                compiled_ob = [order_by_clause_generator(o_by) for o_by in ordering]
+
+            # New value callable
             def over_value(*args, **kwargs):
-                pb, ob = None, None
-                if partition_by:
-                    pb = sql.expression.ClauseList(*(compiled(*args, **kwargs) for compiled in compiled_pb))
-                if order_by:
-                    ob = sql.expression.ClauseList(*(compiled(*args, **kwargs) for compiled in compiled_ob))
+                pb = sql.expression.ClauseList(*(compiled(*args, **kwargs) for compiled in compiled_pb))
+                ob = sql.expression.ClauseList(*(compiled(*args, **kwargs) for compiled in compiled_ob)) \
+                    if wants_order_by else None
 
                 v = value(*args, **kwargs)
                 return v.over(
@@ -464,12 +476,12 @@ class SQLTableImpl(LazyTableImpl):
             assert issubclass(expr.backend, SQLTableImpl)
             return expr.typed_value
 
-        def _translate_function(self, expr, arguments, implementation, **kwargs):
+        def _translate_function(self, expr, implementation, op_args, context_kwargs, **kwargs):
             # Aggregate function -> window function
-            value = implementation(*arguments)
+            value = implementation(*(arg.value for arg in op_args))
             operator = implementation.operator
             override_ftype = OPType.WINDOW if operator.ftype == OPType.AGGREGATE else None
-            ftype = SQLTableImpl._get_op_ftype(expr.args, operator, override_ftype, strict = True)
+            ftype = SQLTableImpl._get_op_ftype(op_args, operator, override_ftype, strict = True)
 
             if operator.ftype == OPType.AGGREGATE:
                 value = value.over()

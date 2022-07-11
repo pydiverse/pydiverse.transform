@@ -24,7 +24,7 @@ class SymbolicExpression(Generic[T]):
     def __init__(self, underlying: T):
         self._ = underlying
 
-    def __getattr__(self, item):
+    def __getattr__(self, item) -> 'SymbolAttribute':
         if item.startswith('_') and item.endswith('_') and len(item) >= 3:
             # Attribute names can't begin and end with an underscore because
             # IPython calls hasattr() to select the correct pretty printing
@@ -40,7 +40,7 @@ class SymbolicExpression(Generic[T]):
         # TODO: Instead of displaying all available operators, translate the
         #       expression and according to the dtype and backend only display
         #       the operators that actually are available.
-        return sorted(operator_registry.OperatorRegistry.ALL_REGISTERED_OPS)
+        return sorted(registry.OperatorRegistry.ALL_REGISTERED_OPS)
 
     # __contains__, __iter__ and __bool__ are all invalid on s-expressions
     __contains__ = None
@@ -91,10 +91,10 @@ class SymbolAttribute:
         self.__name = name
         self.__on = on
 
-    def __getattr__(self, item):
+    def __getattr__(self, item) -> 'SymbolAttribute':
         return SymbolAttribute(self.__name + '.' + item, self.__on)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> SymbolicExpression:
         return SymbolicExpression(expressions.FunctionCall(self.__name, self.__on, *args, **kwargs))
 
     def __hash__(self):

@@ -13,13 +13,6 @@ class JoinDescriptor(Generic[ImplT]):
     how: str
 
 
-@dataclass(slots = True)
-class OrderByDescriptor:
-    order: Any
-    asc: bool
-    nulls_first: bool
-
-
 class LazyTableImpl(AbstractTableImpl):
     """ Base class for lazy backends. """
     pass
