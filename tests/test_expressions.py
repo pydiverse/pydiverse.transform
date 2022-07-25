@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import pytest
 
-from pdtransform import λ
-from pdtransform.core.expressions import FunctionCall, SymbolicExpression
+from pydiverse.transform import λ
+from pydiverse.transform.core.expressions import FunctionCall, SymbolicExpression
 
 
 def compare_sexpr(expr1, expr2):
@@ -12,23 +14,22 @@ def compare_sexpr(expr1, expr2):
 
 
 class TestExpressions:
-
     def test_symbolic_expression(self):
         s1 = SymbolicExpression(1)
         s2 = SymbolicExpression(2)
 
-        compare_sexpr(s1 + s1, FunctionCall('__add__', 1, 1))
-        compare_sexpr(s1 + s2, FunctionCall('__add__', 1, 2))
-        compare_sexpr(s1 + 10, FunctionCall('__add__', 1, 10))
-        compare_sexpr(10 + s1, FunctionCall('__radd__', 1, 10))
+        compare_sexpr(s1 + s1, FunctionCall("__add__", 1, 1))
+        compare_sexpr(s1 + s2, FunctionCall("__add__", 1, 2))
+        compare_sexpr(s1 + 10, FunctionCall("__add__", 1, 10))
+        compare_sexpr(10 + s1, FunctionCall("__radd__", 1, 10))
 
-        compare_sexpr(s1.argument(), FunctionCall('argument', 1))
-        compare_sexpr(s1.str.argument(), FunctionCall('str.argument', 1))
-        compare_sexpr(s1.argument(s2, 3), FunctionCall('argument', 1, 2, 3))
+        compare_sexpr(s1.argument(), FunctionCall("argument", 1))
+        compare_sexpr(s1.str.argument(), FunctionCall("str.argument", 1))
+        compare_sexpr(s1.argument(s2, 3), FunctionCall("argument", 1, 2, 3))
 
     def test_lambda_col(self):
-        compare_sexpr(λ.something, λ['something'])
-        compare_sexpr(λ.something.chained(), λ['something'].chained())
+        compare_sexpr(λ.something, λ["something"])
+        compare_sexpr(λ.something.chained(), λ["something"].chained())
 
     def test_banned_methods(self):
         s1 = SymbolicExpression(1)
