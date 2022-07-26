@@ -241,6 +241,56 @@ class SQLTableImpl(LazyTableImpl):
 
     #### Verb Operations ####
 
+    def preverb_hook(self, verb: str, *args, **kwargs) -> None:
+        def has_any_ftype_cols(ftypes: OPType | tuple[OPType, ...], cols: Iterable):
+            if isinstance(ftypes, OPType):
+                ftypes = (ftypes,)
+            return any(
+                self.cols[c.uuid].ftype in ftypes
+                for v in cols
+                for c in iterate_over_expr(self.resolve_lambda_cols(v))
+                if isinstance(c, Column)
+            )
+
+        requires_subquery = False
+        if verb == "mutate":
+            # Window functions can't be nested, thus a subquery is required
+            requires_subquery = has_any_ftype_cols(OPType.WINDOW, kwargs.values())
+        elif verb == "summarise":
+            # The result of the aggregate is always ordered according to the
+            # grouping columns. We must clear the order_bys so that the order
+            # is consistent with eager execution. We can do this because aggregate
+            # functions are independent of the order.
+            self.order_bys.clear()
+
+            # If the grouping level is different from the grouping level of the
+            # tbl object, or if on of the input columns is a window or aggregate
+            # function, we must make a subquery.
+            requires_subquery |= (
+                bool(self.intrinsic_grouped_by)
+                and self.grouped_by != self.intrinsic_grouped_by
+            )
+            requires_subquery |= has_any_ftype_cols(
+                (OPType.AGGREGATE, OPType.WINDOW), kwargs.values()
+            )
+
+        # TODO: It would be nice if this could be done without having to select all columns.
+        #       As a potential challenge for the hackathon I propose a mean of even creating the subqueries lazyly.
+        #       This means that we could perform some kind of query optimization before submitting the actual query.
+        #       Eg: Instead of selecting all possible columns, only select those that actually get used.
+        if requires_subquery:
+            columns = {
+                name: self.cols[uuid].as_column(name, self)
+                for name, uuid in self.named_cols.fwd.items()
+            }
+
+            original_selects = self.selects.copy()
+            self.selects |= columns.keys()
+            subquery = self.build_select()
+
+            self.replace_tbl(subquery, columns)
+            self.selects = original_selects
+
     def alias(self, name=None):
         if name is None:
             suffix = format(uuid.uuid1().int % 0x7FFFFFFF, "X")
@@ -276,32 +326,6 @@ class SQLTableImpl(LazyTableImpl):
                 dialect=self.engine.dialect, compile_kwargs={"literal_binds": True}
             )
         )
-
-    def pre_mutate(self, **kwargs):
-        requires_subquery = any(
-            self.cols[c.uuid].ftype == OPType.WINDOW
-            for v in kwargs.values()
-            for c in iterate_over_expr(self.resolve_lambda_cols(v))
-            if isinstance(c, Column)
-        )
-
-        if requires_subquery:
-            # TODO: It would be nice if this could be done without having to select all columns.
-            #       As a potential challenge for the hackathon I propose a mean of even creating the subqueries lazyly.
-            #       This means that we could perform some kind of query optimization before submitting the actual query.
-            #       Eg: Instead of selecting all possible columns, only select those that actually get used.
-            #       This also applies to the pre_summarise function.
-
-            columns = {
-                name: self.cols[uuid].as_column(name, self)
-                for name, uuid in self.named_cols.fwd.items()
-            }
-            original_selects = self.selects
-            self.selects = self.selects | columns.keys()
-            subquery = self.build_select()
-
-            self.replace_tbl(subquery, columns)
-            self.selects = original_selects
 
     def join(self, right, on, how, *, validate=None):
         self.alignment_hash = generate_alignment_hash()
@@ -369,36 +393,6 @@ class SQLTableImpl(LazyTableImpl):
     def arrange(self, ordering):
         self.alignment_hash = generate_alignment_hash()
         self.order_bys = ordering + self.order_bys
-
-    def pre_summarise(self, **kwargs):
-        # The result of the aggregate is always ordered according to the
-        # grouping columns. We must clear the order_bys so that the order
-        # is consistent with eager execution. We can do this because aggregate
-        # functions are independent of the order.
-        self.order_bys.clear()
-
-        # If the grouping level is different from the grouping level of the
-        # tbl object, or if on of the input columns is a window or aggregate
-        # function, we must make a subquery.
-        requires_subquery = (
-            bool(self.intrinsic_grouped_by)
-            and self.grouped_by != self.intrinsic_grouped_by
-        ) or any(
-            self.cols[c.uuid].ftype in (OPType.AGGREGATE, OPType.WINDOW)
-            for v in kwargs.values()
-            for c in iterate_over_expr(self.resolve_lambda_cols(v))
-            if isinstance(c, Column)
-        )
-
-        if requires_subquery:
-            columns = {
-                name: self.cols[uuid].as_column(name, self)
-                for name, uuid in self.named_cols.fwd.items()
-            }
-            self.selects |= columns.keys()
-            subquery = self.build_select()
-
-            self.replace_tbl(subquery, columns)
 
     def summarise(self, **kwargs):
         self.alignment_hash = generate_alignment_hash()

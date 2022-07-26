@@ -157,6 +157,19 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
     #### Verb Callbacks ####
 
+    def preverb_hook(self, verb: str, *args, **kwargs) -> None:
+        """Hook that gets called right after `copy` inside a verb
+
+        This gives the backend a chance to react and modify it's state. This
+        can, for example, be used to create a subquery based on specific
+        conditions.
+
+        :param verb: The name of the verb
+        :param args: The arguments passed to the verb
+        :param kwargs: The keyword arguments passed to the verb
+        """
+        ...
+
     def alias(self, name=None) -> AbstractTableImpl:
         ...
 
@@ -167,10 +180,6 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         ...
 
     def select(self, *args):
-        ...
-
-    def pre_mutate(self, **kwargs):
-        """Gives the backend a chance to create a subquery"""
         ...
 
     def mutate(self, **kwargs):
@@ -189,10 +198,6 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         ...
 
     def ungroup(self, *args):
-        ...
-
-    def pre_summarise(self, **kwargs):
-        """Gives the backend a chance to create a subquery"""
         ...
 
     def summarise(self, **kwargs):

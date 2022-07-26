@@ -144,6 +144,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
 
     # SELECT
     new_tbl = tbl.copy()
+    new_tbl.preverb_hook("select", *args)
     new_tbl.selects = ordered_set(selects)
     new_tbl.select(*args)
     return new_tbl
@@ -155,7 +156,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     check_cols_available(tbl, cols_in_expressions(kwargs.values()), "mutate")
 
     new_tbl = tbl.copy()
-    new_tbl.pre_mutate(**kwargs)
+    new_tbl.preverb_hook("mutate", **kwargs)
     kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 
     for name, expr in kwargs.items():
@@ -201,6 +202,7 @@ def join(
     # Construct new table
     # JOIN -> Merge the left and right table
     new_left = left.copy()
+    new_left.preverb_hook("join", right, on, how, validate=validate)
 
     # Update selects
     right_renamed_selects = ordered_set(
@@ -254,6 +256,7 @@ def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
     args = [tbl.resolve_lambda_cols(arg) for arg in args]
 
     new_tbl = tbl.copy()
+    new_tbl.preverb_hook("filter", *args)
     new_tbl.filter(*args)
     return new_tbl
 
@@ -271,6 +274,7 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     ordering = translate_ordering(tbl, args)
 
     new_tbl = tbl.copy()
+    new_tbl.preverb_hook("arrange", *args)
     new_tbl.arrange(ordering)
     return new_tbl
 
@@ -298,6 +302,7 @@ def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add=False):
     args = [tbl.resolve_lambda_cols(arg) for arg in args]
 
     new_tbl = tbl.copy()
+    new_tbl.preverb_hook("group_by", *args, add=add)
     if add:
         new_tbl.grouped_by |= ordered_set(args)
     else:
@@ -312,6 +317,7 @@ def ungroup(tbl: AbstractTableImpl):
     validate_table_args(tbl)
 
     new_tbl = tbl.copy()
+    new_tbl.preverb_hook("ungroup")
     new_tbl.grouped_by.clear()
     new_tbl.ungroup()
     return new_tbl
@@ -324,8 +330,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     check_cols_available(tbl, cols_in_expressions(kwargs.values()), "summarise")
 
     new_tbl = tbl.copy()
-    new_tbl.pre_summarise(**kwargs)
-
+    new_tbl.preverb_hook("summarise", **kwargs)
     kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 
     # TODO: Validate that the functions are actually aggregating functions.
