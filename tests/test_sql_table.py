@@ -5,6 +5,7 @@ import pytest
 import sqlalchemy
 
 from pydiverse.transform import λ
+from pydiverse.transform.core import functions as f
 from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
@@ -366,6 +367,16 @@ class TestSQLTable:
                     "left",
                 )
             ),
+        )
+
+    def test_select_without_tbl_ref(self, tbl2):
+        assert_equal(
+            tbl2 >> summarise(count=f.count()),
+            tbl2 >> summarise(count=f.count(tbl2.col1)),
+        )
+
+        assert_equal(
+            tbl2 >> summarise(count=f.count()), pd.DataFrame({"count": [len(df2)]})
         )
 
 

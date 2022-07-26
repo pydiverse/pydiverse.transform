@@ -166,6 +166,10 @@ class SQLTableImpl(LazyTableImpl):
         # Start building query
         select = self.tbl.select()
 
+        # `select_from` is required if no table is explicitly referenced
+        # inside the SELECT. e.g. `SELECT COUNT(*) AS count`
+        select = select.select_from(self.tbl)
+
         # FROM
         if self.joins:
             for join in self.joins:
