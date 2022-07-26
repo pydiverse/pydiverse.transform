@@ -22,6 +22,7 @@ from pydiverse.transform.core.verbs import (
     join,
     mutate,
     select,
+    show_query,
     summarise,
     ungroup,
 )
@@ -121,8 +122,10 @@ def assert_result_equal(
         return
     else:
         try:
-            dfx = (pipe_factory(*x) >> collect()).reset_index(drop=True)
-            dfy = (pipe_factory(*y) >> collect()).reset_index(drop=True)
+            query_x = pipe_factory(*x)
+            query_y = pipe_factory(*y)
+            dfx = (query_x >> collect()).reset_index(drop=True)
+            dfy = (query_y >> collect()).reset_index(drop=True)
         except Exception as e:
             if may_throw:
                 if exception is not None:
@@ -143,8 +146,12 @@ def assert_result_equal(
     except Exception as e:
         print("First dataframe:")
         print(dfx)
+        query_x >> show_query()
+        print("")
         print("Second dataframe:")
         print(dfy)
+        query_y >> show_query()
+        print("")
         raise e
 
 
