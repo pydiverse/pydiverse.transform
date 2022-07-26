@@ -229,6 +229,9 @@ class PandasTableImpl(EagerTableImpl):
         else:
             self.df = fast_pd_convert_dtypes(pd.DataFrame(translated_values, index=[0]))
 
+    def slice_head(self, n: int, offset: int):
+        self.df = self.df[offset : n + offset]
+
     #### EXPRESSIONS ####
 
     class ExpressionCompiler(

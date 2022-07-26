@@ -27,6 +27,7 @@ __all__ = [
     "group_by",
     "ungroup",
     "summarise",
+    "slice_head",
 ]
 
 
@@ -378,4 +379,25 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     else:
         new_tbl.ungroup()
 
+    return new_tbl
+
+
+@builtin_verb()
+def slice_head(tbl: AbstractTableImpl, n: int, *, offset: int = 0):
+    validate_table_args(tbl)
+    if not isinstance(n, int):
+        raise TypeError("'n' must be an int")
+    if not isinstance(offset, int):
+        raise TypeError("'offset' must be an int")
+    if n <= 0:
+        raise ValueError(f"'n' must be a positive integer (value: {n})")
+    if offset < 0:
+        raise ValueError(f"'offset' can't be negative (value: {offset})")
+
+    if tbl.grouped_by:
+        raise ValueError("Can't slice table that is grouped. Must ungroup first.")
+
+    new_tbl = tbl.copy()
+    new_tbl.preverb_hook("slice_head")
+    new_tbl.slice_head(n, offset)
     return new_tbl

@@ -21,8 +21,10 @@ from pydiverse.transform.core.verbs import (
     group_by,
     join,
     mutate,
+    outer_join,
     select,
     show_query,
+    slice_head,
     summarise,
     ungroup,
 )
@@ -723,4 +725,169 @@ class TestWindowFunction:
             >> mutate(x=f.row_number(arrange=[-λ.col4]))
             >> full_sort()
             >> select(λ.x),
+        )
+
+
+class TestSliceHead:
+    @tables(["df3"])
+    def test_simple(self, df3_x, df3_y):
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(10))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(100))
+
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1, offset=8))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(10, offset=8))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(100, offset=8))
+
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1, offset=100))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(10, offset=100))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(100, offset=100))
+
+    @tables(["df3"])
+    def test_chained(self, df3_x, df3_y):
+        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1) >> slice_head(1))
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> slice_head(10) >> slice_head(5)
+        )
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> slice_head(100) >> slice_head(5)
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> slice_head(2, offset=5) >> slice_head(2, offset=1),
+        )
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> slice_head(10, offset=8) >> slice_head(10, offset=1),
+        )
+
+    @tables(["df3"])
+    def test_with_select(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> select() >> slice_head(4, offset=2) >> select(*t),
+        )
+
+    @tables(["df3"])
+    def test_with_mutate(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> mutate(a=λ.col1 * 2)
+            >> slice_head(4, offset=2)
+            >> mutate(b=λ.col2 + λ.a),
+        )
+
+    @tables(["df1", "df2"])
+    def test_with_join(self, df1_x, df1_y, df2_x, df2_y):
+        assert_result_equal(
+            (df1_x, df2_x),
+            (df1_y, df2_y),
+            lambda t, u: t
+            >> full_sort()
+            >> slice_head(3)
+            >> outer_join(u, t.col1 == u.col1)
+            >> full_sort(),
+        )
+
+        assert_result_equal(
+            (df1_x, df2_x),
+            (df1_y, df2_y),
+            lambda t, u: t
+            >> outer_join(u >> slice_head(2, offset=1), t.col1 == u.col1)
+            >> full_sort(),
+            exception=ValueError,
+            may_throw=True,
+        )
+
+    @tables(["df3"])
+    def test_with_filter(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> filter(t.col4 % 2 == 0) >> slice_head(4, offset=2),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> slice_head(4, offset=2) >> filter(t.col1 == 1),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> filter(t.col4 % 2 == 0)
+            >> slice_head(4, offset=2)
+            >> filter(t.col1 == 1),
+        )
+
+    @tables(["df3"])
+    def test_with_arrange(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> mutate(x=t.col4 - (t.col1 * t.col2))
+            >> arrange(λ.x)
+            >> slice_head(4, offset=2),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> mutate(x=(t.col1 * t.col2))
+            >> slice_head(4)
+            >> arrange(-λ.x, λ.col5),
+        )
+
+    @tables(["df3"])
+    def test_with_group_by(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> slice_head(1) >> group_by(λ.col1) >> mutate(x=f.count()),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> arrange(λ.col1)
+            >> slice_head(6, offset=1)
+            >> group_by(λ.col1)
+            >> select()
+            >> mutate(x=λ.col4.mean()),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> mutate(key=λ.col4 % (λ.col3 + 1))
+            >> arrange(λ.key)
+            >> slice_head(4)
+            >> group_by(λ.key)
+            >> summarise(x=f.count()),
+        )
+
+    @tables(["df3"])
+    def test_with_summarise(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> slice_head(4) >> summarise(count=f.count()),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> slice_head(4) >> summarise(c3_mean=λ.col3.mean()),
         )

@@ -203,6 +203,9 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def summarise(self, **kwargs):
         ...
 
+    def slice_head(self, n: int, offset: int):
+        ...
+
     #### Symbolic Operators ####
 
     @classmethod

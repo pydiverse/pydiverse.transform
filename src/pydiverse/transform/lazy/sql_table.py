@@ -153,10 +153,11 @@ class SQLTableImpl(LazyTableImpl):
             for col in columns.values():
                 self.cols[col.uuid] = ColumnMetaData.from_expr(col.uuid, col, self)
 
-        self.joins = []  # type: list[JoinDescriptor]
-        self.wheres = []  # type: list[SymbolicExpression]
-        self.having = []  # type: list[SymbolicExpression]
-        self.order_bys = []  # type: list[OrderingDescriptor]
+        self.joins: list[JoinDescriptor] = []
+        self.wheres: list[SymbolicExpression] = []
+        self.having: list[SymbolicExpression] = []
+        self.order_bys: list[OrderingDescriptor] = []
+        self.limit_offset: tuple[int, int] = None
 
     def build_select(self) -> sql.Select:
         # Validate current state
@@ -216,6 +217,11 @@ class SQLTableImpl(LazyTableImpl):
             having = compiled(self.sql_columns)
             select = select.having(having)
 
+        # LIMIT / OFFSET
+        if self.limit_offset is not None:
+            limit, offset = self.limit_offset
+            select = select.limit(limit).offset(offset)
+
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
         s = []
@@ -253,9 +259,23 @@ class SQLTableImpl(LazyTableImpl):
             )
 
         requires_subquery = False
+
+        if self.limit_offset is not None:
+            # The LIMIT / TOP clause is executed at the very end of the query.
+            # This means we must create a subquery for any verb that modifies
+            # the rows.
+            if verb in (
+                "join",
+                "filter",
+                "arrange",
+                "group_by",
+                "summarise",
+            ):
+                requires_subquery = True
+
         if verb == "mutate":
             # Window functions can't be nested, thus a subquery is required
-            requires_subquery = has_any_ftype_cols(OPType.WINDOW, kwargs.values())
+            requires_subquery |= has_any_ftype_cols(OPType.WINDOW, kwargs.values())
         elif verb == "summarise":
             # The result of the aggregate is always ordered according to the
             # grouping columns. We must clear the order_bys so that the order
@@ -339,6 +359,12 @@ class SQLTableImpl(LazyTableImpl):
                 " JOIN clause."
             )
 
+        if right.limit_offset is not None:
+            raise ValueError(
+                "The right table can't be sliced when performing a join."
+                " Wrap the right side in a subquery to fix this."
+            )
+
         # TODO: Handle GROUP BY and SELECTS on left / right side
 
         # Combine the WHERE clauses
@@ -396,6 +422,13 @@ class SQLTableImpl(LazyTableImpl):
 
     def summarise(self, **kwargs):
         self.alignment_hash = generate_alignment_hash()
+
+    def slice_head(self, n: int, offset: int):
+        if self.limit_offset is None:
+            self.limit_offset = (n, offset)
+        else:
+            old_n, old_o = self.limit_offset
+            self.limit_offset = (min(abs(old_n - offset), n), old_o + offset)
 
     #### EXPRESSIONS ####
 

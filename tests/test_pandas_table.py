@@ -343,6 +343,32 @@ class TestPandasTable:
             pd.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
         )
 
+    def test_slice_head(self, tbl3):
+        @verb
+        def slice_head_custom(tbl: Table, n: int, *, offset: int = 0):
+            t = (
+                tbl
+                >> mutate(_n=f.row_number(arrange=[]))
+                >> alias()
+                >> filter((offset < λ._n) & (λ._n <= (n + offset)))
+            )
+            return t >> select(*[c for c in t if c._.name != "_n"])
+
+        assert_equal(
+            tbl3 >> slice_head(6),
+            tbl3 >> slice_head_custom(6),
+        )
+
+        assert_equal(
+            tbl3 >> slice_head(3, offset=2),
+            tbl3 >> slice_head_custom(3, offset=2),
+        )
+
+        assert_equal(
+            tbl3 >> slice_head(1, offset=100),
+            tbl3 >> slice_head_custom(1, offset=100),
+        )
+
     def test_lambda_column(self, tbl1, tbl2):
         # Select
         assert_equal(tbl1 >> select(λ.col1), tbl1 >> select(tbl1.col1))
