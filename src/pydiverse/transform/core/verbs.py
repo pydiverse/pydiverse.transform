@@ -9,7 +9,7 @@ from .dispatchers import builtin_verb
 from .expressions import SymbolicExpression
 from .expressions.util import iterate_over_expr
 from .table_impl import AbstractTableImpl, ColumnMetaData
-from .util import bidict, ordered_set, translate_ordering
+from .util import bidict, ordered_set, sign_peeler, translate_ordering
 
 __all__ = [
     "alias",
@@ -132,19 +132,40 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     check_cols_available(tbl, cols_in_expressions(args), "select")
     check_lambdas_valid(tbl, *args)
 
+    cols = []
+    positive_selection = None
     for col in args:
+        col, is_pos = sign_peeler(col)
+        if positive_selection is None:
+            positive_selection = is_pos
+        else:
+            if is_pos is not positive_selection:
+                raise ValueError(
+                    "All columns in input must have the same sign."
+                    " Can't mix selection with deselection."
+                )
+
         if not isinstance(col, (Column, LambdaColumn)):
-            raise ValueError(
+            raise TypeError(
                 "Arguments to select verb must be of type 'Column' or 'LambdaColumn'"
-                f" and not '{type(col)}'."
+                f" and not {type(col)}."
             )
+        cols.append(col)
 
     selects = []
-    for col in args:
+    for col in cols:
         if isinstance(col, Column):
             selects.append(tbl.named_cols.bwd[col.uuid])
         elif isinstance(col, LambdaColumn):
             selects.append(col.name)
+
+    # Invert selection
+    if positive_selection is False:
+        exclude = set(selects)
+        selects.clear()
+        for name in tbl.selects:
+            if name not in exclude:
+                selects.append(name)
 
     # SELECT
     new_tbl = tbl.copy()

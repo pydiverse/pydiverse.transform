@@ -214,6 +214,16 @@ class TestSelect:
             df3_x, df3_y, lambda t: t >> mutate(x=t.col1 * 2) >> select() >> select(...)
         )
 
+    @tables(["df3"])
+    def test_negative_select(self, df3_x, df3_y):
+        assert_result_equal(df3_x, df3_y, lambda t: t >> select(-t.col1))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> select(-λ.col1, -t.col2))
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t >> select() >> mutate(x=t.col1 * 2) >> select(-λ.col3),
+        )
+
 
 class TestMutate:
     @tables(["df2"])

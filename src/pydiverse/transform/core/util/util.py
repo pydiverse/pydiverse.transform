@@ -8,6 +8,7 @@ from pydiverse.transform.core.expressions import expressions
 
 __all__ = (
     "traverse",
+    "sign_peeler",
     "OrderingDescriptor",
     "translate_ordering",
 )
@@ -29,6 +30,22 @@ def traverse(obj: T, callback: typing.Callable) -> T:
     return callback(obj)
 
 
+def sign_peeler(expr):
+    """Remove unary - and + prefix and return the sign
+    :return: `True` for `+` and `False` for `-`
+    """
+    num_neg = 0
+    while isinstance(expr, expressions.FunctionCall):
+        if expr.name == "__neg__":
+            num_neg += 1
+            expr = expr.args[0]
+        elif expr.name == "__pos__":
+            expr = expr.args[0]
+        else:
+            break
+    return expr, num_neg % 2 == 0
+
+
 ####
 
 
@@ -42,16 +59,9 @@ class OrderingDescriptor:
 
 
 def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
-    def ordering_peeler(expr):
-        num_neg = 0
-        while isinstance(expr, expressions.FunctionCall) and expr.name == "__neg__":
-            num_neg += 1
-            expr = expr.args[0]
-        return expr, num_neg % 2 == 0
-
     ordering = []
     for arg in order_list:
-        col, ascending = ordering_peeler(arg)
+        col, ascending = sign_peeler(arg)
         if not isinstance(col, (column.Column, column.LambdaColumn)):
             raise ValueError(
                 "Arguments to arrange must be of type 'Column' or 'LambdaColumn' and"

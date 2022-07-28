@@ -11,8 +11,9 @@ from pydiverse.transform.core.dispatchers import (
     verb,
     wrap_tables,
 )
+from pydiverse.transform.core.expressions import SymbolicExpression
 from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.util import bidict, ordered_set
+from pydiverse.transform.core.util import bidict, ordered_set, sign_peeler
 from pydiverse.transform.core.verbs import (
     arrange,
     collect,
@@ -172,7 +173,7 @@ class TestBuiltinVerbs:
         with pytest.raises(ValueError):
             tbl1 >> select(tbl2.col1)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             tbl1 >> select(tbl1.col1 + tbl1.col1)
 
         # Selection with Ellipsis ...
@@ -192,6 +193,33 @@ class TestBuiltinVerbs:
             >> select(...)
             >> collect()
         ) == ["col1", "col2", "x"]
+
+        # Negative Selection
+        assert (tbl1 >> select(-λ.col1) >> collect()) == ["col2"]
+        assert (tbl1 >> select(λ.col1) >> select(-λ.col1) >> collect()) == []
+        assert (tbl1 >> mutate(x=λ.col1) >> select(-λ.x) >> collect()) == [
+            "col1",
+            "col2",
+        ]
+        assert (tbl1 >> mutate(x=λ.col1) >> select(-λ.col1) >> collect()) == [
+            "col2",
+            "x",
+        ]
+        assert (
+            tbl1 >> mutate(x=λ.col1, y=λ.col2) >> select(-λ.col1, -λ.y) >> collect()
+        ) == ["col2", "x"]
+
+        with pytest.raises(ValueError):
+            tbl1 >> select(-λ.col1, λ.col1)
+        with pytest.raises(ValueError):
+            tbl1 >> select(-λ.col1, λ.col2)
+        with pytest.raises(ValueError):
+            tbl1 >> select(λ.col1, -λ.col2)
+        with pytest.raises(TypeError):
+            tbl1 >> select(..., -λ.col2)
+
+        assert (tbl1 >> select(--λ.col1) >> collect()) == ["col1"]
+        assert (tbl1 >> select(+-+-λ.col1) >> collect()) == ["col1"]
 
     def test_mutate(self, tbl1, tbl2):
         assert (tbl1 >> mutate() >> collect()) == ["col1", "col2"]
@@ -353,6 +381,18 @@ class TestDataStructures:
         assert s.pop() == 1
         assert s.pop_back() == 3
         assert s.pop_back() == 2
+
+
+class TestUtil:
+    def test_sign_peeler(self):
+        x = object()
+        sx = SymbolicExpression(x)
+        assert sign_peeler(sx._) == (x, True)
+        assert sign_peeler((+sx)._) == (x, True)
+        assert sign_peeler((-sx)._) == (x, False)
+        assert sign_peeler((--sx)._) == (x, True)
+        assert sign_peeler((--+sx)._) == (x, True)
+        assert sign_peeler((-++--sx)._) == (x, False)
 
 
 class MockTableImpl(AbstractTableImpl):
