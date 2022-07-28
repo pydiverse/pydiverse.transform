@@ -120,9 +120,12 @@ def show_query(tbl: AbstractTableImpl):
 
 @builtin_verb()
 def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
-    # >> select(...)    ->   Select all columns
     if len(args) == 1 and args[0] is Ellipsis:
-        raise NotImplementedError
+        # >> select(...)  ->  Select all columns
+        args = [
+            tbl.cols[uuid].as_column(name, tbl)
+            for name, uuid in tbl.named_cols.fwd.items()
+        ]
 
     # Validate input
     validate_table_args(tbl)

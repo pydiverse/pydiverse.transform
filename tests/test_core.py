@@ -165,6 +165,7 @@ class TestBuiltinVerbs:
         assert (tbl1 >> collect()) == ["col1", "col2"]
 
     def test_select(self, tbl1, tbl2):
+        # Normal Selection
         assert (tbl1 >> select() >> collect()) == []
         assert (tbl1 >> select(tbl1.col1) >> collect()) == ["col1"]
 
@@ -173,6 +174,24 @@ class TestBuiltinVerbs:
 
         with pytest.raises(ValueError):
             tbl1 >> select(tbl1.col1 + tbl1.col1)
+
+        # Selection with Ellipsis ...
+        assert (tbl1 >> select(...) >> collect()) == ["col1", "col2"]
+        assert (tbl1 >> select() >> select(...) >> collect()) == ["col1", "col2"]
+        assert (tbl1 >> mutate(x=λ.col1) >> select(...) >> collect()) == [
+            "col1",
+            "col2",
+            "x",
+        ]
+        assert (
+            tbl1
+            >> select()
+            >> mutate(x=λ.col1, col1=λ.col2)
+            >> select(...)
+            >> select(λ.col1)
+            >> select(...)
+            >> collect()
+        ) == ["col1", "col2", "x"]
 
     def test_mutate(self, tbl1, tbl2):
         assert (tbl1 >> mutate() >> collect()) == ["col1", "col2"]
@@ -223,6 +242,14 @@ class TestBuiltinVerbs:
         # Test that joined columns are accessible
         t = tbl1 >> join(tbl2, tbl1.col1 == tbl2.col1, "left")
         t >> select(t.col1, t.col1_mock2)
+
+        # Select Ellipsis
+        assert (
+            tbl1
+            >> join(tbl2 >> select(), tbl1.col1 == tbl2.col1, "left")
+            >> select(...)
+            >> collect()
+        ) == ["col1", "col2", "col1_mock2", "col2_mock2", "col3_mock2"]
 
     def test_filter(self, tbl1, tbl2):
         tbl1 >> filter()
