@@ -102,7 +102,11 @@ class PandasTableImpl(EagerTableImpl):
         masked_df = self.df[[*selected_cols_name_map.keys()]]
 
         # rename columns from internal naming scheme to external names
-        return masked_df.rename(columns=selected_cols_name_map)
+        result = masked_df.rename(columns=selected_cols_name_map)
+
+        # Add metadata
+        result.attrs["name"] = self.name
+        return result
 
     def mutate(self, **kwargs):
         uuid_kwargs = {self.named_cols.fwd[k]: (k, v) for k, v in kwargs.items()}

@@ -337,7 +337,11 @@ class SQLTableImpl(LazyTableImpl):
                     return self.connectable.execute(*args, **kwargs)
 
             sql_db = _FixedSqlDatabase(conn)
-            return sql_db.read_sql(select).convert_dtypes()
+            result = sql_db.read_sql(select).convert_dtypes()
+
+        # Add metadata
+        result.attrs["name"] = self.name
+        return result
 
     def build_query(self) -> str:
         query = self.build_select()

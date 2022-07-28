@@ -100,6 +100,16 @@ class TestPandasTable:
     def test_build_query(self, tbl1):
         assert (tbl1 >> build_query()) is None
 
+    def test_collect(self, tbl1):
+        assert_equal(tbl1 >> collect(), df1)
+
+        # Check if metadata is added
+        collected_df = tbl1 >> collect()
+        assert collected_df.attrs.get("name") == tbl1._impl.name
+
+        collected_df = tbl1 >> alias("unicorns_are_amazing") >> collect()
+        assert collected_df.attrs.get("name") == "unicorns_are_amazing"
+
     def test_select(self, tbl1):
         assert_not_inplace(tbl1, select(tbl1.col1))
         assert_equal(tbl1 >> select(tbl1.col1), df1[["col1"]])
