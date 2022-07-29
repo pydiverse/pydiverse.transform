@@ -318,6 +318,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                         f" ({operator.name})."
                     )
                 else:
+                    # TODO: Replace with logger
                     warnings.warn(
                         f"Nesting a window function inside an aggregate function is not"
                         f" supported by SQL backend."
@@ -329,6 +330,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                         f" ({operator.name})."
                     )
                 else:
+                    # TODO: Replace with logger
                     warnings.warn(
                         f"Nesting an aggregate function inside an aggregate function is"
                         f" not supported by SQL backend."

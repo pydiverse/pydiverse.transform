@@ -138,7 +138,8 @@ def assert_result_equal(
                             f"Raised the wrong type of exception: {type(e)} instead of"
                             f" {exception}."
                         ) from e
-                warnings.warn(f"An exception was thrown:\n{e}")
+                # TODO: Replace with logger
+                print(f"An exception was thrown:\n{e}")
                 return
             else:
                 raise e
