@@ -152,6 +152,8 @@ class SQLTableImpl(LazyTableImpl):
             # TODO: Clean up... This feels a bit hacky
             for col in columns.values():
                 self.cols[col.uuid] = ColumnMetaData.from_expr(col.uuid, col, self)
+        if hasattr(self, "intrinsic_grouped_by"):
+            self.intrinsic_grouped_by.clear()
 
         self.joins: list[JoinDescriptor] = []
         self.wheres: list[SymbolicExpression] = []
