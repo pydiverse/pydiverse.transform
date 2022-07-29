@@ -141,6 +141,10 @@ class SQLTableImpl(LazyTableImpl):
             raise e
 
     def replace_tbl(self, new_tbl, columns: dict[str:Column]):
+        if isinstance(new_tbl, sql.Select):
+            # noinspection PyNoneFunctionAssignment
+            new_tbl = new_tbl.subquery()
+
         self.tbl = new_tbl
         self.alignment_hash = generate_alignment_hash()
 
