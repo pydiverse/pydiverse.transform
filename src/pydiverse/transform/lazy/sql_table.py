@@ -276,6 +276,9 @@ class SQLTableImpl(LazyTableImpl):
         if verb == "mutate":
             # Window functions can't be nested, thus a subquery is required
             requires_subquery |= has_any_ftype_cols(OPType.WINDOW, kwargs.values())
+        elif verb == "filter":
+            # Window functions aren't allowed in where clause
+            requires_subquery |= has_any_ftype_cols(OPType.WINDOW, args)
         elif verb == "summarise":
             # The result of the aggregate is always ordered according to the
             # grouping columns. We must clear the order_bys so that the order

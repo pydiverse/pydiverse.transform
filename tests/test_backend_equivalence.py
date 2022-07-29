@@ -689,6 +689,38 @@ class TestWindowFunction:
         )
 
     @tables(["df3"])
+    def test_filter(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> group_by(t.col1, t.col2)
+            >> mutate(mean3=t.col3.mean())
+            >> filter(λ.mean3 <= 2.0),
+        )
+
+    @tables(["df3"])
+    def test_arrange(self, df3_x, df3_y):
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> group_by(t.col1, t.col2)
+            >> mutate(mean3=t.col3.mean())
+            >> arrange(λ.mean3),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> arrange(-t.col4)
+            >> group_by(t.col1, t.col2)
+            >> mutate(mean3=t.col3.mean())
+            >> arrange(λ.mean3),
+        )
+
+    @tables(["df3"])
     def test_summarise(self, df3_x, df3_y):
         assert_result_equal(
             df3_x,
@@ -743,6 +775,35 @@ class TestWindowFunction:
             >> mutate(x=f.row_number(arrange=[-λ.col4]))
             >> full_sort()
             >> select(λ.x),
+        )
+
+    @tables(["df3"])
+    def test_complex(self, df3_x, df3_y):
+        # Window function before summarise
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> group_by(t.col1, t.col2)
+            >> mutate(mean3=t.col3.mean(), rn=f.row_number(arrange=[λ.col1, λ.col2]))
+            >> filter(λ.mean3 > λ.rn)
+            >> summarise(meta_mean=λ.mean3.mean())
+            >> filter(t.col1 >= λ.meta_mean)
+            >> filter(t.col1 != 1)
+            >> arrange(λ.meta_mean),
+        )
+
+        # Window function after summarise
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> group_by(t.col1, t.col2)
+            >> summarise(mean3=t.col3.mean())
+            >> mutate(minM3=λ.mean3.min(), maxM3=λ.mean3.max())
+            >> mutate(span=λ.maxM3 - λ.minM3)
+            >> filter(λ.span < 3)
+            >> arrange(λ.span),
         )
 
 
