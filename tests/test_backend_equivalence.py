@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-import warnings
+import sqlite3
 from collections import defaultdict
 
 import pandas as pd
@@ -20,8 +20,8 @@ from pydiverse.transform.core.verbs import (
     filter,
     group_by,
     join,
+    left_join,
     mutate,
-    outer_join,
     select,
     show_query,
     slice_head,
@@ -263,9 +263,21 @@ class TestMutate:
 
 
 class TestJoin:
-    # TODO: Implement test for outer join. This doesn't work with sqlite
     @tables(["df1", "df2"])
-    @pytest.mark.parametrize("how", ["inner", "left"])
+    @pytest.mark.parametrize(
+        "how",
+        [
+            "inner",
+            "left",
+            pytest.param(
+                "outer",
+                marks=pytest.mark.skipif(
+                    sqlite3.sqlite_version < "3.39.0",
+                    reason="SQLite version doesn't support OUTER JOIN",
+                ),
+            ),
+        ],
+    )
     def test_join(self, df1_x, df1_y, df2_x, df2_y, how):
         assert_result_equal(
             (df1_x, df2_x),
@@ -281,9 +293,21 @@ class TestJoin:
             >> full_sort(),
         )
 
-    # TODO: Implement test for outer join. This doesn't work with sqlite
     @tables(["df1", "df2"])
-    @pytest.mark.parametrize("how", ["inner", "left"])
+    @pytest.mark.parametrize(
+        "how",
+        [
+            "inner",
+            "left",
+            pytest.param(
+                "outer",
+                marks=pytest.mark.skipif(
+                    sqlite3.sqlite_version < "3.39.0",
+                    reason="SQLite version doesn't support OUTER JOIN",
+                ),
+            ),
+        ],
+    )
     def test_join_and_select(self, df1_x, df1_y, df2_x, df2_y, how):
         assert_result_equal(
             (df1_x, df2_x),
@@ -302,9 +326,21 @@ class TestJoin:
             >> full_sort(),
         )
 
-    # TODO: Implement test for outer join. This doesn't work with sqlite
     @tables(["df3"])
-    @pytest.mark.parametrize("how", ["inner", "left"])
+    @pytest.mark.parametrize(
+        "how",
+        [
+            "inner",
+            "left",
+            pytest.param(
+                "outer",
+                marks=pytest.mark.skipif(
+                    sqlite3.sqlite_version < "3.39.0",
+                    reason="SQLite version doesn't support OUTER JOIN",
+                ),
+            ),
+        ],
+    )
     def test_self_join(self, df3_x, df3_y, how):
         # Self join without alias should raise an exception
         assert_result_equal(
@@ -871,7 +907,7 @@ class TestSliceHead:
             lambda t, u: t
             >> full_sort()
             >> slice_head(3)
-            >> outer_join(u, t.col1 == u.col1)
+            >> left_join(u, t.col1 == u.col1)
             >> full_sort(),
         )
 
@@ -879,7 +915,7 @@ class TestSliceHead:
             (df1_x, df2_x),
             (df1_y, df2_y),
             lambda t, u: t
-            >> outer_join(u >> slice_head(2, offset=1), t.col1 == u.col1)
+            >> left_join(u >> slice_head(2, offset=1), t.col1 == u.col1)
             >> full_sort(),
             exception=ValueError,
             may_throw=True,
