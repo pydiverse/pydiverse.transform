@@ -1,8 +1,36 @@
-[build-system]
-requires = ['setuptools', 'setuptools-scm', 'wheel']
+[tool.poetry]
+name = "pydiverse.transform"
+version = "0.1.0"
+description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
+authors = [
+  "QuantCo, Inc.",
+  "Nicolas Camenisch <garnele007@gmail.com>",
+]
+license = "BSD-3-Clause"
+readme = "README.md"
+packages = [
+	{ include = "pydiverse", from = "src" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: SQL",
+  "Topic :: Database",
+]
 
-[tool.setuptools_scm]
-version_scheme = "post-release"
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.23.1"
+pandas = "^1.4.3"
+SQLAlchemy = "^1.4.39"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+pytest-xdist = "^2.5.0"
+black = "^22.6.0"
+pre-commit = "^2.20.0"
+isort = "^5.10.1"
 
 [tool.black]
 exclude = '''
@@ -15,6 +43,8 @@ exclude = '''
 )/
 '''
 
+preview = true
+
 [tool.isort]
 multi_line_output = 3
 include_trailing_comma = true
@@ -24,12 +54,6 @@ known_first_party = "pydiverse.transform"
 skip_glob = '\.eggs/*,\.git/*,\.venv/*,build/*,dist/*'
 default_section = 'THIRDPARTY'
 
-[tool.mypy]
-python_version = 3.8
-ignore_missing_imports = true
-no_implicit_optional = true
-check_untyped_defs = true
-
-[tool.pytest.ini_options]
-# This will be pytest's future default.
-addopts = "--import-mode=importlib"
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
