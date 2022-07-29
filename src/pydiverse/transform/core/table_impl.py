@@ -501,6 +501,13 @@ with AbstractTableImpl.op(ops.Pos()) as op:
         return +x
 
 
+with AbstractTableImpl.op(ops.Abs()) as op:
+
+    @op.auto
+    def _abs(x):
+        return abs(x)
+
+
 #### BINARY OPERATORS ##########################################################
 
 

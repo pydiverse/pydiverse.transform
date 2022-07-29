@@ -124,6 +124,7 @@ class OperatorRegistry:
         "__round__",
         "__pos__",
         "__neg__",
+        "__abs__",
         "__and__",
         "__rand__",
         "__or__",

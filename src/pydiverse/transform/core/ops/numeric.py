@@ -19,6 +19,7 @@ __all__ = [
     "RMod",
     "Neg",
     "Pos",
+    "Abs",
     "Round",
 ]
 
@@ -122,6 +123,14 @@ class Neg(ElementWise, Unary):
 
 class Pos(ElementWise, Unary):
     name = "__pos__"
+    signatures = [
+        "int -> int",
+        "float -> float",
+    ]
+
+
+class Abs(ElementWise, Unary):
+    name = "__abs__"
     signatures = [
         "int -> int",
         "float -> float",

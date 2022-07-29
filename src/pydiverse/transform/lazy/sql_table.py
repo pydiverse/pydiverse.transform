@@ -640,6 +640,13 @@ with SQLTableImpl.op(ops.RFloorDiv(), check_super=False) as op:
         return _floordiv(lhs, rhs)
 
 
+with SQLTableImpl.op(ops.Abs()) as op:
+
+    @op.auto
+    def _abs(x):
+        return sqlfunc.ABS(x)
+
+
 with SQLTableImpl.op(ops.Round()) as op:
 
     @op.auto
