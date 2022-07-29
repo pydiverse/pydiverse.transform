@@ -11,7 +11,7 @@ def assert_equal(left, right, check_dtype=False):
     r = right >> collect() if isinstance(right, Table) else right
 
     try:
-        pd.util.testing.assert_frame_equal(l, r, check_dtype=check_dtype)
+        pd.testing.assert_frame_equal(l, r, check_dtype=check_dtype)
     except AssertionError as e:
         print("First dataframe:")
         print(l)

@@ -85,7 +85,7 @@ def assert_not_inplace(tbl: Table[PandasTableImpl], operation: Pipeable):
     tbl >> operation
     after = tbl._impl.df
 
-    pd.util.testing.assert_frame_equal(initial, after)
+    pd.testing.assert_frame_equal(initial, after)
 
 
 class TestPandasTable:
