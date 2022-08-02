@@ -6,17 +6,16 @@ Pipe based dataframe manipulation library that can also transform data on SQL da
 
 ## Installation
 
-You can install the package in development mode using:
+To install the package locally in development mode, you first have to install
+[Poetry](https://python-poetry.org/docs/#installation).
+After that, install pydiverse transform like this:
 
 ```bash
-git clone https://github.com/pydiverse/pydiverse.transform.git
-cd pydiverse.transform
+git clone https://github.com/Quantco/pdtransform.git
+cd pdtransform
 
-# create and activate a fresh environment named pydiverse.transform
-# see environment.yml for details
-mamba env create
-conda activate pydiverse.transform
-
+# Create the environment, activate it and install the pre-commit hooks
+poetry install
+poetry shell
 pre-commit install
-pip install --no-build-isolation -e .
 ```
