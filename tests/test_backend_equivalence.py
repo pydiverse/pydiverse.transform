@@ -72,13 +72,17 @@ def pandas_impls():
     return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
 
 
-def sql_impls():
-    engine = sqlalchemy.create_engine("sqlite:///:memory:")
+def sql_conn_to_impls(conn: str):
+    engine = sqlalchemy.create_engine(conn)
     impls = {}
     for name, df in dataframes.items():
         df.to_sql(name, engine, index=False, if_exists="replace")
         impls[name] = SQLTableImpl(engine, name)
     return impls
+
+
+def sqlite_impls():
+    return sql_conn_to_impls("sqlite:///:memory:")
 
 
 def mssql_impls():
@@ -87,15 +91,10 @@ def mssql_impls():
     localhost = "127.0.0.1"
     db_name = "master"
     local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    engine = sqlalchemy.create_engine(local_conn)
-    impls = {}
-    for name, df in dataframes.items():
-        df.to_sql(name, engine, index=False, if_exists="replace")
-        impls[name] = SQLTableImpl(engine, name)
-    return impls
+    return sql_conn_to_impls(local_conn)
 
 
-impls = {"pandas": pandas_impls, "sql_sqlite": sql_impls, "mssql": mssql_impls}
+impls = {"pandas": pandas_impls, "sqlite": sqlite_impls, "mssql": mssql_impls}
 
 
 def tables(names: list[str]):
