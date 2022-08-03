@@ -37,6 +37,7 @@ docs = ["Sphinx", "sphinx-rtd-theme", "sphinxcontrib-apidoc"]
 pytest = "^7.1.2"
 pyodbc = "^4.0.34"
 pytest-xdist = "^2.5.0"
+psycopg2 = "2.9.3"
 black = "^22.6.0"
 pre-commit = "^2.20.0"
 isort = "^5.10.1"

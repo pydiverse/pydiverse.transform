@@ -95,7 +95,19 @@ def mssql_impls():
     return sql_conn_to_impls(local_conn)
 
 
-impls = {"pandas": pandas_impls, "sqlite": sqlite_impls, "mssql": mssql_impls}
+def postgresql_impls():
+    user = "sa"
+    password = "Pydiverse23"
+    local_conn = f"postgresql://{user}:{password}@localhost:5432/"
+    return sql_conn_to_impls(local_conn)
+
+
+impls = {
+    "pandas": pandas_impls,
+    "sqlite": sqlite_impls,
+    "mssql": mssql_impls,
+    "postgres": postgresql_impls,
+}
 
 
 def tables(names: list[str]):
