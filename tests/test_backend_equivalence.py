@@ -81,7 +81,21 @@ def sql_impls():
     return impls
 
 
-impls = {"pandas": pandas_impls, "sql_sqlite": sql_impls}
+def mssql_impls():
+    user = "sa"
+    password = "QuantCompare37"
+    localhost = "127.0.0.1"
+    db_name = "master"
+    local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+    engine = sqlalchemy.create_engine(local_conn)
+    impls = {}
+    for name, df in dataframes.items():
+        df.to_sql(name, engine, index=False, if_exists="replace")
+        impls[name] = SQLTableImpl(engine, name)
+    return impls
+
+
+impls = {"pandas": pandas_impls, "sql_sqlite": sql_impls, "mssql": mssql_impls}
 
 
 def tables(names: list[str]):
