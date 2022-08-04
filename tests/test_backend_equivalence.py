@@ -87,7 +87,7 @@ def sqlite_impls():
 
 def mssql_impls():
     user = "sa"
-    password = "QuantCompare37"
+    password = "PidyQuant27"
     localhost = "127.0.0.1"
     db_name = "master"
     local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
