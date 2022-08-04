@@ -42,19 +42,19 @@ jobs:
       matrix:
         os: [Ubuntu]
         python-version: ['3.8', '3.9', '3.10']
-    services:
-      postgres:
-        image: postgresql
-        env:
-          POSTGRES_USER: sa
-          POSTGRES_PASSWORD: Pydiverse23
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
+#    services:
+#      postgres:
+#        image: postgresql
+#        env:
+#          POSTGRES_USER: sa
+#          POSTGRES_PASSWORD: Pydiverse23
+#        options: >-
+#          --health-cmd pg_isready
+#          --health-interval 10s
+#          --health-timeout 5s
+#          --health-retries 5
+#        ports:
+#          - 5432:5432
     steps:
       - name: Docker login
         run: docker login ghcr.io -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
