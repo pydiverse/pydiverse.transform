@@ -96,13 +96,13 @@ def sqlite_impls():
     return sql_conn_to_impls("sqlite:///:memory:")
 
 
-# def mssql_impls():
-#     user = "sa"
-#     password = "QuantCompare37"
-#     localhost = "127.0.0.1"
-#     db_name = "master"
-#     local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-#     return sql_conn_to_impls(local_conn)
+def mssql_impls():
+    user = "sa"
+    password = "PidyQuant27"
+    localhost = "127.0.0.1"
+    db_name = "master"
+    local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+    return sql_conn_to_impls(local_conn)
 
 
 def postgresql_impls():

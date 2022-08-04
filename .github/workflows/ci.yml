@@ -32,6 +32,12 @@ jobs:
   Tests:
     name: "${{ matrix.os }} / ${{ matrix.python-version }}"
     runs-on: ${{ matrix.os }}-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSSWORD: PidyQuant27
     strategy:
       matrix:
         os: [Ubuntu]
