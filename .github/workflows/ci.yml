@@ -42,7 +42,24 @@ jobs:
       matrix:
         os: [Ubuntu]
         python-version: ['3.8', '3.9', '3.10']
+    services:
+      postgres:
+        image: postgresql
+        env:
+          POSTGRES_USER: sa
+          POSTGRES_PASSWORD: Pydiverse23
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
+      - name: Docker login
+        run: docker login ghcr.io -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+      - name: Pull image
+        run: docker pull ghcr.io/quantco/qc-mambaforge-base:latest
       - name: Checkout branch
         uses: actions/checkout@v2.3.5
         with:
@@ -88,6 +105,10 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: poetry install -vvv
+
+      - uses: isbang/compose-action@v1.1.0
+        with:
+          compose-file: ./docker-compose.yaml
 
       - name: Test
         shell: bash
