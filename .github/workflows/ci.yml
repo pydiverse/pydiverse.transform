@@ -1,11 +1,6 @@
 name: Tests
 
 on:
-  push:
-    paths-ignore:
-      - 'docs/**'
-    branches:
-      - '**'
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -32,13 +27,14 @@ jobs:
   Tests:
     name: "${{ matrix.os }} / ${{ matrix.python-version }}"
     runs-on: ${{ matrix.os }}-latest
-    strategy:
-      matrix:
-        os: [Ubuntu]
-        python-version: ['3.8', '3.9', '3.10']
     services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSSWORD: PidyQuant27
       postgres:
-        image: postgresql
+        image: postgres
         env:
           POSTGRES_USER: sa
           POSTGRES_PASSWORD: Pydiverse23
@@ -49,6 +45,10 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+    strategy:
+      matrix:
+        os: [Ubuntu]
+        python-version: ['3.8', '3.9', '3.10']
     steps:
       - name: Docker login
         run: docker login ghcr.io -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
