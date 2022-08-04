@@ -94,7 +94,19 @@ def mssql_impls():
     return sql_conn_to_impls(local_conn)
 
 
-impls = {"pandas": pandas_impls, "sqlite": sqlite_impls, "mssql": mssql_impls}
+def postgresql_impls():
+    user = "sa"
+    password = "Pydiverse23"
+    local_conn = f"postgresql://{user}:{password}@localhost:5432/"
+    return sql_conn_to_impls(local_conn)
+
+
+impls = {
+    "pandas": pandas_impls,
+    "sqlite": sqlite_impls,
+    # "mssql": mssql_impls,
+    "postgres": postgresql_impls,
+}
 
 
 def tables(names: list[str]):
@@ -122,8 +134,9 @@ def tables(names: list[str]):
     return pytest.mark.parametrize(param_names, params)
 
 
+# TODO: when should we still consider the order when comparing?
 def assert_result_equal(
-    x, y, pipe_factory, *, exception=None, may_throw=False, **kwargs
+    x, y, pipe_factory, *, exception=None, check_order=False, may_throw=False, **kwargs
 ):
     if not isinstance(x, (list, tuple)):
         x = (x,)
@@ -141,6 +154,14 @@ def assert_result_equal(
             query_y = pipe_factory(*y)
             dfx = (query_x >> collect()).reset_index(drop=True)
             dfy = (query_y >> collect()).reset_index(drop=True)
+
+            if not check_order:
+                dfx.sort_values(
+                    by=dfx.columns.tolist(), inplace=True, ignore_index=True
+                )
+                dfy.sort_values(
+                    by=dfy.columns.tolist(), inplace=True, ignore_index=True
+                )
         except Exception as e:
             if may_throw:
                 if exception is not None:
@@ -964,7 +985,7 @@ class TestSliceHead:
             df3_y,
             lambda t: t
             >> mutate(x=t.col4 - (t.col1 * t.col2))
-            >> arrange(λ.x)
+            >> arrange(λ.x, *t)
             >> slice_head(4, offset=2),
         )
 
