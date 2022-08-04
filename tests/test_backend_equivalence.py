@@ -104,7 +104,7 @@ def postgresql_impls():
 impls = {
     "pandas": pandas_impls,
     "sqlite": sqlite_impls,
-    # "mssql": mssql_impls,
+    "mssql": mssql_impls,
     "postgres": postgresql_impls,
 }
 

@@ -1,11 +1,6 @@
 name: Tests
 
 on:
-  push:
-    paths-ignore:
-      - 'docs/**'
-    branches:
-      - '**'
   pull_request:
     paths-ignore:
       - 'docs/**'
