@@ -85,13 +85,13 @@ def sqlite_impls():
     return sql_conn_to_impls("sqlite:///:memory:")
 
 
-def mssql_impls():
-    user = "sa"
-    password = "QuantCompare37"
-    localhost = "127.0.0.1"
-    db_name = "master"
-    local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    return sql_conn_to_impls(local_conn)
+# def mssql_impls():
+#     user = "sa"
+#     password = "QuantCompare37"
+#     localhost = "127.0.0.1"
+#     db_name = "master"
+#     local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+#     return sql_conn_to_impls(local_conn)
 
 
 def postgresql_impls():
@@ -104,7 +104,7 @@ def postgresql_impls():
 impls = {
     "pandas": pandas_impls,
     "sqlite": sqlite_impls,
-    "mssql": mssql_impls,
+    # "mssql": mssql_impls,
     "postgres": postgresql_impls,
 }
 
@@ -134,8 +134,9 @@ def tables(names: list[str]):
     return pytest.mark.parametrize(param_names, params)
 
 
+# TODO: when should we still consider the order when comparing?
 def assert_result_equal(
-    x, y, pipe_factory, *, exception=None, may_throw=False, **kwargs
+    x, y, pipe_factory, *, exception=None, check_order=False, may_throw=False, **kwargs
 ):
     if not isinstance(x, (list, tuple)):
         x = (x,)
@@ -153,6 +154,14 @@ def assert_result_equal(
             query_y = pipe_factory(*y)
             dfx = (query_x >> collect()).reset_index(drop=True)
             dfy = (query_y >> collect()).reset_index(drop=True)
+
+            if not check_order:
+                dfx.sort_values(
+                    by=dfx.columns.tolist(), inplace=True, ignore_index=True
+                )
+                dfy.sort_values(
+                    by=dfy.columns.tolist(), inplace=True, ignore_index=True
+                )
         except Exception as e:
             if may_throw:
                 if exception is not None:
