@@ -39,7 +39,7 @@ jobs:
           ACCEPT_EULA: Y
           SA_PASSSWORD: PidyQuant27
       postgres:
-        image: postgresql
+        image: postgres
         env:
           POSTGRES_USER: sa
           POSTGRES_PASSWORD: Pydiverse23
