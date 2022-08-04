@@ -985,7 +985,7 @@ class TestSliceHead:
             df3_y,
             lambda t: t
             >> mutate(x=t.col4 - (t.col1 * t.col2))
-            >> arrange(λ.x)
+            >> arrange(λ.x, *t)
             >> slice_head(4, offset=2),
         )
 
