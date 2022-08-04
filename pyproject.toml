@@ -20,11 +20,12 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.8,<3.11"
 numpy = "^1.23.1"
 pandas = "^1.4.3"
-SQLAlchemy = "^1.4.39"
+SQLAlchemy = "^1.4.27"
 mutate = "^0.0.1-alpha.13"
+google-auth = "^2.9.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -34,6 +35,8 @@ psycopg2 = "2.9.3"
 black = "^22.6.0"
 pre-commit = "^2.20.0"
 isort = "^5.10.1"
+sqlalchemy-bigquery = "^1.4.4"
+google-auth = "^2.9.1"
 
 [tool.black]
 exclude = '''

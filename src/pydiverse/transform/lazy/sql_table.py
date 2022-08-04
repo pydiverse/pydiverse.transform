@@ -39,7 +39,9 @@ class SQLTableImpl(LazyTableImpl):
             can be used by the other table and produces the same result.
     """
 
-    def __init__(self, engine, table, _dtype_hints: dict[str, str] = None):
+    def __init__(
+        self, engine, table, dataset=None, _dtype_hints: dict[str, str] = None
+    ):
         self.engine = (
             sqlalchemy.create_engine(engine) if isinstance(engine, str) else engine
         )
@@ -56,7 +58,14 @@ class SQLTableImpl(LazyTableImpl):
         }
 
         self.replace_tbl(tbl, columns)
-        super().__init__(name=self.tbl.name, columns=columns)
+
+        name = self.tbl.name
+        if engine.dialect.name == "bigquery":
+            spl = self.tbl.name.split(".")
+            if len(spl) == 2:
+                name = spl[1]
+
+        super().__init__(name=name, columns=columns)
 
     def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
         if isinstance(col, Column):
@@ -94,7 +103,9 @@ class SQLTableImpl(LazyTableImpl):
                 "tbl must be a sqlalchemy Table or string, but was %s" % type(tbl)
             )
 
-        schema, table_name = tbl.split(".") if "." in tbl else [None, tbl]
+        spl = tbl.split(".") if "." in tbl else [None, tbl]
+        schema = spl[0]
+        table_name = ".".join(spl[1:])
 
         # TODO: pybigquery uses schema to mean project_id, so we cannot use
         #     siuba's classic breakdown "{schema}.{table_name}". Basically
