@@ -125,7 +125,9 @@ class PandasTableImpl(EagerTableImpl):
             for uuid in uuid_kwargs.keys()
         }
 
-        self.df = self.df.assign(**cols)
+        self.df = self.df.copy(deep=False)
+        for col_name, col in cols.items():
+            self.df[col_name] = col
         self.df = fast_pd_convert_dtypes(self.df)
 
     def join(
