@@ -118,25 +118,15 @@ class PandasTableImpl(EagerTableImpl):
         )
 
         # Update Dataframe
-        if self.grouped_by:
-            # Window Functions
-            gdf = self.grouped_df()
-            cols_transforms = {
-                self.df_name_mapping[uuid]: self.cols[uuid].compiled
-                for uuid in uuid_kwargs.keys()
-            }
-            self.df = gdf.apply(
-                lambda x: x.assign(**{k: v(x) for k, v in cols_transforms.items()})
+        cols = {
+            self.df_name_mapping[uuid]: self.cols[uuid].compiled(
+                self.df, grouper=self.df_grouper()
             )
-            self.df = fast_pd_convert_dtypes(self.df)
-        else:
-            # Normal Functions
-            cols = {
-                self.df_name_mapping[uuid]: self.cols[uuid].compiled(self.df)
-                for uuid in uuid_kwargs.keys()
-            }
-            self.df = self.df.assign(**cols)
-            self.df = fast_pd_convert_dtypes(self.df)
+            for uuid in uuid_kwargs.keys()
+        }
+
+        self.df = self.df.assign(**cols)
+        self.df = fast_pd_convert_dtypes(self.df)
 
     def join(
         self,
@@ -209,29 +199,31 @@ class PandasTableImpl(EagerTableImpl):
         self.df = self.sort_df(self.df, ordering)
 
     def summarise(self, **kwargs):
-        translated_values = {}
+        uuid_kwargs = {self.named_cols.fwd[k]: (k, v) for k, v in kwargs.items()}
+        self.df_name_mapping.update(
+            {
+                uuid: f"{self.name}_summarise_{name}_" + uuid_to_str(uuid)
+                for uuid, (name, _) in uuid_kwargs.items()
+            }
+        )
 
-        grouped_df = self.grouped_df()
-        for name, expr in kwargs.items():
-            uuid = self.named_cols.fwd[name]
-            internal_name = f"{self.name}_summarise_{name}_{uuid_to_str(uuid)}"
-            self.df_name_mapping[uuid] = internal_name
-
-            compiled = self.cols[uuid].compiled
-            if self.grouped_by:
-                translated_values[internal_name] = grouped_df.apply(compiled)
-            else:
-                translated_values[internal_name] = compiled(grouped_df)
+        # Update Dataframe
+        grouper = self.grouped_df().grouper if self.grouped_by else None
+        aggr_cols = {
+            self.df_name_mapping[uuid]: self.cols[uuid].compiled(
+                self.df, grouper=grouper
+            )
+            for uuid in uuid_kwargs.keys()
+        }
 
         # Grouped Dataframe requires different operations compared to ungrouped df.
         if self.grouped_by:
             columns = {
-                k: fast_pd_convert_dtypes(v.rename(k))
-                for k, v in translated_values.items()
+                k: fast_pd_convert_dtypes(v.rename(k)) for k, v in aggr_cols.items()
             }
             self.df = pd.concat(columns, axis="columns", copy=False).reset_index()
         else:
-            self.df = fast_pd_convert_dtypes(pd.DataFrame(translated_values, index=[0]))
+            self.df = fast_pd_convert_dtypes(pd.DataFrame(aggr_cols, index=[0]))
 
     def slice_head(self, n: int, offset: int):
         self.df = self.df[offset : n + offset]
@@ -246,7 +238,7 @@ class PandasTableImpl(EagerTableImpl):
         def _translate_col(self, expr, **kwargs):
             df_col_name = self.backend.df_name_mapping[expr.uuid]
 
-            def df_col(df):
+            def df_col(df, **kw):
                 return df[df_col_name]
 
             return TypedValue(df_col, expr.dtype)
@@ -258,7 +250,7 @@ class PandasTableImpl(EagerTableImpl):
                     f"Literal Column: {expr}"
                 )
 
-            def value(df):
+            def value(df, **kw):
                 literal_value = expr.typed_value.value
                 if isinstance(literal_value, pd.Series):
                     literal_len = len(literal_value.index)
@@ -281,12 +273,45 @@ class PandasTableImpl(EagerTableImpl):
         def _translate_function(
             self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
-            def value(df):
-                return implementation(
-                    *(arg.value(df) for arg in op_args),
-                    _tbl=self.backend,
-                    _df=df,
-                )
+            def value(df, grouper=None, *kw):
+                args = [arg.value(df, grouper=grouper, *kw) for arg in op_args]
+                kwargs = {
+                    "_tbl": self.backend,
+                    "_df": df,
+                }
+
+                # Element wise operator
+                # -> Perform on ungrouped columns
+                if implementation.operator.ftype == OPType.EWISE:
+                    return implementation(*args, **kwargs)
+
+                # Get arguments; If there are no arguments, use dataframe index
+                # instead for grouping.
+                if len(args) > 0:
+                    series, *args = args
+                else:
+                    series = df.index.to_series()
+
+                def bound_impl(x):
+                    """
+                    Helper that binds the *args and **kwargs to the implementation.
+                    Takes one argument - the rest is already supplied.
+                    """
+                    return implementation(x, *args, **kwargs)
+
+                # Grouped
+                if grouper is not None:
+                    series = series.groupby(grouper)
+
+                    if verb == "summarise":
+                        return series.aggregate(bound_impl)
+                    return series.transform(bound_impl)
+
+                # Ungrouped
+                scalar = bound_impl(series)
+                if verb == "summarise":
+                    return scalar
+                return pd.Series(scalar, index=series.index)
 
             operator = implementation.operator
 
@@ -314,10 +339,15 @@ class PandasTableImpl(EagerTableImpl):
                 return value
             ordering = translate_ordering(self.backend, arrange)
 
-            def arranged_value(df):
+            def arranged_value(df, **kwargs):
                 original_index = df.index
                 sorted_df = self.backend.sort_df(df, ordering)
-                v = value(sorted_df)
+
+                # Original grouper can't be used for sorted dataframe
+                sorted_grouper = self.backend.df_grouper(sorted_df)
+                kwargs["grouper"] = sorted_grouper
+
+                v = value(sorted_df, **kwargs)
                 v_with_original_index = v.loc[original_index]
                 return v_with_original_index
 
@@ -431,13 +461,21 @@ class PandasTableImpl(EagerTableImpl):
             na_position=na_position,
         )
 
-    def grouped_df(self):
+    def grouped_df(self, df: pd.DataFrame = None):
+        if df is None:
+            df = self.df
+
         if self.grouped_by:
             grouping_cols_names = [
                 self.df_name_mapping[col.uuid] for col in self.grouped_by
             ]
-            return self.df.groupby(by=list(grouping_cols_names), dropna=False)
-        return self.df
+            return df.groupby(by=list(grouping_cols_names), dropna=False)
+        return df
+
+    def df_grouper(self, df: pd.DataFrame = None):
+        if self.grouped_by:
+            return self.grouped_df(df).grouper
+        return None
 
 
 def fast_pd_convert_dtypes(obj: pd._typing.NDFrameT, **kwargs) -> pd._typing.NDFrameT:
@@ -531,13 +569,9 @@ with PandasTableImpl.op(ops.StringJoin()) as op:
 with PandasTableImpl.op(ops.Count()) as op:
 
     @op.auto
-    def _count(x=None, *, _df):
-        if x is None:
-            # Get the length of df
-            return len(_df.index)
-        else:
-            # Count non null values
-            return x.count()
+    def _count(x: pd.Series):
+        # Count non null values
+        return x.count()
 
 
 #### Window Functions ####
@@ -552,6 +586,6 @@ with PandasTableImpl.op(ops.Shift()) as op:
 with PandasTableImpl.op(ops.RowNumber()) as op:
 
     @op.auto
-    def _row_number(*, _df):
-        n = len(_df.index)
-        return pd.Series(np.arange(1, n + 1), index=_df.index)
+    def _row_number(idx: pd.Series):
+        n = len(idx.index)
+        return pd.Series(np.arange(1, n + 1), index=idx.index)

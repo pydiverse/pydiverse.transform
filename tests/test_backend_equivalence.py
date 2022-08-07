@@ -573,7 +573,6 @@ class TestSummarise:
             >> group_by(t.col1, t.col2)
             >> summarise(mean_of_mean3=t.col3.mean().mean()),
             exception=ValueError,
-            may_throw=True,
         )
 
     @tables(["df3"])
@@ -794,6 +793,7 @@ class TestWindowFunction:
 
     @tables(["df3"])
     def test_arrange_argument(self, df3_x, df3_y):
+        # Grouped
         assert_result_equal(
             df3_x,
             df3_y,
@@ -809,6 +809,25 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col2)
+            >> mutate(x=f.row_number(arrange=[-λ.col4]))
+            >> full_sort()
+            >> select(λ.x),
+        )
+
+        # Ungrouped
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> mutate(x=λ.col4.shift(1, arrange=[-λ.col3]))
+            >> full_sort()
+            >> select(λ.x),
+        )
+
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
             >> mutate(x=f.row_number(arrange=[-λ.col4]))
             >> full_sort()
             >> select(λ.x),
@@ -951,7 +970,7 @@ class TestSliceHead:
             df3_y,
             lambda t: t
             >> mutate(x=t.col4 - (t.col1 * t.col2))
-            >> arrange(λ.x)
+            >> arrange(λ.x, *t)
             >> slice_head(4, offset=2),
         )
 

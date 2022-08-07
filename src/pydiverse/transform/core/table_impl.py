@@ -232,7 +232,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             super().__init__(backend.operator_registry)
 
         def _translate_literal(self, expr, **kwargs):
-            def literal_func(*args):
+            def literal_func(*args, **kwargs):
                 return expr
 
             if isinstance(expr, int):
@@ -324,17 +324,10 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                         f" supported by SQL backend."
                     )
             if OPType.AGGREGATE in ftypes:
-                if strict:
-                    raise ValueError(
-                        "Can't nest an aggregate function inside an aggregate function"
-                        f" ({operator.name})."
-                    )
-                else:
-                    # TODO: Replace with logger
-                    warnings.warn(
-                        f"Nesting an aggregate function inside an aggregate function is"
-                        f" not supported by SQL backend."
-                    )
+                raise ValueError(
+                    "Can't nest an aggregate function inside an aggregate function"
+                    f" ({operator.name})."
+                )
             return op_ftype
 
         if op_ftype == OPType.WINDOW:
