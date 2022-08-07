@@ -306,7 +306,11 @@ class PandasTableImpl(EagerTableImpl):
                     series = series.groupby(grouper)
 
                     if verb == "summarise":
+                        if variant := implementation.get_variant("aggregate"):
+                            return variant(series, *args, **kwargs)
                         return series.aggregate(bound_impl)
+                    if variant := implementation.get_variant("transform"):
+                        return variant(series, *args, **kwargs)
                     return series.transform(bound_impl)
 
                 # Ungrouped
@@ -539,12 +543,28 @@ with PandasTableImpl.op(ops.Mean()) as op:
     def _mean(x):
         return x.mean()
 
+    @op.auto(variant="transform")
+    def _mean(x):
+        return x.transform("mean")
+
+    @op.auto(variant="aggregate")
+    def _mean(x):
+        return x.aggregate("mean")
+
 
 with PandasTableImpl.op(ops.Min()) as op:
 
     @op.auto
     def _min(x):
         return x.min()
+
+    @op.auto(variant="transform")
+    def _min(x):
+        return x.transform("min")
+
+    @op.auto(variant="aggregate")
+    def _min(x):
+        return x.aggregate("min")
 
 
 with PandasTableImpl.op(ops.Max()) as op:
@@ -553,12 +573,28 @@ with PandasTableImpl.op(ops.Max()) as op:
     def _max(x):
         return x.max()
 
+    @op.auto(variant="transform")
+    def _max(x):
+        return x.transform("max")
+
+    @op.auto(variant="aggregate")
+    def _max(x):
+        return x.aggregate("max")
+
 
 with PandasTableImpl.op(ops.Sum()) as op:
 
     @op.auto
     def _sum(x):
         return x.sum()
+
+    @op.auto(variant="transform")
+    def _sum(x):
+        return x.transform("sum")
+
+    @op.auto(variant="aggregate")
+    def _sum(x):
+        return x.aggregate("sum")
 
 
 with PandasTableImpl.op(ops.StringJoin()) as op:
@@ -570,16 +606,22 @@ with PandasTableImpl.op(ops.StringJoin()) as op:
 
 with PandasTableImpl.op(ops.Count()) as op:
 
+    @op.auto(variant="aggregate")
     @op.auto
     def _count(x: pd.Series):
         # Count non null values
         return x.count()
+
+    @op.auto(variant="transform")
+    def _count(x):
+        return x.transform("count")
 
 
 #### Window Functions ####
 
 with PandasTableImpl.op(ops.Shift()) as op:
 
+    @op.auto(variant="transform")
     @op.auto
     def _shift(x: pd.Series, by, empty_value=None):
         return x.shift(by, fill_value=empty_value)
@@ -591,3 +633,7 @@ with PandasTableImpl.op(ops.RowNumber()) as op:
     def _row_number(idx: pd.Series):
         n = len(idx.index)
         return pd.Series(np.arange(1, n + 1), index=idx.index)
+
+    @op.auto(variant="transform")
+    def _row_number(idx: pd.Series):
+        return idx.cumcount() + 1
