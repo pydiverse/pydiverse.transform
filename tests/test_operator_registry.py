@@ -160,3 +160,21 @@ class TestOperatorRegistry:
         assert reg.get_implementation("op1", ("int", "int", "int"))() == 2
         assert reg.get_implementation("op1", ("int", "str", "str"))() == 3
         assert reg.get_implementation("op1", ("int", "str", "str")).rtype == "str"
+
+    def test_variant(self):
+        op1 = self.Op1()
+
+        reg = OperatorRegistry("TestRegistry")
+        reg.register_op(op1)
+
+        with pytest.raises(ValueError):
+            reg.add_implementation(op1, lambda: 2, "-> int", variant="VAR")
+
+        reg.add_implementation(op1, lambda: 1, "-> int")
+        reg.add_implementation(op1, lambda: 2, "-> int", variant="VAR")
+
+        assert reg.get_implementation("op1", tuple())() == 1
+        assert reg.get_implementation("op1", tuple()).get_variant("VAR")() == 2
+
+        with pytest.raises(ValueError):
+            reg.add_implementation(op1, lambda: 2, "-> int", variant="VAR")

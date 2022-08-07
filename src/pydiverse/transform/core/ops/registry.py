@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 import inspect
 import itertools
 import typing
+from functools import partial
 
 if typing.TYPE_CHECKING:
     from pydiverse.transform.core.ops import Operator, OperatorExtension
@@ -30,6 +32,7 @@ class OperatorImpl:
         self.operator = operator
         self.impl = impl
         self.signature = signature
+        self.variants: dict[str, typing.Callable] = {}
 
         self.__id = next(OperatorImpl.id)
 
@@ -73,6 +76,14 @@ class OperatorImpl:
             self.__id,
         )
 
+    def add_variant(self, name: str, impl: typing.Callable):
+        if name in self.variants:
+            raise ValueError(
+                f"Already added a variant with name '{name}'"
+                f" to operator {self.operator}."
+            )
+        self.variants[name] = impl
+
 
 @dataclasses.dataclass
 class TypedOperatorImpl:
@@ -95,12 +106,25 @@ class TypedOperatorImpl:
         )
 
     def __call__(self, *args, **kwargs):
-        _kwargs = {
+        return self.impl.impl(*args, **self.__clean_kwargs(kwargs))
+
+    def get_variant(self, name: str) -> typing.Callable | None:
+        variant = self.impl.variants.get(name)
+        if variant is None:
+            return None
+
+        @functools.wraps(variant)
+        def variant_wrapper(*args, **kwargs):
+            return variant(*args, **self.__clean_kwargs(kwargs))
+
+        return variant_wrapper
+
+    def __clean_kwargs(self, kwargs):
+        return {
             k: v
             for k, v in kwargs.items()
             if not k.startswith("_") or k in self.impl.internal_kwargs
         }
-        return self.impl.impl(*args, **_kwargs)
 
 
 class OperatorRegistry:
@@ -148,7 +172,7 @@ class OperatorRegistry:
         self.name = name
         self.super_registry = super_registry
         self.registered_ops = set()  # type: set[Operator]
-        self.implementations = dict()  # type: dict[str, OperationImplementationStore]
+        self.implementations = dict()  # type: dict[str, OperatorImplementationStore]
         self.check_super = dict()  # type: dict[str, bool]
 
     def register_op(self, operator: Operator, check_super=True):
@@ -186,7 +210,11 @@ class OperatorRegistry:
         return None
 
     def add_implementation(
-        self, operator: Operator, impl: typing.Callable, signature: str
+        self,
+        operator: Operator,
+        impl: typing.Callable,
+        signature: str,
+        variant: str | None = None,
     ):
         if operator not in self.registered_ops:
             raise ValueError(
@@ -198,7 +226,12 @@ class OperatorRegistry:
         operator.validate_signature(signature)
 
         implementation_store = self.implementations[operator.name]
-        implementation_store.add_implementation(OperatorImpl(operator, impl, signature))
+        op_impl = OperatorImpl(operator, impl, signature)
+
+        if variant:
+            implementation_store.add_variant(variant, op_impl)
+        else:
+            implementation_store.add_implementation(op_impl)
 
     def get_implementation(self, name, args_signature) -> TypedOperatorImpl:
         if name not in self.ALL_REGISTERED_OPS:
@@ -365,9 +398,28 @@ class OperatorImplementationStore:
         self.root = self.TrieNode("ROOT", None, [], False)
 
     def add_implementation(self, operator: OperatorImpl):
-        signature = operator.signature
-        node = self.root
+        node = self.get_node(operator.signature, create_missing=True)
+        if node.operator is not None:
+            raise ValueError(
+                f"Implementation for signature {operator.signature} already defined."
+            )
 
+        node.operator = operator
+        node.is_vararg |= operator.signature.is_vararg
+
+    def add_variant(self, name: str, operator: OperatorImpl):
+        node = self.get_node(operator.signature, create_missing=False)
+        if node is None or node.operator is None:
+            raise ValueError(
+                f"No implementation for signature {operator.signature} found."
+                " Make sure there is an exact match to add a variant."
+            )
+
+        assert node.operator.signature.rtype == operator.signature.rtype
+        node.operator.add_variant(name, operator.impl)
+
+    def get_node(self, signature: OperatorSignature, create_missing: bool = True):
+        node = self.root
         for dtype in signature.args:
             dtype = get_base_type(dtype)
             for child in node.children:
@@ -375,17 +427,14 @@ class OperatorImplementationStore:
                     node = child
                     break
             else:
-                new_node = self.TrieNode(dtype, None, [], False)
-                node.children.append(new_node)
-                node = new_node
+                if create_missing:
+                    new_node = self.TrieNode(dtype, None, [], False)
+                    node.children.append(new_node)
+                    node = new_node
+                else:
+                    return None
 
-        if node.operator is not None:
-            raise ValueError(
-                f"Implementation for signature {signature} already defined."
-            )
-
-        node.operator = operator
-        node.is_vararg |= operator.signature.is_vararg
+        return node
 
     def find_best_match(self, signature: tuple[str]) -> TypedOperatorImpl | None:
         matches = list(self._find_matches(signature))
@@ -474,26 +523,29 @@ class OperatorRegistrationContextManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def __call__(self, signature: str):
+    def __call__(self, signature: str, variant: str = None):
         if not isinstance(signature, str):
             raise TypeError(f"Signature must be of type str.")
 
         def decorator(func):
-            self.registry.add_implementation(self.operator, func, signature)
+            self.registry.add_implementation(self.operator, func, signature, variant)
             return func
 
         return decorator
 
-    def auto(self, func):
+    def auto(self, func=None, *, variant: str = None):
+        if func is None:
+            return partial(self.auto, variant=variant)
+
         if not self.operator.signatures:
             raise ValueError(f"Operator {self.operator} has not default signatures.")
 
         for sig in self.operator.signatures:
-            self.registry.add_implementation(self.operator, func, sig)
+            self.registry.add_implementation(self.operator, func, sig, variant)
 
         return func
 
-    def extension(self, extension: type[OperatorExtension]):
+    def extension(self, extension: type[OperatorExtension], variant: str = None):
         if extension.operator != type(self.operator):
             raise ValueError(
                 f"Operator extension for '{extension.operator.__name__}' can't "
@@ -502,7 +554,7 @@ class OperatorRegistrationContextManager:
 
         def decorator(func):
             for sig in extension.signatures:
-                self.registry.add_implementation(self.operator, func, sig)
+                self.registry.add_implementation(self.operator, func, sig, variant)
             return func
 
         return decorator
