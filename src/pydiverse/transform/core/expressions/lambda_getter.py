@@ -10,6 +10,10 @@ class LambdaColumnGetter:
     """
 
     def __getattr__(self, item):
+        if item.startswith("__"):
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{item}'"
+            )
         return SymbolicExpression(LambdaColumn(item))
 
     def __getitem__(self, item):
