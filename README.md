@@ -11,8 +11,8 @@ To install the package locally in development mode, you first have to install
 After that, install pydiverse transform like this:
 
 ```bash
-git clone https://github.com/Quantco/pdtransform.git
-cd pdtransform
+git clone https://github.com/pydiverse/pydiverse.transform.git
+cd pydiverse.transform
 
 # Create the environment, activate it and install the pre-commit hooks
 poetry install
