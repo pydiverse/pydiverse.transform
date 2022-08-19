@@ -34,7 +34,7 @@ copyright = f"{datetime.date.today().year}, QuantCo, Inc"
 author = "QuantCo, Inc."
 
 extensions = [
-    "numpydoc",
+    # "numpydoc",
     "sphinx.ext.linkcode",
     "sphinxcontrib.apidoc",
 ]
