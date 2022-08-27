@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 from collections import ChainMap
-from typing import Iterable
+from typing import Dict, Iterable
 
 from .column import Column, LambdaColumn, generate_col_uuid
 from .dispatchers import builtin_verb
@@ -172,6 +172,45 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     new_tbl.preverb_hook("select", *args)
     new_tbl.selects = ordered_set(selects)
     new_tbl.select(*args)
+    return new_tbl
+
+from typing import Dict, Iterable
+
+
+@builtin_verb()
+def rename(tbl: AbstractTableImpl, dct: dict[str, str]):
+    # Authors: [Ostap, Kevin, Connor]
+
+    # dct {old_col_name: new_col_name}
+
+    new_tbl = tbl.copy()
+
+    # Error handling
+
+    if set(dct.keys()) - set(new_tbl.selects):
+        raise KeyError(f"Columns {set(dct.keys()) - set(new_tbl.selects)} not found.")
+
+    if set(dct.values()) & set(new_tbl.selects):
+        raise ValueError(
+            f"Column names {set(dct.values()) & set(new_tbl.selects)} already in use."
+        )
+
+    if len(dct) - len(set(dct.values())):
+        return ValueError(f"Cannot map multiple columns to the same name")
+
+    new_tbl.selects = ordered_set(
+        [dct[old_col] if old_col in dct else old_col for old_col in new_tbl.selects]
+    )
+
+    # DEAL W NAMED_COLS
+    # maps from name to col.uuid
+
+    for old_col, new_col in dct.items():
+        #   determine corresponding uuid
+        uuid = new_tbl.named_cols.fwd[old_col]
+        #   using bwd, set the new name to that uuid
+        new_tbl.named_cols.bwd[uuid] = new_col
+
     return new_tbl
 
 
