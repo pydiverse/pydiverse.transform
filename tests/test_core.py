@@ -20,6 +20,7 @@ from pydiverse.transform.core.verbs import (
     filter,
     join,
     mutate,
+    rename,
     select,
 )
 
@@ -220,6 +221,61 @@ class TestBuiltinVerbs:
 
         assert (tbl1 >> select(--λ.col1) >> collect()) == ["col1"]
         assert (tbl1 >> select(+-+-λ.col1) >> collect()) == ["col1"]
+
+    def test_rename(self, tbl2):
+        def assert_rename(name_map, expected):
+            assert (tbl2 >> rename(name_map) >> collect()) == expected
+
+        assert_rename({}, ["col1", "col2", "col3"])
+        assert_rename({"col1": "col1"}, ["col1", "col2", "col3"])
+
+        assert_rename({"col1": "1st col"}, ["1st col", "col2", "col3"])
+        assert_rename({"col1": "A", "col2": "B", "col3": "C"}, ["A", "B", "C"])
+
+        # Order of name_map shouldn't matter
+        assert_rename({"col3": "C", "col2": "B", "col1": "A"}, ["A", "B", "C"])
+
+        # Swap names
+        assert_rename({"col1": "col2", "col2": "col1"}, ["col2", "col1", "col3"])
+
+        # Rename + Select
+        assert tbl2 >> select(λ.col1) >> rename(
+            {"col1": "A", "col2": "col1"}
+        ) >> collect() == ["A"]
+
+        assert tbl2 >> select(-λ.col1) >> rename(
+            {"col1": "A", "col2": "col1", "col3": "col2"}
+        ) >> select(*tbl2) >> collect() == ["A", "col1", "col2"]
+
+        assert tbl2 >> rename({"col1": "col2", "col2": "col1"}) >> select(
+            tbl2.col1, tbl2.col2
+        ) >> collect() == ["col2", "col1"]
+
+        # Key and value must be strings
+        with pytest.raises(TypeError):
+            tbl2 >> rename({1: "name"})
+        with pytest.raises(TypeError):
+            tbl2 >> rename({"col1": 1})
+
+        # Try to rename cols that don't exist
+        with pytest.raises(KeyError):
+            tbl2 >> rename({"NONE": "SOMETHING"})
+        with pytest.raises(KeyError):
+            tbl2 >> rename({"name": "name"})
+
+        # Map multiple columns to the same name
+        with pytest.raises(ValueError):
+            tbl2 >> rename({"col1": "A", "col2": "A"})
+        with pytest.raises(ValueError):
+            tbl2 >> rename({"col1": "A"}) >> rename({"col2": "A"})
+
+        # Rename column to one that already exists
+        with pytest.raises(ValueError):
+            tbl2 >> rename({"col1": "col2"})
+        with pytest.raises(ValueError):
+            tbl2 >> rename({"col1": "A"}) >> rename({"col2": "A"})
+        with pytest.raises(ValueError):
+            tbl2 >> mutate(A=λ.col1) >> select(-λ.A) >> rename({"col1": "A"})
 
     def test_mutate(self, tbl1, tbl2):
         assert (tbl1 >> mutate() >> collect()) == ["col1", "col2"]

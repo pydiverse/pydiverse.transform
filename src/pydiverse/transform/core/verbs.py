@@ -17,6 +17,7 @@ __all__ = [
     "build_query",
     "show_query",
     "select",
+    "rename",
     "mutate",
     "join",
     "left_join",
@@ -174,42 +175,46 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     new_tbl.select(*args)
     return new_tbl
 
-from typing import Dict, Iterable
-
 
 @builtin_verb()
-def rename(tbl: AbstractTableImpl, dct: dict[str, str]):
-    # Authors: [Ostap, Kevin, Connor]
+def rename(tbl: AbstractTableImpl, name_map: dict[str, str]):
+    # Type check
+    for k, v in name_map.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise TypeError(
+                f"Key and Value of `name_map` must both be strings: ({k!r}, {v!r})"
+            )
 
-    # dct {old_col_name: new_col_name}
+    # Reference col that doesn't exist
+    if missing_cols := name_map.keys() - tbl.named_cols.fwd.keys():
+        raise KeyError(f"Table has no columns named: " + ", ".join(missing_cols))
 
-    new_tbl = tbl.copy()
-
-    # Error handling
-
-    if set(dct.keys()) - set(new_tbl.selects):
-        raise KeyError(f"Columns {set(dct.keys()) - set(new_tbl.selects)} not found.")
-
-    if set(dct.values()) & set(new_tbl.selects):
+    # Can't rename two cols to the same name
+    _seen = set()
+    if duplicate_names := {
+        name for name in name_map.values() if name in _seen or _seen.add(name)
+    }:
         raise ValueError(
-            f"Column names {set(dct.values()) & set(new_tbl.selects)} already in use."
+            "Can't rename multiple columns to the same name: "
+            + ", ".join(duplicate_names)
         )
 
-    if len(dct) - len(set(dct.values())):
-        return ValueError(f"Cannot map multiple columns to the same name")
+    # Can't rename a column to one that already exists
+    unmodified_cols = tbl.named_cols.fwd.keys() - name_map.keys()
+    if duplicate_names := unmodified_cols & set(name_map.values()):
+        raise ValueError(
+            "Table already contains columns named: " + ", ".join(duplicate_names)
+        )
 
-    new_tbl.selects = ordered_set(
-        [dct[old_col] if old_col in dct else old_col for old_col in new_tbl.selects]
-    )
+    # Rename
+    new_tbl = tbl.copy()
+    new_tbl.selects = ordered_set(name_map.get(name, name) for name in new_tbl.selects)
 
-    # DEAL W NAMED_COLS
-    # maps from name to col.uuid
-
-    for old_col, new_col in dct.items():
-        #   determine corresponding uuid
-        uuid = new_tbl.named_cols.fwd[old_col]
-        #   using bwd, set the new name to that uuid
-        new_tbl.named_cols.bwd[uuid] = new_col
+    uuid_name_map = {new_tbl.named_cols.fwd[old]: new for old, new in name_map.items()}
+    for uuid in uuid_name_map:
+        del new_tbl.named_cols.bwd[uuid]
+    for uuid, name in uuid_name_map.items():
+        new_tbl.named_cols.bwd[uuid] = name
 
     return new_tbl
 
