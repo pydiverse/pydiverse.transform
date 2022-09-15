@@ -7,7 +7,8 @@ from collections import defaultdict
 import pandas as pd
 import pytest
 import sqlalchemy
-#from google.oauth2 import service_account
+
+# from google.oauth2 import service_account
 from pandas.testing import assert_frame_equal
 
 import pydiverse.transform.core.dispatchers
@@ -126,7 +127,7 @@ def postgresql_impls():
 backend_impls = {
     "pandas": pandas_impls(),
     "sqlite": sqlite_impls(),
-    # "mssql": mssql_impls,
+    # "mssql": mssql_impls(),
     "postgres": postgresql_impls(),
     # "bigquery": bigquery_impls(),
 }
