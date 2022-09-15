@@ -1,6 +1,6 @@
 version: "3.9"
 services:
-  db:
+  postgres:
     image: postgres
     environment:
       POSTGRES_USER: sa
@@ -11,6 +11,6 @@ services:
     image: mcr.microsoft.com/mssql/server:2019-latest
     environment:
       ACCEPT_EULA: Y
-      SA_PASSSWORD: PidyQuant27
+      SA_PASSWORD: PidyQuant27
     ports:
       - 1433:1433
