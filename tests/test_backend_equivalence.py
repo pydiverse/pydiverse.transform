@@ -7,7 +7,7 @@ from collections import defaultdict
 import pandas as pd
 import pytest
 import sqlalchemy
-from google.oauth2 import service_account
+#from google.oauth2 import service_account
 from pandas.testing import assert_frame_equal
 
 import pydiverse.transform.core.dispatchers
@@ -111,15 +111,15 @@ def postgresql_impls():
     return sql_conn_to_impls(local_conn)
 
 
-def bigquery_impls():
-    dataset = "pdtransform_test"
-    project_id = "qc-foosball-analytics-dev"
-    auth_path = "bq_key.json"
-    credentials = service_account.Credentials.from_service_account_file(auth_path)
-    local_conn = (  # ?DataSetId={dataset}&ProjectId={project_id}&InitiateOAuth=GETANDREFRESH&OAuthSettingsLocation={auth_path}"
-        f"bigquery://{project_id}"
-    )
-    return sql_conn_to_impls(local_conn, project_id=project_id, dataset=dataset)
+# def bigquery_impls():
+#     dataset = "dataset_test"
+#     project_id = "project-id"
+#     auth_path = "bq_key.json"
+#     credentials = service_account.Credentials.from_service_account_file(auth_path)
+#     local_conn = (  # ?DataSetId={dataset}&ProjectId={project_id}&InitiateOAuth=GETANDREFRESH&OAuthSettingsLocation={auth_path}"
+#         f"bigquery://{project_id}"
+#     )
+#     return sql_conn_to_impls(local_conn, project_id=project_id, dataset=dataset)
 
 
 backend_impls = {
@@ -127,7 +127,7 @@ backend_impls = {
     "sqlite": sqlite_impls(),
     # "mssql": mssql_impls,
     "postgres": postgresql_impls(),
-    "bigquery": bigquery_impls(),
+    # "bigquery": bigquery_impls(),
 }
 
 
