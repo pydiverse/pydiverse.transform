@@ -5,9 +5,10 @@ description = "Pipe based dataframe manipulation library that can also transform
 authors = [
   "QuantCo, Inc.",
   "Nicolas Camenisch <garnele007@gmail.com>",
+  "Martin Trautmann <windiana@users.sf.net>",
 ]
 license = "BSD-3-Clause"
-readme = "README.md"
+readme = "docs/package/README.md"
 packages = [
 	{ include = "pydiverse", from = "src" }
 ]
