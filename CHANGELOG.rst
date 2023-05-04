@@ -7,7 +7,10 @@
 Changelog
 =========
 
+0.1.1 (2023-05-04)
+------------------
+- added support for pandas >= 2.0.0
+
 0.1.0 (2022-09-01)
 ------------------
-
-Initial release.
+- Initial release.

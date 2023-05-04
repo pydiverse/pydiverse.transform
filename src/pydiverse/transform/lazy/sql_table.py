@@ -348,16 +348,22 @@ class SQLTableImpl(LazyTableImpl):
     def collect(self):
         select = self.build_select()
         with self.engine.connect() as conn:
-            # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
-            # Taken from siuba
-            from pandas.io import sql as _pd_sql
+            try:
+                # TODO: check for which pandas versions this is needed:
+                # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
+                # Taken from siuba
+                from pandas.io import sql as _pd_sql
 
-            class _FixedSqlDatabase(_pd_sql.SQLDatabase):
-                def execute(self, *args, **kwargs):
-                    return self.connectable.execute(*args, **kwargs)
+                class _FixedSqlDatabase(_pd_sql.SQLDatabase):
+                    def execute(self, *args, **kwargs):
+                        return self.connectable.execute(*args, **kwargs)
 
-            sql_db = _FixedSqlDatabase(conn)
-            result = sql_db.read_sql(select).convert_dtypes()
+                sql_db = _FixedSqlDatabase(conn)
+                result = sql_db.read_sql(select).convert_dtypes()
+            except AttributeError:
+                import pandas as pd
+
+                result = pd.read_sql_query(select, con=conn)
 
         # Add metadata
         result.attrs["name"] = self.name
