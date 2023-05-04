@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import functools
 from collections import ChainMap
-from typing import Dict, Iterable
+from typing import Dict
+from collections.abc import Iterable
 
 from .column import Column, LambdaColumn, generate_col_uuid
 from .dispatchers import builtin_verb

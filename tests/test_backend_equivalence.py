@@ -7,6 +7,8 @@ from collections import defaultdict
 import pandas as pd
 import pytest
 import sqlalchemy
+
+# from google.oauth2 import service_account
 from pandas.testing import assert_frame_equal
 
 import pydiverse.transform.core.dispatchers
@@ -73,26 +75,72 @@ def pandas_impls():
     return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
 
 
-def sql_impls():
-    engine = sqlalchemy.create_engine("sqlite:///:memory:")
+def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
+    engine = sqlalchemy.create_engine(conn)
     impls = {}
+    print("THIS IS VERY EXPENSIVE")
     for name, df in dataframes.items():
-        df.to_sql(name, engine, index=False, if_exists="replace")
-        impls[name] = SQLTableImpl(engine, name)
+        if engine.dialect.name == "bigquery":
+            if not (project_id and dataset):
+                raise ValueError(
+                    "Project Id and dataset names are required for bigquery"
+                )
+            # name = f"{dataset}.{name}"
+            impls[name] = SQLTableImpl(engine, f"{dataset}.{name}")
+        else:
+            df.to_sql(name, engine, index=False, if_exists="replace")
+            impls[name] = SQLTableImpl(engine, name)
     return impls
 
 
-impls = {"pandas": pandas_impls, "sql_sqlite": sql_impls}
+def sqlite_impls():
+    return sql_conn_to_impls("sqlite:///:memory:")
+
+
+def mssql_impls():
+    user = "sa"
+    password = "PidyQuant27"
+    localhost = "127.0.0.1"
+    db_name = "master"
+    local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+    return sql_conn_to_impls(local_conn)
+
+
+def postgresql_impls():
+    user = "sa"
+    password = "Pydiverse23"
+    local_conn = f"postgresql://{user}:{password}@localhost:5432/"
+    return sql_conn_to_impls(local_conn)
+
+
+# def bigquery_impls():
+#     dataset = "dataset_test"
+#     project_id = "project-id"
+#     auth_path = "bq_key.json"
+#     credentials = service_account.Credentials.from_service_account_file(auth_path)
+#     local_conn = (  # ?DataSetId={dataset}&ProjectId={project_id}&InitiateOAuth=GETANDREFRESH&OAuthSettingsLocation={auth_path}"
+#         f"bigquery://{project_id}"
+#     )
+#     return sql_conn_to_impls(local_conn, project_id=project_id, dataset=dataset)
+
+
+backend_impls = {
+    "pandas": pandas_impls(),
+    "sqlite": sqlite_impls(),
+    # "mssql": mssql_impls(),
+    "postgres": postgresql_impls(),
+    # "bigquery": bigquery_impls(),
+}
 
 
 def tables(names: list[str]):
     param_names = ",".join([f"{name}_x,{name}_y" for name in names])
 
     tables = defaultdict(lambda: [])
-    impl_names = impls.keys()
-    for _, factory in impls.items():
-        for df_name, impl in factory().items():
-            tables[df_name].append(Table(impl))
+    backend_names = backend_impls.keys()
+    for _, impls in backend_impls.items():
+        for table_name, impl in impls.items():
+            tables[table_name].append(Table(impl))
 
     param_combinations = (
         (zip(*itertools.combinations(tables[name], 2))) for name in names
@@ -100,7 +148,7 @@ def tables(names: list[str]):
     param_combinations = itertools.chain(*param_combinations)
     param_combinations = list(zip(*param_combinations))
 
-    names_combinations = list(itertools.combinations(impl_names, 2))
+    names_combinations = list(itertools.combinations(backend_names, 2))
 
     params = [
         pytest.param(*p, id=f"{id[0]} {id[1]}")
@@ -110,8 +158,9 @@ def tables(names: list[str]):
     return pytest.mark.parametrize(param_names, params)
 
 
+# TODO: when should we still consider the order when comparing?
 def assert_result_equal(
-    x, y, pipe_factory, *, exception=None, may_throw=False, **kwargs
+    x, y, pipe_factory, *, exception=None, check_order=False, may_throw=False, **kwargs
 ):
     if not isinstance(x, (list, tuple)):
         x = (x,)
@@ -129,6 +178,14 @@ def assert_result_equal(
             query_y = pipe_factory(*y)
             dfx = (query_x >> collect()).reset_index(drop=True)
             dfy = (query_y >> collect()).reset_index(drop=True)
+
+            if not check_order:
+                dfx.sort_values(
+                    by=dfx.columns.tolist(), inplace=True, ignore_index=True
+                )
+                dfy.sort_values(
+                    by=dfy.columns.tolist(), inplace=True, ignore_index=True
+                )
         except Exception as e:
             if may_throw:
                 if exception is not None:
@@ -909,37 +966,73 @@ class TestWindowFunction:
 class TestSliceHead:
     @tables(["df3"])
     def test_simple(self, df3_x, df3_y):
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1))
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(10))
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(100))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(1))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(10))
+        assert_result_equal(df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(100))
 
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1, offset=8))
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(10, offset=8))
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(100, offset=8))
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(1, offset=8)
+        )
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(10, offset=8)
+        )
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(100, offset=8)
+        )
 
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1, offset=100))
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(10, offset=100))
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(100, offset=100))
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(1, offset=100)
+        )
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(10, offset=100)
+        )
+        assert_result_equal(
+            df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(100, offset=100)
+        )
 
     @tables(["df3"])
     def test_chained(self, df3_x, df3_y):
-        assert_result_equal(df3_x, df3_y, lambda t: t >> slice_head(1) >> slice_head(1))
         assert_result_equal(
-            df3_x, df3_y, lambda t: t >> slice_head(10) >> slice_head(5)
+            df3_x,
+            df3_y,
+            lambda t: t >> arrange(*t) >> slice_head(1) >> arrange(*t) >> slice_head(1),
         )
         assert_result_equal(
-            df3_x, df3_y, lambda t: t >> slice_head(100) >> slice_head(5)
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> arrange(*t)
+            >> slice_head(10)
+            >> arrange(*t)
+            >> slice_head(5),
+        )
+        assert_result_equal(
+            df3_x,
+            df3_y,
+            lambda t: t
+            >> arrange(*t)
+            >> slice_head(100)
+            >> arrange(*t)
+            >> slice_head(5),
         )
 
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> slice_head(2, offset=5) >> slice_head(2, offset=1),
+            lambda t: t
+            >> arrange(*t)
+            >> slice_head(2, offset=5)
+            >> arrange(*t)
+            >> slice_head(2, offset=1),
         )
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> slice_head(10, offset=8) >> slice_head(10, offset=1),
+            lambda t: t
+            >> arrange(*t)
+            >> slice_head(10, offset=8)
+            >> arrange(*t)
+            >> slice_head(10, offset=1),
         )
 
     @tables(["df3"])
@@ -947,7 +1040,11 @@ class TestSliceHead:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> select() >> slice_head(4, offset=2) >> select(*t),
+            lambda t: t
+            >> select()
+            >> arrange(*t)
+            >> slice_head(4, offset=2)
+            >> select(*t),
         )
 
     @tables(["df3"])
@@ -957,6 +1054,7 @@ class TestSliceHead:
             df3_y,
             lambda t: t
             >> mutate(a=λ.col1 * 2)
+            >> arrange(*t)
             >> slice_head(4, offset=2)
             >> mutate(b=λ.col2 + λ.a),
         )
@@ -968,6 +1066,7 @@ class TestSliceHead:
             (df1_y, df2_y),
             lambda t, u: t
             >> full_sort()
+            >> arrange(*t)
             >> slice_head(3)
             >> left_join(u, t.col1 == u.col1)
             >> full_sort(),
@@ -977,7 +1076,7 @@ class TestSliceHead:
             (df1_x, df2_x),
             (df1_y, df2_y),
             lambda t, u: t
-            >> left_join(u >> slice_head(2, offset=1), t.col1 == u.col1)
+            >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1)
             >> full_sort(),
             exception=ValueError,
             may_throw=True,
@@ -988,13 +1087,19 @@ class TestSliceHead:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> filter(t.col4 % 2 == 0) >> slice_head(4, offset=2),
+            lambda t: t
+            >> filter(t.col4 % 2 == 0)
+            >> arrange(*t)
+            >> slice_head(4, offset=2),
         )
 
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> slice_head(4, offset=2) >> filter(t.col1 == 1),
+            lambda t: t
+            >> arrange(*t)
+            >> slice_head(4, offset=2)
+            >> filter(t.col1 == 1),
         )
 
         assert_result_equal(
@@ -1002,6 +1107,7 @@ class TestSliceHead:
             df3_y,
             lambda t: t
             >> filter(t.col4 % 2 == 0)
+            >> arrange(*t)
             >> slice_head(4, offset=2)
             >> filter(t.col1 == 1),
         )
@@ -1022,6 +1128,7 @@ class TestSliceHead:
             df3_y,
             lambda t: t
             >> mutate(x=(t.col1 * t.col2))
+            >> arrange(*t)
             >> slice_head(4)
             >> arrange(-λ.x, λ.col5),
         )
@@ -1031,14 +1138,18 @@ class TestSliceHead:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> slice_head(1) >> group_by(λ.col1) >> mutate(x=f.count()),
+            lambda t: t
+            >> arrange(*t)
+            >> slice_head(1)
+            >> group_by(λ.col1)
+            >> mutate(x=f.count()),
         )
 
         assert_result_equal(
             df3_x,
             df3_y,
             lambda t: t
-            >> arrange(λ.col1)
+            >> arrange(λ.col1, *t)
             >> slice_head(6, offset=1)
             >> group_by(λ.col1)
             >> select()
@@ -1050,7 +1161,7 @@ class TestSliceHead:
             df3_y,
             lambda t: t
             >> mutate(key=λ.col4 % (λ.col3 + 1))
-            >> arrange(λ.key)
+            >> arrange(λ.key, *t)
             >> slice_head(4)
             >> group_by(λ.key)
             >> summarise(x=f.count()),
@@ -1061,11 +1172,14 @@ class TestSliceHead:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> slice_head(4) >> summarise(count=f.count()),
+            lambda t: t >> arrange(*t) >> slice_head(4) >> summarise(count=f.count()),
         )
 
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> slice_head(4) >> summarise(c3_mean=λ.col3.mean()),
+            lambda t: t
+            >> arrange(*t)
+            >> slice_head(4)
+            >> summarise(c3_mean=λ.col3.mean()),
         )

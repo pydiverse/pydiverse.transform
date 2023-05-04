@@ -4,7 +4,8 @@ import copy
 import dataclasses
 import uuid
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Generic, Iterable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
+from collections.abc import Iterable
 
 from pydiverse.transform.core.ops.registry import (
     OperatorRegistrationContextManager,
