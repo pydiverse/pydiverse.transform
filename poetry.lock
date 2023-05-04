@@ -14,9 +14,6 @@ category = "main"
 optional = true
 python-versions = ">=3.7"
 
-[package.dependencies]
-pytz = {version = ">=2015.7", markers = "python_version < \"3.9\""}
-
 [[package]]
 name = "black"
 version = "23.3.0"
@@ -731,8 +728,8 @@ docs = ["Sphinx", "sphinx-rtd-theme", "sphinxcontrib-apidoc"]
 
 [metadata]
 lock-version = "1.1"
-python-versions = ">=3.8"
-content-hash = "8e3f87c7ad2d35d7c78e0d01b2ab347381730b5a99b3b981b9a146e8d8fc7da3"
+python-versions = ">=3.9"
+content-hash = "8a28c72e0b9082316c430460cbfa0618d3ef61af90940c6bed9f867e52deb7a3"
 
 [metadata.files]
 alabaster = [
