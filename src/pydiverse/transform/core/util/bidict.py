@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from typing import (
     Generic,
+    TypeVar,
+)
+from collections.abc import (
     ItemsView,
     Iterable,
     KeysView,
     Mapping,
     MutableMapping,
-    TypeVar,
     ValuesView,
 )
 

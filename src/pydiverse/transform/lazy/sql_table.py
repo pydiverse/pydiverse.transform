@@ -466,7 +466,7 @@ class SQLTableImpl(LazyTableImpl):
         LazyTableImpl.ExpressionCompiler[
             "SQLTableImpl",
             TypedValue[
-                Callable[[Dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]
+                Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]
             ],
         ]
     ):
