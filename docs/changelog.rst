@@ -7,7 +7,14 @@
 Changelog
 =========
 
-1.0.0 (2022-MM-DD)
+0.1.1 (2023-05-04)
 ------------------
+- development of pydiverse.transform is currently slow since pydiverse.pipedag
+   adoption is currently prioritized: this will help to limit scope that then can
+   be provided comprehensively with high quality
+- added support for pandas >= 2.0.0
+- added support for sqlalchemy >= 2.0.0
 
-Initial release.
+0.1.0 (2022-09-01)
+------------------
+- Initial release.
