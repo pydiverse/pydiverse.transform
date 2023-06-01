@@ -7,6 +7,10 @@
 Changelog
 =========
 
+0.1.2 (2023-06-01)
+------------------
+- relax python version requirement (>=3.9, <4).
+
 0.1.1 (2023-05-04)
 ------------------
 - development of pydiverse.transform is currently slow since pydiverse.pipedag
