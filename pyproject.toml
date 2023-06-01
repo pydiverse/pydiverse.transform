@@ -21,30 +21,27 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.12"
+python = ">=3.9"
 numpy = ">=1.23.1"
 pandas = ">=1.4.3"
 SQLAlchemy = ">=1.4.27"
 
-Sphinx = { version = "^5.1.1", optional = true }
-sphinx-rtd-theme = { version = "^1.0.0", optional = true }
-sphinxcontrib-apidoc = { version="^0.3.0", optional = true }
-# bigquery currently does not support sqlalchemy 2.0
-#sqlalchemy-bigquery = { version=">=1.4.4", optional = true }
-#google-auth = { version=">=2.9.1", optional = true }
-
-[tool.poetry.extras]
-docs = ["Sphinx", "sphinx-rtd-theme", "sphinxcontrib-apidoc"]
-#bigquery = ["sqlalchemy-bigquery", "google-auth"]
-
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = ">=7.1.2"
 pytest-xdist = ">=2.5.0"
 psycopg2 = ">=2.9.3"
-black = "^23.3.0"
+black = "23.3.0"
 isort = "^5.10.1"
-pre-commit = ">=2.20.0"
-pyodbc = ">=4.0.34"
+pre-commit = "^3.3.0"
+pyodbc = "^4.0.34"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+Sphinx = "^5.1.1"
+sphinx-rtd-theme = "^1.0.0"
+sphinxcontrib-apidoc = "^0.3.0"
 
 [tool.black]
 exclude = '''
@@ -56,8 +53,6 @@ exclude = '''
   | dist
 )/
 '''
-
-preview = true
 
 [tool.isort]
 multi_line_output = 3
