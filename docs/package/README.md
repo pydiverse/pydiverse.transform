@@ -1,6 +1,6 @@
 # pydiverse.transform
 
-[![CI](https://github.com/pydiverse/pydiverse.transform/actions/workflows/ci.yml/badge.svg)](https://github.com/pydiverse/pydiverse.transform/actions/workflows/ci.yml)
+[![CI](https://github.com/pydiverse/pydiverse.transform/actions/workflows/tests.yml/badge.svg)](https://github.com/pydiverse/pydiverse.transform/actions/workflows/tests.yml)
 
 Pipe based dataframe manipulation library that can also transform data on SQL databases
 
