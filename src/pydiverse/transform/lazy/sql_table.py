@@ -247,11 +247,8 @@ class SQLTableImpl(LazyTableImpl):
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
             s.append(sql_col.label(name))
-        try:
-            select = select.with_only_columns(s)
-        except sqlalchemy.exc.ArgumentError:
-            # since sqlalchemy 2.0.0
-            select = select.with_only_columns(*s)
+
+        select = select.with_only_columns(*s)
 
         # ORDER BY
         if self.order_bys:
