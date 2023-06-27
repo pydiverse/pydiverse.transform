@@ -4,7 +4,7 @@ import functools
 import itertools
 import operator
 import warnings
-from typing import Callable
+from typing import Callable, Any
 
 import numpy as np
 import pandas as pd
@@ -57,15 +57,14 @@ class PandasTableImpl(EagerTableImpl):
 
         super().__init__(name=name, columns=columns)
 
-    def _convert_dtype(self, dtype: np.dtype) -> str:
-        type = dtype.type
-        if issubclass(type, np.integer):
+    def _convert_dtype(self, dtype: Any) -> str:
+        if pd.api.types.is_integer_dtype(dtype):
             return "int"
-        if issubclass(type, np.floating):
+        if pd.api.types.is_float_dtype(dtype):
             return "float"
-        if issubclass(type, np.bool_):
+        if pd.api.types.is_bool_dtype(dtype):
             return "bool"
-        if issubclass(type, str):
+        if pd.api.types.is_string_dtype(dtype):
             return "str"
 
         raise NotImplementedError(f"Invalid type {dtype}.")
