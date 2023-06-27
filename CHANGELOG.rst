@@ -7,6 +7,10 @@
 Changelog
 =========
 
+0.1.3 (2023-06-27)
+------------------
+- support pandas dataframes backed by pyarrow extension dtypes
+
 0.1.2 (2023-06-01)
 ------------------
 - relax python version requirement (>=3.9, <4).
