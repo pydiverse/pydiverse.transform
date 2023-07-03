@@ -4,7 +4,7 @@ import functools
 import itertools
 import operator
 import warnings
-from typing import Callable, Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -274,8 +274,8 @@ class PandasTableImpl(EagerTableImpl):
         def _translate_function(
             self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
-            def value(df, grouper=None, *kw):
-                args = [arg.value(df, grouper=grouper, *kw) for arg in op_args]
+            def value(df, *, grouper=None, **kw):
+                args = [arg.value(df, grouper=grouper, **kw) for arg in op_args]
                 kwargs = {
                     "_tbl": self.backend,
                     "_df": df,
@@ -403,8 +403,8 @@ class PandasTableImpl(EagerTableImpl):
 
             if operator.ftype == OPType.WINDOW and "arrange" in context_kwargs:
                 raise NotImplementedError(
-                    f"The 'arrange' argument for window functions currently is not"
-                    f" supported for aligned expressions."
+                    "The 'arrange' argument for window functions currently is not"
+                    " supported for aligned expressions."
                 )
 
             value = implementation(

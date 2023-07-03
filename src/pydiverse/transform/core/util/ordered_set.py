@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import TypeVar
 from collections.abc import Iterable, MutableSet
+from typing import TypeVar
 
 T = TypeVar("T")
 

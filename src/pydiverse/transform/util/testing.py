@@ -7,19 +7,19 @@ from pydiverse.transform.core.verbs import collect, show_query
 
 
 def assert_equal(left, right, check_dtype=False):
-    l = left >> collect() if isinstance(left, Table) else left
-    r = right >> collect() if isinstance(right, Table) else right
+    left_df = left >> collect() if isinstance(left, Table) else left
+    right_df = right >> collect() if isinstance(right, Table) else right
 
     try:
-        pd.testing.assert_frame_equal(l, r, check_dtype=check_dtype)
+        pd.testing.assert_frame_equal(left_df, right_df, check_dtype=check_dtype)
     except AssertionError as e:
         print("First dataframe:")
-        print(l)
+        print(left_df)
         if isinstance(left, Table):
             left >> show_query()
         print()
         print("Second dataframe:")
-        print(r)
+        print(right_df)
         if isinstance(right, Table):
             right >> show_query()
         raise e

@@ -4,8 +4,8 @@ import copy
 import dataclasses
 import uuid
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 from collections.abc import Iterable
+from typing import Any, Callable, Generic, TypeVar
 
 from pydiverse.transform.core.ops.registry import (
     OperatorRegistrationContextManager,
@@ -17,10 +17,6 @@ from .column import Column, LambdaColumn, LiteralColumn
 from .expressions.translator import DelegatingTranslator, Translator, TypedValue
 from .ops import Operator, OPType
 from .util import OrderingDescriptor
-
-if TYPE_CHECKING:
-    # noinspection PyUnresolvedReferences
-    from pydiverse.transform.core.expressions import SymbolicExpression
 
 
 class _TableImplMeta(type):
@@ -39,7 +35,7 @@ class _TableImplMeta(type):
             if hasattr(super(c, c), "operator_registry")
             else None
         )
-        setattr(c, "operator_registry", OperatorRegistry(name, super_reg))
+        c.operator_registry = OperatorRegistry(name, super_reg)
         return c
 
 
@@ -122,7 +118,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         if isinstance(key, str):
             if uuid := self.named_cols.fwd.get(key, None):
                 return self.cols[uuid].as_column(key, self)
-            # Must return AttributeError, else `hasattr` doesn't work on Table instances.
+            # Must return AttributeError, else `hasattr` doesn't work on Table instances
             raise AttributeError(f"Table '{self.name}' has not column named '{key}'.")
 
         if isinstance(key, Column):
@@ -321,8 +317,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 else:
                     # TODO: Replace with logger
                     warnings.warn(
-                        f"Nesting a window function inside an aggregate function is not"
-                        f" supported by SQL backend."
+                        "Nesting a window function inside an aggregate function is not"
+                        " supported by SQL backend."
                     )
             if OPType.AGGREGATE in ftypes:
                 raise ValueError(
@@ -340,8 +336,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                     )
                 else:
                     warnings.warn(
-                        f"Nesting a window function inside a window function is not"
-                        f" supported by SQL backend."
+                        "Nesting a window function inside a window function is not"
+                        " supported by SQL backend."
                     )
             return op_ftype
 
@@ -375,7 +371,7 @@ class ColumnMetaData:
 #### ARITHMETIC OPERATORS ######################################################
 
 
-from pydiverse.transform.core import ops
+from pydiverse.transform.core import ops  # noqa
 
 with AbstractTableImpl.op(ops.Add()) as op:
 

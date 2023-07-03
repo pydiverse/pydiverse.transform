@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .aggregate import *
 from .core import *
 from .logical import *

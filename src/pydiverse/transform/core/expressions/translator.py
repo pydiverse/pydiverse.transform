@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
-from collections.abc import Iterable
 
 from pydiverse.transform.core import column
 from pydiverse.transform.core.expressions import expressions

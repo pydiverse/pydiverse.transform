@@ -21,7 +21,7 @@ class OperatorImpl:
     `self.internal_kwargs` list.
     """
 
-    id = itertools.count()
+    id_ = itertools.count()
 
     def __init__(
         self,
@@ -34,7 +34,7 @@ class OperatorImpl:
         self.signature = signature
         self.variants: dict[str, typing.Callable] = {}
 
-        self.__id = next(OperatorImpl.id)
+        self.__id = next(OperatorImpl.id_)
 
         # Inspect impl signature to get internal kwargs
         self.internal_kwargs = []
@@ -318,9 +318,9 @@ class OperatorSignature:
         base_args_types = [get_base_type(arg) for arg in args]
         base_rtype = get_base_type(rtype)
 
-        for type in (*base_args_types, base_rtype):
-            if not type.isalnum():
-                raise ValueError(f"Invalid type '{type}'. Types must be alphanumeric.")
+        for type_ in (*base_args_types, base_rtype):
+            if not type_.isalnum():
+                raise ValueError(f"Invalid type '{type_}'. Types must be alphanumeric.")
 
         # Validate Template
         # Output template must also occur in signature
@@ -337,10 +337,10 @@ class OperatorSignature:
 
         for arg in args[:-1]:
             if arg.endswith("..."):
-                raise ValueError(f"Only last argument can be a vararg.")
+                raise ValueError("Only last argument can be a vararg.")
 
         if rtype.endswith("..."):
-            raise ValueError(f"Return value can't be a vararg.")
+            raise ValueError("Return value can't be a vararg.")
 
         return OperatorSignature(
             args=tuple(args),
@@ -530,7 +530,7 @@ class OperatorRegistrationContextManager:
 
     def __call__(self, signature: str, variant: str = None):
         if not isinstance(signature, str):
-            raise TypeError(f"Signature must be of type str.")
+            raise TypeError("Signature must be of type str.")
 
         def decorator(func):
             self.registry.add_implementation(self.operator, func, signature, variant)
@@ -551,7 +551,7 @@ class OperatorRegistrationContextManager:
         return func
 
     def extension(self, extension: type[OperatorExtension], variant: str = None):
-        if extension.operator != type(self.operator):
+        if extension.operator != type(self.operator):  # noqa: E721
             raise ValueError(
                 f"Operator extension for '{extension.operator.__name__}' can't "
                 f"be applied to operator of type '{type(self.operator).__name__}'."

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-import typing
 from collections import ChainMap
 
 from pydiverse.transform.core.ops import registry

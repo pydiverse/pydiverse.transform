@@ -113,23 +113,11 @@ def postgresql_impls():
     return sql_conn_to_impls(local_conn)
 
 
-# def bigquery_impls():
-#     dataset = "dataset_test"
-#     project_id = "project-id"
-#     auth_path = "bq_key.json"
-#     credentials = service_account.Credentials.from_service_account_file(auth_path)
-#     local_conn = (  # ?DataSetId={dataset}&ProjectId={project_id}&InitiateOAuth=GETANDREFRESH&OAuthSettingsLocation={auth_path}"
-#         f"bigquery://{project_id}"
-#     )
-#     return sql_conn_to_impls(local_conn, project_id=project_id, dataset=dataset)
-
-
 backend_impls = {
     "pandas": pandas_impls(),
     "sqlite": sqlite_impls(),
     # "mssql": mssql_impls(),
     "postgres": postgresql_impls(),
-    # "bigquery": bigquery_impls(),
 }
 
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from html import escape
 from typing import Generic, TypeVar
-from collections.abc import Iterable
 
 from pydiverse.transform.core import verbs
 from pydiverse.transform.core.column import Column, LambdaColumn

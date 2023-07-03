@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pydiverse.transform.core import functions
 from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.dispatchers import verb

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 from collections import ChainMap
-from typing import Dict
 from collections.abc import Iterable
 
 from .column import Column, LambdaColumn, generate_col_uuid
@@ -57,9 +56,9 @@ def check_lambdas_valid(tbl: AbstractTableImpl, *expressions):
     lambdas = []
     for expression in expressions:
         lambdas.extend(
-            l for l in iterate_over_expr(expression) if isinstance(l, LambdaColumn)
+            lc for lc in iterate_over_expr(expression) if isinstance(lc, LambdaColumn)
         )
-    missing_lambdas = {l for l in lambdas if l.name not in tbl.named_cols.fwd}
+    missing_lambdas = {lc for lc in lambdas if lc.name not in tbl.named_cols.fwd}
     if missing_lambdas:
         missing_lambdas_str = ", ".join(map(lambda x: str(x), missing_lambdas))
         raise ValueError(f"Invalid lambda column(s) {missing_lambdas_str}.")
@@ -188,7 +187,7 @@ def rename(tbl: AbstractTableImpl, name_map: dict[str, str]):
 
     # Reference col that doesn't exist
     if missing_cols := name_map.keys() - tbl.named_cols.fwd.keys():
-        raise KeyError(f"Table has no columns named: " + ", ".join(missing_cols))
+        raise KeyError("Table has no columns named: " + ", ".join(missing_cols))
 
     # Can't rename two cols to the same name
     _seen = set()
@@ -252,7 +251,7 @@ def join(
     validate_table_args(left, right)
 
     if left.grouped_by or right.grouped_by:
-        raise ValueError(f"Can't join grouped tables. You first have to ungroup them.")
+        raise ValueError("Can't join grouped tables. You first have to ungroup them.")
 
     # Check args only contains valid columns
     check_cols_available((left, right), cols_in_expression(on), "join")
@@ -356,7 +355,8 @@ def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add=False):
     check_cols_available(tbl, cols_in_expressions(args), "group_by")
     check_lambdas_valid(tbl, *args)
 
-    # WARNING: Depending on the SQL backend, you might only be allowed to reference columns
+    # WARNING: Depending on the SQL backend, you might
+    #          only be allowed to reference columns
     if not args:
         raise ValueError(
             "Expected columns to group by, but none were specified. To remove the"

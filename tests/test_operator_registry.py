@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import operator
-
 import pytest
 
 from pydiverse.transform.core.ops import Operator
 from pydiverse.transform.core.ops.registry import (
     OperatorRegistry,
     OperatorSignature,
-    TypedOperatorImpl,
 )
 
 

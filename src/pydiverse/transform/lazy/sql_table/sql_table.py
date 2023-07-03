@@ -5,8 +5,9 @@ import inspect
 import operator
 import uuid
 import warnings
+from collections.abc import Iterable
 from functools import reduce
-from typing import Callable, Dict
+from typing import Callable
 
 import sqlalchemy
 from sqlalchemy import sql
@@ -18,7 +19,6 @@ from pydiverse.transform.core.expressions.translator import TypedValue
 from pydiverse.transform.core.ops import OPType
 from pydiverse.transform.core.table_impl import ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
-
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 
 
@@ -134,8 +134,8 @@ class SQLTableImpl(LazyTableImpl):
     def _create_table(tbl, engine=None):
         """Return a sqlalchemy.Table
 
-        Arguments:
-            tbl: a sqlalchemy.Table or string of form 'table_name' or 'schema_name.table_name'.
+        :param tbl: a sqlalchemy.Table or string of form 'table_name'
+            or 'schema_name.table_name'.
         """
         if isinstance(tbl, sqlalchemy.sql.selectable.FromClause):
             return tbl
@@ -151,8 +151,8 @@ class SQLTableImpl(LazyTableImpl):
 
         # TODO: pybigquery uses schema to mean project_id, so we cannot use
         #     siuba's classic breakdown "{schema}.{table_name}". Basically
-        #     pybigquery uses "{schema=project_id}.{dataset_dot_table_name}" in its internal
-        #     logic. An important side effect is that bigquery errors for
+        #     pybigquery uses "{schema=project_id}.{dataset_dot_table_name}" in its
+        #     internal logic. An important side effect is that bigquery errors for
         #     `dataset`.`table`, but not `dataset.table`.
         if engine and engine.dialect.name == "bigquery":
             table_name = tbl
@@ -284,8 +284,8 @@ class SQLTableImpl(LazyTableImpl):
         # SELECT
         # Convert self.selects to SQLAlchemy Expressions
         s = []
-        for name, uuid in self.selected_cols():
-            sql_col = self.cols[uuid].compiled(self.sql_columns)
+        for name, uuid_ in self.selected_cols():
+            sql_col = self.cols[uuid_].compiled(self.sql_columns)
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
             s.append(sql_col.label(name))
@@ -357,10 +357,12 @@ class SQLTableImpl(LazyTableImpl):
                 (OPType.AGGREGATE, OPType.WINDOW), kwargs.values()
             )
 
-        # TODO: It would be nice if this could be done without having to select all columns.
-        #       As a potential challenge for the hackathon I propose a mean of even creating the subqueries lazyly.
-        #       This means that we could perform some kind of query optimization before submitting the actual query.
-        #       Eg: Instead of selecting all possible columns, only select those that actually get used.
+        # TODO: It would be nice if this could be done without having to select all
+        #       columns. As a potential challenge for the hackathon I propose a mean
+        #       of even creating the subqueries lazyly. This means that we could
+        #       perform some kind of query optimization before submitting the actual
+        #       query. Eg: Instead of selecting all possible columns, only select
+        #       those that actually get used.
         if requires_subquery:
             columns = {
                 name: self.cols[uuid].as_column(name, self)
@@ -379,7 +381,8 @@ class SQLTableImpl(LazyTableImpl):
             suffix = format(uuid.uuid1().int % 0x7FFFFFFF, "X")
             name = f"{self.name}_{suffix}"
 
-        # TODO: If the table has not been modified, a simple `.alias()` would produce nicer queries.
+        # TODO: If the table has not been modified, a simple `.alias()`
+        #       would produce nicer queries.
         subquery = self.build_select().subquery(name=name)
         # In some situations sqlalchemy fails to determine the datatype of a column.
         # To circumvent this, we can pass on the information we know.
@@ -692,7 +695,7 @@ from . import dialects  # noqa
 #### BACKEND SPECIFIC OPERATORS ################################################
 
 
-from sqlalchemy import func as sqlfunc
+from sqlalchemy import func as sqlfunc  # noqa: 402
 
 with SQLTableImpl.op(ops.FloorDiv(), check_super=False) as op:
 

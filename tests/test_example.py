@@ -1,9 +1,12 @@
-from pydiverse.transform import Table
-from pydiverse.transform.lazy import SQLTableImpl
-from pydiverse.transform.eager import PandasTableImpl
-from pydiverse.transform.core.verbs import *
+from __future__ import annotations
+
 import pandas as pd
 import sqlalchemy as sa
+
+from pydiverse.transform import Table
+from pydiverse.transform.core.verbs import *
+from pydiverse.transform.eager import PandasTableImpl
+from pydiverse.transform.lazy import SQLTableImpl
 
 
 def test_example():

@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from typing import (
-    Generic,
-    TypeVar,
-)
 from collections.abc import (
     ItemsView,
     Iterable,
@@ -11,6 +7,10 @@ from collections.abc import (
     Mapping,
     MutableMapping,
     ValuesView,
+)
+from typing import (
+    Generic,
+    TypeVar,
 )
 
 KT = TypeVar("KT")
@@ -36,8 +36,8 @@ class bidict(Generic[KT, VT]):
 
         if len(self.__fwd) != len(self.__bwd) != len(seq):
             raise ValueError(
-                f"Input sequence contains duplicate key value pairs. Mapping must be"
-                f" unique."
+                "Input sequence contains duplicate key value pairs. Mapping must be"
+                " unique."
             )
 
         self.fwd = _BidictInterface(
