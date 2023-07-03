@@ -99,7 +99,7 @@ def sqlite_impls():
 
 def mssql_impls():
     user = "sa"
-    password = "PidyQuant27"
+    password = "PydiQuant27"
     localhost = "127.0.0.1"
     db_name = "master"
     local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
@@ -109,7 +109,7 @@ def mssql_impls():
 def postgresql_impls():
     user = "sa"
     password = "Pydiverse23"
-    local_conn = f"postgresql://{user}:{password}@localhost:5432/"
+    local_conn = f"postgresql://{user}:{password}@localhost:6543/"
     return sql_conn_to_impls(local_conn)
 
 
