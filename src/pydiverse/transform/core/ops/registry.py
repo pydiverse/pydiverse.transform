@@ -207,7 +207,12 @@ class OperatorRegistry:
     def get_operator(self, name: str) -> Operator | None:
         if impl_store := self.implementations.get(name, None):
             return impl_store.operator
-        return None
+
+        # If operation hasn't been defined in this registry, go to the parent
+        # registry and check if it has been defined there.
+        if self.super_registry is None or not self.check_super.get(name, True):
+            raise ValueError(f"No implementation for operator '{name}' found")
+        return self.super_registry.get_operator(name)
 
     def add_implementation(
         self,

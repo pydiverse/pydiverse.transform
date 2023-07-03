@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import operator
 import uuid
 import warnings
@@ -18,7 +19,7 @@ from pydiverse.transform.core.ops import OPType
 from pydiverse.transform.core.table_impl import ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 
-from .lazy_table import JoinDescriptor, LazyTableImpl
+from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 
 
 class SQLTableImpl(LazyTableImpl):
@@ -39,14 +40,55 @@ class SQLTableImpl(LazyTableImpl):
             can be used by the other table and produces the same result.
     """
 
+    __registered_dialects: dict[str, type[SQLTableImpl]] = {}
+    _dialect_name: str
+
+    def __new__(cls, *args, **kwargs):
+        if cls != SQLTableImpl or (not args and not kwargs):
+            return super().__new__(cls)
+
+        signature = inspect.signature(cls.__init__)
+        engine = signature.bind(None, *args, **kwargs).arguments["engine"]
+
+        # If calling SQLTableImpl(engine), then we want to dynamically instantiate
+        # the correct dialect specific subclass based on the engine dialect.
+        if isinstance(engine, str):
+            dialect = sqlalchemy.engine.make_url(engine).get_dialect().name
+        else:
+            dialect = engine.dialect.name
+
+        dialect_specific_cls = SQLTableImpl.__registered_dialects.get(dialect, cls)
+        return super(SQLTableImpl, dialect_specific_cls).__new__(dialect_specific_cls)
+
+    def __init_subclass__(cls, **kwargs):
+        # Whenever a new subclass if SQLTableImpl is defined, it must contain the
+        # `_dialect_name` attribute. This allows us to dynamically instantiate it
+        # when calling SQLTableImpl(engine) based on the dialect name found
+        # in the engine url (see __new__).
+        dialect_name = getattr(cls, "_dialect_name", None)
+        if dialect_name is None:
+            raise ValueError(
+                "All subclasses of SQLTableImpl must have a `_dialect_name` attribute."
+                f" But {cls.__name__}._dialect_name is None."
+            )
+
+        if dialect_name in SQLTableImpl.__registered_dialects:
+            warnings.warn(
+                f"Already registered a SQLTableImpl for dialect {dialect_name}"
+            )
+        SQLTableImpl.__registered_dialects[dialect_name] = cls
+
     def __init__(
-        self, engine, table, dataset=None, _dtype_hints: dict[str, str] = None
+        self,
+        engine: sqlalchemy.Engine | str,
+        table,
+        dataset=None,
+        _dtype_hints: dict[str, str] = None,
     ):
         self.engine = (
             sqlalchemy.create_engine(engine) if isinstance(engine, str) else engine
         )
         tbl = self._create_table(table, self.engine)
-        # backend = self.engine.url.get_backend_name()
 
         columns = {
             col.name: Column(
@@ -641,6 +683,10 @@ def generate_alignment_hash():
     # to a table in two different orders that produce the same table
     # object, their hash could also be equal.
     return uuid.uuid1()
+
+
+# Load SQLTableImpl dialect specific subclasses
+from . import dialects  # noqa
 
 
 #### BACKEND SPECIFIC OPERATORS ################################################
