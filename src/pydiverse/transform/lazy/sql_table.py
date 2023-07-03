@@ -4,6 +4,7 @@ import functools
 import operator
 import uuid
 import warnings
+import datetime as dt
 from functools import reduce
 from typing import Callable, Dict
 
@@ -144,6 +145,8 @@ class SQLTableImpl(LazyTableImpl):
                 return "bool"
             if pytype == float:
                 return "float"
+            if pytype == dt.datetime:
+                return "datetime"
             raise NotImplementedError(f"Invalid type {col.type}.")
         except NotImplementedError as e:
             if hints is not None:
