@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import decimal
 import functools
 import inspect
@@ -201,6 +202,8 @@ class SQLTableImpl(LazyTableImpl):
                 return "bool"
             if pytype == float or pytype == decimal.Decimal:
                 return "float"
+            if pytype == dt.datetime:
+                return "datetime"
             raise NotImplementedError(f"Invalid type {col.type}.")
         except NotImplementedError as e:
             if hints is not None:
