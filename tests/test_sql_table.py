@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-import sqlalchemy
+import sqlalchemy as sa
 
 from pydiverse.transform import λ
 from pydiverse.transform.core import functions as f
@@ -53,7 +53,7 @@ df_right = pd.DataFrame(
 
 @pytest.fixture
 def engine():
-    engine = sqlalchemy.create_engine("sqlite:///:memory:")
+    engine = sa.create_engine("sqlite:///:memory:")
     df1.to_sql("df1", engine, index=False, if_exists="replace")
     df2.to_sql("df2", engine, index=False, if_exists="replace")
     df3.to_sql("df3", engine, index=False, if_exists="replace")

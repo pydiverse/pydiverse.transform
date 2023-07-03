@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from functools import reduce
 from typing import Callable
 
-import sqlalchemy
+import sqlalchemy as sa
 from sqlalchemy import sql
 
 from pydiverse.transform.core import ops
@@ -53,7 +53,7 @@ class SQLTableImpl(LazyTableImpl):
         # If calling SQLTableImpl(engine), then we want to dynamically instantiate
         # the correct dialect specific subclass based on the engine dialect.
         if isinstance(engine, str):
-            dialect = sqlalchemy.engine.make_url(engine).get_dialect().name
+            dialect = sa.engine.make_url(engine).get_dialect().name
         else:
             dialect = engine.dialect.name
 
@@ -80,14 +80,12 @@ class SQLTableImpl(LazyTableImpl):
 
     def __init__(
         self,
-        engine: sqlalchemy.Engine | str,
+        engine: sa.Engine | str,
         table,
         dataset=None,
         _dtype_hints: dict[str, str] = None,
     ):
-        self.engine = (
-            sqlalchemy.create_engine(engine) if isinstance(engine, str) else engine
-        )
+        self.engine = sa.create_engine(engine) if isinstance(engine, str) else engine
         tbl = self._create_table(table, self.engine)
 
         columns = {
@@ -126,18 +124,18 @@ class SQLTableImpl(LazyTableImpl):
 
     @classmethod
     def _html_repr_expr(cls, expr):
-        if isinstance(expr, sqlalchemy.sql.expression.ColumnElement):
+        if isinstance(expr, sa.sql.expression.ColumnElement):
             return str(expr.compile(compile_kwargs={"literal_binds": True}))
         return super()._html_repr_expr(expr)
 
     @staticmethod
     def _create_table(tbl, engine=None):
-        """Return a sqlalchemy.Table
+        """Return a sa.Table
 
-        :param tbl: a sqlalchemy.Table or string of form 'table_name'
+        :param tbl: a sa.Table or string of form 'table_name'
             or 'schema_name.table_name'.
         """
-        if isinstance(tbl, sqlalchemy.sql.selectable.FromClause):
+        if isinstance(tbl, sa.sql.selectable.FromClause):
             return tbl
 
         if not isinstance(tbl, str):
@@ -158,15 +156,15 @@ class SQLTableImpl(LazyTableImpl):
             table_name = tbl
             schema = None
 
-        return sqlalchemy.Table(
+        return sa.Table(
             table_name,
-            sqlalchemy.MetaData(),
+            sa.MetaData(),
             schema=schema,
             autoload_with=engine,
         )
 
     @staticmethod
-    def _get_dtype(col: sqlalchemy.Column, hints: dict[str, str] = None) -> str:
+    def _get_dtype(col: sa.Column, hints: dict[str, str] = None) -> str:
         """Determine the dtype of a column.
 
         :param col: The sqlalchemy column object.
@@ -511,9 +509,7 @@ class SQLTableImpl(LazyTableImpl):
     class ExpressionCompiler(
         LazyTableImpl.ExpressionCompiler[
             "SQLTableImpl",
-            TypedValue[
-                Callable[[dict[uuid.UUID, sqlalchemy.Column]], sql.ColumnElement]
-            ],
+            TypedValue[Callable[[dict[uuid.UUID, sa.Column]], sql.ColumnElement]],
         ]
     ):
         def _translate_col(self, expr, **kwargs):
@@ -695,13 +691,11 @@ from . import dialects  # noqa
 #### BACKEND SPECIFIC OPERATORS ################################################
 
 
-from sqlalchemy import func as sqlfunc  # noqa: 402
-
 with SQLTableImpl.op(ops.FloorDiv(), check_super=False) as op:
 
     @op.auto
     def _floordiv(lhs, rhs):
-        return sql.cast(lhs / rhs, sqlalchemy.types.Integer())
+        return sa.cast(lhs / rhs, sa.Integer())
 
 
 with SQLTableImpl.op(ops.RFloorDiv(), check_super=False) as op:
@@ -715,7 +709,7 @@ with SQLTableImpl.op(ops.Abs()) as op:
 
     @op.auto
     def _abs(x):
-        return sqlfunc.ABS(x)
+        return sa.func.ABS(x)
 
 
 with SQLTableImpl.op(ops.Round()) as op:
@@ -724,16 +718,16 @@ with SQLTableImpl.op(ops.Round()) as op:
     def _round(x, decimals=0):
         # TODO: Don't round integers with decimals >= 0
         if decimals >= 0:
-            return sqlfunc.round(x, decimals)
+            return sa.func.round(x, decimals)
         # For some reason SQLite doesn't like negative decimals values
-        return sqlfunc.round(x / (10**-decimals)) * (10**-decimals)
+        return sa.func.round(x / (10**-decimals)) * (10**-decimals)
 
 
 with SQLTableImpl.op(ops.Strip()) as op:
 
     @op.auto
     def _strip(x):
-        return sqlfunc.TRIM(x)
+        return sa.func.TRIM(x)
 
 
 #### Summarising Functions ####
@@ -743,35 +737,35 @@ with SQLTableImpl.op(ops.Mean()) as op:
 
     @op.auto
     def _mean(x):
-        return sqlfunc.AVG(x)
+        return sa.func.AVG(x)
 
 
 with SQLTableImpl.op(ops.Min()) as op:
 
     @op.auto
     def _min(x):
-        return sqlfunc.MIN(x)
+        return sa.func.MIN(x)
 
 
 with SQLTableImpl.op(ops.Max()) as op:
 
     @op.auto
     def _max(x):
-        return sqlfunc.MAX(x)
+        return sa.func.MAX(x)
 
 
 with SQLTableImpl.op(ops.Sum()) as op:
 
     @op.auto
     def _sum(x):
-        return sqlfunc.SUM(x)
+        return sa.func.SUM(x)
 
 
 with SQLTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto
     def _join(x, sep: str):
-        return sqlfunc.GROUP_CONCAT(x, sep)
+        return sa.func.GROUP_CONCAT(x, sep)
 
 
 with SQLTableImpl.op(ops.Count()) as op:
@@ -780,10 +774,10 @@ with SQLTableImpl.op(ops.Count()) as op:
     def _count(x=None):
         if x is None:
             # Get the number of rows
-            return sqlfunc.COUNT()
+            return sa.func.COUNT()
         else:
             # Count non null values
-            return sqlfunc.COUNT(x)
+            return sa.func.COUNT(x)
 
 
 #### Window Functions ####
@@ -796,9 +790,9 @@ with SQLTableImpl.op(ops.Shift()) as op:
         if by == 0:
             return x
         if by > 0:
-            return sqlfunc.LAG(x, by, empty_value)
+            return sa.func.LAG(x, by, empty_value)
         if by < 0:
-            return sqlfunc.LEAD(x, -by, empty_value)
+            return sa.func.LEAD(x, -by, empty_value)
         raise Exception
 
 
@@ -806,4 +800,4 @@ with SQLTableImpl.op(ops.RowNumber()) as op:
 
     @op.auto
     def _row_number():
-        return sqlfunc.ROW_NUMBER()
+        return sa.func.ROW_NUMBER()

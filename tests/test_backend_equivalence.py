@@ -6,7 +6,7 @@ from collections import defaultdict
 
 import pandas as pd
 import pytest
-import sqlalchemy
+import sqlalchemy as sa
 
 # from google.oauth2 import service_account
 from pandas.testing import assert_frame_equal
@@ -76,7 +76,7 @@ def pandas_impls():
 
 
 def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
-    engine = sqlalchemy.create_engine(conn)
+    engine = sa.create_engine(conn)
     impls = {}
     print("THIS IS VERY EXPENSIVE")
     for name, df in dataframes.items():
