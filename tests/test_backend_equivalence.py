@@ -612,7 +612,15 @@ class TestSummarise:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> summarise(mean3=t.col3.mean(), mean4=t.col4.mean()),
+            lambda t: t
+            >> summarise(
+                mean3=t.col3.mean(),
+                mean4=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
+                any_all=(t.col2 == 0).any() & (t.col1 < 3).all(),
+                any_all2=(t.col2 == 0).any() | (t.col1 < 3).all(),
+            ),
         )
 
     @tables(["df3"])
@@ -624,8 +632,10 @@ class TestSummarise:
             >> group_by(t.col1)
             >> summarise(
                 mean3=t.col3.mean(),
-                # any=(t.col2 == 0).any(),
-                # all=(t.col1 < 2).all(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 2).all(),
+                any_all=(t.col2 == 0).any() & (t.col1 < 3).all(),
+                any_all2=(t.col2 == 0).any() | (t.col1 < 3).all(),
             ),
         )
 
@@ -754,8 +764,8 @@ class TestWindowFunction:
                 min=t.col4.min(),
                 max=t.col4.max(),
                 mean=t.col4.mean(),
-                # any=(t.col2 == 0).any(),
-                # all=(t.col1 < 3).all(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
                 rank2=t.col2.rank(),
                 rank3=t.col3.rank(),
                 rank4=t.col4.rank(),
@@ -774,8 +784,8 @@ class TestWindowFunction:
                 min=t.col4.min(),
                 max=t.col4.max(),
                 mean=t.col4.mean(),
-                # any=(t.col2 == 0).any(),
-                # all=(t.col1 < 2).all(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 2).all(),
                 rank2=t.col2.rank(),
                 rank3=t.col3.rank(),
                 rank4=t.col4.rank(),
@@ -792,8 +802,8 @@ class TestWindowFunction:
                 min=t.col4.min(),
                 max=t.col4.max(),
                 mean=t.col4.mean(),
-                # any=(t.col2 == 0).any(),
-                # all=(t.col1 < 3).all(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
                 rank2=t.col2.rank(),
                 rank3=t.col3.rank(),
                 rank4=t.col4.rank(),
@@ -809,7 +819,8 @@ class TestWindowFunction:
             lambda t: t
             >> group_by(t.col1)
             >> mutate(min=t.col4.min())
-            >> mutate(max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(max=t.col4.max(), mean=t.col4.mean())
+            >> mutate(any=(t.col2 == 0).any(), all=(t.col1 < 3).all()),
         )
 
         assert_result_equal(

@@ -796,6 +796,20 @@ with SQLTableImpl.op(ops.Sum()) as op:
         return sa.func.SUM(x)
 
 
+with SQLTableImpl.op(ops.Any()) as op:
+
+    @op.auto
+    def _any(x):
+        return sa.func.bool_or(x)
+
+
+with SQLTableImpl.op(ops.All()) as op:
+
+    @op.auto
+    def _all(x):
+        return sa.func.bool_and(x)
+
+
 with SQLTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto
