@@ -624,7 +624,13 @@ class TestSummarise:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> summarise(mean3=t.col3.mean(), mean4=t.col4.mean()),
+            lambda t: t
+            >> summarise(
+                mean3=t.col3.mean(),
+                mean4=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
+            ),
         )
 
     @tables(["df3"])
@@ -632,7 +638,11 @@ class TestSummarise:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> group_by(t.col1) >> summarise(mean3=t.col3.mean()),
+            lambda t: t
+            >> group_by(t.col1)
+            >> summarise(
+                mean3=t.col3.mean(), any=(t.col2 == 0).any(), all=(t.col1 < 2).all()
+            ),
         )
 
     @tables(["df3"])
@@ -753,7 +763,13 @@ class TestWindowFunction:
             df3_x,
             df3_y,
             lambda t: t
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
+            ),
         )
 
     @tables(["df3"])
@@ -763,7 +779,13 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col1)
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 2).all(),
+            ),
         )
 
         assert_result_equal(
@@ -771,7 +793,13 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col1, t.col2)
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
+            ),
         )
 
     @tables(["df3"])
@@ -782,7 +810,8 @@ class TestWindowFunction:
             lambda t: t
             >> group_by(t.col1)
             >> mutate(min=t.col4.min())
-            >> mutate(max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(max=t.col4.max(), mean=t.col4.mean())
+            >> mutate(any=(t.col2 == 0).any(), all=(t.col1 < 3).all()),
         )
 
         assert_result_equal(
