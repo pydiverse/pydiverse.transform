@@ -249,8 +249,12 @@ class SQLTableImpl(LazyTableImpl):
             sql_col = self.cols[uuid].compiled(self.sql_columns)
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
-            if self.cols[uuid].dtype == "bool":
-                sql_col = sqlalchemy.cast(sql_col, sqlalchemy.Boolean())
+            if self.cols[uuid].dtype == "bool" and not isinstance(
+                self.cols[uuid].expr, Column
+            ):
+                sql_col = sqlalchemy.cast(
+                    sqlfunc.iif(sql_col, 1, 0), sqlalchemy.Boolean()
+                )
             s.append(sql_col.label(name))
 
         select = select.with_only_columns(*s)
@@ -262,7 +266,7 @@ class SQLTableImpl(LazyTableImpl):
                 compiled, _ = self.compiler.translate(o_by.order)
                 col = compiled(self.sql_columns)
                 col = col.asc() if o_by.asc else col.desc()
-                col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
+                # col = col.nullsfirst() if o_by.nulls_first else col.nullslast()  ## TODO: don't commit
                 o.append(col)
             select = select.order_by(*o)
 
@@ -560,7 +564,7 @@ class SQLTableImpl(LazyTableImpl):
                 def clause(*args, **kwargs):
                     col = compiled(*args, **kwargs)
                     col = col.asc() if ordering.asc else col.desc()
-                    col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
+                    # col = col.nullsfirst() if ordering.nulls_first else col.nullslast()  ## TODO: don't commit
                     return col
 
                 return clause
@@ -739,14 +743,22 @@ with SQLTableImpl.op(ops.Any()) as op:
 
     @op.auto
     def _any(x):
-        return sqlfunc.bool_or(x)
+        post_process = lambda x: x == 1
+        return sqlfunc.max(sqlfunc.iif(x, 1, 0)), post_process
+
+
+#        return sqlfunc.bool_or(x)
 
 
 with SQLTableImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
-        return sqlfunc.bool_and(x)
+        post_process = lambda x: x == 1
+        return sqlfunc.min(sqlfunc.iif(x, 1, 0)), post_process
+
+
+#        return sqlfunc.bool_and(x)
 
 
 with SQLTableImpl.op(ops.StringJoin()) as op:
