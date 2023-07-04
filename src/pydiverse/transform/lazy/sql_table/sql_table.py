@@ -512,6 +512,12 @@ class SQLTableImpl(LazyTableImpl):
             TypedValue[Callable[[dict[uuid.UUID, sa.Column]], sql.ColumnElement]],
         ]
     ):
+        def _get_literal_func(self, expr):
+            def literal_func(*args, **kwargs):
+                return sa.literal(expr)
+
+            return literal_func
+
         def _translate_col(self, expr, **kwargs):
             # Can either be a base SQL column, or a reference to an expression
             if expr.uuid in self.backend.sql_columns:
@@ -540,7 +546,12 @@ class SQLTableImpl(LazyTableImpl):
             self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
         ):
             def value(cols):
-                return implementation(*(arg.value(cols) for arg in op_args))
+                return implementation(
+                    *(
+                        arg.value(cols) if not is_const else arg.const_value(cols)
+                        for arg, is_const in zip(op_args, implementation.const_args)
+                    )
+                )
 
             operator = implementation.operator
 
@@ -617,10 +628,16 @@ class SQLTableImpl(LazyTableImpl):
                 )
 
                 v = value(*args, **kwargs)
-                return v.over(
+                post_process = None
+                if isinstance(v, tuple):
+                    v, post_process = v
+                res = v.over(
                     partition_by=pb,
                     order_by=ob,
                 )
+                if post_process:
+                    res = post_process(res)
+                return res
 
             return over_value
 

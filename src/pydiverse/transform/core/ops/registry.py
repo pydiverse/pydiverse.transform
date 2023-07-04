@@ -96,13 +96,15 @@ class TypedOperatorImpl:
     operator: Operator
     impl: OperatorImpl
     rtype: str
+    const_args: tuple
 
     @classmethod
-    def from_operator_impl(cls, impl: OperatorImpl, rtype: str):
+    def from_operator_impl(cls, impl: OperatorImpl, rtype: str, const_args: list[bool]):
         return cls(
             operator=impl.operator,
             impl=impl,
             rtype=rtype,
+            const_args=const_args,
         )
 
     def __call__(self, *args, **kwargs):
@@ -319,6 +321,8 @@ class OperatorSignature:
         base_rtype = get_base_type(rtype)
 
         for type_ in (*base_args_types, base_rtype):
+            if type_.startswith("const-"):
+                type_ = type_[6:]  # only look at type after dash
             if not type_.isalnum():
                 raise ValueError(f"Invalid type '{type_}'. Types must be alphanumeric.")
 
@@ -451,22 +455,25 @@ class OperatorImplementationStore:
         best_match = None
         best_score = (0xFFFF,)
 
-        for match, templates in matches:
+        for match, templates, const_args in matches:
             if match.operator._precedence < best_score:
-                best_match = (match, templates)
+                best_match = (match, templates, const_args)
                 best_score = match.operator._precedence
 
         rtype = best_match[0].operator.signature.rtype
         rtype = best_match[1].get(rtype, rtype)  # If it is a template -> Translate
+        const_args = best_match[2]
 
-        return TypedOperatorImpl.from_operator_impl(best_match[0].operator, rtype)
+        return TypedOperatorImpl.from_operator_impl(
+            best_match[0].operator, rtype, list(const_args)
+        )
 
     def _find_matches(self, signature: tuple[str]):
         """Yield all operators that match the input signature"""
 
         # Case 0 arguments:
         if len(signature) == 0:
-            yield (self.root, dict())
+            yield (self.root, dict(), [])
             return
 
         # Case 1+ args:
@@ -482,31 +489,35 @@ class OperatorImplementationStore:
             return dtype == node.value
 
         # Store tuple of (Node, index in signature, templates)
-        stack = [(child, 0, dict()) for child in self.root.children]
+        stack = [(child, 0, dict(), tuple()) for child in self.root.children]
 
         while stack:
-            node, s_i, templates = stack.pop()
-            dtype = signature[s_i]
+            node, s_i, templates, const_args = stack.pop()
+            fn_arg_dtype = signature[s_i]
+            dtypes = [(fn_arg_dtype, False)]
+            if fn_arg_dtype.startswith("const-"):
+                dtypes = [(fn_arg_dtype, True), (fn_arg_dtype[6:], False)]
+            for dtype, const_match in dtypes:
+                if not does_match(dtype, node, templates):
+                    continue
 
-            if not does_match(dtype, node, templates):
-                continue
+                const_args = (*const_args, const_match)
+                if is_template_type(node.value) and node.value not in templates:
+                    # Insert dtype into templates dict
+                    templates = templates.copy()
+                    templates[node.value] = dtype
 
-            if is_template_type(node.value) and node.value not in templates:
-                # Insert dtype into templates dict
-                templates = templates.copy()
-                templates[node.value] = dtype
+                if s_i + 1 == len(signature):
+                    if node.operator is not None:
+                        yield (node, templates, const_args)
+                    continue
 
-            if s_i + 1 == len(signature):
-                if node.operator is not None:
-                    yield (node, templates)
-                continue
+                children = iter(node.children)
+                if node.is_vararg:
+                    children = itertools.chain(children, iter((node,)))
 
-            children = iter(node.children)
-            if node.is_vararg:
-                children = itertools.chain(children, iter((node,)))
-
-            for child in children:
-                stack.append((child, s_i + 1, templates))
+                for child in children:
+                    stack.append((child, s_i + 1, templates, const_args))
 
 
 class OperatorRegistrationContextManager:
