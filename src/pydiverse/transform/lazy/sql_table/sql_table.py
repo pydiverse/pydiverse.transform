@@ -546,7 +546,12 @@ class SQLTableImpl(LazyTableImpl):
             self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
         ):
             def value(cols):
-                return implementation(*(arg.value(cols) for arg in op_args))
+                return implementation(
+                    *(
+                        arg.value(cols) if not is_const else arg.const_value(cols)
+                        for arg, is_const in zip(op_args, implementation.const_args)
+                    )
+                )
 
             operator = implementation.operator
 

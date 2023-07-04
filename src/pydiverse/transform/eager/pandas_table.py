@@ -275,7 +275,12 @@ class PandasTableImpl(EagerTableImpl):
             self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             def value(df, *, grouper=None, **kw):
-                args = [arg.value(df, grouper=grouper, **kw) for arg in op_args]
+                args = [
+                    arg.value(df, grouper=grouper, **kw)
+                    if not is_const
+                    else arg.const_value(df, grouper=grouper, **kw)
+                    for arg, is_const in zip(op_args, implementation.const_args)
+                ]
                 kwargs = {
                     "_tbl": self.backend,
                     "_df": df,
@@ -333,7 +338,10 @@ class PandasTableImpl(EagerTableImpl):
                 else None
             )
             ftype = self.backend._get_op_ftype(op_args, operator, override_ftype)
-            return TypedValue(value, implementation.rtype, ftype)
+            const_value = value if implementation.rtype.startswith("const-") else None
+            return TypedValue(
+                value, implementation.rtype, ftype, const_value=const_value
+            )
 
         def arranged_window(
             self, value: Callable, operator: ops.Operator, context_kwargs: dict

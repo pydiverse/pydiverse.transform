@@ -237,14 +237,17 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         def _translate_literal(self, expr, **kwargs):
             literal_func = self._get_literal_func(expr)
 
+            def const_func(*args, **kwargs):
+                return expr
+
             if isinstance(expr, bool):
-                return TypedValue(literal_func, "bool")
+                return TypedValue(literal_func, "bool", const_value=const_func)
             if isinstance(expr, int):
-                return TypedValue(literal_func, "int")
+                return TypedValue(literal_func, "int", const_value=const_func)
             if isinstance(expr, float):
-                return TypedValue(literal_func, "float")
+                return TypedValue(literal_func, "float", const_value=const_func)
             if isinstance(expr, str):
-                return TypedValue(literal_func, "str")
+                return TypedValue(literal_func, "str", const_value=const_func)
 
     class AlignedExpressionEvaluator(Generic[AlignedT], DelegatingTranslator[AlignedT]):
         """
@@ -255,13 +258,13 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
         def _translate_literal(self, expr, **kwargs):
             if isinstance(expr, bool):
-                return TypedValue(expr, "bool")
+                return TypedValue(expr, "bool", const_value=expr)
             if isinstance(expr, int):
-                return TypedValue(expr, "int")
+                return TypedValue(expr, "int", const_value=expr)
             if isinstance(expr, float):
-                return TypedValue(expr, "float")
+                return TypedValue(expr, "float", const_value=expr)
             if isinstance(expr, str):
-                return TypedValue(expr, "str")
+                return TypedValue(expr, "str", const_value=expr)
 
     class LambdaTranslator(Translator):
         """
