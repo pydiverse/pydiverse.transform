@@ -514,7 +514,7 @@ class SQLTableImpl(LazyTableImpl):
     ):
         def _get_literal_func(self, expr):
             def literal_func(*args, **kwargs):
-                return sqlalchemy.literal(expr)
+                return sa.literal(expr)
 
             return literal_func
 
