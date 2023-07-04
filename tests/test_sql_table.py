@@ -164,22 +164,19 @@ class TestSQLTable:
             pd.DataFrame({"a": [1, 2, 2], "b_df_right": [1, 2, 2]}),
         )
 
-        # TODO: Implement test for outer join.
-        #       SQLite doesn't support outer joins :-(
-
-        # assert_equal(
-        #     (
-        #         tbl_left
-        #         >> join(tbl_right, tbl_left.a == tbl_right.b, "outer")
-        #         >> select(tbl_left.a, tbl_right.b)
-        #     ),
-        #     pd.DataFrame(
-        #         {
-        #             "a": [1.0, 2.0, 2.0, 3.0, 4.0, np.nan],
-        #             "b_df_right": [1.0, 2.0, 2.0, np.nan, np.nan, 0.0],
-        #         }
-        #     ),
-        # )
+        assert_equal(
+            (
+                tbl_left
+                >> join(tbl_right, tbl_left.a == tbl_right.b, "outer")
+                >> select(tbl_left.a, tbl_right.b)
+            ),
+            pd.DataFrame(
+                {
+                    "a": [1.0, 2.0, 2.0, 3.0, 4.0, pd.NA],
+                    "b_df_right": [1.0, 2.0, 2.0, pd.NA, pd.NA, 0.0],
+                }
+            ),
+        )
 
     def test_filter(self, tbl1, tbl2):
         # Simple filter expressions
