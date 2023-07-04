@@ -232,9 +232,14 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self.backend = backend
             super().__init__(backend.operator_registry)
 
-        def _translate_literal(self, expr, **kwargs):
+        def _get_literal_func(self, expr):
             def literal_func(*args, **kwargs):
                 return expr
+
+            return literal_func
+
+        def _translate_literal(self, expr, **kwargs):
+            literal_func = self._get_literal_func(expr)
 
             if isinstance(expr, bool):
                 return TypedValue(literal_func, "bool")
@@ -253,14 +258,14 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         """
 
         def _translate_literal(self, expr, **kwargs):
+            if isinstance(expr, bool):
+                return TypedValue(expr, "bool")
             if isinstance(expr, int):
                 return TypedValue(expr, "int")
             if isinstance(expr, float):
                 return TypedValue(expr, "float")
             if isinstance(expr, str):
                 return TypedValue(expr, "str")
-            if isinstance(expr, bool):
-                return TypedValue(expr, "bool")
 
     class LambdaTranslator(Translator):
         """
