@@ -7,6 +7,13 @@
 Changelog
 =========
 
+0.1.4 (YYYY-MM-DD)
+------------------
+- fix handling of boolean literals
+- fix literal handling within SQL expressions
+- support for operators/functions that take constant arguments which can be
+   evaluated during query compilation
+
 0.1.3 (2023-06-27)
 ------------------
 - support pandas dataframes backed by pyarrow extension dtypes
