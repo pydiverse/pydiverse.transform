@@ -376,6 +376,44 @@ class ColumnMetaData:
         return Column(name, table, self.dtype, self.uuid)
 
 
+class ContextInstruction:
+    def __init__(self, instructions: list[ContextInstruction] | None = None):
+        if instructions is None:
+            self._instructions = []  # type: list[ContextInstruction]
+        else:
+            self._instructions = instructions
+
+    def post_process(self, expr):
+        for instruction in self._instructions:
+            expr = instruction._post_process(expr)
+        return expr
+
+    def process_order(self, expr):
+        for instruction in self._instructions:
+            expr = instruction._process_order(expr)
+        return expr
+
+    def _post_process(self, expr):
+        return expr
+
+    def _process_order(self, expr):
+        return expr
+
+    def __and__(self, other: ContextInstruction):
+        return ContextInstruction(self._instructions + other._instructions)
+
+
+class ImplicitArrange(ContextInstruction):
+    def __init__(self, implicit_arrange):
+        super().__init__(instructions=[self])
+        assert hasattr(implicit_arrange, "__len__")
+        self.implicit_arrange = implicit_arrange
+
+    def _process_order(self, expr):
+        assert len(expr) == 0
+        return self.implicit_arrange
+
+
 #### ARITHMETIC OPERATORS ######################################################
 
 

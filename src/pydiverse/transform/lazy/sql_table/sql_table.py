@@ -17,7 +17,11 @@ from pydiverse.transform.core.column import Column, LiteralColumn
 from pydiverse.transform.core.expressions import SymbolicExpression, iterate_over_expr
 from pydiverse.transform.core.expressions.translator import TypedValue
 from pydiverse.transform.core.ops import OPType
-from pydiverse.transform.core.table_impl import ColumnMetaData
+from pydiverse.transform.core.table_impl import (
+    ColumnMetaData,
+    ContextInstruction,
+    ImplicitArrange,
+)
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 
@@ -545,10 +549,22 @@ class SQLTableImpl(LazyTableImpl):
         def _translate_function(
             self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
         ):
+            def check_arg(v, arg):
+                if isinstance(v, tuple):
+                    # might work, but we need to correctly split off instructions
+                    # like ImplicitArrange
+                    raise NotImplementedError(
+                        f"{operator.ftype} function {arg} is currently not allowed "
+                        "as function argument."
+                    )
+                return v
+
             def value(cols):
                 return implementation(
                     *(
-                        arg.value(cols) if not is_const else arg.const_value(cols)
+                        check_arg(arg.value(cols), arg)
+                        if not is_const
+                        else arg.const_value(cols)
                         for arg, is_const in zip(op_args, implementation.const_args)
                     )
                 )
@@ -606,37 +622,37 @@ class SQLTableImpl(LazyTableImpl):
 
                 return clause
 
-            if wants_order_by:
-                arrange = context_kwargs.get("arrange")
-                if not arrange:
-                    raise TypeError("Missing 'arrange' argument.")
-
-                ordering = translate_ordering(self.backend, arrange)
-                compiled_ob = [order_by_clause_generator(o_by) for o_by in ordering]
-
             # New value callable
             def over_value(*args, **kwargs):
+                v = value(*args, **kwargs)
+                context_instruction = ContextInstruction()
+                if isinstance(v, tuple):
+                    v, context_instruction = v
+
                 pb = sql.expression.ClauseList(
                     *(compiled(*args, **kwargs) for compiled in compiled_pb)
                 )
-                ob = (
-                    sql.expression.ClauseList(
+                ob = None
+
+                if wants_order_by:
+                    arrange = context_kwargs.get("arrange", [])
+
+                    ordering = translate_ordering(self.backend, arrange)
+                    compiled_ob = [order_by_clause_generator(o_by) for o_by in ordering]
+
+                    ob = sql.expression.ClauseList(
                         *(compiled(*args, **kwargs) for compiled in compiled_ob)
                     )
-                    if wants_order_by
-                    else None
-                )
 
-                v = value(*args, **kwargs)
-                post_process = None
-                if isinstance(v, tuple):
-                    v, post_process = v
+                    ob = context_instruction.process_order(ob)
+                    if len(ob) == 0:
+                        raise TypeError("Missing 'arrange' argument.")
+
                 res = v.over(
                     partition_by=pb,
                     order_by=ob,
                 )
-                if post_process:
-                    res = post_process(res)
+                res = context_instruction.post_process(res)
                 return res
 
             return over_value
@@ -816,5 +832,25 @@ with SQLTableImpl.op(ops.Shift()) as op:
 with SQLTableImpl.op(ops.RowNumber()) as op:
 
     @op.auto
-    def _row_number():
-        return sa.func.ROW_NUMBER()
+    def _row_number(*args):
+        # support both col.row_number() and row_number(arrange=[col,...])
+        if len(args) == 0:
+            return sa.func.ROW_NUMBER()
+        elif len(args) == 1:
+            return sa.func.ROW_NUMBER(), ImplicitArrange(
+                sql.expression.ClauseList(args[0])
+            )
+        else:
+            raise AssertionError(
+                "Number of arguments should already have been checked based on "
+                "signatures"
+            )
+
+
+with SQLTableImpl.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank(x):
+        # row_number() is like rank(method="first")
+        # rank() is like method="min"
+        return sa.func.RANK(), ImplicitArrange(sql.expression.ClauseList(x))

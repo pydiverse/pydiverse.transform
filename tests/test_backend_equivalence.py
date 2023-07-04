@@ -620,7 +620,13 @@ class TestSummarise:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> group_by(t.col1) >> summarise(mean3=t.col3.mean()),
+            lambda t: t
+            >> group_by(t.col1)
+            >> summarise(
+                mean3=t.col3.mean(),
+                # any=(t.col2 == 0).any(),
+                # all=(t.col1 < 2).all(),
+            ),
         )
 
     @tables(["df3"])
@@ -737,11 +743,24 @@ class TestSummarise:
 class TestWindowFunction:
     @tables(["df3"])
     def test_simple_ungrouped(self, df3_x, df3_y):
+        for df in df3_x, df3_y:
+            print(type(df))
+            print(df >> mutate(rank=λ.col2.rank()) >> collect())
         assert_result_equal(
             df3_x,
             df3_y,
             lambda t: t
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                # any=(t.col2 == 0).any(),
+                # all=(t.col1 < 3).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
+            ),
         )
 
     @tables(["df3"])
@@ -751,7 +770,17 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col1)
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                # any=(t.col2 == 0).any(),
+                # all=(t.col1 < 2).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
+            ),
         )
 
         assert_result_equal(
@@ -759,7 +788,17 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col1, t.col2)
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                # any=(t.col2 == 0).any(),
+                # all=(t.col1 < 3).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
+            ),
         )
 
     @tables(["df3"])
@@ -897,7 +936,7 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col2)
-            >> mutate(x=f.row_number(arrange=[-λ.col4]))
+            >> mutate(x=f.row_number(arrange=[-λ.col4]), y=λ.col4.row_number())
             >> full_sort()
             >> select(λ.x),
         )
@@ -916,7 +955,7 @@ class TestWindowFunction:
             df3_x,
             df3_y,
             lambda t: t
-            >> mutate(x=f.row_number(arrange=[-λ.col4]))
+            >> mutate(x=f.row_number(arrange=[-λ.col4]), y=λ.col4.row_number())
             >> full_sort()
             >> select(λ.x),
         )

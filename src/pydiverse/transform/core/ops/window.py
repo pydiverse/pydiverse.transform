@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from .core import Nullary, Window
+from .core import Window
 
 __all__ = [
     "Shift",
     "RowNumber",
+    "Rank",
 ]
 
 
@@ -16,8 +17,16 @@ class Shift(Window):
     ]
 
 
-class RowNumber(Window, Nullary):
+class RowNumber(Window):
     name = "row_number"
     signatures = [
-        "-> int",
+        "-> int",  # uses arrange argument
+        "T -> int",
+    ]
+
+
+class Rank(Window):
+    name = "rank"
+    signatures = [
+        "T -> int",
     ]
