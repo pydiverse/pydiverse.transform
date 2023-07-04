@@ -236,14 +236,14 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             def literal_func(*args, **kwargs):
                 return expr
 
+            if isinstance(expr, bool):
+                return TypedValue(literal_func, "bool")
             if isinstance(expr, int):
                 return TypedValue(literal_func, "int")
             if isinstance(expr, float):
                 return TypedValue(literal_func, "float")
             if isinstance(expr, str):
                 return TypedValue(literal_func, "str")
-            if isinstance(expr, bool):
-                return TypedValue(literal_func, "bool")
 
     class AlignedExpressionEvaluator(Generic[AlignedT], DelegatingTranslator[AlignedT]):
         """
