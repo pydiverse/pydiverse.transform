@@ -5,6 +5,7 @@ from .expressions import FunctionCall, SymbolicExpression
 __all__ = [
     "count",
     "row_number",
+    "rank",
 ]
 
 
@@ -21,3 +22,7 @@ def count(expr: SymbolicExpression = None):
 
 def row_number(*, arrange: list):
     return _sym_f_call("row_number", arrange=arrange)
+
+
+def rank(*, arrange: list):
+    return _sym_f_call("rank", arrange=arrange)

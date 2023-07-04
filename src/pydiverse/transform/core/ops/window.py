@@ -5,6 +5,7 @@ from .core import Nullary, Window
 __all__ = [
     "Shift",
     "RowNumber",
+    "Rank",
 ]
 
 
@@ -18,6 +19,13 @@ class Shift(Window):
 
 class RowNumber(Window, Nullary):
     name = "row_number"
+    signatures = [
+        "-> int",
+    ]
+
+
+class Rank(Window, Nullary):
+    name = "rank"
     signatures = [
         "-> int",
     ]

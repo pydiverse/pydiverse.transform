@@ -641,7 +641,9 @@ class TestSummarise:
             lambda t: t
             >> group_by(t.col1)
             >> summarise(
-                mean3=t.col3.mean(), any=(t.col2 == 0).any(), all=(t.col1 < 2).all()
+                mean3=t.col3.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 2).all(),
             ),
         )
 
@@ -769,6 +771,10 @@ class TestWindowFunction:
                 mean=t.col4.mean(),
                 any=(t.col2 == 0).any(),
                 all=(t.col1 < 3).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
             ),
         )
 
@@ -785,6 +791,10 @@ class TestWindowFunction:
                 mean=t.col4.mean(),
                 any=(t.col2 == 0).any(),
                 all=(t.col1 < 2).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
             ),
         )
 
@@ -799,6 +809,10 @@ class TestWindowFunction:
                 mean=t.col4.mean(),
                 any=(t.col2 == 0).any(),
                 all=(t.col1 < 3).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
             ),
         )
 

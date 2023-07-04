@@ -666,3 +666,14 @@ with PandasTableImpl.op(ops.RowNumber()) as op:
     @op.auto(variant="transform")
     def _row_number(idx: pd.Series):
         return idx.cumcount() + 1
+
+
+with PandasTableImpl.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank(x: pd.Series):
+        return x.rank(method="min")
+
+    @op.auto(variant="transform")
+    def _rank(x: pd.Series):
+        return x.transform("rank", method="min")

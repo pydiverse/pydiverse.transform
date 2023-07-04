@@ -249,6 +249,8 @@ class SQLTableImpl(LazyTableImpl):
             sql_col = self.cols[uuid].compiled(self.sql_columns)
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
+            if self.cols[uuid].dtype == "bool":
+                sql_col = sqlalchemy.cast(sql_col, sqlalchemy.Boolean())
             s.append(sql_col.label(name))
 
         select = select.with_only_columns(*s)
@@ -775,3 +777,12 @@ with SQLTableImpl.op(ops.RowNumber()) as op:
     @op.auto
     def _row_number():
         return sqlfunc.ROW_NUMBER()
+
+
+with SQLTableImpl.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank():
+        # row_number() is like rank(method="first")
+        # rank() is like method="min"
+        return sqlfunc.RANK()
