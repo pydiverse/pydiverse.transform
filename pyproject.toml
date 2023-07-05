@@ -34,8 +34,20 @@ black = { version = "23.3.0", extras = ["d"] }
 ruff = "^0.0.270"
 pre-commit = ">=2.20.0"
 
+duckdb = "^0.8.1"
+duckdb-engine = ">=0.7.3"
+
+[tool.poetry.group.tests]
+optional = true
+
+[tool.poetry.group.tests.dependencies]
+# Postgres
 psycopg2 = ">=2.9.3"
-pyodbc = "^4.0.34"
+# MSSQL
+pyodbc = ">=4.0.35"
+# IBM DB2
+ibm-db = { version = ">=3.1.4", markers="platform_machine == 'x86_64'" }
+ibm-db-sa = { version = ">=0.3.8", markers="platform_machine == 'x86_64'" }
 
 [tool.poetry.group.docs]
 optional = true

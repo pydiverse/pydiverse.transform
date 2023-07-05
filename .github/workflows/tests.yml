@@ -60,3 +60,5 @@ jobs:
 
       - name: Run Tests
         uses: ./.github/actions/test
+        with:
+          arguments: --workers 4 --postgres  # --mssql --ibm_db2

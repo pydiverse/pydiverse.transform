@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import sqlite3
 from collections import defaultdict
+from functools import cached_property
 
 import pandas as pd
 import pytest
@@ -33,6 +34,7 @@ from pydiverse.transform.core.verbs import (
 )
 from pydiverse.transform.eager.pandas_table import PandasTableImpl
 from pydiverse.transform.lazy.sql_table import SQLTableImpl
+from tests.fixtures.instances import INSTANCE_MARKS
 
 dataframes = {
     "df1": pd.DataFrame(
@@ -71,8 +73,10 @@ dataframes = {
 }
 
 
-def pandas_impls():
-    return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
+class PandasImpls:
+    @cached_property
+    def impls(self):
+        return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
 
 
 def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
@@ -93,31 +97,54 @@ def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
     return impls
 
 
-def sqlite_impls():
-    return sql_conn_to_impls("sqlite:///:memory:")
+class SqliteImpls:
+    @cached_property
+    def impls(self):
+        return sql_conn_to_impls("sqlite:///:memory:")
 
 
-def mssql_impls():
-    user = "sa"
-    password = "PydiQuant27"
-    localhost = "127.0.0.1"
-    db_name = "master"
-    local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    return sql_conn_to_impls(local_conn)
+class DuckDbImpls:
+    @cached_property
+    def impls(self):
+        return sql_conn_to_impls("duckdb://")
 
 
-def postgresql_impls():
-    user = "sa"
-    password = "Pydiverse23"
-    local_conn = f"postgresql://{user}:{password}@localhost:6543/"
-    return sql_conn_to_impls(local_conn)
+class MssqlImpls:
+    @cached_property
+    def impls(self):
+        user = "sa"
+        password = "PydiQuant27"
+        localhost = "127.0.0.1"
+        db_name = "master"
+        local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+        return sql_conn_to_impls(local_conn)
+
+
+class PostgresqlImpls:
+    @cached_property
+    def impls(self):
+        user = "sa"
+        password = "Pydiverse23"
+        local_conn = f"postgresql://{user}:{password}@localhost:6543/"
+        return sql_conn_to_impls(local_conn)
+
+
+class IbmDb2Impls:
+    @cached_property
+    def impls(self):
+        user = "db2inst1"
+        password = "password"
+        local_conn = f"db2+ibm_db://{user}:{password}@localhost:50000/testdb"
+        return sql_conn_to_impls(local_conn)
 
 
 backend_impls = {
-    "pandas": pandas_impls(),
-    "sqlite": sqlite_impls(),
-    # "mssql": mssql_impls(),
-    "postgres": postgresql_impls(),
+    "pandas": PandasImpls(),
+    "sqlite": SqliteImpls(),
+    "duckdb": DuckDbImpls(),
+    "postgres": PostgresqlImpls(),
+    "mssql": MssqlImpls(),
+    "ibm_db2": IbmDb2Impls(),
 }
 
 
@@ -126,9 +153,18 @@ def tables(names: list[str]):
 
     tables = defaultdict(lambda: [])
     backend_names = backend_impls.keys()
+
+    # lazy initialization of database connections to make
+    # pytest marks effective
+    def get_table_fn(_impls, _table_name):
+        def get_table():
+            return Table(_impls.impls[_table_name])
+
+        return get_table
+
     for _, impls in backend_impls.items():
-        for table_name, impl in impls.items():
-            tables[table_name].append(Table(impl))
+        for table_name in dataframes.keys():
+            tables[table_name].append(get_table_fn(impls, table_name))
 
     param_combinations = (
         (zip(*itertools.combinations(tables[name], 2))) for name in names
@@ -136,11 +172,25 @@ def tables(names: list[str]):
     param_combinations = itertools.chain(*param_combinations)
     param_combinations = list(zip(*param_combinations))
 
-    names_combinations = list(itertools.combinations(backend_names, 2))
+    # I don't think we need to test every backend against every other backend
+    # names_combinations = list(itertools.combinations(backend_names, 2))
+    names_combinations = [
+        ("pandas", backend) for backend in backend_names if backend != "pandas"
+    ]
+    marks_combinations = [
+        [
+            getattr(pytest.mark, name)
+            for name in [name1, name2]
+            if name in INSTANCE_MARKS
+        ]
+        for name1, name2 in names_combinations
+    ]
 
     params = [
-        pytest.param(*p, id=f"{id[0]} {id[1]}")
-        for p, id in zip(param_combinations, names_combinations)
+        pytest.param(*p, id=f"{id[0]} {id[1]}", marks=marks)
+        for p, id, marks in zip(
+            param_combinations, names_combinations, marks_combinations
+        )
     ]
 
     return pytest.mark.parametrize(param_names, params)
@@ -153,6 +203,9 @@ def assert_result_equal(
     if not isinstance(x, (list, tuple)):
         x = (x,)
         y = (y,)
+    # lazy retrieval of tables to make pytest marks effective
+    x = (f() for f in x)
+    y = (f() for f in y)
 
     if exception and not may_throw:
         with pytest.raises(exception):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import decimal
 import functools
 import inspect
 import operator
@@ -186,7 +187,7 @@ class SQLTableImpl(LazyTableImpl):
                 return "str"
             if pytype == bool:
                 return "bool"
-            if pytype == float:
+            if pytype == float or pytype == decimal.Decimal:
                 return "float"
             raise NotImplementedError(f"Invalid type {col.type}.")
         except NotImplementedError as e:
