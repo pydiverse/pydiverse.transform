@@ -290,6 +290,8 @@ class SQLTableImpl(LazyTableImpl):
             sql_col = self.cols[uuid_].compiled(self.sql_columns)
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
+            if self.cols[uuid_].dtype == "bool":
+                sql_col = sa.cast(sql_col, sa.Boolean())
             s.append(sql_col.label(name))
 
         select = select.with_only_columns(*s)
