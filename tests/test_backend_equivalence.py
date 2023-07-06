@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import itertools
+import logging
 import sqlite3
 from collections import defaultdict
 from functools import cached_property
+from inspect import signature
 
 import pandas as pd
 import pytest
@@ -80,9 +81,10 @@ class PandasImpls:
 
 
 def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
+    logger = logging.getLogger(__name__ + "-sql_conn_to_impls")
     engine = sa.create_engine(conn)
     impls = {}
-    print("THIS IS VERY EXPENSIVE")
+    logger.info("Loading dataframes into %s database...", engine.dialect.name)
     for name, df in dataframes.items():
         if engine.dialect.name == "bigquery":
             if not (project_id and dataset):
@@ -94,6 +96,7 @@ def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
         else:
             df.to_sql(name, engine, index=False, if_exists="replace")
             impls[name] = SQLTableImpl(engine, name)
+    logger.info("Done loading dataframes into database")
     return impls
 
 
@@ -147,36 +150,46 @@ backend_impls = {
     "ibm_db2": IbmDb2Impls(),
 }
 
+# compare one dataframe and one SQL backend to all others
+# (some tests are ignored if either backend does not support a feature)
+compare_backends = ["pandas", "duckdb"]
 
-def tables(names: list[str]):
+
+def tables(names: list[str], expect_not_implemented=None):
+    logger = logging.getLogger(__name__)
+    if expect_not_implemented is None:
+        expect_not_implemented = []
     param_names = ",".join([f"{name}_x,{name}_y" for name in names])
 
-    tables = defaultdict(lambda: [])
+    defaultdict(lambda: [])
     backend_names = backend_impls.keys()
 
     # lazy initialization of database connections to make
     # pytest marks effective
-    def get_table_fn(_impls, _table_name):
+    def get_table_fn(_backend, _impls, _table_name):
         def get_table():
             return Table(_impls.impls[_table_name])
 
-        return get_table
+        return dict(
+            fn=get_table, expect_not_implemented=_backend in expect_not_implemented
+        )
 
-    for _, impls in backend_impls.items():
-        for table_name in dataframes.keys():
-            tables[table_name].append(get_table_fn(impls, table_name))
-
-    param_combinations = (
-        (zip(*itertools.combinations(tables[name], 2))) for name in names
-    )
-    param_combinations = itertools.chain(*param_combinations)
-    param_combinations = list(zip(*param_combinations))
-
-    # I don't think we need to test every backend against every other backend
-    # names_combinations = list(itertools.combinations(backend_names, 2))
+    # We test all compare_backends against all other backends
     names_combinations = [
-        ("pandas", backend) for backend in backend_names if backend != "pandas"
+        (cmp_backend, backend)
+        for cmp_backend in compare_backends
+        for backend in backend_names
+        if backend != cmp_backend
     ]
+    param_combinations = [
+        tuple(
+            get_table_fn(backend, backend_impls[backend], table_name)
+            for table_name in names
+            for backend in [backend1, backend2]
+        )
+        for backend1, backend2 in names_combinations
+    ]
+
     marks_combinations = [
         [
             getattr(pytest.mark, name)
@@ -193,24 +206,49 @@ def tables(names: list[str]):
         )
     ]
 
-    return pytest.mark.parametrize(param_names, params)
+    ret = pytest.mark.parametrize(param_names, params)
+
+    if len(set(compare_backends) - set(expect_not_implemented)) == 0:
+
+        def warn(fn):
+            def call(*args, **kwargs):
+                logger.warning("Test is a pure smoke test, no comparisons will be made")
+                return fn(*args, **kwargs)
+
+            call.__signature__ = signature(fn)
+            return ret(call)
+
+        return warn
+    return ret
 
 
 # TODO: when should we still consider the order when comparing?
 def assert_result_equal(
     x, y, pipe_factory, *, exception=None, check_order=False, may_throw=False, **kwargs
 ):
+    logger = logging.getLogger(__name__ + "-assert_result_equal")
     if not isinstance(x, (list, tuple)):
         x = (x,)
         y = (y,)
     # lazy retrieval of tables to make pytest marks effective
-    x = (f() for f in x)
-    y = (f() for f in y)
+    exceptions_x = {NotImplementedError for d in x if d["expect_not_implemented"]}
+    exceptions_y = {NotImplementedError for d in y if d["expect_not_implemented"]}
+    x = tuple(d["fn"]() for d in x)
+    y = tuple(d["fn"]() for d in y)
+    if exception is not None:
+        exceptions_x.add(exception)
+        exceptions_y.add(exception)
 
-    if exception and not may_throw:
-        with pytest.raises(exception):
+    if not may_throw and len(exceptions_x.union(exceptions_y)) > 0:
+        if len(exceptions_x) > 0:
+            with pytest.raises(tuple(exceptions_x)):
+                pipe_factory(*x) >> collect()
+        else:
             pipe_factory(*x) >> collect()
-        with pytest.raises(exception):
+        if len(exceptions_y) > 0:
+            with pytest.raises(tuple(exceptions_y)):
+                pipe_factory(*y) >> collect()
+        else:
             pipe_factory(*y) >> collect()
         return
     else:
@@ -237,8 +275,7 @@ def assert_result_equal(
                             f"Raised the wrong type of exception: {type(e)} instead of"
                             f" {exception}."
                         ) from e
-                # TODO: Replace with logger
-                print(f"An exception was thrown:\n{e}")
+                logger.info("An exception was thrown as expected:\n%s", e)
                 return
             else:
                 raise e
@@ -565,11 +602,13 @@ class TestArrange:
         assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(-t.col2))
 
     @tables(["df3"])
-    def test_multiple(self, df3_x, df3_y):
+    def test_multiple_sign(self, df3_x, df3_y):
         assert_result_equal(
             df3_x, df3_y, lambda t: t >> arrange(t.col2, -t.col3, -t.col4)
         )
 
+    @tables(["df3"])
+    def test_multiple(self, df3_x, df3_y):
         assert_result_equal(
             df3_x, df3_y, lambda t: t >> arrange(t.col2) >> arrange(-t.col3, -t.col4)
         )
@@ -806,9 +845,6 @@ class TestSummarise:
 class TestWindowFunction:
     @tables(["df3"])
     def test_simple_ungrouped(self, df3_x, df3_y):
-        for df in df3_x, df3_y:
-            print(type(df))
-            print(df >> mutate(rank=λ.col2.rank()) >> collect())
         assert_result_equal(
             df3_x,
             df3_y,

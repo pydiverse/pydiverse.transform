@@ -68,6 +68,12 @@ def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
                 f" not '{type(col)}'."
             )
         col = tbl.resolve_lambda_cols(col)
-        ordering.append(OrderingDescriptor(col, ascending, False))
+        # TODO: allow user to change nulls_first and choose a dialect specific default
+        # MSSQL:
+        #   only NULL FIRST is possible for ascending order
+        #   only NULL LAST is possible for descending order
+        # Pandas:
+        #   cannot handle different NULL FIRST/LAST ordering multiple columns
+        ordering.append(OrderingDescriptor(col, ascending, nulls_first=False))
 
     return ordering

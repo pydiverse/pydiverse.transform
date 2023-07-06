@@ -303,12 +303,16 @@ class SQLTableImpl(LazyTableImpl):
             for o_by in self.order_bys:
                 compiled, _ = self.compiler.translate(o_by.order)
                 col = compiled(self.sql_columns)
-                col = col.asc() if o_by.asc else col.desc()
-                col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
+                col = self.post_process_order_by(col, o_by)
                 o.append(col)
             select = select.order_by(*o)
 
         return select
+
+    def post_process_order_by(self, col, o_by):
+        col = col.asc() if o_by.asc else col.desc()
+        col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
+        return col
 
     #### Verb Operations ####
 
