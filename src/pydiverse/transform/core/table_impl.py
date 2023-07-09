@@ -414,10 +414,27 @@ class ImplicitArrange(ContextInstruction):
         return self.implicit_arrange
 
 
-#### ARITHMETIC OPERATORS ######################################################
-
+#### MARKER OPERATORS ##########################################################
 
 from pydiverse.transform.core import ops  # noqa
+
+with AbstractTableImpl.op(ops.NullsFirst()) as op:
+
+    @op.auto
+    def _nulls_first(x):
+        # it is just a marker not doing anything to the input
+        return x
+
+
+with AbstractTableImpl.op(ops.NullsLast()) as op:
+
+    @op.auto
+    def _nulls_last(x):
+        # it is just a marker not doing anything to the input
+        return x
+
+
+#### ARITHMETIC OPERATORS ######################################################
 
 with AbstractTableImpl.op(ops.Add()) as op:
 

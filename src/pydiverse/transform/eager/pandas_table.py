@@ -456,15 +456,15 @@ class PandasTableImpl(EagerTableImpl):
         ascending = [o.asc for o in ordering]
         nulls_first = [o.nulls_first for o in ordering]
 
-        if all(nulls_first):
+        if all([nf is None or nf for nf in nulls_first]):
             na_position = "first"
-        elif not any(nulls_first):
+        elif all([nf is None or not nf for nf in nulls_first]):
             na_position = "last"
         else:
             raise NotImplementedError(
-                "Pandas sort can't handle different null positions (first / last)"
+                f"Pandas sort can't handle different null positions (first / last)"
                 " inside a single sort. This can be resolved by splitting the ordering"
-                " into multiple arranges."
+                f" into multiple arranges. Found: {nulls_first}."
             )
 
         return df.sort_values(

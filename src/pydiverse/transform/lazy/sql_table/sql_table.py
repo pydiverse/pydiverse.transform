@@ -624,7 +624,12 @@ class SQLTableImpl(LazyTableImpl):
                 def clause(*args, **kwargs):
                     col = compiled(*args, **kwargs)
                     col = col.asc() if ordering.asc else col.desc()
-                    col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
+                    if ordering.nulls_first is not None:
+                        col = (
+                            col.nullsfirst()
+                            if ordering.nulls_first
+                            else col.nullslast()
+                        )
                     return col
 
                 return clause

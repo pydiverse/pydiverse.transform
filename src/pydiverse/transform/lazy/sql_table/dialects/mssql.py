@@ -10,11 +10,11 @@ class MssqlTableImpl(SQLTableImpl):
         col = col.asc() if o_by.asc else col.desc()
         # NULLS is not supported by TSQL, yet
         # col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
-        if o_by.asc and not o_by.nulls_first:
+        if o_by.asc and o_by.nulls_first is not None and not o_by.nulls_first:
             raise NotImplementedError(
                 "NULLS LAST is not supported by TSQL on ascending order"
             )
-        if not o_by.asc and o_by.nulls_first:
+        if not o_by.asc and o_by.nulls_first is not None and o_by.nulls_first:
             raise NotImplementedError(
                 "NULLS FIRST is not supported by TSQL on descending order"
             )

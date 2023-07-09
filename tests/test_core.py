@@ -443,12 +443,12 @@ class TestUtil:
     def test_sign_peeler(self):
         x = object()
         sx = SymbolicExpression(x)
-        assert sign_peeler(sx._) == (x, True)
-        assert sign_peeler((+sx)._) == (x, True)
-        assert sign_peeler((-sx)._) == (x, False)
-        assert sign_peeler((--sx)._) == (x, True)
-        assert sign_peeler((--+sx)._) == (x, True)
-        assert sign_peeler((-++--sx)._) == (x, False)  # noqa: B002
+        assert sign_peeler(sx._) == (x, True, None)
+        assert sign_peeler((+sx)._) == (x, True, None)
+        assert sign_peeler((-sx)._) == (x, False, None)
+        assert sign_peeler((--sx)._) == (x, True, None)
+        assert sign_peeler((--+sx)._) == (x, True, None)
+        assert sign_peeler((-++--sx)._) == (x, False, None)  # noqa: B002
 
 
 class MockTableImpl(AbstractTableImpl):

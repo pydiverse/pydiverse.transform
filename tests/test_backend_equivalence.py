@@ -60,6 +60,15 @@ dataframes = {
             "col5": list("abcdefghijkl"),
         }
     ),
+    "df4": pd.DataFrame(
+        {
+            "col1": [None, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2],
+            "col2": [0, 0, 1, 1, 0, 0, 1, None, 1, 0, 0, 1, 1],
+            "col3": [0, 1, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+            "col4": [0, 1, 2, 3, 4, None, 5, 6, 7, 8, 9, 10, 11],
+            "col5": list("abcdefghijkl") + [None],
+        }
+    ),
     "df_left": pd.DataFrame(
         {
             "a": [1, 2, 3, 4],
@@ -601,10 +610,34 @@ class TestArrange:
         assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(t.col2))
         assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(-t.col2))
 
-    @tables(["df3"])
-    def test_multiple_sign(self, df3_x, df3_y):
+    @tables(["df4"])
+    def test_multiple_sign(self, df4_x, df4_y):
         assert_result_equal(
-            df3_x, df3_y, lambda t: t >> arrange(t.col2, -t.col3, -t.col4)
+            df4_x, df4_y, lambda t: t >> arrange(t.col2, -t.col3, -t.col4)
+        )
+
+    @tables(["df4"], expect_not_implemented=["mssql"])
+    def test_multiple_sign_nulls_first(self, df4_x, df4_y):
+        assert_result_equal(
+            df4_x,
+            df4_y,
+            lambda t: t
+            >> arrange(
+                t.col2.nulls_first(), -t.col3.nulls_first(), (-t.col4).nulls_first()
+            ),
+            check_order=True,
+        )
+
+    @tables(["df4"], expect_not_implemented=["pandas"])
+    def test_multiple_sign_nulls_switch(self, df4_x, df4_y):
+        assert_result_equal(
+            df4_x,
+            df4_y,
+            lambda t: t
+            >> arrange(
+                t.col2.nulls_first(), -t.col3.nulls_last(), -t.col4.nulls_last()
+            ),
+            check_order=True,
         )
 
     @tables(["df3"])
