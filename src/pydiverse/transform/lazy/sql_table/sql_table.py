@@ -289,10 +289,13 @@ class SQLTableImpl(LazyTableImpl):
         s = []
         for name, uuid_ in self.selected_cols():
             sql_col = self.cols[uuid_].compiled(self.sql_columns)
+            context = ContextInstruction()
+            if isinstance(sql_col, tuple):
+                sql_col, context = sql_col
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
-            if self.cols[uuid_].dtype == "bool":
-                sql_col = sa.cast(sql_col, sa.Boolean())
+            sql_col = context.post_process(sql_col)
+            sql_col = self.post_process_select_column(sql_col, self.cols[uuid_])
             s.append(sql_col.label(name))
 
         select = select.with_only_columns(*s)
@@ -308,6 +311,17 @@ class SQLTableImpl(LazyTableImpl):
             select = select.order_by(*o)
 
         return select
+
+    def get_literal_func(self, expr):
+        def literal_func(*args, **kwargs):
+            return sa.literal(expr)
+
+        return literal_func
+
+    def post_process_select_column(self, sql_col, pdt_col):
+        if pdt_col.dtype == "bool":
+            sql_col = sa.cast(sql_col, sa.Boolean())
+        return sql_col
 
     def post_process_order_by(self, col, o_by):
         col = col.asc() if o_by.asc else col.desc()
@@ -402,23 +416,29 @@ class SQLTableImpl(LazyTableImpl):
 
     def collect(self):
         select = self.build_select()
-        with self.engine.connect() as conn:
-            try:
-                # TODO: check for which pandas versions this is needed:
-                # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
-                # Taken from siuba
-                from pandas.io import sql as _pd_sql
+        try:
+            with self.engine.connect() as conn:
+                try:
+                    # TODO: check for which pandas versions this is needed:
+                    # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
+                    # Taken from siuba
+                    from pandas.io import sql as _pd_sql
 
-                class _FixedSqlDatabase(_pd_sql.SQLDatabase):
-                    def execute(self, *args, **kwargs):
-                        return self.connectable.execute(*args, **kwargs)
+                    class _FixedSqlDatabase(_pd_sql.SQLDatabase):
+                        def execute(self, *args, **kwargs):
+                            return self.connectable.execute(*args, **kwargs)
 
-                sql_db = _FixedSqlDatabase(conn)
-                result = sql_db.read_sql(select).convert_dtypes()
-            except AttributeError:
-                import pandas as pd
+                    sql_db = _FixedSqlDatabase(conn)
+                    result = sql_db.read_sql(select).convert_dtypes()
+                except AttributeError:
+                    import pandas as pd
 
-                result = pd.read_sql_query(select, con=conn)
+                    result = pd.read_sql_query(select, con=conn)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to execute query:\n"
+                f"{select.compile(self.engine, compile_kwargs={'literal_binds': True})}"
+            ) from e
 
         # Add metadata
         result.attrs["name"] = self.name
@@ -426,11 +446,7 @@ class SQLTableImpl(LazyTableImpl):
 
     def build_query(self) -> str:
         query = self.build_select()
-        return str(
-            query.compile(
-                dialect=self.engine.dialect, compile_kwargs={"literal_binds": True}
-            )
-        )
+        return str(query.compile(self.engine, compile_kwargs={"literal_binds": True}))
 
     def join(self, right, on, how, *, validate=None):
         self.alignment_hash = generate_alignment_hash()
@@ -524,10 +540,7 @@ class SQLTableImpl(LazyTableImpl):
         ]
     ):
         def _get_literal_func(self, expr):
-            def literal_func(*args, **kwargs):
-                return sa.literal(expr)
-
-            return literal_func
+            return self.backend.get_literal_func(expr)
 
         def _translate_col(self, expr, **kwargs):
             # Can either be a base SQL column, or a reference to an expression
@@ -556,25 +569,22 @@ class SQLTableImpl(LazyTableImpl):
         def _translate_function(
             self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
         ):
-            def check_arg(v, arg):
-                if isinstance(v, tuple):
-                    # might work, but we need to correctly split off instructions
-                    # like ImplicitArrange
-                    raise NotImplementedError(
-                        f"{operator.ftype} function {arg} is currently not allowed "
-                        "as function argument."
-                    )
-                return v
-
             def value(cols):
-                return implementation(
-                    *(
-                        check_arg(arg.value(cols), arg)
-                        if not is_const
-                        else arg.const_value(cols)
-                        for arg, is_const in zip(op_args, implementation.const_args)
-                    )
-                )
+                args = [
+                    arg.value(cols) if not is_const else arg.const_value(cols)
+                    for arg, is_const in zip(op_args, implementation.const_args)
+                ]
+                main_args = [
+                    arg[1].process_arg(arg[0]) if isinstance(arg, tuple) else arg
+                    for arg in args
+                ]
+                parts_args = [len(arg) if isinstance(arg, tuple) else 1 for arg in args]
+                res = implementation(*main_args)
+                # aggregate context instructions returned by arg.value() functions
+                assert (
+                    len(parts_args) == 0 or max(parts_args) <= 2
+                ), "value function returned more than two parts"
+                return res
 
             operator = implementation.operator
 
