@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import decimal
 import functools
 import inspect
 import operator
@@ -17,7 +18,11 @@ from pydiverse.transform.core.column import Column, LiteralColumn
 from pydiverse.transform.core.expressions import SymbolicExpression, iterate_over_expr
 from pydiverse.transform.core.expressions.translator import TypedValue
 from pydiverse.transform.core.ops import OPType
-from pydiverse.transform.core.table_impl import ColumnMetaData
+from pydiverse.transform.core.table_impl import (
+    ColumnMetaData,
+    ContextInstruction,
+    ImplicitArrange,
+)
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 
@@ -85,7 +90,19 @@ class SQLTableImpl(LazyTableImpl):
         dataset=None,
         _dtype_hints: dict[str, str] = None,
     ):
+        _ = dataset  # unused in SQLTableImpl
         self.engine = sa.create_engine(engine) if isinstance(engine, str) else engine
+        self.alignment_hash = None
+        self.tbl = None
+        self.sql_columns = None
+        self.selects = None
+        self.joins: list[JoinDescriptor] = []
+        self.wheres: list[SymbolicExpression] = []
+        self.having: list[SymbolicExpression] = []
+        self.grouped_by = None
+        self.order_bys: list[OrderingDescriptor] = []
+        self.limit_offset: tuple[int, int] | None = None
+
         tbl = self._create_table(table, self.engine)
 
         columns = {
@@ -182,7 +199,7 @@ class SQLTableImpl(LazyTableImpl):
                 return "str"
             if pytype == bool:
                 return "bool"
-            if pytype == float:
+            if pytype == float or pytype == decimal.Decimal:
                 return "float"
             raise NotImplementedError(f"Invalid type {col.type}.")
         except NotImplementedError as e:
@@ -210,11 +227,11 @@ class SQLTableImpl(LazyTableImpl):
         if hasattr(self, "intrinsic_grouped_by"):
             self.intrinsic_grouped_by.clear()
 
-        self.joins: list[JoinDescriptor] = []
-        self.wheres: list[SymbolicExpression] = []
-        self.having: list[SymbolicExpression] = []
-        self.order_bys: list[OrderingDescriptor] = []
-        self.limit_offset: tuple[int, int] = None
+        self.joins = []
+        self.wheres = []
+        self.having = []
+        self.order_bys = []
+        self.limit_offset = None
 
     def build_select(self) -> sql.Select:
         # Validate current state
@@ -284,8 +301,13 @@ class SQLTableImpl(LazyTableImpl):
         s = []
         for name, uuid_ in self.selected_cols():
             sql_col = self.cols[uuid_].compiled(self.sql_columns)
+            context = ContextInstruction()
+            if isinstance(sql_col, tuple):
+                sql_col, context = sql_col
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
+            sql_col = context.post_process(sql_col)
+            sql_col = self.post_process_select_column(sql_col, self.cols[uuid_])
             s.append(sql_col.label(name))
 
         select = select.with_only_columns(*s)
@@ -296,12 +318,27 @@ class SQLTableImpl(LazyTableImpl):
             for o_by in self.order_bys:
                 compiled, _ = self.compiler.translate(o_by.order)
                 col = compiled(self.sql_columns)
-                col = col.asc() if o_by.asc else col.desc()
-                col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
+                col = self.post_process_order_by(col, o_by)
                 o.append(col)
             select = select.order_by(*o)
 
         return select
+
+    def get_literal_func(self, expr):
+        def literal_func(*args, **kwargs):
+            return sa.literal(expr)
+
+        return literal_func
+
+    def post_process_select_column(self, sql_col, pdt_col):
+        if pdt_col.dtype == "bool":
+            sql_col = sa.cast(sql_col, sa.Boolean())
+        return sql_col
+
+    def post_process_order_by(self, col, o_by):
+        col = col.asc() if o_by.asc else col.desc()
+        col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
+        return col
 
     #### Verb Operations ####
 
@@ -317,6 +354,7 @@ class SQLTableImpl(LazyTableImpl):
             )
 
         requires_subquery = False
+        clear_order = False
 
         if self.limit_offset is not None:
             # The LIMIT / TOP clause is executed at the very end of the query.
@@ -342,7 +380,7 @@ class SQLTableImpl(LazyTableImpl):
             # grouping columns. We must clear the order_bys so that the order
             # is consistent with eager execution. We can do this because aggregate
             # functions are independent of the order.
-            self.order_bys.clear()
+            clear_order = True
 
             # If the grouping level is different from the grouping level of the
             # tbl object, or if on of the input columns is a window or aggregate
@@ -374,6 +412,9 @@ class SQLTableImpl(LazyTableImpl):
             self.replace_tbl(subquery, columns)
             self.selects = original_selects
 
+        if clear_order:
+            self.order_bys.clear()
+
     def alias(self, name=None):
         if name is None:
             suffix = format(uuid.uuid1().int % 0x7FFFFFFF, "X")
@@ -391,23 +432,29 @@ class SQLTableImpl(LazyTableImpl):
 
     def collect(self):
         select = self.build_select()
-        with self.engine.connect() as conn:
-            try:
-                # TODO: check for which pandas versions this is needed:
-                # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
-                # Taken from siuba
-                from pandas.io import sql as _pd_sql
+        try:
+            with self.engine.connect() as conn:
+                try:
+                    # TODO: check for which pandas versions this is needed:
+                    # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
+                    # Taken from siuba
+                    from pandas.io import sql as _pd_sql
 
-                class _FixedSqlDatabase(_pd_sql.SQLDatabase):
-                    def execute(self, *args, **kwargs):
-                        return self.connectable.execute(*args, **kwargs)
+                    class _FixedSqlDatabase(_pd_sql.SQLDatabase):
+                        def execute(self, *args, **kwargs):
+                            return self.connectable.execute(*args, **kwargs)
 
-                sql_db = _FixedSqlDatabase(conn)
-                result = sql_db.read_sql(select).convert_dtypes()
-            except AttributeError:
-                import pandas as pd
+                    sql_db = _FixedSqlDatabase(conn)
+                    result = sql_db.read_sql(select).convert_dtypes()
+                except AttributeError:
+                    import pandas as pd
 
-                result = pd.read_sql_query(select, con=conn)
+                    result = pd.read_sql_query(select, con=conn)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to execute query:\n"
+                f"{select.compile(self.engine, compile_kwargs={'literal_binds': True})}"
+            ) from e
 
         # Add metadata
         result.attrs["name"] = self.name
@@ -415,11 +462,7 @@ class SQLTableImpl(LazyTableImpl):
 
     def build_query(self) -> str:
         query = self.build_select()
-        return str(
-            query.compile(
-                dialect=self.engine.dialect, compile_kwargs={"literal_binds": True}
-            )
-        )
+        return str(query.compile(self.engine, compile_kwargs={"literal_binds": True}))
 
     def join(self, right, on, how, *, validate=None):
         self.alignment_hash = generate_alignment_hash()
@@ -493,6 +536,10 @@ class SQLTableImpl(LazyTableImpl):
     def arrange(self, ordering):
         self.alignment_hash = generate_alignment_hash()
         self.order_bys = ordering + self.order_bys
+        # drop duplicates without changing order
+        self.order_bys = list(dict.fromkeys(self.order_bys))
+        # TODO: check for same OrderDescriptor.order but different attributes
+        #  and potentially raise error
 
     def summarise(self, **kwargs):
         self.alignment_hash = generate_alignment_hash()
@@ -512,6 +559,9 @@ class SQLTableImpl(LazyTableImpl):
             TypedValue[Callable[[dict[uuid.UUID, sa.Column]], sql.ColumnElement]],
         ]
     ):
+        def _get_literal_func(self, expr):
+            return self.backend.get_literal_func(expr)
+
         def _translate_col(self, expr, **kwargs):
             # Can either be a base SQL column, or a reference to an expression
             if expr.uuid in self.backend.sql_columns:
@@ -540,7 +590,21 @@ class SQLTableImpl(LazyTableImpl):
             self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
         ):
             def value(cols):
-                return implementation(*(arg.value(cols) for arg in op_args))
+                args = [
+                    arg.value(cols) if not is_const else arg.const_value(cols)
+                    for arg, is_const in zip(op_args, implementation.const_args)
+                ]
+                main_args = [
+                    arg[1].process_arg(arg[0]) if isinstance(arg, tuple) else arg
+                    for arg in args
+                ]
+                parts_args = [len(arg) if isinstance(arg, tuple) else 1 for arg in args]
+                res = implementation(*main_args)
+                # aggregate context instructions returned by arg.value() functions
+                assert (
+                    len(parts_args) == 0 or max(parts_args) <= 2
+                ), "value function returned more than two parts"
+                return res
 
             operator = implementation.operator
 
@@ -590,37 +654,48 @@ class SQLTableImpl(LazyTableImpl):
                 def clause(*args, **kwargs):
                     col = compiled(*args, **kwargs)
                     col = col.asc() if ordering.asc else col.desc()
-                    col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
+                    if ordering.nulls_first is not None:
+                        col = (
+                            col.nullsfirst()
+                            if ordering.nulls_first
+                            else col.nullslast()
+                        )
                     return col
 
                 return clause
 
-            if wants_order_by:
-                arrange = context_kwargs.get("arrange")
-                if not arrange:
-                    raise TypeError("Missing 'arrange' argument.")
-
-                ordering = translate_ordering(self.backend, arrange)
-                compiled_ob = [order_by_clause_generator(o_by) for o_by in ordering]
-
             # New value callable
             def over_value(*args, **kwargs):
+                v = value(*args, **kwargs)
+                context_instruction = ContextInstruction()
+                if isinstance(v, tuple):
+                    v, context_instruction = v
+
                 pb = sql.expression.ClauseList(
                     *(compiled(*args, **kwargs) for compiled in compiled_pb)
                 )
-                ob = (
-                    sql.expression.ClauseList(
+                ob = None
+
+                if wants_order_by:
+                    arrange = context_kwargs.get("arrange", [])
+
+                    ordering = translate_ordering(self.backend, arrange)
+                    compiled_ob = [order_by_clause_generator(o_by) for o_by in ordering]
+
+                    ob = sql.expression.ClauseList(
                         *(compiled(*args, **kwargs) for compiled in compiled_ob)
                     )
-                    if wants_order_by
-                    else None
-                )
 
-                v = value(*args, **kwargs)
-                return v.over(
+                    ob = context_instruction.process_order(ob)
+                    if len(ob) == 0:
+                        raise TypeError("Missing 'arrange' argument.")
+
+                res = v.over(
                     partition_by=pb,
                     order_by=ob,
                 )
+                res = context_instruction.post_process(res)
+                return res
 
             return over_value
 
@@ -688,7 +763,7 @@ def generate_alignment_hash():
 from . import dialects  # noqa
 
 
-#### BACKEND SPECIFIC OPERATORS ################################################
+# ## BACKEND SPECIFIC OPERATORS ################################################
 
 
 with SQLTableImpl.op(ops.FloorDiv(), check_super=False) as op:
@@ -730,7 +805,7 @@ with SQLTableImpl.op(ops.Strip()) as op:
         return sa.func.TRIM(x)
 
 
-#### Summarising Functions ####
+# ## Summarising Functions ####
 
 
 with SQLTableImpl.op(ops.Mean()) as op:
@@ -761,6 +836,20 @@ with SQLTableImpl.op(ops.Sum()) as op:
         return sa.func.SUM(x)
 
 
+with SQLTableImpl.op(ops.Any()) as op:
+
+    @op.auto
+    def _any(x):
+        return sa.func.bool_or(x)
+
+
+with SQLTableImpl.op(ops.All()) as op:
+
+    @op.auto
+    def _all(x):
+        return sa.func.bool_and(x)
+
+
 with SQLTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto
@@ -780,7 +869,7 @@ with SQLTableImpl.op(ops.Count()) as op:
             return sa.func.COUNT(x)
 
 
-#### Window Functions ####
+# ## Window Functions ####
 
 
 with SQLTableImpl.op(ops.Shift()) as op:
@@ -799,5 +888,25 @@ with SQLTableImpl.op(ops.Shift()) as op:
 with SQLTableImpl.op(ops.RowNumber()) as op:
 
     @op.auto
-    def _row_number():
-        return sa.func.ROW_NUMBER()
+    def _row_number(*args):
+        # support both col.row_number() and row_number(arrange=[col,...])
+        if len(args) == 0:
+            return sa.func.ROW_NUMBER()
+        elif len(args) == 1:
+            return sa.func.ROW_NUMBER(), ImplicitArrange(
+                sql.expression.ClauseList(args[0])
+            )
+        else:
+            raise AssertionError(
+                "Number of arguments should already have been checked based on "
+                "signatures"
+            )
+
+
+with SQLTableImpl.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank(x):
+        # row_number() is like rank(method="first")
+        # rank() is like method="min"
+        return sa.func.RANK(), ImplicitArrange(sql.expression.ClauseList(x))

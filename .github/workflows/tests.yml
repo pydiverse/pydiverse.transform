@@ -44,6 +44,10 @@ jobs:
         uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python-version }}
+          poetry-flags: --all-extras --with=tests
+
+      - name: Install Microsoft ODBC
+        run: sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
 
       - name: Start Docker Compose
         uses: isbang/compose-action@v1.4.1
@@ -60,3 +64,5 @@ jobs:
 
       - name: Run Tests
         uses: ./.github/actions/test
+        with:
+          arguments: --workers 4 --postgres --mssql #--ibm_db2

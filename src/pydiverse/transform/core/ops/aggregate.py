@@ -7,6 +7,8 @@ __all__ = [
     "Max",
     "Mean",
     "Sum",
+    "Any",
+    "All",
     "StringJoin",
     "Count",
 ]
@@ -43,6 +45,20 @@ class Sum(Aggregate, Unary):
     signatures = [
         "int -> int",
         "float -> float",
+    ]
+
+
+class Any(Aggregate, Unary):
+    name = "any"
+    signatures = [
+        "bool -> bool",
+    ]
+
+
+class All(Aggregate, Unary):
+    name = "all"
+    signatures = [
+        "bool -> bool",
     ]
 
 

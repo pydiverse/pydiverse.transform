@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import functools
 import uuid
 import warnings
 from collections.abc import Iterable
@@ -152,7 +153,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         """
         return repr(expr)
 
-    #### Verb Callbacks ####
+    # ### Verb Callbacks ####
 
     def preverb_hook(self, verb: str, *args, **kwargs) -> None:
         """Hook that gets called right after `copy` inside a verb
@@ -203,7 +204,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     def slice_head(self, n: int, offset: int):
         ...
 
-    #### Symbolic Operators ####
+    # ### Symbolic Operators ####
 
     @classmethod
     def op(cls, operator: Operator, **kwargs) -> OperatorRegistrationContextManager:
@@ -211,7 +212,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             cls.operator_registry, operator, **kwargs
         )
 
-    #### Expressions ####
+    # ### Expressions ####
 
     class ExpressionCompiler(
         Generic[ImplT, ExprCompT], DelegatingTranslator[ExprCompT]
@@ -228,18 +229,26 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self.backend = backend
             super().__init__(backend.operator_registry)
 
-        def _translate_literal(self, expr, **kwargs):
+        def _get_literal_func(self, expr):
             def literal_func(*args, **kwargs):
                 return expr
 
-            if isinstance(expr, int):
-                return TypedValue(literal_func, "int")
-            if isinstance(expr, float):
-                return TypedValue(literal_func, "float")
-            if isinstance(expr, str):
-                return TypedValue(literal_func, "str")
+            return literal_func
+
+        def _translate_literal(self, expr, **kwargs):
+            literal_func = self._get_literal_func(expr)
+
+            def const_func(*args, **kwargs):
+                return expr
+
             if isinstance(expr, bool):
-                return TypedValue(literal_func, "bool")
+                return TypedValue(literal_func, "bool", const_value=const_func)
+            if isinstance(expr, int):
+                return TypedValue(literal_func, "int", const_value=const_func)
+            if isinstance(expr, float):
+                return TypedValue(literal_func, "float", const_value=const_func)
+            if isinstance(expr, str):
+                return TypedValue(literal_func, "str", const_value=const_func)
 
     class AlignedExpressionEvaluator(Generic[AlignedT], DelegatingTranslator[AlignedT]):
         """
@@ -249,14 +258,14 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
         """
 
         def _translate_literal(self, expr, **kwargs):
-            if isinstance(expr, int):
-                return TypedValue(expr, "int")
-            if isinstance(expr, float):
-                return TypedValue(expr, "float")
-            if isinstance(expr, str):
-                return TypedValue(expr, "str")
             if isinstance(expr, bool):
-                return TypedValue(expr, "bool")
+                return TypedValue(expr, "bool", const_value=expr)
+            if isinstance(expr, int):
+                return TypedValue(expr, "int", const_value=expr)
+            if isinstance(expr, float):
+                return TypedValue(expr, "float", const_value=expr)
+            if isinstance(expr, str):
+                return TypedValue(expr, "str", const_value=expr)
 
     class LambdaTranslator(Translator):
         """
@@ -280,7 +289,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 return self.backend.cols[uuid].as_column(expr.name, self.backend)
             return expr
 
-    #### Helpers ####
+    # ### Helpers ####
 
     @classmethod
     def _get_op_ftype(
@@ -368,10 +377,129 @@ class ColumnMetaData:
         return Column(name, table, self.dtype, self.uuid)
 
 
-#### ARITHMETIC OPERATORS ######################################################
+# noinspection PyMethodMayBeStatic
+class ContextInstruction:
+    def __init__(
+        self,
+        instructions: list[ContextInstruction] | None = None,
+        prevent_duplicate_keys: list[str] | None = None,
+    ):
+        if instructions is None:
+            self._instructions = []  # type: list[ContextInstruction]
+            self._prevent_duplicate_keys = []  # type: list[str]
+        elif len(instructions) == 1 and not hasattr(instructions[0], "_instructions"):
+            # super().__init__(instructions=[self]) call
+            self._instructions = instructions
+            self._prevent_duplicate_keys = (
+                prevent_duplicate_keys if prevent_duplicate_keys is not None else [None]
+            )
+        else:
+            _instructions = [instr._instructions for instr in instructions]
+            _prevent_duplicate_keys = [
+                instr._prevent_duplicate_keys for instr in instructions
+            ]
+            self._instructions = functools.reduce(lambda a, b: a + b, _instructions)
+            self._prevent_duplicate_keys = functools.reduce(
+                lambda a, b: a + b, _prevent_duplicate_keys
+            )
 
+    def _unary_op(self, expr, fn_name):
+        prevent_duplicate_keys = set()
+        for instruction, key in zip(self._instructions, self._prevent_duplicate_keys):
+            if key is not None:
+                if key in prevent_duplicate_keys:
+                    continue
+                prevent_duplicate_keys.add(key)
+            expr = getattr(instruction, fn_name)(expr)
+        return expr
+
+    def post_process(self, expr):
+        return self._unary_op(expr, "_post_process")
+
+    def process_arg(self, expr):
+        return self._unary_op(expr, "_process_arg")
+
+    def process_order(self, expr):
+        return self._unary_op(expr, "_process_order")
+
+    def _post_process(self, expr):
+        return expr
+
+    def _process_arg(self, expr):
+        return expr
+
+    def _process_order(self, expr):
+        return expr
+
+    def __and__(self, other: ContextInstruction):
+        return ContextInstruction(self._instructions + other._instructions)
+
+
+class ImplicitArrange(ContextInstruction):
+    def __init__(self, implicit_arrange, prevent_duplicate_key: str | None = None):
+        prevent_duplicate_keys = (
+            [prevent_duplicate_key] if prevent_duplicate_key is not None else None
+        )
+        super().__init__(
+            instructions=[self], prevent_duplicate_keys=prevent_duplicate_keys
+        )
+        assert hasattr(implicit_arrange, "__len__")
+        self.implicit_arrange = implicit_arrange
+
+    def _process_order(self, expr):
+        assert len(expr) == 0
+        return self.implicit_arrange
+
+
+class PostProcess(ContextInstruction):
+    def __init__(self, fn, prevent_duplicate_key: str | None = None):
+        prevent_duplicate_keys = (
+            [prevent_duplicate_key] if prevent_duplicate_key is not None else None
+        )
+        super().__init__(
+            instructions=[self], prevent_duplicate_keys=prevent_duplicate_keys
+        )
+        self.fn = fn
+
+    def _post_process(self, expr):
+        return self.fn(expr)
+
+
+class ProcessArg(ContextInstruction):
+    def __init__(self, fn, prevent_duplicate_key: str | None = None):
+        prevent_duplicate_keys = (
+            [prevent_duplicate_key] if prevent_duplicate_key is not None else None
+        )
+        super().__init__(
+            instructions=[self], prevent_duplicate_keys=prevent_duplicate_keys
+        )
+        self.fn = fn
+
+    def _process_arg(self, expr):
+        return self.fn(expr)
+
+
+# MARKER OPERATORS #############################################################
 
 from pydiverse.transform.core import ops  # noqa
+
+with AbstractTableImpl.op(ops.NullsFirst()) as op:
+
+    @op.auto
+    def _nulls_first(x):
+        # it is just a marker not doing anything to the input
+        return x
+
+
+with AbstractTableImpl.op(ops.NullsLast()) as op:
+
+    @op.auto
+    def _nulls_last(x):
+        # it is just a marker not doing anything to the input
+        return x
+
+
+# ARITHMETIC OPERATORS #########################################################
 
 with AbstractTableImpl.op(ops.Add()) as op:
 
@@ -500,7 +628,7 @@ with AbstractTableImpl.op(ops.Abs()) as op:
         return abs(x)
 
 
-#### BINARY OPERATORS ##########################################################
+# BINARY OPERATORS #############################################################
 
 
 with AbstractTableImpl.op(ops.And()) as op:
@@ -552,7 +680,7 @@ with AbstractTableImpl.op(ops.Invert()) as op:
         return ~x
 
 
-#### COMPARISON OPERATORS ######################################################
+# COMPARISON OPERATORS #########################################################
 
 
 with AbstractTableImpl.op(ops.Equal()) as op:

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import itertools
+import logging
 import sqlite3
 from collections import defaultdict
+from functools import cached_property
+from inspect import signature
 
 import pandas as pd
 import pytest
@@ -33,6 +35,7 @@ from pydiverse.transform.core.verbs import (
 )
 from pydiverse.transform.eager.pandas_table import PandasTableImpl
 from pydiverse.transform.lazy.sql_table import SQLTableImpl
+from tests.fixtures.instances import INSTANCE_MARKS
 
 dataframes = {
     "df1": pd.DataFrame(
@@ -57,6 +60,15 @@ dataframes = {
             "col5": list("abcdefghijkl"),
         }
     ),
+    "df4": pd.DataFrame(
+        {
+            "col1": [None, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2],
+            "col2": [0, 0, 1, 1, 0, 0, 1, None, 1, 0, 0, 1, 1],
+            "col3": [0, 1, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+            "col4": [0, 1, 2, 3, 4, None, 5, 6, 7, 8, 9, 10, 11],
+            "col5": list("abcdefghijkl") + [None],
+        }
+    ),
     "df_left": pd.DataFrame(
         {
             "a": [1, 2, 3, 4],
@@ -71,14 +83,17 @@ dataframes = {
 }
 
 
-def pandas_impls():
-    return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
+class PandasImpls:
+    @cached_property
+    def impls(self):
+        return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
 
 
 def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
+    logger = logging.getLogger(__name__ + "-sql_conn_to_impls")
     engine = sa.create_engine(conn)
     impls = {}
-    print("THIS IS VERY EXPENSIVE")
+    logger.info("Loading dataframes into %s database...", engine.dialect.name)
     for name, df in dataframes.items():
         if engine.dialect.name == "bigquery":
             if not (project_id and dataset):
@@ -90,74 +105,159 @@ def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
         else:
             df.to_sql(name, engine, index=False, if_exists="replace")
             impls[name] = SQLTableImpl(engine, name)
+    logger.info("Done loading dataframes into database")
     return impls
 
 
-def sqlite_impls():
-    return sql_conn_to_impls("sqlite:///:memory:")
+class SqliteImpls:
+    @cached_property
+    def impls(self):
+        return sql_conn_to_impls("sqlite:///:memory:")
 
 
-def mssql_impls():
-    user = "sa"
-    password = "PidyQuant27"
-    localhost = "127.0.0.1"
-    db_name = "master"
-    local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    return sql_conn_to_impls(local_conn)
+class DuckDbImpls:
+    @cached_property
+    def impls(self):
+        return sql_conn_to_impls("duckdb://")
 
 
-def postgresql_impls():
-    user = "sa"
-    password = "Pydiverse23"
-    local_conn = f"postgresql://{user}:{password}@localhost:5432/"
-    return sql_conn_to_impls(local_conn)
+class MssqlImpls:
+    @cached_property
+    def impls(self):
+        user = "sa"
+        password = "PydiQuant27"
+        localhost = "127.0.0.1"
+        db_name = "master"
+        local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+        return sql_conn_to_impls(local_conn)
+
+
+class PostgresqlImpls:
+    @cached_property
+    def impls(self):
+        user = "sa"
+        password = "Pydiverse23"
+        local_conn = f"postgresql://{user}:{password}@localhost:6543/"
+        return sql_conn_to_impls(local_conn)
+
+
+class IbmDb2Impls:
+    @cached_property
+    def impls(self):
+        user = "db2inst1"
+        password = "password"
+        local_conn = f"db2+ibm_db://{user}:{password}@localhost:50000/testdb"
+        return sql_conn_to_impls(local_conn)
 
 
 backend_impls = {
-    "pandas": pandas_impls(),
-    "sqlite": sqlite_impls(),
-    # "mssql": mssql_impls(),
-    "postgres": postgresql_impls(),
+    "pandas": PandasImpls(),
+    "sqlite": SqliteImpls(),
+    "duckdb": DuckDbImpls(),
+    "postgres": PostgresqlImpls(),
+    "mssql": MssqlImpls(),
+    "ibm_db2": IbmDb2Impls(),
 }
 
+# compare one dataframe and one SQL backend to all others
+# (some tests are ignored if either backend does not support a feature)
+compare_backends = ["pandas", "duckdb"]
 
-def tables(names: list[str]):
+
+def tables(names: list[str], expect_not_implemented=None):
+    logger = logging.getLogger(__name__)
+    if expect_not_implemented is None:
+        expect_not_implemented = []
     param_names = ",".join([f"{name}_x,{name}_y" for name in names])
 
-    tables = defaultdict(lambda: [])
+    defaultdict(lambda: [])
     backend_names = backend_impls.keys()
-    for _, impls in backend_impls.items():
-        for table_name, impl in impls.items():
-            tables[table_name].append(Table(impl))
 
-    param_combinations = (
-        (zip(*itertools.combinations(tables[name], 2))) for name in names
-    )
-    param_combinations = itertools.chain(*param_combinations)
-    param_combinations = list(zip(*param_combinations))
+    # lazy initialization of database connections to make
+    # pytest marks effective
+    def get_table_fn(_backend, _impls, _table_name):
+        def get_table():
+            return Table(_impls.impls[_table_name])
 
-    names_combinations = list(itertools.combinations(backend_names, 2))
+        return dict(
+            fn=get_table, expect_not_implemented=_backend in expect_not_implemented
+        )
 
-    params = [
-        pytest.param(*p, id=f"{id[0]} {id[1]}")
-        for p, id in zip(param_combinations, names_combinations)
+    # We test all compare_backends against all other backends
+    names_combinations = [
+        (cmp_backend, backend)
+        for cmp_backend in compare_backends
+        for backend in backend_names
+        if backend != cmp_backend
+    ]
+    param_combinations = [
+        tuple(
+            get_table_fn(backend, backend_impls[backend], table_name)
+            for table_name in names
+            for backend in [backend1, backend2]
+        )
+        for backend1, backend2 in names_combinations
     ]
 
-    return pytest.mark.parametrize(param_names, params)
+    marks_combinations = [
+        [
+            getattr(pytest.mark, name)
+            for name in [name1, name2]
+            if name in INSTANCE_MARKS
+        ]
+        for name1, name2 in names_combinations
+    ]
+
+    params = [
+        pytest.param(*p, id=f"{id[0]} {id[1]}", marks=marks)
+        for p, id, marks in zip(
+            param_combinations, names_combinations, marks_combinations
+        )
+    ]
+
+    ret = pytest.mark.parametrize(param_names, params)
+
+    if len(set(compare_backends) - set(expect_not_implemented)) == 0:
+
+        def warn(fn):
+            def call(*args, **kwargs):
+                logger.warning("Test is a pure smoke test, no comparisons will be made")
+                return fn(*args, **kwargs)
+
+            call.__signature__ = signature(fn)
+            return ret(call)
+
+        return warn
+    return ret
 
 
 # TODO: when should we still consider the order when comparing?
 def assert_result_equal(
     x, y, pipe_factory, *, exception=None, check_order=False, may_throw=False, **kwargs
 ):
+    logger = logging.getLogger(__name__ + "-assert_result_equal")
     if not isinstance(x, (list, tuple)):
         x = (x,)
         y = (y,)
+    # lazy retrieval of tables to make pytest marks effective
+    exceptions_x = {NotImplementedError for d in x if d["expect_not_implemented"]}
+    exceptions_y = {NotImplementedError for d in y if d["expect_not_implemented"]}
+    x = tuple(d["fn"]() for d in x)
+    y = tuple(d["fn"]() for d in y)
+    if exception is not None:
+        exceptions_x.add(exception)
+        exceptions_y.add(exception)
 
-    if exception and not may_throw:
-        with pytest.raises(exception):
+    if not may_throw and len(exceptions_x.union(exceptions_y)) > 0:
+        if len(exceptions_x) > 0:
+            with pytest.raises(tuple(exceptions_x)):
+                pipe_factory(*x) >> collect()
+        else:
             pipe_factory(*x) >> collect()
-        with pytest.raises(exception):
+        if len(exceptions_y) > 0:
+            with pytest.raises(tuple(exceptions_y)):
+                pipe_factory(*y) >> collect()
+        else:
             pipe_factory(*y) >> collect()
         return
     else:
@@ -184,8 +284,7 @@ def assert_result_equal(
                             f"Raised the wrong type of exception: {type(e)} instead of"
                             f" {exception}."
                         ) from e
-                # TODO: Replace with logger
-                print(f"An exception was thrown:\n{e}")
+                logger.info("An exception was thrown as expected:\n%s", e)
                 return
             else:
                 raise e
@@ -511,12 +610,38 @@ class TestArrange:
         assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(t.col2))
         assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(-t.col2))
 
-    @tables(["df3"])
-    def test_multiple(self, df3_x, df3_y):
+    @tables(["df4"])
+    def test_multiple_sign(self, df4_x, df4_y):
         assert_result_equal(
-            df3_x, df3_y, lambda t: t >> arrange(t.col2, -t.col3, -t.col4)
+            df4_x, df4_y, lambda t: t >> arrange(t.col2, -t.col3, -t.col4)
         )
 
+    @tables(["df4"], expect_not_implemented=["mssql"])
+    def test_multiple_sign_nulls_first(self, df4_x, df4_y):
+        assert_result_equal(
+            df4_x,
+            df4_y,
+            lambda t: t
+            >> arrange(
+                t.col2.nulls_first(), -t.col3.nulls_first(), (-t.col4).nulls_first()
+            ),
+            check_order=True,
+        )
+
+    @tables(["df4"], expect_not_implemented=["pandas"])
+    def test_multiple_sign_nulls_switch(self, df4_x, df4_y):
+        assert_result_equal(
+            df4_x,
+            df4_y,
+            lambda t: t
+            >> arrange(
+                t.col2.nulls_first(), -t.col3.nulls_last(), -t.col4.nulls_last()
+            ),
+            check_order=True,
+        )
+
+    @tables(["df3"])
+    def test_multiple(self, df3_x, df3_y):
         assert_result_equal(
             df3_x, df3_y, lambda t: t >> arrange(t.col2) >> arrange(-t.col3, -t.col4)
         )
@@ -612,7 +737,15 @@ class TestSummarise:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> summarise(mean3=t.col3.mean(), mean4=t.col4.mean()),
+            lambda t: t
+            >> summarise(
+                mean3=t.col3.mean(),
+                mean4=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
+                any_all=(t.col2 == 0).any() & (t.col1 < 3).all(),
+                any_all2=(t.col2 == 0).any() | (t.col1 < 3).all(),
+            ),
         )
 
     @tables(["df3"])
@@ -620,7 +753,15 @@ class TestSummarise:
         assert_result_equal(
             df3_x,
             df3_y,
-            lambda t: t >> group_by(t.col1) >> summarise(mean3=t.col3.mean()),
+            lambda t: t
+            >> group_by(t.col1)
+            >> summarise(
+                mean3=t.col3.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 2).all(),
+                any_all=(t.col2 == 0).any() & (t.col1 < 3).all(),
+                any_all2=(t.col2 == 0).any() | (t.col1 < 3).all(),
+            ),
         )
 
     @tables(["df3"])
@@ -741,7 +882,17 @@ class TestWindowFunction:
             df3_x,
             df3_y,
             lambda t: t
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
+            ),
         )
 
     @tables(["df3"])
@@ -751,7 +902,17 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col1)
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 2).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
+            ),
         )
 
         assert_result_equal(
@@ -759,7 +920,17 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col1, t.col2)
-            >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(
+                min=t.col4.min(),
+                max=t.col4.max(),
+                mean=t.col4.mean(),
+                any=(t.col2 == 0).any(),
+                all=(t.col1 < 3).all(),
+                rank2=t.col2.rank(),
+                rank3=t.col3.rank(),
+                rank4=t.col4.rank(),
+                rank5=t.col5.rank(),
+            ),
         )
 
     @tables(["df3"])
@@ -770,7 +941,8 @@ class TestWindowFunction:
             lambda t: t
             >> group_by(t.col1)
             >> mutate(min=t.col4.min())
-            >> mutate(max=t.col4.max(), mean=t.col4.mean()),
+            >> mutate(max=t.col4.max(), mean=t.col4.mean())
+            >> mutate(any=(t.col2 == 0).any(), all=(t.col1 < 3).all()),
         )
 
         assert_result_equal(
@@ -897,7 +1069,7 @@ class TestWindowFunction:
             df3_y,
             lambda t: t
             >> group_by(t.col2)
-            >> mutate(x=f.row_number(arrange=[-λ.col4]))
+            >> mutate(x=f.row_number(arrange=[-λ.col4]), y=λ.col4.row_number())
             >> full_sort()
             >> select(λ.x),
         )
@@ -916,7 +1088,7 @@ class TestWindowFunction:
             df3_x,
             df3_y,
             lambda t: t
-            >> mutate(x=f.row_number(arrange=[-λ.col4]))
+            >> mutate(x=f.row_number(arrange=[-λ.col4]), y=λ.col4.row_number())
             >> full_sort()
             >> select(λ.x),
         )

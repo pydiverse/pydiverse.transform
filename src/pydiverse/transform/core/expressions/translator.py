@@ -23,6 +23,7 @@ class TypedValue(Generic[T]):
     value: T
     dtype: str
     ftype: OPType = dataclasses.field(default=OPType.EWISE)
+    const_value: T = None
 
     def __iter__(self):
         return iter((self.value, self.dtype))
@@ -82,7 +83,10 @@ class DelegatingTranslator(Generic[T], Translator[T]):
             if op_kwargs:
                 raise NotImplementedError
 
-            signature = tuple(arg.dtype for arg in op_args)
+            signature = tuple(
+                "const-" + arg.dtype if arg.const_value else arg.dtype
+                for arg in op_args
+            )
             implementation = self.operator_registry.get_implementation(
                 expr.name, signature
             )

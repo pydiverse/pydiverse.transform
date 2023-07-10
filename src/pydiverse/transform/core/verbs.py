@@ -136,7 +136,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
     cols = []
     positive_selection = None
     for col in args:
-        col, is_pos = sign_peeler(col)
+        col, is_pos, _ = sign_peeler(col)
         if positive_selection is None:
             positive_selection = is_pos
         else:

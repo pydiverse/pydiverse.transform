@@ -275,7 +275,12 @@ class PandasTableImpl(EagerTableImpl):
             self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             def value(df, *, grouper=None, **kw):
-                args = [arg.value(df, grouper=grouper, **kw) for arg in op_args]
+                args = [
+                    arg.value(df, grouper=grouper, **kw)
+                    if not is_const
+                    else arg.const_value(df, grouper=grouper, **kw)
+                    for arg, is_const in zip(op_args, implementation.const_args)
+                ]
                 kwargs = {
                     "_tbl": self.backend,
                     "_df": df,
@@ -333,7 +338,10 @@ class PandasTableImpl(EagerTableImpl):
                 else None
             )
             ftype = self.backend._get_op_ftype(op_args, operator, override_ftype)
-            return TypedValue(value, implementation.rtype, ftype)
+            const_value = value if implementation.rtype.startswith("const-") else None
+            return TypedValue(
+                value, implementation.rtype, ftype, const_value=const_value
+            )
 
         def arranged_window(
             self, value: Callable, operator: ops.Operator, context_kwargs: dict
@@ -448,15 +456,15 @@ class PandasTableImpl(EagerTableImpl):
         ascending = [o.asc for o in ordering]
         nulls_first = [o.nulls_first for o in ordering]
 
-        if all(nulls_first):
+        if all([nf is None or nf for nf in nulls_first]):
             na_position = "first"
-        elif not any(nulls_first):
+        elif all([nf is None or not nf for nf in nulls_first]):
             na_position = "last"
         else:
-            raise ValueError(
-                "Pandas sort can't handle different null positions (first / last)"
+            raise NotImplementedError(
+                f"Pandas sort can't handle different null positions (first / last)"
                 " inside a single sort. This can be resolved by splitting the ordering"
-                " into multiple arranges."
+                f" into multiple arranges. Found: {nulls_first}."
             )
 
         return df.sort_values(
@@ -596,6 +604,36 @@ with PandasTableImpl.op(ops.Sum()) as op:
         return x.aggregate("sum")
 
 
+with PandasTableImpl.op(ops.Any()) as op:
+
+    @op.auto
+    def _any(x):
+        return x.any()
+
+    @op.auto(variant="transform")
+    def _any(x):
+        return x.transform("any")
+
+    @op.auto(variant="aggregate")
+    def _any(x):
+        return x.aggregate("any")
+
+
+with PandasTableImpl.op(ops.All()) as op:
+
+    @op.auto
+    def _all(x):
+        return x.all()
+
+    @op.auto(variant="transform")
+    def _all(x):
+        return x.transform("all")
+
+    @op.auto(variant="aggregate")
+    def _all(x):
+        return x.aggregate("all")
+
+
 with PandasTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto
@@ -636,3 +674,14 @@ with PandasTableImpl.op(ops.RowNumber()) as op:
     @op.auto(variant="transform")
     def _row_number(idx: pd.Series):
         return idx.cumcount() + 1
+
+
+with PandasTableImpl.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank(x: pd.Series):
+        return x.rank(method="min")
+
+    @op.auto(variant="transform")
+    def _rank(x: pd.Series):
+        return x.transform("rank", method="min")
