@@ -332,6 +332,7 @@ class SQLTableImpl(LazyTableImpl):
             )
 
         requires_subquery = False
+        clear_order = False
 
         if self.limit_offset is not None:
             # The LIMIT / TOP clause is executed at the very end of the query.
@@ -357,7 +358,7 @@ class SQLTableImpl(LazyTableImpl):
             # grouping columns. We must clear the order_bys so that the order
             # is consistent with eager execution. We can do this because aggregate
             # functions are independent of the order.
-            self.order_bys.clear()
+            clear_order = True
 
             # If the grouping level is different from the grouping level of the
             # tbl object, or if on of the input columns is a window or aggregate
@@ -388,6 +389,9 @@ class SQLTableImpl(LazyTableImpl):
 
             self.replace_tbl(subquery, columns)
             self.selects = original_selects
+
+        if clear_order:
+            self.order_bys.clear()
 
     def alias(self, name=None):
         if name is None:
