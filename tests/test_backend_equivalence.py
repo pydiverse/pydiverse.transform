@@ -23,6 +23,7 @@ from pydiverse.transform.core.verbs import (
     collect,
     filter,
     group_by,
+    inner_join,
     join,
     left_join,
     mutate,
@@ -558,6 +559,25 @@ class TestJoin:
             return t >> join(u, (t.col2 == u.col3), how=how) >> full_sort()
 
         assert_result_equal(df3_x, df3_y, self_join_3)
+
+    @tables(["df1", "df2"], expect_not_implemented=["pandas"])
+    def test_inequality_join(self, df1_x, df1_y, df2_x, df2_y):
+        assert_result_equal(
+            (df1_x, df2_x),
+            (df1_y, df2_y),
+            lambda t, u: t
+            >> select()
+            >> inner_join(u, (t.col1 >= u.col1) & (t.col1 <= u.col1))
+            >> full_sort(),
+        )
+
+        assert_result_equal(
+            (df1_x, df2_x),
+            (df1_y, df2_y),
+            lambda t, u: t
+            >> inner_join(u >> select(), ~((t.col1 < u.col1) | (t.col1 > u.col1)))
+            >> full_sort(),
+        )
 
 
 class TestFilter:

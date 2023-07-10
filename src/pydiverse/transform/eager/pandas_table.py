@@ -444,7 +444,7 @@ class PandasTableImpl(EagerTableImpl):
                     return ((c1, c2),)
                 if expr.name == "__and__":
                     return tuple(itertools.chain(*expr.args))
-            raise Exception(
+            raise NotImplementedError(
                 f"Invalid ON clause element: {expr}. Only a conjunction of equalities"
                 " is supported by pandas (ands of equals)."
             )

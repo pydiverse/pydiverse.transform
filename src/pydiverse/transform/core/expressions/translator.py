@@ -35,7 +35,10 @@ class Translator(Generic[T]):
         try:
             return bottom_up_replace(expr, lambda e: self._translate(e, **kwargs))
         except Exception as e:
-            raise ValueError(
+            etype = ValueError
+            if isinstance(e, NotImplementedError):
+                etype = NotImplementedError
+            raise etype(
                 "An exception occured while trying to translate the expression"
                 f" '{expr}':\n{e}"
             ) from e
