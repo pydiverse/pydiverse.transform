@@ -64,6 +64,17 @@ class OrderingDescriptor:
     asc: bool
     nulls_first: bool | None
 
+    def __hash__(self):
+        return hash(self.order) + hash(self.asc) + hash(self.nulls_first)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, OrderingDescriptor)
+            and self.order == other.order
+            and self.asc == other.asc
+            and self.nulls_first == other.nulls_first
+        )
+
 
 def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
     ordering = []

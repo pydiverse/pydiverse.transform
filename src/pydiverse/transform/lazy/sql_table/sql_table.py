@@ -90,7 +90,19 @@ class SQLTableImpl(LazyTableImpl):
         dataset=None,
         _dtype_hints: dict[str, str] = None,
     ):
+        _ = dataset  # unused in SQLTableImpl
         self.engine = sa.create_engine(engine) if isinstance(engine, str) else engine
+        self.alignment_hash = None
+        self.tbl = None
+        self.sql_columns = None
+        self.selects = None
+        self.joins: list[JoinDescriptor] = []
+        self.wheres: list[SymbolicExpression] = []
+        self.having: list[SymbolicExpression] = []
+        self.grouped_by = None
+        self.order_bys: list[OrderingDescriptor] = []
+        self.limit_offset: tuple[int, int] | None = None
+
         tbl = self._create_table(table, self.engine)
 
         columns = {
@@ -215,11 +227,11 @@ class SQLTableImpl(LazyTableImpl):
         if hasattr(self, "intrinsic_grouped_by"):
             self.intrinsic_grouped_by.clear()
 
-        self.joins: list[JoinDescriptor] = []
-        self.wheres: list[SymbolicExpression] = []
-        self.having: list[SymbolicExpression] = []
-        self.order_bys: list[OrderingDescriptor] = []
-        self.limit_offset: tuple[int, int] = None
+        self.joins = []
+        self.wheres = []
+        self.having = []
+        self.order_bys = []
+        self.limit_offset = None
 
     def build_select(self) -> sql.Select:
         # Validate current state
@@ -520,6 +532,10 @@ class SQLTableImpl(LazyTableImpl):
     def arrange(self, ordering):
         self.alignment_hash = generate_alignment_hash()
         self.order_bys = ordering + self.order_bys
+        # drop duplicates without changing order
+        self.order_bys = list(dict.fromkeys(self.order_bys))
+        # TODO: check for same OrderDescriptor.order but different attributes
+        #  and potentially raise error
 
     def summarise(self, **kwargs):
         self.alignment_hash = generate_alignment_hash()
@@ -743,7 +759,7 @@ def generate_alignment_hash():
 from . import dialects  # noqa
 
 
-#### BACKEND SPECIFIC OPERATORS ################################################
+# ## BACKEND SPECIFIC OPERATORS ################################################
 
 
 with SQLTableImpl.op(ops.FloorDiv(), check_super=False) as op:
@@ -785,7 +801,7 @@ with SQLTableImpl.op(ops.Strip()) as op:
         return sa.func.TRIM(x)
 
 
-#### Summarising Functions ####
+# ## Summarising Functions ####
 
 
 with SQLTableImpl.op(ops.Mean()) as op:
@@ -849,7 +865,7 @@ with SQLTableImpl.op(ops.Count()) as op:
             return sa.func.COUNT(x)
 
 
-#### Window Functions ####
+# ## Window Functions ####
 
 
 with SQLTableImpl.op(ops.Shift()) as op:
