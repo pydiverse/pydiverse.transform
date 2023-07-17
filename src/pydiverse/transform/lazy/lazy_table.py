@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic
 
+from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core.table_impl import AbstractTableImpl
-
-ImplT = TypeVar("ImplT", bound=AbstractTableImpl)
 
 
 @dataclass

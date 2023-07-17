@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, MutableSet
-from typing import TypeVar
 
-T = TypeVar("T")
+from pydiverse.transform._typing import T
 
 
 class ordered_set(MutableSet[T]):

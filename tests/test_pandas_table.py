@@ -8,6 +8,7 @@ from pydiverse.transform import λ
 from pydiverse.transform.core import functions as f
 from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.dispatchers import Pipeable, verb
+from pydiverse.transform.core.ops import dtypes
 from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
 from pydiverse.transform.eager.pandas_table import PandasTableImpl
@@ -90,12 +91,12 @@ def assert_not_inplace(tbl: Table[PandasTableImpl], operation: Pipeable):
 
 class TestPandasTable:
     def test_dtype(self, tbl1, tbl2):
-        assert tbl1.col1._.dtype == "int"
-        assert tbl1.col2._.dtype == "str"
+        assert isinstance(tbl1.col1._.dtype, dtypes.Int)
+        assert isinstance(tbl1.col2._.dtype, dtypes.String)
 
-        assert tbl2.col1._.dtype == "int"
-        assert tbl2.col2._.dtype == "int"
-        assert tbl2.col3._.dtype == "float"
+        assert isinstance(tbl2.col1._.dtype, dtypes.Int)
+        assert isinstance(tbl2.col2._.dtype, dtypes.Int)
+        assert isinstance(tbl2.col3._.dtype, dtypes.Float)
 
     def test_build_query(self, tbl1):
         assert (tbl1 >> build_query()) is None

@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from html import escape
-from typing import Generic, TypeVar
+from typing import Generic
 
+from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core import verbs
 from pydiverse.transform.core.column import Column, LambdaColumn
 from pydiverse.transform.core.expressions import SymbolicExpression
-from pydiverse.transform.core.table_impl import AbstractTableImpl
-
-ImplT = TypeVar("ImplT", bound=AbstractTableImpl)
 
 
 class Table(Generic[ImplT]):

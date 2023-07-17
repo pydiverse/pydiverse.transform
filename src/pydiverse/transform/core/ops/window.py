@@ -11,8 +11,8 @@ __all__ = [
 class Shift(Window):
     name = "shift"
     signatures = [
-        "T, int -> T",
-        "T, int, T -> T",
+        "T, const int -> T",
+        "T, const int, const T -> T",
     ]
 
 

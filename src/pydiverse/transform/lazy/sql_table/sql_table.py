@@ -16,7 +16,7 @@ from pydiverse.transform.core import ops
 from pydiverse.transform.core.column import Column, LiteralColumn
 from pydiverse.transform.core.expressions import SymbolicExpression, iterate_over_expr
 from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.ops import OPType
+from pydiverse.transform.core.ops import OPType, dtypes
 from pydiverse.transform.core.table_impl import ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
@@ -82,8 +82,7 @@ class SQLTableImpl(LazyTableImpl):
         self,
         engine: sa.Engine | str,
         table,
-        dataset=None,
-        _dtype_hints: dict[str, str] = None,
+        _dtype_hints: dict[str, dtypes.DType] = None,
     ):
         self.engine = sa.create_engine(engine) if isinstance(engine, str) else engine
         tbl = self._create_table(table, self.engine)
@@ -98,14 +97,7 @@ class SQLTableImpl(LazyTableImpl):
         }
 
         self.replace_tbl(tbl, columns)
-
-        name = self.tbl.name
-        if engine.dialect.name == "bigquery":
-            spl = self.tbl.name.split(".")
-            if len(spl) == 2:
-                name = spl[1]
-
-        super().__init__(name=name, columns=columns)
+        super().__init__(name=self.tbl.name, columns=columns)
 
     def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
         if isinstance(col, Column):
@@ -143,19 +135,7 @@ class SQLTableImpl(LazyTableImpl):
                 "tbl must be a sqlalchemy Table or string, but was %s" % type(tbl)
             )
 
-        spl = tbl.split(".") if "." in tbl else [None, tbl]
-        schema = spl[0]
-        table_name = ".".join(spl[1:])
-
-        # TODO: pybigquery uses schema to mean project_id, so we cannot use
-        #     siuba's classic breakdown "{schema}.{table_name}". Basically
-        #     pybigquery uses "{schema=project_id}.{dataset_dot_table_name}" in its
-        #     internal logic. An important side effect is that bigquery errors for
-        #     `dataset`.`table`, but not `dataset.table`.
-        if engine and engine.dialect.name == "bigquery":
-            table_name = tbl
-            schema = None
-
+        schema, table_name = tbl.split(".") if "." in tbl else [None, tbl]
         return sa.Table(
             table_name,
             sa.MetaData(),
@@ -164,7 +144,9 @@ class SQLTableImpl(LazyTableImpl):
         )
 
     @staticmethod
-    def _get_dtype(col: sa.Column, hints: dict[str, str] = None) -> str:
+    def _get_dtype(
+        col: sa.Column, hints: dict[str, dtypes.DType] = None
+    ) -> dtypes.DType:
         """Determine the dtype of a column.
 
         :param col: The sqlalchemy column object.
@@ -174,16 +156,18 @@ class SQLTableImpl(LazyTableImpl):
         :return: Appropriate dtype string.
         """
 
+        # TODO: Cleaner implementation like pydiverse.pipedag
+
         try:
             pytype = col.type.python_type
             if pytype == int:
-                return "int"
+                return dtypes.Int()
             if pytype == str:
-                return "str"
+                return dtypes.String()
             if pytype == bool:
-                return "bool"
+                return dtypes.Bool()
             if pytype == float:
-                return "float"
+                return dtypes.Float()
             raise NotImplementedError(f"Invalid type {col.type}.")
         except NotImplementedError as e:
             if hints is not None:
@@ -248,7 +232,7 @@ class SQLTableImpl(LazyTableImpl):
                 operator.and_, map(SymbolicExpression, self.wheres)
             )._
             compiled, where_dtype = self.compiler.translate(combined_where)
-            assert where_dtype == "bool"
+            assert isinstance(where_dtype, dtypes.Bool)
             where = compiled(self.sql_columns)
             select = select.where(where)
 
@@ -270,7 +254,7 @@ class SQLTableImpl(LazyTableImpl):
                 operator.and_, map(SymbolicExpression, self.having)
             )._
             compiled, having_dtype = self.compiler.translate(combined_having)
-            assert having_dtype == "bool"
+            assert isinstance(having_dtype, dtypes.Bool)
             having = compiled(self.sql_columns)
             select = select.having(having)
 
@@ -387,6 +371,7 @@ class SQLTableImpl(LazyTableImpl):
         dtype_hints = {
             name: self.cols[self.named_cols.fwd[name]].dtype for name in self.selects
         }
+
         return self.__class__(self.engine, subquery, _dtype_hints=dtype_hints)
 
     def collect(self):

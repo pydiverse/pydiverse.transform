@@ -7,6 +7,7 @@ import warnings
 from collections.abc import Iterable
 from typing import Any, Callable, Generic, TypeVar
 
+from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core.ops.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
@@ -15,7 +16,7 @@ from pydiverse.transform.core.util import bidict, ordered_set
 
 from .column import Column, LambdaColumn, LiteralColumn
 from .expressions.translator import DelegatingTranslator, Translator, TypedValue
-from .ops import Operator, OPType
+from .ops import Operator, OPType, dtypes
 from .util import OrderingDescriptor
 
 
@@ -39,7 +40,6 @@ class _TableImplMeta(type):
         return c
 
 
-ImplT = TypeVar("ImplT", bound="AbstractTableImpl")
 ExprCompT = TypeVar("ExprCompT", bound="TypedValue")
 AlignedT = TypeVar("AlignedT", bound="TypedValue")
 
@@ -233,13 +233,13 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 return expr
 
             if isinstance(expr, bool):
-                return TypedValue(literal_func, "bool")
+                return TypedValue(literal_func, dtypes.Bool(const=True))
             if isinstance(expr, int):
-                return TypedValue(literal_func, "int")
+                return TypedValue(literal_func, dtypes.Int(const=True))
             if isinstance(expr, float):
-                return TypedValue(literal_func, "float")
+                return TypedValue(literal_func, dtypes.Float(const=True))
             if isinstance(expr, str):
-                return TypedValue(literal_func, "str")
+                return TypedValue(literal_func, dtypes.String(const=True))
 
     class AlignedExpressionEvaluator(Generic[AlignedT], DelegatingTranslator[AlignedT]):
         """
@@ -250,13 +250,13 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
 
         def _translate_literal(self, expr, **kwargs):
             if isinstance(expr, bool):
-                return TypedValue(expr, "bool")
+                return TypedValue(expr, dtypes.Bool(const=True))
             if isinstance(expr, int):
-                return TypedValue(expr, "int")
+                return TypedValue(expr, dtypes.Int(const=True))
             if isinstance(expr, float):
-                return TypedValue(expr, "float")
+                return TypedValue(expr, dtypes.Float(const=True))
             if isinstance(expr, str):
-                return TypedValue(expr, "str")
+                return TypedValue(expr, dtypes.String(const=True))
 
     class LambdaTranslator(Translator):
         """
@@ -347,7 +347,7 @@ class ColumnMetaData:
     uuid: uuid.UUID
     expr: Any
     compiled: Callable[[Any], TypedValue]
-    dtype: str
+    dtype: dtypes.DType
     ftype: str
 
     @classmethod

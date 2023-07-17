@@ -3,25 +3,20 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import Any, Generic
 
+from pydiverse.transform._typing import T
 from pydiverse.transform.core import column
 from pydiverse.transform.core.expressions import expressions
 from pydiverse.transform.core.ops import Operator, OPType, registry
-
-if TYPE_CHECKING:
-    # noinspection PyUnresolvedReferences
-    from pydiverse.transform.core.table_impl import AbstractTableImpl
-
-ImplT = TypeVar("ImplT", bound="AbstractTableImpl")
-T = TypeVar("T")
+from pydiverse.transform.core.ops.dtypes import DType
 
 
 # Basic container to store value and associated type metadata
 @dataclass
 class TypedValue(Generic[T]):
     value: T
-    dtype: str
+    dtype: DType
     ftype: OPType = dataclasses.field(default=OPType.EWISE)
 
     def __iter__(self):

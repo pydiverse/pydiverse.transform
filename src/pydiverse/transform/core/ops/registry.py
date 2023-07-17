@@ -7,6 +7,8 @@ import itertools
 import typing
 from functools import partial
 
+from pydiverse.transform.core.ops import dtypes
+
 if typing.TYPE_CHECKING:
     from pydiverse.transform.core.ops import Operator, OperatorExtension
 
@@ -60,9 +62,9 @@ class OperatorImpl:
         templates_set = set()
         first_template_index = len(signature.args)
         for i, dtype in enumerate(signature.args):
-            if is_template_type(dtype):
+            if isinstance(dtype, dtypes.Template):
                 num_templates += 1
-                templates_set.add(dtype)
+                templates_set.add(dtype.name)
                 first_template_index = min(first_template_index, i)
         num_different_templates = len(templates_set)
         is_vararg = int(self.signature.is_vararg)
@@ -95,10 +97,10 @@ class TypedOperatorImpl:
 
     operator: Operator
     impl: OperatorImpl
-    rtype: str
+    rtype: dtypes.DType
 
     @classmethod
-    def from_operator_impl(cls, impl: OperatorImpl, rtype: str):
+    def from_operator_impl(cls, impl: OperatorImpl, rtype: dtypes.DType):
         return cls(
             operator=impl.operator,
             impl=impl,
@@ -166,7 +168,7 @@ class OperatorRegistry:
 
     # Set containing all operator names that have been defined across all registries.
     # Used for __dir__ method of SymbolicExpression
-    ALL_REGISTERED_OPS = set()  # type: set[str]
+    ALL_REGISTERED_OPS: set[str] = set()
 
     def __init__(self, name, super_registry=None):
         self.name = name
@@ -242,6 +244,13 @@ class OperatorRegistry:
         if name not in self.ALL_REGISTERED_OPS:
             raise ValueError(f"No operator named '{name}'.")
 
+        for dtype in args_signature:
+            if not isinstance(dtype, dtypes.DType):
+                raise TypeError(
+                    "Expected elements of `args_signature` to be of type DType,"
+                    f" but found element of type {type(dtype).__name__} instead."
+                )
+
         if store := self.implementations.get(name):
             if impl := store.find_best_match(args_signature):
                 return impl
@@ -261,11 +270,12 @@ class OperatorSignature:
     Specification:
 
         signature ::= arguments "->" rtype
-        arguments ::= (dtype ",")* terminal_arg
-        terminal_arg ::= dtype | vararg
+        arguments ::= (modifiers dtype ",")* terminal_arg
+        terminal_arg ::= modifiers (dtype | vararg)
         vararg ::= dtype "..."
         rtype ::= dtype
         dtype ::= template | "int" | "float" | "str" | "bool" | and others...
+        modifiers ::= "const"?
         template ::= single uppercase character
 
     Examples:
@@ -282,7 +292,7 @@ class OperatorSignature:
 
     """
 
-    def __init__(self, args: tuple[str], rtype: str):
+    def __init__(self, args: list[dtypes.DType], rtype: dtypes.DType):
         """
         :param args: Tuple of argument types.
         :param rtype: The return type.
@@ -296,7 +306,7 @@ class OperatorSignature:
             # cstypes = comma seperated types
             types = cst.split(",")
             types = [t.strip() for t in types]
-            types = [t for t in types if t]
+            types = [dtypes.dtype_from_string(t) for t in types if t]
             return types
 
         if "->" not in signature:
@@ -315,40 +325,32 @@ class OperatorSignature:
 
         rtype = rtype[0]
 
-        base_args_types = [get_base_type(arg) for arg in args]
-        base_rtype = get_base_type(rtype)
-
-        for type_ in (*base_args_types, base_rtype):
-            if not type_.isalnum():
-                raise ValueError(f"Invalid type '{type_}'. Types must be alphanumeric.")
-
         # Validate Template
         # Output template must also occur in signature
-
-        if is_template_type(base_rtype):
-            if base_rtype not in base_args_types:
+        if isinstance(rtype, dtypes.Template):
+            if rtype.name not in [arg.name for arg in args]:
                 raise ValueError(
-                    f"Template return type '{base_rtype}' must also occur in the"
+                    f"Template return type '{rtype}' must also occur in the"
                     " argument signature."
                 )
 
         # Validate vararg
         # Vararg can only occur for the very last element
-
         for arg in args[:-1]:
-            if arg.endswith("..."):
+            if arg.vararg:
                 raise ValueError("Only last argument can be a vararg.")
 
-        if rtype.endswith("..."):
+        if rtype.vararg:
             raise ValueError("Return value can't be a vararg.")
 
         return OperatorSignature(
-            args=tuple(args),
+            args=args,
             rtype=rtype,
         )
 
     def __repr__(self):
-        return f"{ ', '.join(self.args)} -> {self.rtype}"
+        args_str = ", ".join(str(arg) for arg in self.args)
+        return args_str + " -> " + str(self.rtype)
 
     def __hash__(self):
         return hash((self.args, self.rtype))
@@ -362,25 +364,7 @@ class OperatorSignature:
     def is_vararg(self) -> bool:
         if len(self.args) == 0:
             return False
-        return is_vararg_type(self.args[-1])
-
-
-def is_template_type(s: str) -> bool:
-    # Singe upper case ASCII character
-    return len(s) == 1 and 65 <= ord(s) <= 90
-
-
-def is_vararg_type(s: str) -> bool:
-    return s.endswith("...")
-
-
-def get_base_type(s: str) -> str:
-    """Get base type from imput string without any decorators.
-    -> Trims varargs ellipsis (...) from input.
-    """
-    if s.endswith("..."):
-        return s[:-3]
-    return s
+        return self.args[-1].vararg
 
 
 class OperatorImplementationStore:
@@ -392,15 +376,14 @@ class OperatorImplementationStore:
 
     @dataclasses.dataclass
     class TrieNode:
-        __slots__ = ("value", "operator", "children", "is_vararg")
-        value: str
+        __slots__ = ("value", "operator", "children")
+        value: dtypes.DType
         operator: OperatorImpl | None
         children: list[OperatorImplementationStore.TrieNode]
-        is_vararg: bool
 
     def __init__(self, operator: Operator):
         self.operator = operator
-        self.root = self.TrieNode("ROOT", None, [], False)
+        self.root = self.TrieNode("ROOT", None, [])
 
     def add_implementation(self, operator: OperatorImpl):
         node = self.get_node(operator.signature, create_missing=True)
@@ -410,7 +393,6 @@ class OperatorImplementationStore:
             )
 
         node.operator = operator
-        node.is_vararg |= operator.signature.is_vararg
 
     def add_variant(self, name: str, operator: OperatorImpl):
         node = self.get_node(operator.signature, create_missing=False)
@@ -420,20 +402,19 @@ class OperatorImplementationStore:
                 " Make sure there is an exact match to add a variant."
             )
 
-        assert node.operator.signature.rtype == operator.signature.rtype
+        assert node.operator.signature.rtype.same_kind(operator.signature.rtype)
         node.operator.add_variant(name, operator.impl)
 
     def get_node(self, signature: OperatorSignature, create_missing: bool = True):
         node = self.root
         for dtype in signature.args:
-            dtype = get_base_type(dtype)
             for child in node.children:
-                if dtype == child.value:
+                if child.value == dtype:
                     node = child
                     break
             else:
                 if create_missing:
-                    new_node = self.TrieNode(dtype, None, [], False)
+                    new_node = self.TrieNode(dtype, None, [])
                     node.children.append(new_node)
                     node = new_node
                 else:
@@ -441,7 +422,9 @@ class OperatorImplementationStore:
 
         return node
 
-    def find_best_match(self, signature: tuple[str]) -> TypedOperatorImpl | None:
+    def find_best_match(
+        self, signature: tuple[dtypes.DType]
+    ) -> TypedOperatorImpl | None:
         matches = list(self._find_matches(signature))
 
         if not matches:
@@ -457,32 +440,36 @@ class OperatorImplementationStore:
                 best_score = match.operator._precedence
 
         rtype = best_match[0].operator.signature.rtype
-        rtype = best_match[1].get(rtype, rtype)  # If it is a template -> Translate
+        if isinstance(rtype, dtypes.Template):
+            # If rtype is a template -> Translate
+            rtype = best_match[1][rtype.name]
 
         return TypedOperatorImpl.from_operator_impl(best_match[0].operator, rtype)
 
-    def _find_matches(self, signature: tuple[str]):
+    def _find_matches(
+        self, signature: list[dtypes.DType]
+    ) -> typing.Iterable[TrieNode, dict[str, dtypes.DType]]:
         """Yield all operators that match the input signature"""
 
         # Case 0 arguments:
         if len(signature) == 0:
-            yield (self.root, dict())
+            yield self.root, dict()
             return
 
         # Case 1+ args:
-
         def does_match(
-            dtype: str,
+            dtype: dtypes.DType,
             node: OperatorImplementationStore.TrieNode,
-            templates: dict[str, str],
+            templates: dict[str, dtypes.DType],
         ) -> bool:
-            if is_template_type(node.value):
-                t = templates.get(node.value)
-                return t is None or dtype == t
-            return dtype == node.value
+            if isinstance(node.value, dtypes.Template):
+                t = templates.get(node.value.name)
+                return t is None or t.same_kind(dtype)
+            return node.value.same_kind(dtype)
 
-        # Store tuple of (Node, index in signature, templates)
-        stack = [(child, 0, dict()) for child in self.root.children]
+        stack = [
+            (child, 0, dict()) for child in self.root.children
+        ]  # type: list[tuple[OperatorImplementationStore.TrieNode, int, dict]]
 
         while stack:
             node, s_i, templates = stack.pop()
@@ -491,18 +478,21 @@ class OperatorImplementationStore:
             if not does_match(dtype, node, templates):
                 continue
 
-            if is_template_type(node.value) and node.value not in templates:
+            if (
+                isinstance(node.value, dtypes.Template)
+                and node.value.name not in templates
+            ):
                 # Insert dtype into templates dict
                 templates = templates.copy()
-                templates[node.value] = dtype
+                templates[node.value.name] = dtype
 
             if s_i + 1 == len(signature):
                 if node.operator is not None:
-                    yield (node, templates)
+                    yield node, templates
                 continue
 
             children = iter(node.children)
-            if node.is_vararg:
+            if node.value.vararg:
                 children = itertools.chain(children, iter((node,)))
 
             for child in children:
@@ -514,7 +504,7 @@ class OperatorRegistrationContextManager:
         self,
         registry: OperatorRegistry,
         operator: Operator,
-        # Options
+        *,
         check_super=True,
     ):
         self.registry = registry

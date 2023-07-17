@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from . import dtypes
 from .core import Binary, ElementWise, Unary
 
 __all__ = [
@@ -33,7 +34,7 @@ class Comparison(ElementWise, Binary):
     ]
 
     def validate_signature(self, signature):
-        assert signature.rtype == "bool"
+        assert isinstance(signature.rtype, dtypes.Bool)
         super().validate_signature(signature)
 
 
@@ -70,8 +71,14 @@ class BooleanBinary(ElementWise, Binary):
     ]
 
     def validate_signature(self, signature):
-        assert signature.args == ("bool", "bool")
-        assert signature.rtype == "bool"
+        assert len(signature.args) == 2
+
+        for arg_dtype in signature.args:
+            assert isinstance(arg_dtype, dtypes.Bool)
+            assert not arg_dtype.vararg
+            assert not arg_dtype.const
+
+        assert isinstance(signature.rtype, dtypes.Bool)
         super().validate_signature(signature)
 
 

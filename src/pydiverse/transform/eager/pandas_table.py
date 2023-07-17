@@ -15,7 +15,7 @@ from pydiverse.transform.core import ops
 from pydiverse.transform.core.column import Column, LiteralColumn
 from pydiverse.transform.core.expressions import FunctionCall, SymbolicExpression
 from pydiverse.transform.core.expressions.translator import Translator, TypedValue
-from pydiverse.transform.core.ops import OPType
+from pydiverse.transform.core.ops import OPType, dtypes
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 
 from .eager_table import EagerTableImpl, uuid_to_str
@@ -57,15 +57,15 @@ class PandasTableImpl(EagerTableImpl):
 
         super().__init__(name=name, columns=columns)
 
-    def _convert_dtype(self, dtype: Any) -> str:
+    def _convert_dtype(self, dtype: Any) -> dtypes.DType:
         if pd.api.types.is_integer_dtype(dtype):
-            return "int"
+            return dtypes.Int()
         if pd.api.types.is_float_dtype(dtype):
-            return "float"
+            return dtypes.Float()
         if pd.api.types.is_bool_dtype(dtype):
-            return "bool"
+            return dtypes.Bool()
         if pd.api.types.is_string_dtype(dtype):
-            return "str"
+            return dtypes.String()
 
         raise NotImplementedError(f"Invalid type {dtype}.")
 
@@ -191,7 +191,7 @@ class PandasTableImpl(EagerTableImpl):
             return
 
         compiled, dtype = self.compiler.translate(functools.reduce(operator.and_, args))
-        assert dtype == "bool"
+        assert isinstance(dtype, dtypes.Bool)
 
         condition = compiled(self.df)
         self.df = self.df.loc[condition]

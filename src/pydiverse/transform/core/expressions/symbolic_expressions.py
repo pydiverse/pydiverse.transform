@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from html import escape
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic
 
+from pydiverse.transform._typing import T
 from pydiverse.transform.core import alignment
 from pydiverse.transform.core.util import traverse
 
 from ..ops import registry
 from . import expressions, util
-
-T = TypeVar("T")
 
 
 class SymbolicExpression(Generic[T]):
@@ -85,7 +84,9 @@ class SymbolicExpression(Generic[T]):
             backend = util.determine_expr_backend(self._)
 
             value_repr = backend._html_repr_expr(result.typed_value.value)
-            html += f"dtype: <code>{escape(result.typed_value.dtype)}</code></br></br>"
+            html += (
+                f"dtype: <code>{escape(str(result.typed_value.dtype))}</code></br></br>"
+            )
             html += f"<pre>{escape(value_repr)}</pre>"
         except Exception as e:
             html += (

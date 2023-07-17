@@ -75,21 +75,13 @@ def pandas_impls():
     return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
 
 
-def sql_conn_to_impls(conn: str, project_id=None, dataset=None):
+def sql_conn_to_impls(conn: str):
     engine = sa.create_engine(conn)
     impls = {}
     print("THIS IS VERY EXPENSIVE")
     for name, df in dataframes.items():
-        if engine.dialect.name == "bigquery":
-            if not (project_id and dataset):
-                raise ValueError(
-                    "Project Id and dataset names are required for bigquery"
-                )
-            # name = f"{dataset}.{name}"
-            impls[name] = SQLTableImpl(engine, f"{dataset}.{name}")
-        else:
-            df.to_sql(name, engine, index=False, if_exists="replace")
-            impls[name] = SQLTableImpl(engine, name)
+        df.to_sql(name, engine, index=False, if_exists="replace")
+        impls[name] = SQLTableImpl(engine, name)
     return impls
 
 

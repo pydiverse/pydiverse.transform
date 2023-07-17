@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from dataclasses import dataclass
 
+from pydiverse.transform._typing import T
 from pydiverse.transform.core import column
 from pydiverse.transform.core.expressions import expressions
 
@@ -12,8 +13,6 @@ __all__ = (
     "OrderingDescriptor",
     "translate_ordering",
 )
-
-T = typing.TypeVar("T")
 
 
 def traverse(obj: T, callback: typing.Callable) -> T:

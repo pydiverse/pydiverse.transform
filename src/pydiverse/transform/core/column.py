@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic
+
+from pydiverse.transform._typing import ImplT, T
+from pydiverse.transform.core.ops import dtypes
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -13,14 +16,12 @@ def generate_col_uuid():
     return uuid.uuid1()
 
 
-ImplT = TypeVar("ImplT", bound="AbstractTableImpl")
-LiteralT = TypeVar("LiteralT")
-
-
 class Column(Generic[ImplT]):
     __slots__ = ("name", "table", "dtype", "uuid")
 
-    def __init__(self, name: str, table: ImplT, dtype: str, uuid: uuid.UUID = None):
+    def __init__(
+        self, name: str, table: ImplT, dtype: dtypes.DType, uuid: uuid.UUID = None
+    ):
         self.name = name
         self.table = table
         self.dtype = dtype
@@ -74,12 +75,12 @@ class LambdaColumn:
         return hash(("λ", self.name))
 
 
-class LiteralColumn(Generic[LiteralT]):
+class LiteralColumn(Generic[T]):
     __slots__ = ("typed_value", "expr", "backend")
 
     def __init__(
         self,
-        typed_value: TypedValue[LiteralT],
+        typed_value: TypedValue[T],
         expr: Any,
         backend: type[AbstractTableImpl],
     ):
