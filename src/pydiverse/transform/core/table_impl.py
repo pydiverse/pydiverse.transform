@@ -228,18 +228,25 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self.backend = backend
             super().__init__(backend.operator_registry)
 
-        def _translate_literal(self, expr, **kwargs):
+        def _map_literal(self, expr):
+            """Takes a literal and converts it into the correct type"""
+
             def literal_func(*args, **kwargs):
                 return expr
 
+            return literal_func
+
+        def _translate_literal(self, expr, **kwargs):
+            literal = self._map_literal(expr)
+
             if isinstance(expr, bool):
-                return TypedValue(literal_func, dtypes.Bool(const=True))
+                return TypedValue(literal, dtypes.Bool(const=True))
             if isinstance(expr, int):
-                return TypedValue(literal_func, dtypes.Int(const=True))
+                return TypedValue(literal, dtypes.Int(const=True))
             if isinstance(expr, float):
-                return TypedValue(literal_func, dtypes.Float(const=True))
+                return TypedValue(literal, dtypes.Float(const=True))
             if isinstance(expr, str):
-                return TypedValue(literal_func, dtypes.String(const=True))
+                return TypedValue(literal, dtypes.String(const=True))
 
     class AlignedExpressionEvaluator(Generic[AlignedT], DelegatingTranslator[AlignedT]):
         """

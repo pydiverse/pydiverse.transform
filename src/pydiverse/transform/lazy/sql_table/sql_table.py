@@ -525,7 +525,14 @@ class SQLTableImpl(LazyTableImpl):
             self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
         ):
             def value(cols):
-                return implementation(*(arg.value(cols) for arg in op_args))
+                arguments = []
+                for arg in op_args:
+                    if arg.dtype.const:
+                        arguments.append(arg.value(cols, as_sql_literal=False))
+                    else:
+                        arguments.append(arg.value(cols))
+
+                return implementation(*arguments)
 
             operator = implementation.operator
 
@@ -554,6 +561,14 @@ class SQLTableImpl(LazyTableImpl):
             else:
                 ftype = self.backend._get_op_ftype(op_args, operator, strict=True)
                 return TypedValue(value, implementation.rtype, ftype)
+
+        def _map_literal(self, expr):
+            def literal_func(*args, as_sql_literal=True):
+                if as_sql_literal:
+                    return sa.literal(expr)
+                return expr
+
+            return literal_func
 
         def over_clause(
             self, value: Callable, operator: ops.Operator, context_kwargs: dict
