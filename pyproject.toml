@@ -36,6 +36,8 @@ pre-commit = ">=2.20.0"
 
 psycopg2 = ">=2.9.3"
 pyodbc = "^4.0.34"
+duckdb = "^0.8.1"
+duckdb-engine = "^0.9.1"
 
 [tool.poetry.group.docs]
 optional = true

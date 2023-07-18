@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from pydiverse.transform import Table
 from pydiverse.transform.eager import PandasTableImpl
 from pydiverse.transform.lazy import SQLTableImpl
-from tests.fixtures.backend import ALL_BACKENDS, flatten
+from tests.fixtures.backend import flatten
 
 dataframes = {
     "df1": pd.DataFrame(
@@ -68,6 +68,11 @@ def sqlite_impls():
 
 
 @functools.cache
+def duckdb_impls():
+    return sql_conn_to_impls("duckdb:///:memory:")
+
+
+@functools.cache
 def mssql_impls():
     user = "sa"
     password = "PydiQuant27"
@@ -88,13 +93,14 @@ def postgresql_impls():
 backend_impls = {
     "pandas": pandas_impls,
     "sqlite": sqlite_impls,
+    "duckdb": duckdb_impls,
     "postgres": postgresql_impls,
     "mssql": mssql_impls,
 }
 
 # compare one dataframe and one SQL backend to all others
 # (some tests are ignored if either backend does not support a feature)
-reference_backends = ["pandas", "sqlite"]
+reference_backends = ["pandas", "duckdb"]
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc):
@@ -102,7 +108,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
 
     from tests.fixtures.backend import BACKEND_MARKS
 
-    backends = dict.fromkeys(ALL_BACKENDS)
+    backends = dict.fromkeys(backend_impls)
     # if mark := metafunc.definition.get_closest_marker("backends"):
     #     backends = dict.fromkeys(mark.args)
     if mark := metafunc.definition.get_closest_marker("skip_backends"):

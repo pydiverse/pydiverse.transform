@@ -11,15 +11,6 @@ BACKEND_MARKS = {
     "ibm_db2": pytest.mark.ibm_db2,
 }
 
-# Collection of instances that represent different database technologies
-ALL_BACKENDS = (
-    "pandas",
-    "sqlite",
-    "postgres",
-    "mssql",
-    "ibm_db2",
-)
-
 
 def with_backends(*backends):
     """Decorator to run a test with a specific set of backends
