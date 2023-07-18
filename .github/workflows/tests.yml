@@ -44,6 +44,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python-version }}
+          poetry-flags: --all-extras --with=tests
 
       - name: Start Docker Compose
         uses: isbang/compose-action@v1.4.1
@@ -60,3 +61,5 @@ jobs:
 
       - name: Run Tests
         uses: ./.github/actions/test
+        with:
+          arguments: --postgres
