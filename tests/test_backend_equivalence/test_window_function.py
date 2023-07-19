@@ -237,3 +237,34 @@ def test_complex(df3_x, df3_y):
         >> filter(λ.span < 3)
         >> arrange(λ.span),
     )
+
+
+# Test specific operations
+
+
+@tables("df3")
+def test_op_shift(df3_x, df3_y):
+    assert_result_equal(
+        df3_x,
+        df3_y,
+        lambda t: t
+        >> group_by(t.col1)
+        >> mutate(
+            shift1=t.col2.shift(1, arrange=[t.col4]),
+            shift2=t.col4.shift(-2, arrange=[t.col4]),
+        ),
+    )
+
+
+@tables("df3")
+def test_op_row_number(df3_x, df3_y):
+    assert_result_equal(
+        df3_x,
+        df3_y,
+        lambda t: t
+        >> group_by(t.col1)
+        >> mutate(
+            row_number1=f.row_number(arrange=[λ.col4]),
+            row_number2=f.row_number(arrange=[λ.col2, λ.col3]),
+        ),
+    )
