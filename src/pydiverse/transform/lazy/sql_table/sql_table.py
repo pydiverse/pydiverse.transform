@@ -213,57 +213,89 @@ class SQLTableImpl(LazyTableImpl):
         select = select.select_from(self.tbl)
 
         # FROM
-        if self.joins:
-            for join in self.joins:
-                compiled, _ = self.compiler.translate(join.on)
-                on = compiled(self.sql_columns)
-
-                select = select.join(
-                    join.right.tbl,
-                    onclause=on,
-                    isouter=join.how != "inner",
-                    full=join.how == "outer",
-                )
+        select = self._build_select_from(select)
 
         # WHERE
-        if self.wheres:
-            # Combine wheres using ands
-            combined_where = functools.reduce(
-                operator.and_, map(SymbolicExpression, self.wheres)
-            )._
-            compiled, where_dtype = self.compiler.translate(combined_where)
-            assert isinstance(where_dtype, dtypes.Bool)
-            where = compiled(self.sql_columns)
-            select = select.where(where)
+        select = self._build_select_where(select)
 
         # GROUP BY
-        if self.intrinsic_grouped_by:
-            compiled_gb, group_by_dtypes = zip(
-                *(
-                    self.compiler.translate(group_by)
-                    for group_by in self.intrinsic_grouped_by
-                )
-            )
-            group_bys = (compiled(self.sql_columns) for compiled in compiled_gb)
-            select = select.group_by(*group_bys)
+        select = self._build_select_group_by(select)
 
         # HAVING
-        if self.having:
-            # Combine havings using ands
-            combined_having = functools.reduce(
-                operator.and_, map(SymbolicExpression, self.having)
-            )._
-            compiled, having_dtype = self.compiler.translate(combined_having)
-            assert isinstance(having_dtype, dtypes.Bool)
-            having = compiled(self.sql_columns)
-            select = select.having(having)
+        select = self._build_select_having(select)
 
         # LIMIT / OFFSET
-        if self.limit_offset is not None:
-            limit, offset = self.limit_offset
-            select = select.limit(limit).offset(offset)
+        select = self._build_select_limit_offset(select)
 
         # SELECT
+        select = self._build_select_select(select)
+
+        # ORDER BY
+        select = self._build_select_order_by(select)
+
+        return select
+
+    def _build_select_from(self, select):
+        for join in self.joins:
+            compiled, _ = self.compiler.translate(join.on)
+            on = compiled(self.sql_columns)
+
+            select = select.join(
+                join.right.tbl,
+                onclause=on,
+                isouter=join.how != "inner",
+                full=join.how == "outer",
+            )
+
+        return select
+
+    def _build_select_where(self, select):
+        if not self.wheres:
+            return select
+
+        # Combine wheres using ands
+        combined_where = functools.reduce(
+            operator.and_, map(SymbolicExpression, self.wheres)
+        )._
+        compiled, where_dtype = self.compiler.translate(combined_where)
+        assert isinstance(where_dtype, dtypes.Bool)
+        where = compiled(self.sql_columns)
+        return select.where(where)
+
+    def _build_select_group_by(self, select):
+        if not self.intrinsic_grouped_by:
+            return select
+
+        compiled_gb, group_by_dtypes = zip(
+            *(
+                self.compiler.translate(group_by)
+                for group_by in self.intrinsic_grouped_by
+            )
+        )
+        group_bys = (compiled(self.sql_columns) for compiled in compiled_gb)
+        return select.group_by(*group_bys)
+
+    def _build_select_having(self, select):
+        if not self.having:
+            return select
+
+        # Combine havings using ands
+        combined_having = functools.reduce(
+            operator.and_, map(SymbolicExpression, self.having)
+        )._
+        compiled, having_dtype = self.compiler.translate(combined_having)
+        assert isinstance(having_dtype, dtypes.Bool)
+        having = compiled(self.sql_columns)
+        return select.having(having)
+
+    def _build_select_limit_offset(self, select):
+        if self.limit_offset is None:
+            return select
+
+        limit, offset = self.limit_offset
+        return select.limit(limit).offset(offset)
+
+    def _build_select_select(self, select):
         # Convert self.selects to SQLAlchemy Expressions
         s = []
         for name, uuid_ in self.selected_cols():
@@ -271,21 +303,20 @@ class SQLTableImpl(LazyTableImpl):
             if not isinstance(sql_col, sql.ColumnElement):
                 sql_col = sql.literal(sql_col)
             s.append(sql_col.label(name))
+        return select.with_only_columns(*s)
 
-        select = select.with_only_columns(*s)
+    def _build_select_order_by(self, select):
+        if not self.order_bys:
+            return select
 
-        # ORDER BY
-        if self.order_bys:
-            o = []
-            for o_by in self.order_bys:
-                compiled, _ = self.compiler.translate(o_by.order)
-                col = compiled(self.sql_columns)
-                col = col.asc() if o_by.asc else col.desc()
-                col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
-                o.append(col)
-            select = select.order_by(*o)
-
-        return select
+        o = []
+        for o_by in self.order_bys:
+            compiled, _ = self.compiler.translate(o_by.order)
+            col = compiled(self.sql_columns)
+            col = col.asc() if o_by.asc else col.desc()
+            col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
+            o.append(col)
+        return select.order_by(*o)
 
     #### Verb Operations ####
 
