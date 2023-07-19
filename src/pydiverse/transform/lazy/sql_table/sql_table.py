@@ -511,7 +511,17 @@ class SQLTableImpl(LazyTableImpl):
 
     def arrange(self, ordering):
         self.alignment_hash = generate_alignment_hash()
-        self.order_bys = ordering + self.order_bys
+
+        # Merge order bys and remove duplicate columns
+        order_bys = []
+        order_by_columns = set()
+        for o_by in ordering + self.order_bys:
+            if o_by.order in order_by_columns:
+                continue
+            order_bys.append(o_by)
+            order_by_columns.add(o_by.order)
+
+        self.order_bys = order_bys
 
     def summarise(self, **kwargs):
         self.alignment_hash = generate_alignment_hash()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pydiverse.transform import λ
 from pydiverse.transform.core.verbs import (
     arrange,
 )
@@ -32,4 +33,16 @@ def test_multiple(df3_x, df3_y):
 
     assert_result_equal(
         df3_x, df3_y, lambda t: t >> arrange(t.col2) >> arrange(-t.col3, -t.col4)
+    )
+
+    assert_result_equal(
+        df3_x,
+        df3_y,
+        lambda t: t >> arrange(t.col2, -t.col2),
+    )
+
+    assert_result_equal(
+        df3_x,
+        df3_y,
+        lambda t: t >> arrange(t.col2, λ.col2),
     )
