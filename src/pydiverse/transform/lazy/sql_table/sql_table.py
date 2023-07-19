@@ -313,9 +313,8 @@ class SQLTableImpl(LazyTableImpl):
         for o_by in self.order_bys:
             compiled, _ = self.compiler.translate(o_by.order)
             col = compiled(self.sql_columns)
-            col = col.asc() if o_by.asc else col.desc()
-            col = col.nullsfirst() if o_by.nulls_first else col.nullslast()
-            o.append(col)
+            o.extend(self._order_col(col, o_by))
+
         return select.order_by(*o)
 
     #### Verb Operations ####
@@ -526,6 +525,13 @@ class SQLTableImpl(LazyTableImpl):
 
     #### EXPRESSIONS ####
 
+    def _order_col(
+        self, col: sa.SQLColumnExpression, ordering: OrderingDescriptor
+    ) -> list[sa.SQLColumnExpression]:
+        col = col.asc() if ordering.asc else col.desc()
+        col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
+        return [col]
+
     class ExpressionCompiler(
         LazyTableImpl.ExpressionCompiler[
             "SQLTableImpl",
@@ -624,9 +630,7 @@ class SQLTableImpl(LazyTableImpl):
 
                 def clause(*args, **kwargs):
                     col = compiled(*args, **kwargs)
-                    col = col.asc() if ordering.asc else col.desc()
-                    col = col.nullsfirst() if ordering.nulls_first else col.nullslast()
-                    return col
+                    return self.backend._order_col(col, ordering)
 
                 return clause
 
@@ -645,7 +649,11 @@ class SQLTableImpl(LazyTableImpl):
                 )
                 ob = (
                     sql.expression.ClauseList(
-                        *(compiled(*args, **kwargs) for compiled in compiled_ob)
+                        *(
+                            clause
+                            for compiled in compiled_ob
+                            for clause in compiled(*args, **kwargs)
+                        )
                     )
                     if wants_order_by
                     else None
