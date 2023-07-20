@@ -608,7 +608,8 @@ with PandasTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto
     def _join(x, sep):
-        return sep.join(x)
+        # Must remove nulls
+        return sep.join(x[x.notnull()])
 
 
 with PandasTableImpl.op(ops.Count()) as op:
