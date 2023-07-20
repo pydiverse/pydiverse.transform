@@ -141,7 +141,7 @@ class Round(ElementWise):
     name = "__round__"
     signatures = [
         "int -> int",
-        "int, int -> int",
+        "int, const int -> int",
         "float -> int",
-        "float, int -> float",
+        "float, const int -> float",
     ]

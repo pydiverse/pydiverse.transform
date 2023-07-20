@@ -49,7 +49,7 @@ class Sum(Aggregate, Unary):
 class StringJoin(Aggregate):
     name = "join"
     signatures = [
-        "str, str -> str",
+        "str, const str -> str",
     ]
 
 
