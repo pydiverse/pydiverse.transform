@@ -21,6 +21,9 @@ class DType(ABC):
             return False
         return True
 
+    def __hash__(self):
+        return hash((self.name, self.const, self.vararg))
+
     def __repr__(self):
         dtype_str = ""
         if self.const:
