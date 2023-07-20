@@ -274,11 +274,14 @@ class PandasTableImpl(EagerTableImpl):
         def _translate_function(
             self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
+            internal_kwargs = {}
+
             def value(df, *, grouper=None, **kw):
                 args = [arg.value(df, grouper=grouper, **kw) for arg in op_args]
                 kwargs = {
                     "_tbl": self.backend,
                     "_df": df,
+                    **internal_kwargs,
                 }
 
                 # Element wise operator
@@ -325,6 +328,11 @@ class PandasTableImpl(EagerTableImpl):
                     raise ValueError(
                         "Window function are only allowed inside a mutate."
                     )
+
+                if arrange := context_kwargs.get("arrange"):
+                    ordering = translate_ordering(self.backend, arrange)
+                    internal_kwargs["_ordering"] = ordering
+
                 value = self.arranged_window(value, operator, context_kwargs)
 
             override_ftype = (
@@ -636,3 +644,49 @@ with PandasTableImpl.op(ops.RowNumber()) as op:
     @op.auto(variant="transform")
     def _row_number(idx: pd.Series):
         return idx.cumcount() + 1
+
+
+with PandasTableImpl.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank(x: pd.Series, *, _ordering: list[OrderingDescriptor]):
+        assert len(_ordering) == 1
+        ordering = _ordering[0]
+        na_option = "top" if ordering.nulls_first else "bottom"
+
+        return x.rank(method="min", ascending=ordering.asc, na_option=na_option)
+
+    # transform variant currently disabled due to bug in pandas:
+    # https://github.com/pandas-dev/pandas/issues/54206
+
+    # @op.auto(variant="transform")
+    # def _rank(x: pd.Series, *, _ordering: list[OrderingDescriptor]):
+    #     assert len(_ordering) == 1
+    #     ordering = _ordering[0]
+    #     na_option = "top" if ordering.nulls_first else "bottom"
+    #     return x.transform(
+    #         "rank", method="min", ascending=ordering.asc, na_option=na_option
+    #     )
+
+
+with PandasTableImpl.op(ops.DenseRank()) as op:
+
+    @op.auto
+    def _dense_rank(x: pd.Series, *, _ordering: list[OrderingDescriptor]):
+        assert len(_ordering) == 1
+        ordering = _ordering[0]
+        na_option = "top" if ordering.nulls_first else "bottom"
+
+        return x.rank(method="dense", ascending=ordering.asc, na_option=na_option)
+
+    # transform variant currently disabled due to bug in pandas:
+    # https://github.com/pandas-dev/pandas/issues/54206
+
+    # @op.auto(variant="transform")
+    # def _dense_rank(x: pd.Series, *, _ordering: list[OrderingDescriptor]):
+    #     assert len(_ordering) == 1
+    #     ordering = _ordering[0]
+    #     na_option = "top" if ordering.nulls_first else "bottom"
+    #     return x.transform(
+    #         "rank", method="dense", ascending=ordering.asc, na_option=na_option
+    #     )

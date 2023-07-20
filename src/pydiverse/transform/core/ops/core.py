@@ -82,6 +82,12 @@ class Operator:
     def validate_signature(self, signature: registry.OperatorSignature) -> bool:
         pass
 
+    def mutate_args(self, args, kwargs):
+        """
+        Allows the operator to modify the arguments passed to it before translation
+        """
+        return args, kwargs
+
 
 class OperatorExtension:
     """

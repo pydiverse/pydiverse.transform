@@ -29,29 +29,44 @@ def traverse(obj: T, callback: typing.Callable) -> T:
     return callback(obj)
 
 
-def sign_peeler(expr):
-    """Remove unary - and + prefix and return the sign
-    :return: `True` for `+` and `False` for `-`
-    """
-    num_neg = 0
+def peel_markers(expr, markers):
+    found_markers = []
     while isinstance(expr, expressions.FunctionCall):
-        if expr.name == "__neg__":
-            num_neg += 1
-            expr = expr.args[0]
-        elif expr.name == "__pos__":
+        if expr.name in markers:
+            found_markers.append(expr.name)
+            assert len(expr.args) == 1
             expr = expr.args[0]
         else:
             break
+    return expr, found_markers
+
+
+def sign_peeler(expr):
+    """
+    Remove unary - and + prefix and return the sign
+    :return: `True` for `+` and `False` for `-`
+    """
+
+    expr, markers = peel_markers(expr, {"__neg__", "__pos__"})
+    num_neg = markers.count("__neg__")
     return expr, num_neg % 2 == 0
 
 
-def extract_nulls_first(expr):
-    if expr.name == "nulls_first":
-        return True, expr.args[0]
-    if expr.name == "nulls_last":
-        return False, expr.args[0]
+def ordering_peeler(expr):
+    expr, markers = peel_markers(
+        expr, {"__neg__", "__pos__", "nulls_first", "nulls_last"}
+    )
 
-    return False, expr
+    ascending = markers.count("__neg__") % 2 == 0
+    nulls_first = False
+    for marker in markers:
+        if marker == "nulls_first":
+            nulls_first = True
+            break
+        if marker == "nulls_last":
+            break
+
+    return expr, ascending, nulls_first
 
 
 ####
@@ -69,8 +84,7 @@ class OrderingDescriptor:
 def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
     ordering = []
     for arg in order_list:
-        col, ascending = sign_peeler(arg)
-        nulls_first, col = extract_nulls_first(col)
+        col, ascending, nulls_first = ordering_peeler(arg)
 
         if not isinstance(col, (column.Column, column.LambdaColumn)):
             raise ValueError(

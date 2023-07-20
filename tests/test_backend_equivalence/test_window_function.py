@@ -242,11 +242,11 @@ def test_complex(df3_x, df3_y):
 # Test specific operations
 
 
-@tables("df3")
-def test_op_shift(df3_x, df3_y):
+@tables("df4")
+def test_op_shift(df4_x, df4_y):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df4_x,
+        df4_y,
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
@@ -256,15 +256,49 @@ def test_op_shift(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_op_row_number(df3_x, df3_y):
+@tables("df4")
+def test_op_row_number(df4_x, df4_y):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df4_x,
+        df4_y,
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
             row_number1=f.row_number(arrange=[λ.col4]),
             row_number2=f.row_number(arrange=[λ.col2, λ.col3]),
+        ),
+    )
+
+
+@tables("df4")
+def test_op_rank(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> group_by(t.col1)
+        >> mutate(
+            rank1=t.col1.rank(),
+            rank2=t.col2.rank(),
+            rank3=t.col2.nulls_last().rank(),
+            rank4=t.col5.nulls_first().rank(),
+            rank5=(-t.col5.nulls_first()).rank(),
+        ),
+    )
+
+
+@tables("df4")
+def test_op_dense_rank(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> group_by(t.col1)
+        >> mutate(
+            rank1=t.col1.dense_rank(),
+            rank2=t.col2.dense_rank(),
+            rank3=t.col2.nulls_last().dense_rank(),
+            rank4=t.col5.nulls_first().dense_rank(),
+            rank5=(-t.col5.nulls_first()).dense_rank(),
         ),
     )

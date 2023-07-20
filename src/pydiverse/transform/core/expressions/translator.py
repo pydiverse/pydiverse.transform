@@ -70,6 +70,11 @@ class DelegatingTranslator(Generic[T], Translator[T]):
 
         if isinstance(expr, expressions.FunctionCall):
             operator = self.operator_registry.get_operator(expr.name)
+
+            # Mutate function call arguments using operator
+            expr_args, expr_kwargs = operator.mutate_args(expr.args, expr.kwargs)
+            expr = expressions.FunctionCall(expr.name, *expr_args, **expr_kwargs)
+
             op_args, op_kwargs, context_kwargs = self.__translate_function_arguments(
                 expr, operator, **kwargs
             )

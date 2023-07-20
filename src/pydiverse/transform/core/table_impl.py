@@ -382,17 +382,15 @@ class ColumnMetaData:
 with AbstractTableImpl.op(ops.NullsFirst()) as op:
 
     @op.auto
-    def _nulls_first(x):
-        # it is just a marker not doing anything to the input
-        return x
+    def _nulls_first(_):
+        raise RuntimeError("This is just a marker that never should get called")
 
 
 with AbstractTableImpl.op(ops.NullsLast()) as op:
 
     @op.auto
-    def _nulls_last(x):
-        # it is just a marker not doing anything to the input
-        return x
+    def _nulls_last(_):
+        raise RuntimeError("This is just a marker that never should get called")
 
 
 #### ARITHMETIC OPERATORS ######################################################

@@ -854,3 +854,17 @@ with SQLTableImpl.op(ops.RowNumber()) as op:
     @op.auto
     def _row_number():
         return sa.func.ROW_NUMBER()
+
+
+with SQLTableImpl.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank(_):
+        return sa.func.rank()
+
+
+with SQLTableImpl.op(ops.DenseRank()) as op:
+
+    @op.auto
+    def _dense_rank(_):
+        return sa.func.dense_rank()
