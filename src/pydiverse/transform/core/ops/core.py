@@ -16,6 +16,7 @@ __all__ = [
     "ElementWise",
     "Aggregate",
     "Window",
+    "Marker",
 ]
 
 
@@ -149,3 +150,7 @@ class Window(Operator):
     context_kwargs = {
         "arrange",  # List[Column | LambdaColumn]
     }
+
+
+class Marker(Operator):
+    ftype = None

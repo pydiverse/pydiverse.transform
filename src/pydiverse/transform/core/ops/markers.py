@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from . import ElementWise, Unary
+from . import Marker
 
 __all__ = [
     "NullsFirst",
@@ -9,12 +9,12 @@ __all__ = [
 
 
 # Mark order-by column that it should be ordered with NULLs first
-class NullsFirst(ElementWise, Unary):
+class NullsFirst(Marker):
     name = "nulls_first"
     signatures = ["T -> T"]
 
 
 # Mark order-by column that it should be ordered with NULLs last
-class NullsLast(ElementWise, Unary):
+class NullsLast(Marker):
     name = "nulls_last"
     signatures = ["T -> T"]
