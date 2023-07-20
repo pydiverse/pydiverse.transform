@@ -68,7 +68,7 @@ class Float(DType):
 
 
 class String(DType):
-    name = "float"
+    name = "str"
 
 
 class Bool(DType):

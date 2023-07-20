@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import inspect
 import itertools
+import textwrap
 import typing
 from functools import partial
 
@@ -380,6 +381,14 @@ class OperatorImplementationStore:
         value: dtypes.DType
         operator: OperatorImpl | None
         children: list[OperatorImplementationStore.TrieNode]
+
+        def __repr__(self):
+            self_text = f"({self.value} - {self.operator})"
+            if self.children:
+                children_text = "\n".join(repr(c) for c in self.children)
+                children_text = textwrap.indent(children_text, "  ")
+                return self_text + "\n" + children_text
+            return self_text
 
     def __init__(self, operator: Operator):
         self.operator = operator
