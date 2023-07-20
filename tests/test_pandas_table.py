@@ -39,6 +39,16 @@ df3 = pd.DataFrame(
     }
 )
 
+df4 = pd.DataFrame(
+    {
+        "col1": [None, 0, 0, 0, 0, None, 1, 1, 1, 2, 2, 2, 2],
+        "col2": [0, 0, 1, 1, 0, 0, 1, None, 1, 0, 0, 1, 1],
+        "col3": [0, 1, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+        "col4": [None, 1, 2, 3, None, None, 5, 6, 7, 8, 9, 10, 11],
+        "col5": list("abcdefghijkl") + [None],
+    }
+)
+
 df_left = pd.DataFrame(
     {
         "a": [1, 2, 3, 4],
@@ -66,6 +76,11 @@ def tbl2():
 @pytest.fixture
 def tbl3():
     return Table(PandasTableImpl("df3", df3.copy()))
+
+
+@pytest.fixture
+def tbl4():
+    return Table(PandasTableImpl("df4", df4.copy()))
 
 
 @pytest.fixture
@@ -237,7 +252,7 @@ class TestPandasTable:
             df1.loc[(1 < df1["col1"]) & (df1["col1"] < 4)],
         )
 
-    def test_arrange(self, tbl2):
+    def test_arrange(self, tbl2, tbl4):
         assert_not_inplace(tbl2, arrange(tbl2.col2))
 
         assert_equal(
@@ -253,6 +268,36 @@ class TestPandasTable:
         assert_equal(
             tbl2 >> arrange(tbl2.col1, tbl2.col2),
             df2.sort_values(["col1", "col2"], ascending=[True, True], kind="mergesort"),
+        )
+
+        assert_equal(
+            tbl4
+            >> arrange(
+                tbl4.col1.nulls_first(),
+                -tbl4.col2.nulls_first(),
+                -tbl4.col5.nulls_first(),
+            ),
+            df4.sort_values(
+                ["col1", "col2", "col5"],
+                ascending=[True, False, False],
+                kind="mergesort",
+                na_position="first",
+            ),
+        )
+
+        assert_equal(
+            tbl4
+            >> arrange(
+                tbl4.col1.nulls_last(),
+                -tbl4.col2.nulls_last(),
+                -tbl4.col5.nulls_last(),
+            ),
+            df4.sort_values(
+                ["col1", "col2", "col5"],
+                ascending=[True, False, False],
+                kind="mergesort",
+                na_position="last",
+            ),
         )
 
         assert_equal(

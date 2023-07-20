@@ -14,6 +14,7 @@ from pydiverse.transform.core.ops.registry import (
 )
 from pydiverse.transform.core.util import bidict, ordered_set
 
+from . import ops
 from .column import Column, LambdaColumn, LiteralColumn
 from .expressions.translator import DelegatingTranslator, Translator, TypedValue
 from .ops import Operator, OPType, dtypes
@@ -375,10 +376,27 @@ class ColumnMetaData:
         return Column(name, table, self.dtype, self.uuid)
 
 
+#### MARKER OPERATIONS #########################################################
+
+
+with AbstractTableImpl.op(ops.NullsFirst()) as op:
+
+    @op.auto
+    def _nulls_first(x):
+        # it is just a marker not doing anything to the input
+        return x
+
+
+with AbstractTableImpl.op(ops.NullsLast()) as op:
+
+    @op.auto
+    def _nulls_last(x):
+        # it is just a marker not doing anything to the input
+        return x
+
+
 #### ARITHMETIC OPERATORS ######################################################
 
-
-from pydiverse.transform.core import ops  # noqa
 
 with AbstractTableImpl.op(ops.Add()) as op:
 

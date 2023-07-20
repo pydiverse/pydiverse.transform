@@ -34,6 +34,15 @@ dataframes = {
             "col5": list("abcdefghijkl"),
         }
     ),
+    "df4": pd.DataFrame(
+        {
+            "col1": [None, 0, 0, 0, 0, None, 1, 1, 1, 2, 2, 2, 2],
+            "col2": [0, 0, 1, 1, 0, 0, 1, None, 1, 0, 0, 1, 1],
+            "col3": [0, 1, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+            "col4": [None, 1, 2, 3, None, None, 5, 6, 7, 8, 9, 10, 11],
+            "col5": list("abcdefghijkl") + [None],
+        }
+    ),
     "df_left": pd.DataFrame(
         {
             "a": [1, 2, 3, 4],

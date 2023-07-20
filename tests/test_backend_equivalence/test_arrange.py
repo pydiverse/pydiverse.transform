@@ -4,6 +4,7 @@ from pydiverse.transform import λ
 from pydiverse.transform.core.verbs import (
     arrange,
 )
+from tests.fixtures.backend import skip_backends
 
 from . import assert_result_equal, tables
 
@@ -45,4 +46,50 @@ def test_multiple(df3_x, df3_y):
         df3_x,
         df3_y,
         lambda t: t >> arrange(t.col2, λ.col2),
+    )
+
+
+@tables("df4")
+def test_nulls_first(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> arrange(
+            t.col1.nulls_first(),
+            -t.col2.nulls_first(),
+            t.col5.nulls_first(),
+        ),
+        check_order=True,
+    )
+
+
+@tables("df4")
+def test_nulls_last(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> arrange(
+            t.col1.nulls_last(),
+            -t.col2.nulls_last(),
+            t.col5.nulls_last(),
+        ),
+        check_order=True,
+    )
+
+
+@skip_backends("pandas")
+@tables("df4")
+def test_nulls_first_last_mixed(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> arrange(
+            t.col1.nulls_first(),
+            -t.col2.nulls_last(),
+            -t.col5,
+        ),
+        check_order=True,
     )

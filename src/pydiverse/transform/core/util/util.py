@@ -45,6 +45,15 @@ def sign_peeler(expr):
     return expr, num_neg % 2 == 0
 
 
+def extract_nulls_first(expr):
+    if expr.name == "nulls_first":
+        return True, expr.args[0]
+    if expr.name == "nulls_last":
+        return False, expr.args[0]
+
+    return False, expr
+
+
 ####
 
 
@@ -61,12 +70,14 @@ def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
     ordering = []
     for arg in order_list:
         col, ascending = sign_peeler(arg)
+        nulls_first, col = extract_nulls_first(col)
+
         if not isinstance(col, (column.Column, column.LambdaColumn)):
             raise ValueError(
                 "Arguments to arrange must be of type 'Column' or 'LambdaColumn' and"
                 f" not '{type(col)}'."
             )
         col = tbl.resolve_lambda_cols(col)
-        ordering.append(OrderingDescriptor(col, ascending, False))
+        ordering.append(OrderingDescriptor(col, ascending, nulls_first))
 
     return ordering

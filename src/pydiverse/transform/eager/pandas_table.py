@@ -453,7 +453,7 @@ class PandasTableImpl(EagerTableImpl):
         elif not any(nulls_first):
             na_position = "last"
         else:
-            raise ValueError(
+            raise NotImplementedError(
                 "Pandas sort can't handle different null positions (first / last)"
                 " inside a single sort. This can be resolved by splitting the ordering"
                 " into multiple arranges."
