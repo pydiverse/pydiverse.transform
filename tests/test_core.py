@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import λ
-from pydiverse.transform.core import AbstractTableImpl, Column, Table
+from pydiverse.transform.core import AbstractTableImpl, Table
 from pydiverse.transform.core.dispatchers import (
     col_to_table,
     inverse_partial,
@@ -11,7 +11,7 @@ from pydiverse.transform.core.dispatchers import (
     verb,
     wrap_tables,
 )
-from pydiverse.transform.core.expressions import SymbolicExpression
+from pydiverse.transform.core.expressions import Column, SymbolicExpression
 from pydiverse.transform.core.expressions.translator import TypedValue
 from pydiverse.transform.core.util import bidict, ordered_set, sign_peeler
 from pydiverse.transform.core.verbs import (

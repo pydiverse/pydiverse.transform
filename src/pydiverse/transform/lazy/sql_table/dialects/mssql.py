@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from pydiverse.transform.core import ops
+from pydiverse.transform import ops
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
 

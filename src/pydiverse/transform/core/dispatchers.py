@@ -4,9 +4,11 @@ import copy
 from functools import partial, reduce, wraps
 from typing import Any
 
-from pydiverse.transform.core import column, table, verbs
-from pydiverse.transform.core.expressions import unwrap_symbolic_expressions
-from pydiverse.transform.core.table_impl import AbstractTableImpl
+from pydiverse.transform.core.expressions import (
+    Column,
+    LambdaColumn,
+    unwrap_symbolic_expressions,
+)
 from pydiverse.transform.core.util import bidict, traverse
 
 
@@ -59,10 +61,10 @@ class inverse_partial(partial):
 
 
 def verb(func):
+    from pydiverse.transform.core.table import Table
+
     def copy_tables(arg: Any = None):
-        return traverse(
-            arg, lambda x: copy.copy(x) if isinstance(x, table.Table) else x
-        )
+        return traverse(arg, lambda x: copy.copy(x) if isinstance(x, Table) else x)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -141,15 +143,16 @@ def col_to_table(arg: Any = None):
         feature_col = get_c(tblA.b, tblB)
 
     """
+    from pydiverse.transform.core.verbs import select
 
-    if isinstance(arg, column.Column):
-        tbl = (arg.table >> verbs.select(arg))._impl  # type: AbstractTableImpl
+    if isinstance(arg, Column):
+        tbl = (arg.table >> select(arg))._impl
         col = tbl.get_col(arg)
 
         tbl.available_cols = {col.uuid}
         tbl.named_cols = bidict({col.name: col.uuid})
         return tbl
-    elif isinstance(arg, column.LambdaColumn):
+    elif isinstance(arg, LambdaColumn):
         raise ValueError
 
     return arg
@@ -160,7 +163,9 @@ def unwrap_tables(arg: Any = None):
     Takes an instance or collection of `Table` objects and replaces them with
     their implementation.
     """
-    return traverse(arg, lambda x: x._impl if isinstance(x, table.Table) else x)
+    from pydiverse.transform.core.table import Table
+
+    return traverse(arg, lambda x: x._impl if isinstance(x, Table) else x)
 
 
 def wrap_tables(arg: Any = None):
@@ -168,6 +173,7 @@ def wrap_tables(arg: Any = None):
     Takes an instance or collection of `AbstractTableImpl` objects and wraps
     them in a `Table` object. This is an inverse to the `unwrap_tables` function.
     """
-    return traverse(
-        arg, lambda x: table.Table(x) if isinstance(x, AbstractTableImpl) else x
-    )
+    from pydiverse.transform.core.table import Table
+    from pydiverse.transform.core.table_impl import AbstractTableImpl
+
+    return traverse(arg, lambda x: Table(x) if isinstance(x, AbstractTableImpl) else x)

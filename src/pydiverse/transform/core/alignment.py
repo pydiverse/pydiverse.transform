@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import inspect
+from typing import TYPE_CHECKING
 
-from pydiverse.transform.core import column, table, table_impl
-from pydiverse.transform.core.expressions import symbolic_expressions, util
+from pydiverse.transform.core.expressions import (
+    Column,
+    LiteralColumn,
+    SymbolicExpression,
+    util,
+)
+
+if TYPE_CHECKING:
+    from pydiverse.transform.core import AbstractTableImpl, Table
 
 
 def aligned(*, with_: str):
     """Decorator for aligned functions."""
+    from pydiverse.transform.core import AbstractTableImpl, Table
+
     if callable(with_):
         raise ValueError("Decorator @aligned requires with_ argument.")
 
@@ -23,7 +33,7 @@ def aligned(*, with_: str):
         def wrapper(*args, **kwargs):
             # Execute func
             result = func(*args, **kwargs)
-            if not isinstance(result, symbolic_expressions.SymbolicExpression):
+            if not isinstance(result, SymbolicExpression):
                 raise ValueError(
                     "Aligned function must return a symbolic expression not"
                     f" '{result}'."
@@ -34,14 +44,12 @@ def aligned(*, with_: str):
             bound_sig.apply_defaults()
 
             alignment_param = bound_sig.arguments[with_]
-            if isinstance(alignment_param, symbolic_expressions.SymbolicExpression):
+            if isinstance(alignment_param, SymbolicExpression):
                 alignment_param = alignment_param._
 
-            if isinstance(alignment_param, column.Column):
+            if isinstance(alignment_param, Column):
                 aligned_with = alignment_param.table
-            elif isinstance(
-                alignment_param, (table.Table, table_impl.AbstractTableImpl)
-            ):
+            elif isinstance(alignment_param, (Table, AbstractTableImpl)):
                 aligned_with = alignment_param
             else:
                 raise NotImplementedError
@@ -55,15 +63,12 @@ def aligned(*, with_: str):
 
 
 def eval_aligned(
-    sexpr: symbolic_expressions.SymbolicExpression,
-    with_: table_impl.AbstractTableImpl | table.Table = None,
-    **kwargs,
-) -> symbolic_expressions.SymbolicExpression[column.LiteralColumn]:
+    sexpr: SymbolicExpression, with_: AbstractTableImpl | Table = None, **kwargs
+) -> SymbolicExpression[LiteralColumn]:
     """Evaluates an expression using the AlignedExpressionEvaluator."""
+    from pydiverse.transform.core import AbstractTableImpl, Table
 
-    expr = (
-        sexpr._ if isinstance(sexpr, symbolic_expressions.SymbolicExpression) else sexpr
-    )
+    expr = sexpr._ if isinstance(sexpr, SymbolicExpression) else sexpr
 
     # Determine Backend
     backend = util.determine_expr_backend(expr)
@@ -75,15 +80,13 @@ def eval_aligned(
     alignedEvaluator = backend.AlignedExpressionEvaluator(backend.operator_registry)
     result = alignedEvaluator.translate(expr, **kwargs)
 
-    literal_column = column.LiteralColumn(
-        typed_value=result, expr=expr, backend=backend
-    )
+    literal_column = LiteralColumn(typed_value=result, expr=expr, backend=backend)
 
     # Check if alignment condition holds
     if with_ is not None:
-        if isinstance(with_, table.Table):
+        if isinstance(with_, Table):
             with_ = with_._impl
-        if not isinstance(with_, table_impl.AbstractTableImpl):
+        if not isinstance(with_, AbstractTableImpl):
             raise ValueError(
                 "'with_' must either be an instance of a Table or TableImpl. Not"
                 f" '{with_}'."
@@ -94,4 +97,4 @@ def eval_aligned(
 
     # Convert to sexpr so that the user can easily continue transforming
     # it symbolically.
-    return symbolic_expressions.SymbolicExpression(literal_column)
+    return SymbolicExpression(literal_column)

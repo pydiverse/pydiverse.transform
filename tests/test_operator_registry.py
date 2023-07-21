@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform.core.ops import Operator, dtypes
-from pydiverse.transform.core.ops.registry import (
+from pydiverse.transform.core import dtypes
+from pydiverse.transform.core.registry import (
     OperatorRegistry,
     OperatorSignature,
 )
+from pydiverse.transform.ops import Operator
 
 
 def assert_signature(

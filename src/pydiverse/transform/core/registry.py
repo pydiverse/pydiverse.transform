@@ -8,10 +8,10 @@ import textwrap
 import typing
 from functools import partial
 
-from pydiverse.transform.core.ops import dtypes
+from pydiverse.transform.core import dtypes
 
 if typing.TYPE_CHECKING:
-    from pydiverse.transform.core.ops import Operator, OperatorExtension
+    from pydiverse.transform.ops import Operator, OperatorExtension
 
 
 class OperatorImpl:
@@ -392,7 +392,7 @@ class OperatorImplementationStore:
 
     def __init__(self, operator: Operator):
         self.operator = operator
-        self.root = self.TrieNode("ROOT", None, [])
+        self.root = self.TrieNode("ROOT", None, [])  # type: ignore
 
     def add_implementation(self, operator: OperatorImpl):
         node = self.get_node(operator.signature, create_missing=True)

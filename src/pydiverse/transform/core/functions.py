@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .expressions import FunctionCall, SymbolicExpression
+from pydiverse.transform.core.expressions import FunctionCall, SymbolicExpression
 
 __all__ = [
     "count",

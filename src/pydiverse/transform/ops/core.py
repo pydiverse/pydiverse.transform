@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import enum
 from collections import ChainMap
+from typing import TYPE_CHECKING
 
-from pydiverse.transform.core.ops import registry
+if TYPE_CHECKING:
+    from pydiverse.transform.core.registry import OperatorSignature
 
 __all__ = [
     "OPType",
@@ -80,7 +82,7 @@ class Operator:
     def __hash__(self):
         return hash(type(self))
 
-    def validate_signature(self, signature: registry.OperatorSignature) -> bool:
+    def validate_signature(self, signature: OperatorSignature):
         pass
 
     def mutate_args(self, args, kwargs):

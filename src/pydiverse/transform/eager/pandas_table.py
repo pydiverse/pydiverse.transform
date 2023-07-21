@@ -11,12 +11,17 @@ import pandas as pd
 import pandas.core.dtypes.cast
 import pandas.core.dtypes.dtypes
 
-from pydiverse.transform.core import ops
-from pydiverse.transform.core.column import Column, LiteralColumn
-from pydiverse.transform.core.expressions import FunctionCall, SymbolicExpression
+from pydiverse.transform import ops
+from pydiverse.transform.core import dtypes
+from pydiverse.transform.core.expressions import (
+    Column,
+    FunctionCall,
+    LiteralColumn,
+    SymbolicExpression,
+)
 from pydiverse.transform.core.expressions.translator import Translator, TypedValue
-from pydiverse.transform.core.ops import OPType, dtypes
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
+from pydiverse.transform.ops import OPType
 
 from .eager_table import EagerTableImpl, uuid_to_str
 

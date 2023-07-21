@@ -5,20 +5,28 @@ import dataclasses
 import uuid
 import warnings
 from collections.abc import Iterable
-from typing import Any, Callable, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
+from pydiverse.transform import ops
 from pydiverse.transform._typing import ImplT
-from pydiverse.transform.core.ops.registry import (
+from pydiverse.transform.core import dtypes
+from pydiverse.transform.core.expressions import Column, LambdaColumn, LiteralColumn
+from pydiverse.transform.core.expressions.translator import (
+    DelegatingTranslator,
+    Translator,
+    TypedValue,
+)
+from pydiverse.transform.core.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
 )
 from pydiverse.transform.core.util import bidict, ordered_set
+from pydiverse.transform.ops import OPType
 
-from . import ops
-from .column import Column, LambdaColumn, LiteralColumn
-from .expressions.translator import DelegatingTranslator, Translator, TypedValue
-from .ops import Operator, OPType, dtypes
-from .util import OrderingDescriptor
+if TYPE_CHECKING:
+    from pydiverse.transform.core.util import OrderingDescriptor
+    from pydiverse.transform.ops import Operator
+
 
 ExprCompT = TypeVar("ExprCompT", bound="TypedValue")
 AlignedT = TypeVar("AlignedT", bound="TypedValue")
@@ -346,7 +354,7 @@ class ColumnMetaData:
     expr: Any
     compiled: Callable[[Any], TypedValue]
     dtype: dtypes.DType
-    ftype: str
+    ftype: OPType
 
     @classmethod
     def from_expr(cls, uuid, expr, table: AbstractTableImpl, **kwargs):

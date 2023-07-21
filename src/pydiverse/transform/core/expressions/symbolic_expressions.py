@@ -4,11 +4,9 @@ from html import escape
 from typing import Any, Generic
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.core import alignment
+from pydiverse.transform.core.expressions import FunctionCall, util
+from pydiverse.transform.core.registry import OperatorRegistry
 from pydiverse.transform.core.util import traverse
-
-from ..ops import registry
-from . import expressions, util
 
 
 class SymbolicExpression(Generic[T]):
@@ -39,13 +37,13 @@ class SymbolicExpression(Generic[T]):
         return SymbolAttribute(item, self)
 
     def __getitem__(self, item):
-        return SymbolicExpression(expressions.FunctionCall("__getitem__", self, item))
+        return SymbolicExpression(FunctionCall("__getitem__", self, item))
 
     def __dir__(self):
         # TODO: Instead of displaying all available operators, translate the
         #       expression and according to the dtype and backend only display
         #       the operators that actually are available.
-        return sorted(registry.OperatorRegistry.ALL_REGISTERED_OPS)
+        return sorted(OperatorRegistry.ALL_REGISTERED_OPS)
 
     # __contains__, __iter__ and __bool__ are all invalid on s-expressions
     __contains__ = None
@@ -58,8 +56,10 @@ class SymbolicExpression(Generic[T]):
         )
 
     def __str__(self):
+        from pydiverse.transform.core.alignment import eval_aligned
+
         try:
-            result = alignment.eval_aligned(self._, check_alignment=False)._
+            result = eval_aligned(self._, check_alignment=False)._
 
             dtype = result.typed_value.dtype
             value = result.typed_value.value
@@ -77,10 +77,12 @@ class SymbolicExpression(Generic[T]):
         return f"<Sym: {self._}>"
 
     def _repr_html_(self):
+        from pydiverse.transform.core.alignment import eval_aligned
+
         html = f"<pre>Symbolic Expression:\n{escape(repr(self._))}</pre>"
 
         try:
-            result = alignment.eval_aligned(self._, check_alignment=False)._
+            result = eval_aligned(self._, check_alignment=False)._
             backend = util.determine_expr_backend(self._)
 
             value_repr = backend._html_repr_expr(result.typed_value.value)
@@ -109,9 +111,7 @@ class SymbolAttribute:
         return SymbolAttribute(self.__name + "." + item, self.__on)
 
     def __call__(self, *args, **kwargs) -> SymbolicExpression:
-        return SymbolicExpression(
-            expressions.FunctionCall(self.__name, self.__on, *args, **kwargs)
-        )
+        return SymbolicExpression(FunctionCall(self.__name, self.__on, *args, **kwargs))
 
     def __hash__(self):
         raise Exception(
@@ -133,11 +133,11 @@ def unwrap_symbolic_expressions(arg: Any = None):
 # dunder methods.
 def create_operator(op):
     def impl(*args, **kwargs):
-        return SymbolicExpression(expressions.FunctionCall(op, *args, **kwargs))
+        return SymbolicExpression(FunctionCall(op, *args, **kwargs))
 
     return impl
 
 
-for dunder in registry.OperatorRegistry.SUPPORTED_DUNDER:
+for dunder in OperatorRegistry.SUPPORTED_DUNDER:
     setattr(SymbolicExpression, dunder, create_operator(dunder))
 del create_operator

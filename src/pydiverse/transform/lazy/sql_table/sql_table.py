@@ -12,18 +12,23 @@ from typing import TYPE_CHECKING, Callable
 import sqlalchemy as sa
 from sqlalchemy import sql
 
-from pydiverse.transform.core import ops
-from pydiverse.transform.core.column import Column, LiteralColumn
-from pydiverse.transform.core.expressions import SymbolicExpression, iterate_over_expr
+from pydiverse.transform import ops
+from pydiverse.transform.core import dtypes
+from pydiverse.transform.core.expressions import (
+    Column,
+    LiteralColumn,
+    SymbolicExpression,
+    iterate_over_expr,
+)
 from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.ops import OPType, dtypes
 from pydiverse.transform.core.table_impl import ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
+from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions import FunctionCall
-    from pydiverse.transform.core.ops.registry import TypedOperatorImpl
+    from pydiverse.transform.core.registry import TypedOperatorImpl
 
 
 class SQLTableImpl(LazyTableImpl):

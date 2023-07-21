@@ -5,9 +5,11 @@ from html import escape
 from typing import Generic
 
 from pydiverse.transform._typing import ImplT
-from pydiverse.transform.core import verbs
-from pydiverse.transform.core.column import Column, LambdaColumn
-from pydiverse.transform.core.expressions import SymbolicExpression
+from pydiverse.transform.core.expressions import (
+    Column,
+    LambdaColumn,
+    SymbolicExpression,
+)
 
 
 class Table(Generic[ImplT]):
@@ -28,6 +30,8 @@ class Table(Generic[ImplT]):
         """Mutate a column
         :param col: Either a str or SymbolicColumn
         """
+        from pydiverse.transform.core.verbs import mutate
+
         col_name = None
 
         if isinstance(col, SymbolicExpression):
@@ -41,7 +45,7 @@ class Table(Generic[ImplT]):
             raise KeyError(
                 f"Invalid key {col}. Must be either a string, Column or LambdaColumn."
             )
-        self._impl = (self >> verbs.mutate(**{col_name: expr}))._impl
+        self._impl = (self >> mutate(**{col_name: expr}))._impl
 
     def __getattr__(self, name) -> SymbolicExpression[Column]:
         return SymbolicExpression(self._impl.get_col(name))
@@ -80,10 +84,12 @@ class Table(Generic[ImplT]):
         return self.__class__(impl_copy)
 
     def __str__(self):
+        from pydiverse.transform.core.verbs import collect
+
         try:
             return (
                 f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n"
-                f"{self >> verbs.collect()}"
+                f"{self >> collect()}"
             )
         except Exception as e:
             return (
@@ -93,13 +99,15 @@ class Table(Generic[ImplT]):
             )
 
     def _repr_html_(self) -> str | None:
+        from pydiverse.transform.core.verbs import collect
+
         html = (
             f"Table <code>{self._impl.name}</code> using"
             f" <code>{type(self._impl).__name__}</code> backend:</br>"
         )
         try:
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
-            html += (self >> verbs.collect())._repr_html_()
+            html += (self >> collect())._repr_html_()
         except Exception as e:
             html += (
                 "</br><pre>Failed to collect table due to an exception:\n"

@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydiverse.transform.core import column
-
-from . import expressions
+from pydiverse.transform.core.expressions import Column, FunctionCall, LiteralColumn
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -18,12 +16,12 @@ def iterate_over_expr(expr, expand_literal_col=False):
 
     yield expr
 
-    if isinstance(expr, expressions.FunctionCall):
+    if isinstance(expr, FunctionCall):
         for child in expr.iter_children():
             yield from iterate_over_expr(child, expand_literal_col=expand_literal_col)
         return
 
-    if expand_literal_col and isinstance(expr, column.LiteralColumn):
+    if expand_literal_col and isinstance(expr, LiteralColumn):
         yield from iterate_over_expr(expr.expr, expand_literal_col=expand_literal_col)
         return
 
@@ -39,9 +37,9 @@ def determine_expr_backend(expr) -> type[AbstractTableImpl] | None:
 
     backends = set()
     for atom in iterate_over_expr(expr):
-        if isinstance(atom, column.Column):
+        if isinstance(atom, Column):
             backends.add(type(atom.table))
-        if isinstance(atom, column.LiteralColumn):
+        if isinstance(atom, LiteralColumn):
             backends.add(atom.backend)
 
     if len(backends) == 1:

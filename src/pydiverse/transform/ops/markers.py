@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from . import Marker
+from pydiverse.transform.ops.core import Marker
 
 __all__ = [
     "NullsFirst",

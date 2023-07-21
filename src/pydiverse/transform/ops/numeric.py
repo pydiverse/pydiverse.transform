@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from . import Binary, ElementWise, Unary
+from pydiverse.transform.ops.core import Binary, ElementWise, Unary
 
 __all__ = [
     "Add",

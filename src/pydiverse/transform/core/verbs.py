@@ -4,12 +4,20 @@ import functools
 from collections import ChainMap
 from collections.abc import Iterable
 
-from .column import Column, LambdaColumn, generate_col_uuid
-from .dispatchers import builtin_verb
-from .expressions import SymbolicExpression
-from .expressions.util import iterate_over_expr
-from .table_impl import AbstractTableImpl, ColumnMetaData
-from .util import bidict, ordered_set, sign_peeler, translate_ordering
+from pydiverse.transform.core.dispatchers import builtin_verb
+from pydiverse.transform.core.expressions import (
+    Column,
+    LambdaColumn,
+    SymbolicExpression,
+)
+from pydiverse.transform.core.expressions.util import iterate_over_expr
+from pydiverse.transform.core.table_impl import AbstractTableImpl, ColumnMetaData
+from pydiverse.transform.core.util import (
+    bidict,
+    ordered_set,
+    sign_peeler,
+    translate_ordering,
+)
 
 __all__ = [
     "alias",
@@ -229,7 +237,7 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
     kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 
     for name, expr in kwargs.items():
-        uid = generate_col_uuid()
+        uid = Column.generate_col_uuid()
         new_tbl.selects.add(name)
         new_tbl.named_cols.fwd[name] = uid
         new_tbl.available_cols.add(uid)
@@ -425,7 +433,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
                 f"Column with name '{name}' already in select. The new summarised"
                 " columns must have a different name than the grouping columns."
             )
-        uid = generate_col_uuid()
+        uid = Column.generate_col_uuid()
         selects.add(name)
         named_cols.fwd[name] = uid
         available_cols.add(uid)

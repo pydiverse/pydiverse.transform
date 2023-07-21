@@ -5,10 +5,10 @@ import pandas as pd
 import pytest
 
 from pydiverse.transform import λ
+from pydiverse.transform.core import dtypes
 from pydiverse.transform.core import functions as f
 from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.dispatchers import Pipeable, verb
-from pydiverse.transform.core.ops import dtypes
 from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
 from pydiverse.transform.eager.pandas_table import PandasTableImpl

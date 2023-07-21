@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform.core.column import LambdaColumn
-from pydiverse.transform.core.expressions import SymbolicExpression
+from pydiverse.transform.core.expressions import LambdaColumn
+from pydiverse.transform.core.expressions.symbolic_expressions import SymbolicExpression
 
 
 class LambdaColumnGetter:

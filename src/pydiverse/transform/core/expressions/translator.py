@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any, Generic
+from typing import TYPE_CHECKING, Any, Generic
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.core import column
-from pydiverse.transform.core.expressions import expressions
-from pydiverse.transform.core.ops import Operator, OPType, registry
-from pydiverse.transform.core.ops.dtypes import DType
+from pydiverse.transform.core import registry
+from pydiverse.transform.core.expressions import Column, FunctionCall, LiteralColumn
+from pydiverse.transform.ops.core import Operator, OPType
+
+if TYPE_CHECKING:
+    from pydiverse.transform.core.dtypes import DType
 
 
 # Basic container to store value and associated type metadata
@@ -58,21 +60,21 @@ class DelegatingTranslator(Translator[T], Generic[T]):
             ) from e
 
     def _translate(self, expr, accept_literal_col=True, **kwargs):
-        if isinstance(expr, column.Column):
+        if isinstance(expr, Column):
             return self._translate_col(expr, **kwargs)
 
-        if isinstance(expr, column.LiteralColumn):
+        if isinstance(expr, LiteralColumn):
             if accept_literal_col:
                 return self._translate_literal_col(expr, **kwargs)
             else:
                 raise ValueError("Literal columns aren't allowed in this context.")
 
-        if isinstance(expr, expressions.FunctionCall):
+        if isinstance(expr, FunctionCall):
             operator = self.operator_registry.get_operator(expr.name)
 
             # Mutate function call arguments using operator
             expr_args, expr_kwargs = operator.mutate_args(expr.args, expr.kwargs)
-            expr = expressions.FunctionCall(expr.name, *expr_args, **expr_kwargs)
+            expr = FunctionCall(expr.name, *expr_args, **expr_kwargs)
 
             op_args, op_kwargs, context_kwargs = self.__translate_function_arguments(
                 expr, operator, **kwargs
@@ -98,15 +100,15 @@ class DelegatingTranslator(Translator[T], Generic[T]):
             f" {expr}."
         )
 
-    def _translate_col(self, expr: column.Column, **kwargs) -> T:
+    def _translate_col(self, expr: Column, **kwargs) -> T:
         raise NotImplementedError
 
-    def _translate_literal_col(self, expr: column.LiteralColumn, **kwargs) -> T:
+    def _translate_literal_col(self, expr: LiteralColumn, **kwargs) -> T:
         raise NotImplementedError
 
     def _translate_function(
         self,
-        expr: expressions.FunctionCall,
+        expr: FunctionCall,
         implementation: registry.TypedOperatorImpl,
         op_args: list[T],
         context_kwargs: dict[str, Any],
@@ -118,7 +120,7 @@ class DelegatingTranslator(Translator[T], Generic[T]):
         raise NotImplementedError
 
     def __translate_function_arguments(
-        self, expr: expressions.FunctionCall, operator: Operator, **kwargs
+        self, expr: FunctionCall, operator: Operator, **kwargs
     ) -> tuple[list[T], dict[str, T], dict[str, Any]]:
         op_args = [self._translate(arg, **kwargs) for arg in expr.args]
         op_kwargs = {}
@@ -135,8 +137,8 @@ class DelegatingTranslator(Translator[T], Generic[T]):
 
 def bottom_up_replace(expr, replace):
     def transform(expr):
-        if isinstance(expr, expressions.FunctionCall):
-            f = expressions.FunctionCall(
+        if isinstance(expr, FunctionCall):
+            f = FunctionCall(
                 expr.name,
                 *(transform(arg) for arg in expr.args),
                 **{k: transform(v) for k, v in expr.kwargs.items()},

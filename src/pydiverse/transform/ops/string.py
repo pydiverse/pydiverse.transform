@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from .core import ElementWise, OperatorExtension, Unary
-from .numeric import Add, RAdd
+from pydiverse.transform.ops.core import ElementWise, OperatorExtension, Unary
+from pydiverse.transform.ops.numeric import Add, RAdd
 
 __all__ = [
     "StringAdd",

@@ -4,8 +4,7 @@ import typing
 from dataclasses import dataclass
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.core import column
-from pydiverse.transform.core.expressions import expressions
+from pydiverse.transform.core.expressions import Column, FunctionCall, LambdaColumn
 
 __all__ = (
     "traverse",
@@ -31,7 +30,7 @@ def traverse(obj: T, callback: typing.Callable) -> T:
 
 def peel_markers(expr, markers):
     found_markers = []
-    while isinstance(expr, expressions.FunctionCall):
+    while isinstance(expr, FunctionCall):
         if expr.name in markers:
             found_markers.append(expr.name)
             assert len(expr.args) == 1
@@ -86,7 +85,7 @@ def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
     for arg in order_list:
         col, ascending, nulls_first = ordering_peeler(arg)
 
-        if not isinstance(col, (column.Column, column.LambdaColumn)):
+        if not isinstance(col, (Column, LambdaColumn)):
             raise ValueError(
                 "Arguments to arrange must be of type 'Column' or 'LambdaColumn' and"
                 f" not '{type(col)}'."
