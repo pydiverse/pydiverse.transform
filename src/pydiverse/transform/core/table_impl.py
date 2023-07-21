@@ -215,7 +215,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
     #### Expressions ####
 
     class ExpressionCompiler(
-        Generic[ImplT, ExprCompT], DelegatingTranslator[ExprCompT]
+        DelegatingTranslator[ExprCompT], Generic[ImplT, ExprCompT]
     ):
         """
         Class convert an expression into a function that, when provided with
@@ -249,7 +249,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             if isinstance(expr, str):
                 return TypedValue(literal, dtypes.String(const=True))
 
-    class AlignedExpressionEvaluator(Generic[AlignedT], DelegatingTranslator[AlignedT]):
+    class AlignedExpressionEvaluator(DelegatingTranslator[AlignedT], Generic[AlignedT]):
         """
         Used for evaluating an expression in a typical eager style where, as
         long as two columns have the same alignment / length, we can perform

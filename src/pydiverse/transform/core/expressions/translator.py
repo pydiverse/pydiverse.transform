@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Generic
 
@@ -39,7 +38,7 @@ class Translator(Generic[T]):
         raise NotImplementedError
 
 
-class DelegatingTranslator(Generic[T], Translator[T]):
+class DelegatingTranslator(Translator[T], Generic[T]):
     """
     Translator that dispatches to different translate functions based on
     the type of the expression.
@@ -109,7 +108,7 @@ class DelegatingTranslator(Generic[T], Translator[T]):
         self,
         expr: expressions.FunctionCall,
         implementation: registry.TypedOperatorImpl,
-        op_args: Iterable[T],
+        op_args: list[T],
         context_kwargs: dict[str, Any],
         **kwargs,
     ) -> T:
@@ -120,7 +119,7 @@ class DelegatingTranslator(Generic[T], Translator[T]):
 
     def __translate_function_arguments(
         self, expr: expressions.FunctionCall, operator: Operator, **kwargs
-    ):
+    ) -> tuple[list[T], dict[str, T], dict[str, Any]]:
         op_args = [self._translate(arg, **kwargs) for arg in expr.args]
         op_kwargs = {}
         context_kwargs = {}
