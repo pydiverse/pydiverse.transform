@@ -20,32 +20,11 @@ from .expressions.translator import DelegatingTranslator, Translator, TypedValue
 from .ops import Operator, OPType, dtypes
 from .util import OrderingDescriptor
 
-
-class _TableImplMeta(type):
-    """
-    Metaclass that adds an appropriate operator_registry attribute to each class
-    in the table implementation class hierarchy.
-    """
-
-    def __new__(cls, name, bases, attrs, **kwargs):
-        c = super().__new__(cls, name, bases, attrs, **kwargs)
-
-        # By using `super` to get the super_registry, we can check for potential
-        # operation definitions in order of the MRO.
-        super_reg = (
-            super(c, c).operator_registry
-            if hasattr(super(c, c), "operator_registry")
-            else None
-        )
-        c.operator_registry = OperatorRegistry(name, super_reg)
-        return c
-
-
 ExprCompT = TypeVar("ExprCompT", bound="TypedValue")
 AlignedT = TypeVar("AlignedT", bound="TypedValue")
 
 
-class AbstractTableImpl(metaclass=_TableImplMeta):
+class AbstractTableImpl:
     """
     Base class from which all table backend implementations are derived from.
     It tracks various metadata that is relevant for all backends.
@@ -72,7 +51,7 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             summarising operation.
     """
 
-    operator_registry: OperatorRegistry
+    operator_registry = OperatorRegistry("AbstractTableImpl")
 
     def __init__(
         self,
@@ -97,6 +76,19 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self.named_cols.fwd[name] = col.uuid
             self.available_cols.add(col.uuid)
             self.cols[col.uuid] = ColumnMetaData.from_expr(col.uuid, col, self)
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        # Add new `operator_registry` class variable to subclass.
+        # We define the super registry by walking up the MRO. This allows us
+        # to check for potential operation definitions in the parent classes.
+        super_reg = None
+        for super_cls in cls.__mro__:
+            if hasattr(super_cls, "operator_registry"):
+                super_reg = super_cls.operator_registry
+                break
+        cls.operator_registry = OperatorRegistry(cls.__name__, super_reg)
 
     def copy(self):
         c = copy.copy(self)
@@ -229,16 +221,8 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
             self.backend = backend
             super().__init__(backend.operator_registry)
 
-        def _map_literal(self, expr):
-            """Takes a literal and converts it into the correct type"""
-
-            def literal_func(*args, **kwargs):
-                return expr
-
-            return literal_func
-
         def _translate_literal(self, expr, **kwargs):
-            literal = self._map_literal(expr)
+            literal = self._translate_literal_value(expr)
 
             if isinstance(expr, bool):
                 return TypedValue(literal, dtypes.Bool(const=True))
@@ -248,6 +232,12 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 return TypedValue(literal, dtypes.Float(const=True))
             if isinstance(expr, str):
                 return TypedValue(literal, dtypes.String(const=True))
+
+        def _translate_literal_value(self, expr):
+            def literal_func(*args, **kwargs):
+                return expr
+
+            return literal_func
 
     class AlignedExpressionEvaluator(DelegatingTranslator[AlignedT], Generic[AlignedT]):
         """

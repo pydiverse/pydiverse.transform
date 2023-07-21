@@ -7,7 +7,7 @@ import uuid
 import warnings
 from collections.abc import Iterable
 from functools import reduce
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import sqlalchemy as sa
 from sqlalchemy import sql
@@ -20,6 +20,10 @@ from pydiverse.transform.core.ops import OPType, dtypes
 from pydiverse.transform.core.table_impl import ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
+
+if TYPE_CHECKING:
+    from pydiverse.transform.core.expressions import FunctionCall
+    from pydiverse.transform.core.ops.registry import TypedOperatorImpl
 
 
 class SQLTableImpl(LazyTableImpl):
@@ -61,6 +65,8 @@ class SQLTableImpl(LazyTableImpl):
         return super(SQLTableImpl, dialect_specific_cls).__new__(dialect_specific_cls)
 
     def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
         # Whenever a new subclass if SQLTableImpl is defined, it must contain the
         # `_dialect_name` attribute. This allows us to dynamically instantiate it
         # when calling SQLTableImpl(engine) based on the dialect name found
@@ -575,16 +581,14 @@ class SQLTableImpl(LazyTableImpl):
         def _translate_function(
             self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
         ):
-            def value(cols):
-                arguments = []
-                for arg in op_args:
-                    if arg.dtype.const:
-                        arguments.append(arg.value(cols, as_sql_literal=False))
-                    else:
-                        arguments.append(arg.value(cols))
-
-                return implementation(*arguments)
-
+            value = self._translate_function_value(
+                expr,
+                implementation,
+                op_args,
+                context_kwargs,
+                verb,
+                **kwargs,
+            )
             operator = implementation.operator
 
             if operator.ftype == OPType.AGGREGATE and verb == "mutate":
@@ -613,7 +617,28 @@ class SQLTableImpl(LazyTableImpl):
                 ftype = self.backend._get_op_ftype(op_args, operator, strict=True)
                 return TypedValue(value, implementation.rtype, ftype)
 
-        def _map_literal(self, expr):
+        def _translate_function_value(
+            self,
+            expr: FunctionCall,
+            implementation: TypedOperatorImpl,
+            op_args: list,
+            context_kwargs: dict,
+            verb=None,
+            **kwargs,
+        ):
+            def value(cols):
+                arguments = []
+                for arg in op_args:
+                    if arg.dtype.const:
+                        arguments.append(arg.value(cols, as_sql_literal=False))
+                    else:
+                        arguments.append(arg.value(cols))
+
+                return implementation(*arguments)
+
+            return value
+
+        def _translate_literal_value(self, expr):
             def literal_func(*args, as_sql_literal=True):
                 if as_sql_literal:
                     return sa.literal(expr)
