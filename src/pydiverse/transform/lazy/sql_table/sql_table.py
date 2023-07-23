@@ -248,7 +248,7 @@ class SQLTableImpl(LazyTableImpl):
 
     def _build_select_from(self, select):
         for join in self.joins:
-            compiled, _ = self.compiler.translate(join.on)
+            compiled, _ = self.compiler.translate(join.on, verb="join")
             on = compiled(self.sql_columns)
 
             select = select.join(
@@ -268,7 +268,7 @@ class SQLTableImpl(LazyTableImpl):
         combined_where = functools.reduce(
             operator.and_, map(SymbolicExpression, self.wheres)
         )._
-        compiled, where_dtype = self.compiler.translate(combined_where)
+        compiled, where_dtype = self.compiler.translate(combined_where, verb="filter")
         assert isinstance(where_dtype, dtypes.Bool)
         where = compiled(self.sql_columns)
         return select.where(where)
@@ -279,7 +279,7 @@ class SQLTableImpl(LazyTableImpl):
 
         compiled_gb, group_by_dtypes = zip(
             *(
-                self.compiler.translate(group_by)
+                self.compiler.translate(group_by, verb="group_by")
                 for group_by in self.intrinsic_grouped_by
             )
         )
@@ -294,7 +294,7 @@ class SQLTableImpl(LazyTableImpl):
         combined_having = functools.reduce(
             operator.and_, map(SymbolicExpression, self.having)
         )._
-        compiled, having_dtype = self.compiler.translate(combined_having)
+        compiled, having_dtype = self.compiler.translate(combined_having, verb="filter")
         assert isinstance(having_dtype, dtypes.Bool)
         having = compiled(self.sql_columns)
         return select.having(having)
@@ -322,7 +322,7 @@ class SQLTableImpl(LazyTableImpl):
 
         o = []
         for o_by in self.order_bys:
-            compiled, _ = self.compiler.translate(o_by.order)
+            compiled, _ = self.compiler.translate(o_by.order, verb="arrange")
             col = compiled(self.sql_columns)
             o.extend(self._order_col(col, o_by))
 

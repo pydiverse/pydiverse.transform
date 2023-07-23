@@ -76,7 +76,7 @@ class DelegatingTranslator(Translator[T], Generic[T]):
             expr_args, expr_kwargs = operator.mutate_args(expr.args, expr.kwargs)
             expr = FunctionCall(expr.name, *expr_args, **expr_kwargs)
 
-            op_args, op_kwargs, context_kwargs = self.__translate_function_arguments(
+            op_args, op_kwargs, context_kwargs = self._translate_function_arguments(
                 expr, operator, **kwargs
             )
 
@@ -119,7 +119,7 @@ class DelegatingTranslator(Translator[T], Generic[T]):
     def _translate_literal(self, expr, **kwargs) -> T:
         raise NotImplementedError
 
-    def __translate_function_arguments(
+    def _translate_function_arguments(
         self, expr: FunctionCall, operator: Operator, **kwargs
     ) -> tuple[list[T], dict[str, T], dict[str, Any]]:
         op_args = [self._translate(arg, **kwargs) for arg in expr.args]
