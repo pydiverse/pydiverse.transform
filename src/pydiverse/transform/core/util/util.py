@@ -4,7 +4,7 @@ import typing
 from dataclasses import dataclass
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.core.expressions import Column, FunctionCall, LambdaColumn
+from pydiverse.transform.core.expressions import FunctionCall
 
 __all__ = (
     "traverse",
@@ -84,12 +84,6 @@ def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
     ordering = []
     for arg in order_list:
         col, ascending, nulls_first = ordering_peeler(arg)
-
-        if not isinstance(col, (Column, LambdaColumn)):
-            raise ValueError(
-                "Arguments to arrange must be of type 'Column' or 'LambdaColumn' and"
-                f" not '{type(col)}'."
-            )
         col = tbl.resolve_lambda_cols(col)
         ordering.append(OrderingDescriptor(col, ascending, nulls_first))
 

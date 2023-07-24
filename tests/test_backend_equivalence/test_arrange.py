@@ -21,6 +21,11 @@ def test_arrange(df2):
     assert_result_equal(df2, lambda t: t >> arrange(-t.col3))
 
 
+def test_arrange_expression(df3):
+    assert_result_equal(df3, lambda t: t >> arrange(t.col4 + t.col2), check_order=True)
+    assert_result_equal(df3, lambda t: t >> arrange(-t.col4 * 2), check_order=True)
+
+
 def test_arrange_null(df2):
     assert_result_equal(df2, lambda t: t >> arrange(t.col2))
     assert_result_equal(df2, lambda t: t >> arrange(-t.col2))

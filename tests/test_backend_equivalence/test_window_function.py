@@ -261,6 +261,7 @@ def test_op_rank(df4):
             rank3=t.col2.nulls_last().rank(),
             rank4=t.col5.nulls_first().rank(),
             rank5=(-t.col5.nulls_first()).rank(),
+            rank_expr=(t.col3 - t.col2).rank(),
         ),
     )
 

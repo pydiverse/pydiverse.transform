@@ -353,9 +353,6 @@ class TestBuiltinVerbs:
         with pytest.raises(ValueError):
             tbl1 >> arrange(tbl1.col1, -tbl2.col1)
 
-        with pytest.raises(ValueError):
-            tbl1 >> arrange(tbl1.col1 * 4)
-
     def test_col_pipeable(self, tbl1, tbl2):
         result = tbl1.col1 >> mutate(x=tbl1.col1 * 2)
 

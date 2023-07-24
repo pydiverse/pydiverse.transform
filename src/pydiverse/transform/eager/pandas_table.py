@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import operator
+import uuid
 import warnings
 from typing import Any, Callable
 
@@ -122,9 +123,10 @@ class PandasTableImpl(EagerTableImpl):
         )
 
         # Update Dataframe
+        grouper = self.df_grouper()
         cols = {
             self.df_name_mapping[uuid]: self.cols[uuid].compiled(
-                self.df, grouper=self.df_grouper()
+                self.df, grouper=grouper
             )
             for uuid in uuid_kwargs.keys()
         }
