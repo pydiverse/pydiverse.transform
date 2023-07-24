@@ -149,3 +149,46 @@ def test_intermediate_select(df3_x, df3_y):
 
 
 # TODO: Implement more test cases for summarise verb
+
+
+# Test specific operations
+
+
+@tables("df4")
+def test_op_min(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> group_by(t.col1)
+        >> summarise(**{c._.name + "_min": c.min() for c in t}),
+    )
+
+
+@tables("df4")
+def test_op_max(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> group_by(t.col1)
+        >> summarise(**{c._.name + "_max": c.max() for c in t}),
+    )
+
+
+@tables("df4")
+def test_op_any(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t >> group_by(t.col1) >> summarise(any=(λ.col1 == λ.col2).any()),
+    )
+
+
+@tables("df4")
+def test_op_all(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t >> group_by(t.col1) >> summarise(all=(λ.col2 != λ.col3).all()),
+    )

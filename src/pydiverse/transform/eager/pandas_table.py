@@ -609,6 +609,36 @@ with PandasTableImpl.op(ops.Sum()) as op:
         return x.aggregate("sum")
 
 
+with PandasTableImpl.op(ops.Any()) as op:
+
+    @op.auto
+    def _any(x):
+        return x.any()
+
+    @op.auto(variant="transform")
+    def _any(x):
+        return x.transform("any")
+
+    @op.auto(variant="aggregate")
+    def _any(x):
+        return x.aggregate("any")
+
+
+with PandasTableImpl.op(ops.All()) as op:
+
+    @op.auto
+    def _all(x):
+        return x.all()
+
+    @op.auto(variant="transform")
+    def _all(x):
+        return x.transform("all")
+
+    @op.auto(variant="aggregate")
+    def _all(x):
+        return x.aggregate("all")
+
+
 with PandasTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto

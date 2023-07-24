@@ -803,7 +803,7 @@ with SQLTableImpl.op(ops.Round()) as op:
         if decimals >= 0:
             return sa.func.round(x, decimals)
         # For some reason SQLite doesn't like negative decimals values
-        return sa.func.round(x / (10**-decimals)) * (10**-decimals)
+        return sa.func.ROUND(x / (10**-decimals)) * (10**-decimals)
 
 
 with SQLTableImpl.op(ops.Strip()) as op:
@@ -827,21 +827,35 @@ with SQLTableImpl.op(ops.Min()) as op:
 
     @op.auto
     def _min(x):
-        return sa.func.MIN(x)
+        return sa.func.min(x)
 
 
 with SQLTableImpl.op(ops.Max()) as op:
 
     @op.auto
     def _max(x):
-        return sa.func.MAX(x)
+        return sa.func.max(x)
 
 
 with SQLTableImpl.op(ops.Sum()) as op:
 
     @op.auto
     def _sum(x):
-        return sa.func.SUM(x)
+        return sa.func.sum(x)
+
+
+with SQLTableImpl.op(ops.Any()) as op:
+
+    @op.auto
+    def _any(x):
+        return sa.func.coalesce(sa.func.max(x), False)
+
+
+with SQLTableImpl.op(ops.All()) as op:
+
+    @op.auto
+    def _all(x):
+        return sa.func.coalesce(sa.func.min(x), False)
 
 
 with SQLTableImpl.op(ops.StringJoin()) as op:
@@ -857,10 +871,10 @@ with SQLTableImpl.op(ops.Count()) as op:
     def _count(x=None):
         if x is None:
             # Get the number of rows
-            return sa.func.COUNT()
+            return sa.func.count()
         else:
             # Count non null values
-            return sa.func.COUNT(x)
+            return sa.func.count(x)
 
 
 #### Window Functions ####
