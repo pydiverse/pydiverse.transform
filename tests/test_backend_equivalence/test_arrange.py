@@ -7,54 +7,46 @@ from pydiverse.transform.core.verbs import (
 )
 from tests.fixtures.backend import skip_backends
 
-from . import assert_result_equal, tables
+from . import assert_result_equal
 
 
-@tables("df1")
-def test_noop(df1_x, df1_y):
-    assert_result_equal(df1_x, df1_y, lambda t: t >> arrange())
+def test_noop(df1):
+    assert_result_equal(df1, lambda t: t >> arrange())
 
 
-@tables("df2")
-def test_arrange(df2_x, df2_y):
-    assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(t.col1))
-    assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(-t.col1))
-    assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(t.col3))
-    assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(-t.col3))
+def test_arrange(df2):
+    assert_result_equal(df2, lambda t: t >> arrange(t.col1))
+    assert_result_equal(df2, lambda t: t >> arrange(-t.col1))
+    assert_result_equal(df2, lambda t: t >> arrange(t.col3))
+    assert_result_equal(df2, lambda t: t >> arrange(-t.col3))
 
 
-@tables("df2")
-def test_arrange_null(df2_x, df2_y):
-    assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(t.col2))
-    assert_result_equal(df2_x, df2_y, lambda t: t >> arrange(-t.col2))
+def test_arrange_null(df2):
+    assert_result_equal(df2, lambda t: t >> arrange(t.col2))
+    assert_result_equal(df2, lambda t: t >> arrange(-t.col2))
 
 
-@tables("df3")
-def test_multiple(df3_x, df3_y):
-    assert_result_equal(df3_x, df3_y, lambda t: t >> arrange(t.col2, -t.col3, -t.col4))
+def test_multiple(df3):
+    assert_result_equal(df3, lambda t: t >> arrange(t.col2, -t.col3, -t.col4))
 
     assert_result_equal(
-        df3_x, df3_y, lambda t: t >> arrange(t.col2) >> arrange(-t.col3, -t.col4)
+        df3, lambda t: t >> arrange(t.col2) >> arrange(-t.col3, -t.col4)
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(t.col2, -t.col2),
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(t.col2, λ.col2),
     )
 
 
-@tables("df4")
-def test_nulls_first(df4_x, df4_y):
+def test_nulls_first(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t
         >> arrange(
             t.col1.nulls_first(),
@@ -65,11 +57,9 @@ def test_nulls_first(df4_x, df4_y):
     )
 
 
-@tables("df4")
-def test_nulls_last(df4_x, df4_y):
+def test_nulls_last(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t
         >> arrange(
             t.col1.nulls_last(),
@@ -81,11 +71,9 @@ def test_nulls_last(df4_x, df4_y):
 
 
 @skip_backends("pandas")
-@tables("df4")
-def test_nulls_first_last_mixed(df4_x, df4_y):
+def test_nulls_first_last_mixed(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t
         >> arrange(
             t.col1.nulls_first(),
@@ -96,11 +84,9 @@ def test_nulls_first_last_mixed(df4_x, df4_y):
     )
 
 
-@tables("df4")
-def test_arrange_after_mutate(df4_x, df4_y):
+def test_arrange_after_mutate(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t >> mutate(x=t.col1 <= t.col2) >> arrange(λ.x, λ.col4),
         check_order=True,
     )

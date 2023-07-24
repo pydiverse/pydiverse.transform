@@ -13,57 +13,39 @@ from pydiverse.transform.core.verbs import (
     summarise,
 )
 
-from . import assert_result_equal, full_sort, tables
+from . import assert_result_equal, full_sort
 
 
-@tables("df3")
-def test_simple(df3_x, df3_y):
-    assert_result_equal(df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(1))
-    assert_result_equal(df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(10))
-    assert_result_equal(df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(100))
+def test_simple(df3):
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(1))
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(10))
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(100))
 
-    assert_result_equal(
-        df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(1, offset=8)
-    )
-    assert_result_equal(
-        df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(10, offset=8)
-    )
-    assert_result_equal(
-        df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(100, offset=8)
-    )
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(1, offset=8))
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(10, offset=8))
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(100, offset=8))
 
-    assert_result_equal(
-        df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(1, offset=100)
-    )
-    assert_result_equal(
-        df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(10, offset=100)
-    )
-    assert_result_equal(
-        df3_x, df3_y, lambda t: t >> arrange(*t) >> slice_head(100, offset=100)
-    )
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(1, offset=100))
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(10, offset=100))
+    assert_result_equal(df3, lambda t: t >> arrange(*t) >> slice_head(100, offset=100))
 
 
-@tables("df3")
-def test_chained(df3_x, df3_y):
+def test_chained(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(*t) >> slice_head(1) >> arrange(*t) >> slice_head(1),
     )
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(*t) >> slice_head(10) >> arrange(*t) >> slice_head(5),
     )
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(*t) >> slice_head(100) >> arrange(*t) >> slice_head(5),
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> arrange(*t)
         >> slice_head(2, offset=5)
@@ -71,8 +53,7 @@ def test_chained(df3_x, df3_y):
         >> slice_head(2, offset=1),
     )
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> arrange(*t)
         >> slice_head(10, offset=8)
@@ -81,20 +62,16 @@ def test_chained(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_with_select(df3_x, df3_y):
+def test_with_select(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> select() >> arrange(*t) >> slice_head(4, offset=2) >> select(*t),
     )
 
 
-@tables("df3")
-def test_with_mutate(df3_x, df3_y):
+def test_with_mutate(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> mutate(a=λ.col1 * 2)
         >> arrange(*t)
@@ -103,11 +80,9 @@ def test_with_mutate(df3_x, df3_y):
     )
 
 
-@tables("df1", "df2")
-def test_with_join(df1_x, df1_y, df2_x, df2_y):
+def test_with_join(df1, df2):
     assert_result_equal(
-        (df1_x, df2_x),
-        (df1_y, df2_y),
+        (df1, df2),
         lambda t, u: t
         >> full_sort()
         >> arrange(*t)
@@ -117,8 +92,7 @@ def test_with_join(df1_x, df1_y, df2_x, df2_y):
     )
 
     assert_result_equal(
-        (df1_x, df2_x),
-        (df1_y, df2_y),
+        (df1, df2),
         lambda t, u: t
         >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1)
         >> full_sort(),
@@ -127,11 +101,9 @@ def test_with_join(df1_x, df1_y, df2_x, df2_y):
     )
 
 
-@tables("df3")
-def test_with_filter(df3_x, df3_y):
+def test_with_filter(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> filter(t.col4 % 2 == 0)
         >> arrange(*t)
@@ -139,14 +111,12 @@ def test_with_filter(df3_x, df3_y):
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(*t) >> slice_head(4, offset=2) >> filter(t.col1 == 1),
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> filter(t.col4 % 2 == 0)
         >> arrange(*t)
@@ -155,11 +125,9 @@ def test_with_filter(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_with_arrange(df3_x, df3_y):
+def test_with_arrange(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> mutate(x=t.col4 - (t.col1 * t.col2))
         >> arrange(λ.x, *t)
@@ -167,8 +135,7 @@ def test_with_arrange(df3_x, df3_y):
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> mutate(x=(t.col1 * t.col2))
         >> arrange(*t)
@@ -177,11 +144,9 @@ def test_with_arrange(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_with_group_by(df3_x, df3_y):
+def test_with_group_by(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> arrange(*t)
         >> slice_head(1)
@@ -190,8 +155,7 @@ def test_with_group_by(df3_x, df3_y):
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> arrange(λ.col1, *t)
         >> slice_head(6, offset=1)
@@ -201,8 +165,7 @@ def test_with_group_by(df3_x, df3_y):
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> mutate(key=λ.col4 % (λ.col3 + 1))
         >> arrange(λ.key, *t)
@@ -212,16 +175,13 @@ def test_with_group_by(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_with_summarise(df3_x, df3_y):
+def test_with_summarise(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(*t) >> slice_head(4) >> summarise(count=f.count()),
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> arrange(*t) >> slice_head(4) >> summarise(c3_mean=λ.col3.mean()),
     )

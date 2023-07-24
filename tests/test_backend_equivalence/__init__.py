@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 import pytest
 from pandas._testing import assert_frame_equal
 
@@ -7,13 +9,8 @@ from pydiverse.transform import Table, verb
 from pydiverse.transform.core.verbs import arrange, collect, show_query
 
 
-def tables(*names: str):
-    return pytest.mark.request_tables(names)
-
-
 def assert_result_equal(
-    x,
-    y,
+    input_tables,
     pipe_factory,
     *,
     exception=None,
@@ -21,9 +18,9 @@ def assert_result_equal(
     may_throw=False,
     **kwargs,
 ):
-    if not isinstance(x, (list, tuple)):
-        x = (x,)
-        y = (y,)
+    if not isinstance(input_tables[0], (tuple, list)):
+        input_tables = (input_tables,)
+    x, y = zip(*input_tables)
 
     if exception and not may_throw:
         with pytest.raises(exception):

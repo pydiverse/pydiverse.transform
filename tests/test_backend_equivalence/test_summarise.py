@@ -10,42 +10,34 @@ from pydiverse.transform.core.verbs import (
     summarise,
 )
 
-from . import assert_result_equal, tables
+from . import assert_result_equal
 
 
-@tables("df3")
-def test_ungrouped(df3_x, df3_y):
-    assert_result_equal(df3_x, df3_y, lambda t: t >> summarise(mean3=t.col3.mean()))
+def test_ungrouped(df3):
+    assert_result_equal(df3, lambda t: t >> summarise(mean3=t.col3.mean()))
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> summarise(mean3=t.col3.mean(), mean4=t.col4.mean()),
     )
 
 
-@tables("df3")
-def test_simple_grouped(df3_x, df3_y):
+def test_simple_grouped(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> group_by(t.col1) >> summarise(mean3=t.col3.mean()),
     )
 
 
-@tables("df3")
-def test_multi_grouped(df3_x, df3_y):
+def test_multi_grouped(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t >> group_by(t.col1, t.col2) >> summarise(mean3=t.col3.mean()),
     )
 
 
-@tables("df3")
-def test_chained_summarised(df3_x, df3_y):
+def test_chained_summarised(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
@@ -53,8 +45,7 @@ def test_chained_summarised(df3_x, df3_y):
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> mutate(k=(λ.col1 + λ.col2) * λ.col4)
         >> group_by(λ.k)
@@ -63,11 +54,9 @@ def test_chained_summarised(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_nested(df3_x, df3_y):
+def test_nested(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean_of_mean3=t.col3.mean().mean()),
@@ -75,11 +64,9 @@ def test_nested(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_select(df3_x, df3_y):
+def test_select(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
@@ -87,11 +74,9 @@ def test_select(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_mutate(df3_x, df3_y):
+def test_mutate(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
@@ -99,11 +84,9 @@ def test_mutate(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_filter(df3_x, df3_y):
+def test_filter(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
@@ -111,11 +94,9 @@ def test_filter(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_arrange(df3_x, df3_y):
+def test_arrange(df3):
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
@@ -123,8 +104,7 @@ def test_arrange(df3_x, df3_y):
     )
 
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> arrange(-t.col4)
         >> group_by(t.col1, t.col2)
@@ -133,12 +113,10 @@ def test_arrange(df3_x, df3_y):
     )
 
 
-@tables("df3")
-def test_intermediate_select(df3_x, df3_y):
+def test_intermediate_select(df3):
     # Check that subqueries happen transparently
     assert_result_equal(
-        df3_x,
-        df3_y,
+        df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(x=t.col4.mean())
@@ -154,41 +132,33 @@ def test_intermediate_select(df3_x, df3_y):
 # Test specific operations
 
 
-@tables("df4")
-def test_op_min(df4_x, df4_y):
+def test_op_min(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t
         >> group_by(t.col1)
         >> summarise(**{c._.name + "_min": c.min() for c in t}),
     )
 
 
-@tables("df4")
-def test_op_max(df4_x, df4_y):
+def test_op_max(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t
         >> group_by(t.col1)
         >> summarise(**{c._.name + "_max": c.max() for c in t}),
     )
 
 
-@tables("df4")
-def test_op_any(df4_x, df4_y):
+def test_op_any(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t >> group_by(t.col1) >> summarise(any=(λ.col1 == λ.col2).any()),
     )
 
 
-@tables("df4")
-def test_op_all(df4_x, df4_y):
+def test_op_all(df4):
     assert_result_equal(
-        df4_x,
-        df4_y,
+        df4,
         lambda t: t >> group_by(t.col1) >> summarise(all=(λ.col2 != λ.col3).all()),
     )

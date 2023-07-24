@@ -134,7 +134,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
     ]
 
     params = []
-    table_names = metafunc.definition.get_closest_marker("request_tables").args[0]
+    table_names = [name for name in metafunc.fixturenames if name in dataframes]
     for reference_backend, backend in backend_combinations:
         # Skip some redundant backend combinations
         if reference_backend == backend:
@@ -154,7 +154,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
             )
         )
 
-        arguments = [reference_backend, backend] * len(table_names)
+        arguments = [(reference_backend, backend)] * len(table_names)
 
         params.append(
             pytest.param(
@@ -164,7 +164,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
             )
         )
 
-    param_names = ",".join([f"{name}_x, {name}_y" for name in table_names])
+    param_names = ",".join([f"{name}" for name in table_names])
     return metafunc.parametrize(param_names, params, indirect=True)
 
 
@@ -172,14 +172,14 @@ def generate_df_fixtures():
     def gen_fixture(table_name):
         @pytest.fixture(scope="function")
         def table_fixture(request):
-            table = Table(backend_impls[request.param]()[table_name])
-            return table
+            table_x = Table(backend_impls[request.param[0]]()[table_name])
+            table_y = Table(backend_impls[request.param[1]]()[table_name])
+            return table_x, table_y
 
         return table_fixture
 
     for name in dataframes:
-        globals()[f"{name}_x"] = gen_fixture(name)
-        globals()[f"{name}_y"] = gen_fixture(name)
+        globals()[f"{name}"] = gen_fixture(name)
 
 
 generate_df_fixtures()
