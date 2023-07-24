@@ -45,7 +45,7 @@ class PandasTableImpl(EagerTableImpl):
         self.join_translator = self.JoinTranslator()
 
         columns = {
-            name: Column(name=name, table=self, dtype=self._convert_dtype(dtype))
+            name: Column(name=name, table=self, dtype=self._dtype_from_pd(dtype))
             for name, dtype in self.df.dtypes.items()
         }
 
@@ -63,7 +63,8 @@ class PandasTableImpl(EagerTableImpl):
 
         super().__init__(name=name, columns=columns)
 
-    def _convert_dtype(self, dtype: Any) -> dtypes.DType:
+    def _dtype_from_pd(self, dtype: Any) -> dtypes.DType:
+        # TODO: Do this better (e.g. how pipedag does it)
         if pd.api.types.is_integer_dtype(dtype):
             return dtypes.Int()
         if pd.api.types.is_float_dtype(dtype):
@@ -72,6 +73,19 @@ class PandasTableImpl(EagerTableImpl):
             return dtypes.Bool()
         if pd.api.types.is_string_dtype(dtype):
             return dtypes.String()
+
+        raise NotImplementedError(f"Invalid type {dtype}.")
+
+    def _dtype_to_pd(self, dtype: dtypes.DType) -> Any:
+        # TODO: Do this better (e.g. how pipedag does it)
+        if dtypes.Int().same_kind(dtype):
+            return pd.Int64Dtype()
+        if dtypes.Float().same_kind(dtype):
+            return pd.Float64Dtype()
+        if dtypes.Bool().same_kind(dtype):
+            return pd.BooleanDtype()
+        if dtypes.String().same_kind(dtype):
+            return pd.StringDtype()
 
         raise NotImplementedError(f"Invalid type {dtype}.")
 
@@ -326,7 +340,9 @@ class PandasTableImpl(EagerTableImpl):
                 scalar = bound_impl(series)
                 if verb == "summarise":
                     return scalar
-                return pd.Series(scalar, index=series.index)
+
+                pd_dtype = self.backend._dtype_to_pd(implementation.rtype)
+                return pd.Series(scalar, index=series.index, dtype=pd_dtype)
 
             operator = implementation.operator
 
@@ -340,7 +356,9 @@ class PandasTableImpl(EagerTableImpl):
                     ordering = translate_ordering(self.backend, arrange)
                     internal_kwargs["_ordering"] = ordering
 
-                value = self.arranged_window(value, operator, context_kwargs)
+                value = self.arranged_window(
+                    value, operator, context_kwargs, verb=verb, **kwargs
+                )
 
             override_ftype = (
                 OPType.WINDOW
@@ -351,7 +369,11 @@ class PandasTableImpl(EagerTableImpl):
             return TypedValue(value, implementation.rtype, ftype)
 
         def arranged_window(
-            self, value: Callable, operator: ops.Operator, context_kwargs: dict
+            self,
+            value: Callable,
+            operator: ops.Operator,
+            context_kwargs: dict,
+            **translate_kwargs,
         ):
             arrange = context_kwargs.get("arrange")
             if arrange is None:
@@ -361,7 +383,7 @@ class PandasTableImpl(EagerTableImpl):
 
             def arranged_value(df, **kwargs):
                 original_index = df.index
-                sorted_df = self.backend.sort_df(df, ordering)
+                sorted_df = self.backend.sort_df(df, ordering, translate_kwargs)
 
                 # Original grouper can't be used for sorted dataframe
                 sorted_grouper = self.backend.df_grouper(sorted_df)
@@ -458,8 +480,7 @@ class PandasTableImpl(EagerTableImpl):
 
     #### HELPERS ####
 
-    def sort_df(self, df, ordering: list[OrderingDescriptor]):
-        cols = [self.df_name_mapping[o.order.uuid] for o in ordering]
+    def sort_df(self, df, ordering: list[OrderingDescriptor], translate_kwargs=None):
         ascending = [o.asc for o in ordering]
         nulls_first = [o.nulls_first for o in ordering]
 
@@ -474,12 +495,36 @@ class PandasTableImpl(EagerTableImpl):
                 " into multiple arranges."
             )
 
-        return df.sort_values(
-            by=cols,
+        # Add temporary columns
+        ordering_cols_names = []
+        temporary_ordering_cols = {}
+        for o in ordering:
+            if isinstance(o.order, Column):
+                ordering_cols_names.append(self.df_name_mapping[o.order.uuid])
+                continue
+
+            # Order is an expression: Create a temporary column
+            tmp_name = "tmp_arrange_" + uuid_to_str(uuid.uuid1())
+            tmp_col = self.compiler.translate(
+                o.order, **(translate_kwargs or {})
+            ).value(df)
+
+            ordering_cols_names.append(tmp_name)
+            temporary_ordering_cols[tmp_name] = tmp_col
+
+        df = df.copy(deep=False)
+        for col_name, col in temporary_ordering_cols.items():
+            df[col_name] = col
+
+        df = df.sort_values(
+            by=ordering_cols_names,
             ascending=ascending,
             kind="mergesort",
             na_position=na_position,
         )
+        df.drop(columns=list(temporary_ordering_cols), inplace=True)
+
+        return df
 
     def grouped_df(self, df: pd.DataFrame = None):
         if df is None:

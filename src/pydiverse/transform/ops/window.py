@@ -39,6 +39,8 @@ class Shift(Window):
     signatures = [
         "T, const int -> T",
         "T, const int, const T -> T",
+        # Special case
+        "float, const int, const int -> float",
     ]
 
 

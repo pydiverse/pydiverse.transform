@@ -95,6 +95,9 @@ class Pow(ElementWise, Binary):
     name = "__pow__"
     signatures = [
         "int, int -> int",
+        "int, float -> float",
+        "float, int -> float",
+        "float, float -> float",
     ]
 
 
@@ -142,6 +145,6 @@ class Round(ElementWise):
     signatures = [
         "int -> int",
         "int, const int -> int",
-        "float -> int",
+        "float -> float",
         "float, const int -> float",
     ]
