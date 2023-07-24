@@ -51,6 +51,9 @@ jobs:
         with:
           compose-file: ./docker-compose.yaml
 
+      - name: Install Microsoft ODBC
+        run: sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+
       - name: Wait for Docker Servers
         timeout-minutes: 1
         shell: bash
@@ -62,4 +65,4 @@ jobs:
       - name: Run Tests
         uses: ./.github/actions/test
         with:
-          arguments: --postgres
+          arguments: --postgres --mssql
