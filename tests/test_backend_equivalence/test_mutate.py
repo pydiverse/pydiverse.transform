@@ -41,3 +41,14 @@ def test_literals(df1_x, df1_y):
     assert_result_equal(df1_x, df1_y, lambda t: t >> mutate(x=1.1))
     assert_result_equal(df1_x, df1_y, lambda t: t >> mutate(x=True))
     assert_result_equal(df1_x, df1_y, lambda t: t >> mutate(x="test"))
+
+
+@tables("df4")
+def test_mutate_bool_expr(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= λ.col4)
+        >> mutate(xAndY=λ.x & λ.y),
+    )

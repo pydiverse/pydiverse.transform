@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydiverse.transform import λ
 from pydiverse.transform.core.verbs import (
     arrange,
+    mutate,
 )
 from tests.fixtures.backend import skip_backends
 
@@ -91,5 +92,15 @@ def test_nulls_first_last_mixed(df4_x, df4_y):
             -t.col2.nulls_last(),
             -t.col5,
         ),
+        check_order=True,
+    )
+
+
+@tables("df4")
+def test_arrange_after_mutate(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t >> mutate(x=t.col1 <= t.col2) >> arrange(λ.x, λ.col4),
         check_order=True,
     )

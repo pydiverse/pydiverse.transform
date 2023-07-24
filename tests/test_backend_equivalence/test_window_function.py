@@ -239,6 +239,22 @@ def test_complex(df3_x, df3_y):
     )
 
 
+@tables("df4")
+def test_nested_bool(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> group_by(t.col1)
+        >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= λ.col4)
+        >> mutate(
+            xshift=λ.x.shift(1, arrange=[t.col4]),
+            yshift=λ.y.shift(-1, arrange=[t.col4]),
+        )
+        >> mutate(xAndY=λ.x & λ.y, xAndYshifted=λ.xshift & λ.yshift),
+    )
+
+
 # Test specific operations
 
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from pydiverse.transform import λ
 from pydiverse.transform.core.verbs import (
     filter,
+    mutate,
 )
 
 from . import assert_result_equal, tables
@@ -36,4 +38,13 @@ def test_filter_empty_result(df3_x, df3_y):
         df3_x,
         df3_y,
         lambda t: t >> filter(t.col1 == 0) >> filter(t.col2 == 2) >> filter(t.col4 < 2),
+    )
+
+
+@tables("df4")
+def test_filter_after_mutate(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t >> mutate(x=t.col1 <= t.col2) >> filter(λ.x),
     )

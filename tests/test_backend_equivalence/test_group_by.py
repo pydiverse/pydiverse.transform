@@ -102,3 +102,15 @@ def test_arrange(df3_x, df3_y):
     assert_result_equal(
         df3_x, df3_y, lambda t: t >> group_by(t.col1) >> arrange(-t.col4)
     )
+
+
+@tables("df4")
+def test_group_by_bool_col(df4_x, df4_y):
+    assert_result_equal(
+        df4_x,
+        df4_y,
+        lambda t: t
+        >> mutate(x=t.col1 <= t.col2)
+        >> group_by(λ.x)
+        >> mutate(y=λ.col4.mean()),
+    )
