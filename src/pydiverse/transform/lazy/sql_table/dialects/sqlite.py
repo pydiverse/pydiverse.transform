@@ -18,3 +18,10 @@ with SQLiteTableImpl.op(ops.Round()) as op:
             return sa.func.ROUND(x, decimals, type=x.type)
         # For some reason SQLite doesn't like negative decimals values
         return sa.func.ROUND(x / (10**-decimals), type=x.type) * (10**-decimals)
+
+
+with SQLiteTableImpl.op(ops.StringJoin()) as op:
+
+    @op.auto
+    def _join(x, sep: str):
+        return sa.func.GROUP_CONCAT(x, sep, type_=x.type)

@@ -10,6 +10,23 @@ class PostgresTableImpl(SQLTableImpl):
     _dialect_name = "postgresql"
 
 
+with PostgresTableImpl.op(ops.Round()) as op:
+
+    @op.auto
+    def _round(x, decimals=0):
+        if decimals == 0:
+            if isinstance(x.type, sa.Integer):
+                return x
+            return sa.func.ROUND(x, type_=x.type)
+
+        if isinstance(x.type, sa.Float):
+            # Postgres doesn't support rounding of doubles to specific precision
+            # -> Must first cast to numeric
+            return sa.func.ROUND(sa.cast(x, sa.Numeric), decimals, type_=sa.Numeric)
+
+        return sa.func.ROUND(x, decimals, type_=x.type)
+
+
 with PostgresTableImpl.op(ops.Any()) as op:
 
     @op.auto

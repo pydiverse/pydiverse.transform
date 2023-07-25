@@ -954,7 +954,7 @@ with SQLTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto
     def _join(x, sep: str):
-        return sa.func.GROUP_CONCAT(x, sep, type_=x.type)
+        return sa.func.STRING_AGG(x, sep, type_=x.type)
 
 
 with SQLTableImpl.op(ops.Count()) as op:
