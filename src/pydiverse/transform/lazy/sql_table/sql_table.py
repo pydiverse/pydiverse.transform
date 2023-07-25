@@ -788,29 +788,67 @@ with SQLTableImpl.op(ops.RFloorDiv(), check_super=False) as op:
         return _floordiv(lhs, rhs)
 
 
+with SQLTableImpl.op(ops.Pow()) as op:
+
+    @op.auto
+    def _pow(lhs, rhs):
+        if isinstance(lhs.type, sa.Float) or isinstance(rhs.type, sa.Float):
+            type_ = sa.Double()
+        elif isinstance(lhs.type, sa.Numeric) or isinstance(rhs, sa.Numeric):
+            type_ = sa.Numeric()
+        else:
+            type_ = sa.Double()
+
+        return sa.func.pow(lhs, rhs, type_=type_)
+
+
+with SQLTableImpl.op(ops.RPow()) as op:
+
+    @op.auto
+    def _rpow(rhs, lhs):
+        return _pow(lhs, rhs)
+
+
+with SQLTableImpl.op(ops.Xor()) as op:
+
+    @op.auto
+    def _xor(lhs, rhs):
+        return lhs != rhs
+
+
+with SQLTableImpl.op(ops.RXor()) as op:
+
+    @op.auto
+    def _rxor(rhs, lhs):
+        return lhs != rhs
+
+
+with SQLTableImpl.op(ops.Pos()) as op:
+
+    @op.auto
+    def _pos(x):
+        return x
+
+
 with SQLTableImpl.op(ops.Abs()) as op:
 
     @op.auto
     def _abs(x):
-        return sa.func.ABS(x)
+        return sa.func.ABS(x, type_=x.type)
 
 
 with SQLTableImpl.op(ops.Round()) as op:
 
     @op.auto
     def _round(x, decimals=0):
-        # TODO: Don't round integers with decimals >= 0
-        if decimals >= 0:
-            return sa.func.round(x, decimals)
-        # For some reason SQLite doesn't like negative decimals values
-        return sa.func.ROUND(x / (10**-decimals)) * (10**-decimals)
+        return sa.func.ROUND(x, decimals, type_=x.type)
 
 
 with SQLTableImpl.op(ops.Strip()) as op:
 
     @op.auto
     def _strip(x):
-        return sa.func.TRIM(x)
+        return sa.func.TRIM(x, type_=x.type)
 
 
 #### Summarising Functions ####
@@ -820,7 +858,11 @@ with SQLTableImpl.op(ops.Mean()) as op:
 
     @op.auto
     def _mean(x):
-        return sa.func.AVG(x)
+        type_ = sa.Numeric()
+        if isinstance(x.type, sa.Float):
+            type_ = sa.Double()
+
+        return sa.func.AVG(x, type_=type_)
 
 
 with SQLTableImpl.op(ops.Min()) as op:
@@ -862,7 +904,7 @@ with SQLTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto
     def _join(x, sep: str):
-        return sa.func.GROUP_CONCAT(x, sep)
+        return sa.func.GROUP_CONCAT(x, sep, type_=x.type)
 
 
 with SQLTableImpl.op(ops.Count()) as op:
@@ -887,9 +929,9 @@ with SQLTableImpl.op(ops.Shift()) as op:
         if by == 0:
             return x
         if by > 0:
-            return sa.func.LAG(x, by, empty_value)
+            return sa.func.LAG(x, by, empty_value, type_=x.type)
         if by < 0:
-            return sa.func.LEAD(x, -by, empty_value)
+            return sa.func.LEAD(x, -by, empty_value, type_=x.type)
         raise Exception
 
 
@@ -897,7 +939,7 @@ with SQLTableImpl.op(ops.RowNumber()) as op:
 
     @op.auto
     def _row_number():
-        return sa.func.ROW_NUMBER()
+        return sa.func.ROW_NUMBER(type_=sa.Integer())
 
 
 with SQLTableImpl.op(ops.Rank()) as op:

@@ -14,11 +14,11 @@ with PostgresTableImpl.op(ops.Any()) as op:
 
     @op.auto
     def _any(x):
-        return sa.func.coalesce(sa.func.BOOL_OR(x), False)
+        return sa.func.coalesce(sa.func.BOOL_OR(x, type_=sa.Boolean()), False)
 
 
 with PostgresTableImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
-        return sa.func.coalesce(sa.func.BOOL_AND(x), False)
+        return sa.func.coalesce(sa.func.BOOL_AND(x, type_=sa.Boolean()), False)

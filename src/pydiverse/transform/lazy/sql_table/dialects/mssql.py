@@ -176,4 +176,4 @@ with MSSqlTableImpl.op(ops.Mean()) as op:
 
     @op.auto
     def _mean(x):
-        return sa.func.AVG(sa.cast(x, sa.Float()))
+        return sa.func.AVG(sa.cast(x, sa.Double()), type_=sa.Double())
