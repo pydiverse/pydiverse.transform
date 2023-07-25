@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import itertools
-import operator
+import operator as py_operator
 import uuid
 import warnings
 from typing import Any, Callable
@@ -211,7 +211,9 @@ class PandasTableImpl(EagerTableImpl):
         if not args:
             return
 
-        compiled, dtype = self.compiler.translate(functools.reduce(operator.and_, args))
+        compiled, dtype = self.compiler.translate(
+            functools.reduce(py_operator.and_, args)
+        )
         assert isinstance(dtype, dtypes.Bool)
 
         condition = compiled(self.df)

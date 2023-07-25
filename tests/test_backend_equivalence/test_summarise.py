@@ -155,10 +155,18 @@ def test_op_any(df4):
         df4,
         lambda t: t >> group_by(t.col1) >> summarise(any=(λ.col1 == λ.col2).any()),
     )
+    assert_result_equal(
+        df4,
+        lambda t: t >> group_by(t.col1) >> mutate(any=(λ.col1 == λ.col2).any()),
+    )
 
 
 def test_op_all(df4):
     assert_result_equal(
         df4,
         lambda t: t >> group_by(t.col1) >> summarise(all=(λ.col2 != λ.col3).all()),
+    )
+    assert_result_equal(
+        df4,
+        lambda t: t >> group_by(t.col1) >> mutate(all=(λ.col2 != λ.col3).all()),
     )

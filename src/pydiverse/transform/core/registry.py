@@ -5,12 +5,13 @@ import functools
 import inspect
 import itertools
 import textwrap
-import typing
+from collections.abc import Iterable
 from functools import partial
+from typing import TYPE_CHECKING, Callable
 
 from pydiverse.transform.core import dtypes
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from pydiverse.transform.ops import Operator, OperatorExtension
 
 
@@ -29,28 +30,19 @@ class OperatorImpl:
     def __init__(
         self,
         operator: Operator,
-        impl: typing.Callable,
+        impl: Callable,
         signature: OperatorSignature,
     ):
         self.operator = operator
         self.impl = impl
         self.signature = signature
-        self.variants: dict[str, typing.Callable] = {}
+        self.variants: dict[str, Callable] = {}
 
         self.__id = next(OperatorImpl.id_)
 
         # Inspect impl signature to get internal kwargs
-        self.internal_kwargs = []
-
-        try:
-            impl_signature = inspect.signature(impl)
-            for name, param in impl_signature.parameters.items():
-                if param.kind == inspect.Parameter.KEYWORD_ONLY and name.startswith(
-                    "_"
-                ):
-                    self.internal_kwargs.append(name)
-        except (TypeError, ValueError):
-            pass
+        self.internal_kwargs = self._compute_internal_kwargs(impl)
+        self.variant_internal_kwargs = {}
 
         # Calculate Ordering Key
         # - Find match with the least number templates in the signature
@@ -79,13 +71,29 @@ class OperatorImpl:
             self.__id,
         )
 
-    def add_variant(self, name: str, impl: typing.Callable):
+    def add_variant(self, name: str, impl: Callable):
         if name in self.variants:
             raise ValueError(
                 f"Already added a variant with name '{name}'"
                 f" to operator {self.operator}."
             )
         self.variants[name] = impl
+        self.variant_internal_kwargs[name] = self._compute_internal_kwargs(impl)
+
+    @staticmethod
+    def _compute_internal_kwargs(impl: Callable):
+        internal_kwargs = []
+        try:
+            impl_signature = inspect.signature(impl)
+            for name, param in impl_signature.parameters.items():
+                if param.kind == inspect.Parameter.KEYWORD_ONLY and name.startswith(
+                    "_"
+                ):
+                    internal_kwargs.append(name)
+        except (TypeError, ValueError):
+            pass
+
+        return internal_kwargs
 
 
 @dataclasses.dataclass
@@ -111,22 +119,29 @@ class TypedOperatorImpl:
     def __call__(self, *args, **kwargs):
         return self.impl.impl(*args, **self.__clean_kwargs(kwargs))
 
-    def get_variant(self, name: str) -> typing.Callable | None:
+    def has_variant(self, name: str) -> bool:
+        return name in self.impl.variants
+
+    def get_variant(self, name: str) -> Callable | None:
         variant = self.impl.variants.get(name)
         if variant is None:
             return None
 
         @functools.wraps(variant)
         def variant_wrapper(*args, **kwargs):
-            return variant(*args, **self.__clean_kwargs(kwargs))
+            return variant(*args, **self.__clean_kwargs(kwargs, variant=name))
 
         return variant_wrapper
 
-    def __clean_kwargs(self, kwargs):
+    def __clean_kwargs(self, kwargs, variant=None):
+        internal_kwargs = self.impl.internal_kwargs
+        if variant:
+            internal_kwargs = self.impl.variant_internal_kwargs[variant]
+
         return {
             k: v
             for k, v in kwargs.items()
-            if not k.startswith("_") or k in self.impl.internal_kwargs
+            if not k.startswith("_") or k in internal_kwargs
         }
 
 
@@ -220,7 +235,7 @@ class OperatorRegistry:
     def add_implementation(
         self,
         operator: Operator,
-        impl: typing.Callable,
+        impl: Callable,
         signature: str,
         variant: str | None = None,
     ):
@@ -457,7 +472,7 @@ class OperatorImplementationStore:
 
     def _find_matches(
         self, signature: list[dtypes.DType]
-    ) -> typing.Iterable[TrieNode, dict[str, dtypes.DType]]:
+    ) -> Iterable[TrieNode, dict[str, dtypes.DType]]:
         """Yield all operators that match the input signature"""
 
         # Case 0 arguments:
@@ -527,12 +542,17 @@ class OperatorRegistrationContextManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def __call__(self, signature: str, variant: str = None):
+    def __call__(self, signature: str, *, variant: str = None):
         if not isinstance(signature, str):
             raise TypeError("Signature must be of type str.")
 
         def decorator(func):
-            self.registry.add_implementation(self.operator, func, signature, variant)
+            self.registry.add_implementation(
+                self.operator,
+                func,
+                signature,
+                variant,
+            )
             return func
 
         return decorator
@@ -544,8 +564,13 @@ class OperatorRegistrationContextManager:
         if not self.operator.signatures:
             raise ValueError(f"Operator {self.operator} has not default signatures.")
 
-        for sig in self.operator.signatures:
-            self.registry.add_implementation(self.operator, func, sig, variant)
+        for signature in self.operator.signatures:
+            self.registry.add_implementation(
+                self.operator,
+                func,
+                signature,
+                variant,
+            )
 
         return func
 

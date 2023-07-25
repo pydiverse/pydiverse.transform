@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import inspect
 import itertools
-import operator
+import operator as py_operator
 import uuid
 import warnings
 from collections.abc import Iterable
@@ -267,7 +267,7 @@ class SQLTableImpl(LazyTableImpl):
 
         # Combine wheres using ands
         combined_where = functools.reduce(
-            operator.and_, map(SymbolicExpression, self.wheres)
+            py_operator.and_, map(SymbolicExpression, self.wheres)
         )._
         compiled, where_dtype = self.compiler.translate(combined_where, verb="filter")
         assert isinstance(where_dtype, dtypes.Bool)
@@ -293,7 +293,7 @@ class SQLTableImpl(LazyTableImpl):
 
         # Combine havings using ands
         combined_having = functools.reduce(
-            operator.and_, map(SymbolicExpression, self.having)
+            py_operator.and_, map(SymbolicExpression, self.having)
         )._
         compiled, having_dtype = self.compiler.translate(combined_having, verb="filter")
         assert isinstance(having_dtype, dtypes.Bool)
@@ -478,7 +478,7 @@ class SQLTableImpl(LazyTableImpl):
             self.wheres.extend(right.wheres)
         elif how == "left":
             # WHERES from right must go into the ON clause
-            on = reduce(operator.and_, (on, *right.wheres))
+            on = reduce(py_operator.and_, (on, *right.wheres))
         elif how == "outer":
             # For outer joins, the WHERE clause can't easily be merged.
             # The best solution for now is to move them into a subquery.
@@ -599,9 +599,7 @@ class SQLTableImpl(LazyTableImpl):
 
             if operator.ftype == OPType.AGGREGATE and verb == "mutate":
                 # Aggregate function in mutate verb -> window function
-                over_value = self.over_clause(
-                    value, implementation.operator, context_kwargs
-                )
+                over_value = self.over_clause(value, implementation, context_kwargs)
                 ftype = self.backend._get_op_ftype(
                     op_args, operator, OPType.WINDOW, strict=True
                 )
@@ -613,9 +611,7 @@ class SQLTableImpl(LazyTableImpl):
                         "Window function are only allowed inside a mutate."
                     )
 
-                over_value = self.over_clause(
-                    value, implementation.operator, context_kwargs
-                )
+                over_value = self.over_clause(value, implementation, context_kwargs)
                 ftype = self.backend._get_op_ftype(op_args, operator, strict=True)
                 return TypedValue(over_value, implementation.rtype, ftype)
 
@@ -639,20 +635,29 @@ class SQLTableImpl(LazyTableImpl):
                     itertools.repeat(impl_dtypes[-1]),
                 )
 
-            def value(cols):
-                arguments = []
+            def value(cols, *, variant=None, internal_kwargs=None):
+                args = []
                 for arg, dtype in zip(op_args, impl_dtypes):
                     if dtype.const:
-                        arguments.append(arg.value(cols, as_sql_literal=False))
+                        args.append(arg.value(cols, as_sql_literal=False))
                     else:
-                        arguments.append(arg.value(cols))
+                        args.append(arg.value(cols))
 
-                return implementation(*arguments)
+                kwargs = {
+                    "_tbl": self.backend,
+                    **(internal_kwargs or {}),
+                }
+
+                if variant is not None:
+                    if variant_impl := implementation.get_variant(variant):
+                        return variant_impl(*args, **kwargs)
+
+                return implementation(*args, **kwargs)
 
             return value
 
         def _translate_literal_value(self, expr):
-            def literal_func(*args, as_sql_literal=True):
+            def literal_func(*args, as_sql_literal=True, **kwargs):
                 if as_sql_literal:
                     return sa.literal(expr)
                 return expr
@@ -660,8 +665,12 @@ class SQLTableImpl(LazyTableImpl):
             return literal_func
 
         def over_clause(
-            self, value: Callable, operator: ops.Operator, context_kwargs: dict
+            self,
+            value: Callable,
+            implementation: TypedOperatorImpl,
+            context_kwargs: dict,
         ):
+            operator = implementation.operator
             if operator.ftype not in (OPType.AGGREGATE, OPType.WINDOW):
                 raise ValueError
 
@@ -707,8 +716,21 @@ class SQLTableImpl(LazyTableImpl):
                     else None
                 )
 
-                v = value(*args, **kwargs)
-                return v.over(
+                # Some operators need to further modify the OVER expression
+                # To do this, we allow registering a variant called "window"
+                if implementation.has_variant("window"):
+                    return value(
+                        *args,
+                        variant="window",
+                        internal_kwargs={
+                            "_window_partition_by": pb,
+                            "_window_order_by": ob,
+                        },
+                        **kwargs,
+                    )
+
+                # If now window variant has been defined, just apply generic OVER clause
+                return value(*args, **kwargs).over(
                     partition_by=pb,
                     order_by=ob,
                 )
@@ -897,15 +919,35 @@ with SQLTableImpl.op(ops.Sum()) as op:
 with SQLTableImpl.op(ops.Any()) as op:
 
     @op.auto
-    def _any(x):
-        return sa.func.coalesce(sa.func.max(x), False)
+    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+        return sa.func.coalesce(sa.func.max(x), sa.false())
+
+    @op.auto(variant="window")
+    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+        return sa.func.coalesce(
+            sa.func.max(x).over(
+                partition_by=_window_partition_by,
+                order_by=_window_order_by,
+            ),
+            sa.false(),
+        )
 
 
 with SQLTableImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
-        return sa.func.coalesce(sa.func.min(x), False)
+        return sa.func.coalesce(sa.func.min(x), sa.false())
+
+    @op.auto(variant="window")
+    def _all(x, *, _window_partition_by=None, _window_order_by=None):
+        return sa.func.coalesce(
+            sa.func.min(x).over(
+                partition_by=_window_partition_by,
+                order_by=_window_order_by,
+            ),
+            sa.false(),
+        )
 
 
 with SQLTableImpl.op(ops.StringJoin()) as op:
