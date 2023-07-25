@@ -580,6 +580,22 @@ def fast_pd_convert_dtypes(obj: pd._typing.NDFrameT, **kwargs) -> pd._typing.NDF
 #### BACKEND SPECIFIC OPERATORS ################################################
 
 
+with PandasTableImpl.op(ops.Pow()) as op:
+
+    @op("int, int -> float")
+    def _pow(lhs, rhs):
+        if isinstance(lhs, int):
+            return lhs ** rhs.astype(pd.Float64Dtype())
+        return lhs.astype(pd.Float64Dtype()) ** rhs
+
+
+with PandasTableImpl.op(ops.RPow()) as op:
+
+    @op("int, int -> float")
+    def _rpow(rhs, lhs):
+        return _pow(lhs, rhs)
+
+
 with PandasTableImpl.op(ops.Round()) as op:
 
     @op.auto

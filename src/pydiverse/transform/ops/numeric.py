@@ -94,7 +94,7 @@ class RFloorDiv(FloorDiv):
 class Pow(ElementWise, Binary):
     name = "__pow__"
     signatures = [
-        "int, int -> int",
+        "int, int -> float",
         "int, float -> float",
         "float, int -> float",
         "float, float -> float",
