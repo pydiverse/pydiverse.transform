@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import itertools
 import operator
 import uuid
 import warnings
@@ -631,10 +632,17 @@ class SQLTableImpl(LazyTableImpl):
             verb=None,
             **kwargs,
         ):
+            impl_dtypes = implementation.impl.signature.args
+            if implementation.impl.signature.is_vararg:
+                impl_dtypes = itertools.chain(
+                    impl_dtypes[:-1],
+                    itertools.repeat(impl_dtypes[-1]),
+                )
+
             def value(cols):
                 arguments = []
-                for arg in op_args:
-                    if arg.dtype.const:
+                for arg, dtype in zip(op_args, impl_dtypes):
+                    if dtype.const:
                         arguments.append(arg.value(cols, as_sql_literal=False))
                     else:
                         arguments.append(arg.value(cols))
