@@ -233,7 +233,8 @@ def test_op_shift(df4):
         >> group_by(t.col1)
         >> mutate(
             shift1=t.col2.shift(1, arrange=[t.col4]),
-            shift2=t.col4.shift(-2, arrange=[t.col4]),
+            shift2=t.col4.shift(-2, 0, arrange=[t.col4]),
+            shift3=t.col4.shift(0, arrange=[t.col4]),
         ),
     )
 

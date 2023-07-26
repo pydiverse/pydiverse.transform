@@ -829,7 +829,7 @@ with SQLTableImpl.op(ops.Pow()) as op:
         else:
             type_ = sa.Double()
 
-        return sa.func.pow(lhs, rhs, type_=type_)
+        return sa.func.POW(lhs, rhs, type_=type_)
 
 
 with SQLTableImpl.op(ops.RPow()) as op:
@@ -975,14 +975,28 @@ with SQLTableImpl.op(ops.Count()) as op:
 with SQLTableImpl.op(ops.Shift()) as op:
 
     @op.auto
-    def _shift(x, by, empty_value=None):
+    def _shift():
+        raise RuntimeError("This is a stub")
+
+    @op.auto(variant="window")
+    def _shift(
+        x,
+        by,
+        empty_value=None,
+        *,
+        _window_partition_by=None,
+        _window_order_by=None,
+    ):
         if by == 0:
             return x
         if by > 0:
-            return sa.func.LAG(x, by, empty_value, type_=x.type)
+            return sa.func.LAG(x, by, empty_value, type_=x.type).over(
+                partition_by=_window_partition_by, order_by=_window_order_by
+            )
         if by < 0:
-            return sa.func.LEAD(x, -by, empty_value, type_=x.type)
-        raise Exception
+            return sa.func.LEAD(x, -by, empty_value, type_=x.type).over(
+                partition_by=_window_partition_by, order_by=_window_order_by
+            )
 
 
 with SQLTableImpl.op(ops.RowNumber()) as op:
