@@ -95,6 +95,12 @@ class Template(DType):
         return self.name == other.name
 
 
+class NoneDType(DType):
+    """DType used to represent the `None` value."""
+
+    name = "none"
+
+
 def dtype_from_string(t: str) -> DType:
     parts = [part for part in t.split(" ") if part]
 
@@ -132,5 +138,7 @@ def dtype_from_string(t: str) -> DType:
         return String(const=is_const, vararg=is_vararg)
     if base_type == "bool":
         return Bool(const=is_const, vararg=is_vararg)
+    if base_type == "none":
+        return NoneDType(const=is_const, vararg=is_vararg)
 
     raise ValueError(f"Unknown type '{base_type}'")

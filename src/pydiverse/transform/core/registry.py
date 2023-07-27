@@ -557,7 +557,7 @@ class OperatorRegistrationContextManager:
 
         return decorator
 
-    def auto(self, func=None, *, variant: str = None):
+    def auto(self, func: Callable = None, *, variant: str = None):
         if func is None:
             return partial(self.auto, variant=variant)
 

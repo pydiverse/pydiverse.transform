@@ -582,6 +582,22 @@ def fast_pd_convert_dtypes(obj: pd._typing.NDFrameT, **kwargs) -> pd._typing.NDF
 #### BACKEND SPECIFIC OPERATORS ################################################
 
 
+with PandasTableImpl.op(ops.Equal()) as op:
+
+    @op("T, const none -> bool")
+    def _eq(lhs, rhs):
+        assert rhs is None
+        return lhs.isna()
+
+
+with PandasTableImpl.op(ops.NotEqual()) as op:
+
+    @op("T, const none -> bool")
+    def _ne(lhs, rhs):
+        assert rhs is None
+        return lhs.notna()
+
+
 with PandasTableImpl.op(ops.Pow()) as op:
 
     @op("int, int -> float")

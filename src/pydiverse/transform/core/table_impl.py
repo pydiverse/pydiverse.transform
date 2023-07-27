@@ -241,6 +241,9 @@ class AbstractTableImpl:
             if isinstance(expr, str):
                 return TypedValue(literal, dtypes.String(const=True))
 
+            if expr is None:
+                return TypedValue(literal, dtypes.NoneDType(const=True))
+
         def _translate_literal_value(self, expr):
             def literal_func(*args, **kwargs):
                 return expr
@@ -263,6 +266,9 @@ class AbstractTableImpl:
                 return TypedValue(expr, dtypes.Float(const=True))
             if isinstance(expr, str):
                 return TypedValue(expr, dtypes.String(const=True))
+
+            if expr is None:
+                return TypedValue(expr, dtypes.NoneDType(const=True))
 
     class LambdaTranslator(Translator):
         """

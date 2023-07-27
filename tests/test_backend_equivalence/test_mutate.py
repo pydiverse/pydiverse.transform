@@ -38,6 +38,20 @@ def test_literals(df1):
     assert_result_equal(df1, lambda t: t >> mutate(x="test"))
 
 
+def test_none(df4):
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            x1=(t.col1 == None),
+            x2=(t.col1 != None),
+            y1=(None == t.col2),
+            y2=(None != t.col2),
+        ),
+    )
+    # assert_result_equal(df1, lambda t: t >> mutate(x=None))
+
+
 def test_mutate_bool_expr(df4):
     assert_result_equal(
         df4,

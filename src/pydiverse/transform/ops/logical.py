@@ -40,10 +40,16 @@ class Comparison(ElementWise, Binary):
 
 class Equal(Comparison):
     name = "__eq__"
+    signatures = Comparison.signatures + [
+        "T, const none -> bool",
+    ]
 
 
 class NotEqual(Comparison):
     name = "__ne__"
+    signatures = Comparison.signatures + [
+        "T, const none -> bool",
+    ]
 
 
 class Less(Comparison):
