@@ -369,7 +369,7 @@ class ColumnMetaData:
             uuid=uuid,
             expr=expr,
             compiled=v.value,
-            dtype=v.dtype,
+            dtype=v.dtype.without_modifiers(),
             ftype=v.ftype,
         )
 

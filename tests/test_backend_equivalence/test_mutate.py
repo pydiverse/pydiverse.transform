@@ -39,6 +39,7 @@ def test_literals(df1):
 
 
 def test_none(df4):
+    assert_result_equal(df4, lambda t: t >> mutate(x=None), exception=TypeError)
     assert_result_equal(
         df4,
         lambda t: t
@@ -49,7 +50,6 @@ def test_none(df4):
             y2=(None != t.col2),
         ),
     )
-    # assert_result_equal(df1, lambda t: t >> mutate(x=None))
 
 
 def test_mutate_bool_expr(df4):

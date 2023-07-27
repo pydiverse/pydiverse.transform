@@ -15,9 +15,9 @@ with SQLiteTableImpl.op(ops.Round()) as op:
     @op.auto
     def _round(x, decimals=0):
         if decimals >= 0:
-            return sa.func.ROUND(x, decimals, type=x.type)
+            return sa.func.ROUND(x, decimals, type_=x.type)
         # For some reason SQLite doesn't like negative decimals values
-        return sa.func.ROUND(x / (10**-decimals), type=x.type) * (10**-decimals)
+        return sa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
 
 
 with SQLiteTableImpl.op(ops.StringJoin()) as op:

@@ -4,6 +4,7 @@ import functools
 from collections import ChainMap
 from collections.abc import Iterable
 
+from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.dispatchers import builtin_verb
 from pydiverse.transform.core.expressions import (
     Column,
@@ -18,6 +19,7 @@ from pydiverse.transform.core.util import (
     sign_peeler,
     translate_ordering,
 )
+from pydiverse.transform.ops import OPType
 
 __all__ = [
     "alias",
@@ -238,10 +240,15 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
 
     for name, expr in kwargs.items():
         uid = Column.generate_col_uuid()
+        col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="mutate")
+
+        if dtypes.NoneDType().same_kind(col.dtype):
+            raise TypeError(f"Column '{name}' has an invalid type: {col.dtype}")
+
         new_tbl.selects.add(name)
         new_tbl.named_cols.fwd[name] = uid
         new_tbl.available_cols.add(uid)
-        new_tbl.cols[uid] = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="mutate")
+        new_tbl.cols[uid] = col
 
     new_tbl.mutate(**kwargs)
     return new_tbl
@@ -434,10 +441,19 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
                 " columns must have a different name than the grouping columns."
             )
         uid = Column.generate_col_uuid()
+        col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="summarise")
+
+        if dtypes.NoneDType().same_kind(col.dtype):
+            raise TypeError(f"Column '{name}' has an invalid type: {col.dtype}")
+        if col.ftype != OPType.AGGREGATE:
+            raise ValueError(
+                f"Expression for column '{name}' doesn't summarise any values."
+            )
+
         selects.add(name)
         named_cols.fwd[name] = uid
         available_cols.add(uid)
-        cols[uid] = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="summarise")
+        cols[uid] = col
 
     # Update new_tbl
     new_tbl.selects = ordered_set(selects)
