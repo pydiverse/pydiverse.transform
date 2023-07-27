@@ -4,7 +4,7 @@ from html import escape
 from typing import Any, Generic
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.core.expressions import FunctionCall, util
+from pydiverse.transform.core.expressions import CaseExpression, FunctionCall, util
 from pydiverse.transform.core.registry import OperatorRegistry
 from pydiverse.transform.core.util import traverse
 
@@ -38,6 +38,15 @@ class SymbolicExpression(Generic[T]):
 
     def __getitem__(self, item):
         return SymbolicExpression(FunctionCall("__getitem__", self, item))
+
+    def case(self, *cases: tuple[Any, Any], default: Any = None):
+        case_expression = CaseExpression(
+            switching_on=self,
+            cases=cases,
+            default=default,
+        )
+
+        return SymbolicExpression(case_expression)
 
     def __dir__(self):
         # TODO: Instead of displaying all available operators, translate the

@@ -425,6 +425,56 @@ class TestPandasTable:
             tbl3 >> slice_head_custom(1, offset=100),
         )
 
+    def test_case_expression(self, tbl3):
+        assert_equal(
+            (
+                tbl3
+                >> select()
+                >> mutate(
+                    col1=λ.col1.case(
+                        (0, 1),
+                        (1, 2),
+                        (2, 3),
+                        default=-1,
+                    )
+                )
+                >> collect()
+            ),
+            (df3[["col1"]] + 1),
+        )
+
+        assert_equal(
+            (
+                tbl3
+                >> select()
+                >> mutate(
+                    x=λ.col1.case(
+                        (λ.col2, 1),
+                        (λ.col3, 2),
+                        default=0,
+                    )
+                )
+                >> collect()
+            ),
+            pd.DataFrame({"x": [1, 1, 0, 0, 0, 2, 1, 1, 0, 0, 2, 0]}),
+        )
+
+        assert_equal(
+            (
+                tbl3
+                >> select()
+                >> mutate(
+                    x=f.case(
+                        (λ.col1 == λ.col2, 1),
+                        (λ.col1 == λ.col3, 2),
+                        default=λ.col4,
+                    )
+                )
+                >> collect()
+            ),
+            pd.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
+        )
+
     def test_lambda_column(self, tbl1, tbl2):
         # Select
         assert_equal(tbl1 >> select(λ.col1), tbl1 >> select(tbl1.col1))

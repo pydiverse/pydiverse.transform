@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydiverse.transform.core.expressions import Column, FunctionCall, LiteralColumn
+from pydiverse.transform.core.expressions import (
+    CaseExpression,
+    Column,
+    FunctionCall,
+    LiteralColumn,
+)
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -17,6 +22,11 @@ def iterate_over_expr(expr, expand_literal_col=False):
     yield expr
 
     if isinstance(expr, FunctionCall):
+        for child in expr.iter_children():
+            yield from iterate_over_expr(child, expand_literal_col=expand_literal_col)
+        return
+
+    if isinstance(expr, CaseExpression):
         for child in expr.iter_children():
             yield from iterate_over_expr(child, expand_literal_col=expand_literal_col)
         return

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from pydiverse.transform.core.expressions import FunctionCall, SymbolicExpression
+from typing import Any
+
+from pydiverse.transform.core.expressions import (
+    CaseExpression,
+    FunctionCall,
+    SymbolicExpression,
+)
 
 __all__ = [
     "count",
@@ -21,3 +27,13 @@ def count(expr: SymbolicExpression = None):
 
 def row_number(*, arrange: list):
     return _sym_f_call("row_number", arrange=arrange)
+
+
+def case(*cases: tuple[Any, Any], default: Any = None):
+    case_expression = CaseExpression(
+        switching_on=None,
+        cases=cases,
+        default=default,
+    )
+
+    return SymbolicExpression(case_expression)

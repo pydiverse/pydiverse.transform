@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import λ
-from pydiverse.transform.core import AbstractTableImpl, Table
+from pydiverse.transform.core import AbstractTableImpl, Table, dtypes
 from pydiverse.transform.core.dispatchers import (
     col_to_table,
     inverse_partial,
@@ -450,7 +450,9 @@ class TestUtil:
 
 class MockTableImpl(AbstractTableImpl):
     def __init__(self, name, col_names):
-        super().__init__(name, {name: Column(name, self, "int") for name in col_names})
+        super().__init__(
+            name, {name: Column(name, self, dtypes.Int()) for name in col_names}
+        )
 
     def resolve_lambda_cols(self, expr):
         return expr
@@ -460,4 +462,4 @@ class MockTableImpl(AbstractTableImpl):
 
     class ExpressionCompiler(AbstractTableImpl.ExpressionCompiler):
         def _translate(self, expr, **kwargs):
-            return TypedValue(None, None)
+            return TypedValue(None, dtypes.Int())

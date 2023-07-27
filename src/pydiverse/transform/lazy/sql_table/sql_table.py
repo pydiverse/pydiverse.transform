@@ -564,7 +564,7 @@ class SQLTableImpl(LazyTableImpl):
             # Can either be a base SQL column, or a reference to an expression
             if expr.uuid in self.backend.sql_columns:
 
-                def sql_col(cols):
+                def sql_col(cols, **kw):
                     return cols[expr.uuid]
 
                 return TypedValue(sql_col, expr.dtype, OPType.EWISE)
@@ -579,20 +579,20 @@ class SQLTableImpl(LazyTableImpl):
                     f"Literal Column: {expr}"
                 )
 
-            def sql_col(cols):
+            def sql_col(cols, **kw):
                 return expr.typed_value.value
 
             return TypedValue(sql_col, expr.typed_value.dtype, expr.typed_value.ftype)
 
         def _translate_function(
-            self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
+            self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             value = self._translate_function_value(
                 expr,
                 implementation,
                 op_args,
                 context_kwargs,
-                verb,
+                verb=verb,
                 **kwargs,
             )
             operator = implementation.operator
@@ -625,6 +625,7 @@ class SQLTableImpl(LazyTableImpl):
             implementation: TypedOperatorImpl,
             op_args: list,
             context_kwargs: dict,
+            *,
             verb=None,
             **kwargs,
         ):
@@ -635,7 +636,7 @@ class SQLTableImpl(LazyTableImpl):
                     itertools.repeat(impl_dtypes[-1]),
                 )
 
-            def value(cols, *, variant=None, internal_kwargs=None):
+            def value(cols, *, variant=None, internal_kwargs=None, **kw):
                 args = []
                 for arg, dtype in zip(op_args, impl_dtypes):
                     if dtype.const:
@@ -655,6 +656,34 @@ class SQLTableImpl(LazyTableImpl):
                 return implementation(*args, **kwargs)
 
             return value
+
+        def _translate_case(self, expr, switching_on, cases, default, **kwargs):
+            def value(*args, **kw):
+                default_ = default.value(*args, **kwargs)
+
+                if switching_on is not None:
+                    switching_on_ = switching_on.value(*args, **kwargs)
+                    return sa.case(
+                        {
+                            cond.value(*args, **kw): val.value(*args, **kw)
+                            for cond, val in cases
+                        },
+                        value=switching_on_,
+                        else_=default_,
+                    )
+
+                return sa.case(
+                    *(
+                        (cond.value(*args, **kw), val.value(*args, **kw))
+                        for cond, val in cases
+                    ),
+                    else_=default_,
+                )
+
+            result_dtype, result_ftype = self._translate_case_common(
+                expr, switching_on, cases, default, **kwargs
+            )
+            return TypedValue(value, result_dtype, result_ftype)
 
         def _translate_literal_value(self, expr):
             def literal_func(*args, as_sql_literal=True, **kwargs):

@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any, Generic
 
 from pydiverse.transform._typing import T
 from pydiverse.transform.core import registry
-from pydiverse.transform.core.expressions import Column, FunctionCall, LiteralColumn
+from pydiverse.transform.core.expressions import (
+    CaseExpression,
+    Column,
+    FunctionCall,
+    LiteralColumn,
+)
 from pydiverse.transform.ops.core import Operator, OPType
 
 if TYPE_CHECKING:
@@ -59,15 +64,12 @@ class DelegatingTranslator(Translator[T], Generic[T]):
                 f" '{expr}':\n{e}"
             ) from e
 
-    def _translate(self, expr, accept_literal_col=True, **kwargs):
+    def _translate(self, expr, **kwargs):
         if isinstance(expr, Column):
             return self._translate_col(expr, **kwargs)
 
         if isinstance(expr, LiteralColumn):
-            if accept_literal_col:
-                return self._translate_literal_col(expr, **kwargs)
-            else:
-                raise ValueError("Literal columns aren't allowed in this context.")
+            return self._translate_literal_col(expr, **kwargs)
 
         if isinstance(expr, FunctionCall):
             operator = self.operator_registry.get_operator(expr.name)
@@ -92,6 +94,25 @@ class DelegatingTranslator(Translator[T], Generic[T]):
                 expr, implementation, op_args, context_kwargs, **kwargs
             )
 
+        if isinstance(expr, CaseExpression):
+            switching_on = (
+                self._translate(expr.switching_on, **{**kwargs, "context": "case_val"})
+                if expr.switching_on is not None
+                else None
+            )
+
+            cases = []
+            for cond, value in expr.cases:
+                cases.append(
+                    (
+                        self._translate(cond, **{**kwargs, "context": "case_cond"}),
+                        self._translate(value, **{**kwargs, "context": "case_val"}),
+                    )
+                )
+
+            default = self._translate(expr.default, **{**kwargs, "context": "case_val"})
+            return self._translate_case(expr, switching_on, cases, default, **kwargs)
+
         if literal_result := self._translate_literal(expr, **kwargs):
             return literal_result
 
@@ -112,6 +133,16 @@ class DelegatingTranslator(Translator[T], Generic[T]):
         implementation: registry.TypedOperatorImpl,
         op_args: list[T],
         context_kwargs: dict[str, Any],
+        **kwargs,
+    ) -> T:
+        raise NotImplementedError
+
+    def _translate_case(
+        self,
+        expr: CaseExpression,
+        switching_on: T | None,
+        cases: list[tuple[T, T]],
+        default: T,
         **kwargs,
     ) -> T:
         raise NotImplementedError
@@ -144,7 +175,15 @@ def bottom_up_replace(expr, replace):
                 **{k: transform(v) for k, v in expr.kwargs.items()},
             )
             return replace(f)
-        else:
-            return replace(expr)
+
+        if isinstance(expr, CaseExpression):
+            c = CaseExpression(
+                switching_on=transform(expr.switching_on),
+                cases=[(transform(k), transform(v)) for k, v in expr.cases],
+                default=transform(expr.default),
+            )
+            return replace(c)
+
+        return replace(expr)
 
     return transform(expr)

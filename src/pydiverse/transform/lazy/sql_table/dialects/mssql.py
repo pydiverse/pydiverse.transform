@@ -55,6 +55,15 @@ class MSSqlTableImpl(SQLTableImpl):
                 expr, **kwargs, mssql_bool_as_bit=mssql_bool_as_bit
             )
 
+        def _translate(self, expr, **kwargs):
+            if context := kwargs.get("context"):
+                if context == "case_val":
+                    kwargs["mssql_bool_as_bit"] = True
+                elif context == "case_cond":
+                    kwargs["mssql_bool_as_bit"] = False
+
+            return super()._translate(expr, **kwargs)
+
         def _translate_col(self, expr, **kwargs):
             # If mssql_bool_as_bit is true, then we can just return the
             # precompiled col. Otherwise, we must recompile it to ensure
@@ -64,9 +73,13 @@ class MSSqlTableImpl(SQLTableImpl):
 
             # Can either be a base SQL column, or a reference to an expression
             if expr.uuid in self.backend.sql_columns:
+                is_bool = dtypes.Bool().same_kind(self.backend.cols[expr.uuid].dtype)
 
-                def sql_col(cols):
-                    return cols[expr.uuid]
+                def sql_col(cols, **kw):
+                    col = cols[expr.uuid]
+                    if is_bool:
+                        return mssql_convert_bit_to_bool(col)
+                    return col
 
                 return TypedValue(sql_col, expr.dtype, OPType.EWISE)
 
@@ -74,14 +87,14 @@ class MSSqlTableImpl(SQLTableImpl):
             return self._translate(col.expr, **kwargs)
 
         def _translate_function_value(
-            self, expr, implementation, op_args, context_kwargs, verb=None, **kwargs
+            self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             value = super()._translate_function_value(
                 expr,
                 implementation,
                 op_args,
                 context_kwargs,
-                verb,
+                verb=verb,
                 **kwargs,
             )
 
@@ -137,7 +150,7 @@ def mssql_op_returns_bool_as_bit(implementation: TypedOperatorImpl) -> bool | No
 
 
 def mssql_convert_bit_to_bool(x: sa.SQLColumnExpression):
-    return x.is_(1)
+    return x == sa.literal_column("1")
 
 
 def mssql_convert_bool_to_bit(x: sa.SQLColumnExpression):

@@ -61,9 +61,25 @@ class DType(ABC):
 
         return True
 
+    def can_promote_to(self, other: DType) -> bool:
+        return other.same_kind(self)
+
 
 class Int(DType):
     name = "int"
+
+    def can_promote_to(self, other: DType) -> bool:
+        if super().can_promote_to(other):
+            return True
+
+        # int can be promoted to float
+        if Float().same_kind(other):
+            if other.const and not self.const:
+                return False
+
+            return True
+
+        return False
 
 
 class Float(DType):
@@ -142,3 +158,26 @@ def dtype_from_string(t: str) -> DType:
         return NoneDType(const=is_const, vararg=is_vararg)
 
     raise ValueError(f"Unknown type '{base_type}'")
+
+
+def promote_dtypes(dtypes: list[DType]) -> DType:
+    if len(dtypes) == 0:
+        raise ValueError("Expected non empty list of dtypes")
+
+    promoted = dtypes[0]
+    for dtype in dtypes[1:]:
+        if isinstance(dtype, NoneDType):
+            continue
+        if isinstance(promoted, NoneDType):
+            promoted = dtype
+            continue
+
+        if dtype.can_promote_to(promoted):
+            continue
+        if promoted.can_promote_to(dtype):
+            promoted = dtype
+            continue
+
+        raise TypeError(f"Incompatible types {dtype} and {promoted}.")
+
+    return promoted

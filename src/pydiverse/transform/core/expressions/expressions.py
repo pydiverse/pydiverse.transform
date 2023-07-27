@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
@@ -11,7 +12,11 @@ if TYPE_CHECKING:
     from pydiverse.transform.core.table_impl import AbstractTableImpl
 
 
-class Column(Generic[ImplT]):
+class BaseExpression:
+    pass
+
+
+class Column(BaseExpression, Generic[ImplT]):
     __slots__ = ("name", "table", "dtype", "uuid")
 
     def __init__(self, name: str, table: ImplT, dtype: DType, uuid: uuid.UUID = None):
@@ -39,7 +44,7 @@ class Column(Generic[ImplT]):
         return uuid.uuid1()
 
 
-class LambdaColumn:
+class LambdaColumn(BaseExpression):
     """Anonymous Column
 
     A lambda column is a column without an associated table or UUID. This means
@@ -72,7 +77,7 @@ class LambdaColumn:
         return hash(("λ", self.name))
 
 
-class LiteralColumn(Generic[T]):
+class LiteralColumn(BaseExpression, Generic[T]):
     __slots__ = ("typed_value", "expr", "backend")
 
     def __init__(
@@ -101,7 +106,7 @@ class LiteralColumn(Generic[T]):
         return not self.__eq__(other)
 
 
-class FunctionCall:
+class FunctionCall(BaseExpression):
     """
     AST node to represent a function / operator call.
     """
@@ -139,3 +144,37 @@ class FunctionCall:
 
     def iter_children(self):
         yield from self.args
+
+
+class CaseExpression(BaseExpression):
+    def __init__(
+        self, switching_on: Any | None, cases: Iterable[tuple[Any, Any]], default: Any
+    ):
+        from pydiverse.transform.core.expressions.symbolic_expressions import (
+            unwrap_symbolic_expressions,
+        )
+
+        # Unwrap all symbolic expressions in the input
+        switching_on = unwrap_symbolic_expressions(switching_on)
+        cases = unwrap_symbolic_expressions(list(cases))
+        default = unwrap_symbolic_expressions(default)
+
+        self.switching_on = switching_on
+        self.cases = cases
+        self.default = default
+
+    def __repr__(self):
+        if self.switching_on:
+            return f"case({self.switching_on}, {self.cases}, default={self.default})"
+        else:
+            return f"case({self.cases}, default={self.default})"
+
+    def iter_children(self):
+        if self.switching_on:
+            yield self.switching_on
+
+        for k, v in self.cases:
+            yield k
+            yield v
+
+        yield self.default

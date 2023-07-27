@@ -370,6 +370,40 @@ class PandasTableImpl(EagerTableImpl):
             ftype = self.backend._get_op_ftype(op_args, operator, override_ftype)
             return TypedValue(value, implementation.rtype, ftype)
 
+        def _translate_case(self, expr, switching_on, cases, default, **kwargs):
+            def value(df, **kw):
+                pd_dtype = self.backend._dtype_to_pd(result_dtype)
+                grouper = kw.get("grouper")
+
+                default_ = default.value(df, **kw)
+
+                if not isinstance(default_, pd.Series):
+                    result_index = df.index if grouper is None else grouper.result_index
+                    result = pd.Series(default_, index=result_index, dtype=pd_dtype)
+                else:
+                    result = default_
+
+                if switching_on is not None:
+                    switching_on_ = switching_on.value(df, **kw)
+                else:
+                    switching_on_ = None
+
+                for cond, val in cases[::-1]:
+                    cond_ = cond.value(df, **kw)
+                    val_ = val.value(df, **kw)
+
+                    if switching_on_ is not None:
+                        cond_ = switching_on_ == cond_
+
+                    result.mask(cond_, val_, inplace=True)
+
+                return result
+
+            result_dtype, result_ftype = self._translate_case_common(
+                expr, switching_on, cases, default, **kwargs
+            )
+            return TypedValue(value, result_dtype, result_ftype)
+
         def arranged_window(
             self,
             value: Callable,

@@ -127,7 +127,7 @@ def test_intermediate_select(df3):
 
 
 def test_not_summarising(df4):
-    assert_result_equal(df4, lambda t: t >> summarise(x=λ.col1), exception=TypeError)
+    assert_result_equal(df4, lambda t: t >> summarise(x=λ.col1), exception=ValueError)
 
 
 def test_none(df4):

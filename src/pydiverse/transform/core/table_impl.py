@@ -10,7 +10,12 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 from pydiverse.transform import ops
 from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core import dtypes
-from pydiverse.transform.core.expressions import Column, LambdaColumn, LiteralColumn
+from pydiverse.transform.core.expressions import (
+    CaseExpression,
+    Column,
+    LambdaColumn,
+    LiteralColumn,
+)
 from pydiverse.transform.core.expressions.translator import (
     DelegatingTranslator,
     Translator,
@@ -249,6 +254,63 @@ class AbstractTableImpl:
                 return expr
 
             return literal_func
+
+        def _translate_case_common(
+            self,
+            expr: CaseExpression,
+            switching_on: ExprCompT | None,
+            cases: list[tuple[ExprCompT, ExprCompT]],
+            default: ExprCompT,
+            **kwargs,
+        ) -> tuple[dtypes.DType, OPType]:
+            # Determine dtype of result
+            val_dtypes = [default.dtype.without_modifiers()]
+            for _, val in cases:
+                val_dtypes.append(val.dtype.without_modifiers())
+
+            result_dtype = dtypes.promote_dtypes(val_dtypes)
+
+            # Determine ftype of result
+            val_ftypes = set()
+            if not default.dtype.const:
+                val_ftypes.add(default.ftype)
+
+            for _, val in cases:
+                if not val.dtype.const:
+                    val_ftypes.add(val.ftype)
+
+            if len(val_ftypes) == 0:
+                result_ftype = OPType.EWISE
+            elif len(val_ftypes) == 1:
+                (result_ftype,) = val_ftypes
+            elif OPType.WINDOW in val_ftypes:
+                result_ftype = OPType.WINDOW
+            else:
+                # AGGREGATE and EWISE are incompatible
+                raise ValueError(
+                    "Incompatible function types found in case statement: "
+                    ", ".join(val_ftypes)
+                )
+
+            if result_ftype is OPType.EWISE and switching_on is not None:
+                result_ftype = switching_on.ftype
+
+            # Type check conditions
+            if switching_on is None:
+                # All conditions must be boolean
+                for cond, _ in cases:
+                    if not dtypes.Bool().same_kind(cond.dtype):
+                        raise TypeError
+            else:
+                # All conditions must be of the same type as switching_on
+                for cond, _ in cases:
+                    if not cond.dtype.can_promote_to(
+                        switching_on.dtype.without_modifiers()
+                    ):
+                        # Can't compare
+                        raise TypeError
+
+            return result_dtype, result_ftype
 
     class AlignedExpressionEvaluator(DelegatingTranslator[AlignedT], Generic[AlignedT]):
         """
