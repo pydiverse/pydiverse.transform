@@ -6,6 +6,7 @@ from .expressions import (
     FunctionCall,
     LambdaColumn,
     LiteralColumn,
+    expr_repr,
 )
 from .symbolic_expressions import SymbolicExpression, unwrap_symbolic_expressions
 from .translator import Translator, TypedValue

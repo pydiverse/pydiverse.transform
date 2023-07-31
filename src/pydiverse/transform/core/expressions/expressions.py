@@ -12,8 +12,57 @@ if TYPE_CHECKING:
     from pydiverse.transform.core.table_impl import AbstractTableImpl
 
 
+def expr_repr(it: Any):
+    from pydiverse.transform.core.expressions import SymbolicExpression
+
+    if isinstance(it, SymbolicExpression):
+        return expr_repr(it._)
+    if isinstance(it, BaseExpression):
+        return it._expr_repr()
+    if isinstance(it, (list, tuple)):
+        return f"[{ ', '.join([expr_repr(e) for e in it]) }]"
+    return repr(it)
+
+
+_dunder_expr_repr = {
+    "__add__": lambda lhs, rhs: f"({lhs} + {rhs})",
+    "__radd__": lambda rhs, lhs: f"({lhs} + {rhs})",
+    "__sub__": lambda lhs, rhs: f"({lhs} - {rhs})",
+    "__rsub__": lambda rhs, lhs: f"({lhs} - {rhs})",
+    "__mul__": lambda lhs, rhs: f"({lhs} * {rhs})",
+    "__rmul__": lambda rhs, lhs: f"({lhs} * {rhs})",
+    "__truediv__": lambda lhs, rhs: f"({lhs} / {rhs})",
+    "__rtruediv__": lambda rhs, lhs: f"({lhs} / {rhs})",
+    "__floordiv__": lambda lhs, rhs: f"({lhs} // {rhs})",
+    "__rfloordiv__": lambda rhs, lhs: f"({lhs} + {rhs})",
+    "__pow__": lambda lhs, rhs: f"({lhs} ** {rhs})",
+    "__rpow__": lambda rhs, lhs: f"({lhs} ** {rhs})",
+    "__mod__": lambda lhs, rhs: f"({lhs} % {rhs})",
+    "__rmod__": lambda rhs, lhs: f"({lhs} % {rhs})",
+    "__round__": lambda x, y=None: f"round({x}, {y})" if y else f"round({x})",
+    "__pos__": lambda x: f"(+{x})",
+    "__neg__": lambda x: f"(-{x})",
+    "__abs__": lambda x: f"abs({x})",
+    "__and__": lambda lhs, rhs: f"({lhs} & {rhs})",
+    "__rand__": lambda rhs, lhs: f"({lhs} & {rhs})",
+    "__or__": lambda lhs, rhs: f"({lhs} | {rhs})",
+    "__ror__": lambda rhs, lhs: f"({lhs} | {rhs})",
+    "__xor__": lambda lhs, rhs: f"({lhs} ^ {rhs})",
+    "__rxor__": lambda rhs, lhs: f"({lhs} ^ {rhs})",
+    "__invert__": lambda x: f"(~{x})",
+    "__lt__": lambda lhs, rhs: f"({lhs} < {rhs})",
+    "__le__": lambda lhs, rhs: f"({lhs} <= {rhs})",
+    "__eq__": lambda lhs, rhs: f"({lhs} == {rhs})",
+    "__ne__": lambda lhs, rhs: f"({lhs} != {rhs})",
+    "__gt__": lambda lhs, rhs: f"({lhs} > {rhs})",
+    "__ge__": lambda lhs, rhs: f"({lhs} >= {rhs})",
+}
+
+
 class BaseExpression:
-    pass
+    def _expr_repr(self) -> str:
+        """String repr that, when executed, returns the same expression"""
+        raise NotImplementedError
 
 
 class Column(BaseExpression, Generic[ImplT]):
@@ -27,6 +76,9 @@ class Column(BaseExpression, Generic[ImplT]):
 
     def __repr__(self):
         return f"<{self.table.name}.{self.name}({self.dtype})>"
+
+    def _expr_repr(self) -> str:
+        return f"{self.table.name}.{self.name}"
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -65,6 +117,9 @@ class LambdaColumn(BaseExpression):
     def __repr__(self):
         return f"<λ.{self.name}>"
 
+    def _expr_repr(self) -> str:
+        return f"λ.{self.name}"
+
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.name == other.name
@@ -92,6 +147,9 @@ class LiteralColumn(BaseExpression, Generic[T]):
 
     def __repr__(self):
         return f"<Lit: {self.expr} ({self.typed_value.dtype})>"
+
+    def _expr_repr(self) -> str:
+        return repr(self)
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -129,6 +187,21 @@ class FunctionCall(BaseExpression):
             f"{k}={repr(v)}" for k, v in self.kwargs.items()
         ]
         return f'{self.name}({", ".join(args)})'
+
+    def _expr_repr(self) -> str:
+        args = [expr_repr(e) for e in self.args] + [
+            f"{k}={expr_repr(v)}" for k, v in self.kwargs.items()
+        ]
+
+        if self.name in _dunder_expr_repr:
+            return _dunder_expr_repr[self.name](*args)
+
+        if len(self.args) == 0:
+            args_str = ", ".join(args)
+            return f"f.{self.name}({args_str})"
+        else:
+            args_str = ", ".join(args[1:])
+            return f"{args[0]}.{self.name}({args_str})"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -168,6 +241,15 @@ class CaseExpression(BaseExpression):
             return f"case({self.switching_on}, {self.cases}, default={self.default})"
         else:
             return f"case({self.cases}, default={self.default})"
+
+    def _expr_repr(self) -> str:
+        prefix = "f"
+        if self.switching_on:
+            prefix = expr_repr(self.switching_on)
+
+        args = [expr_repr(case) for case in self.cases]
+        args.append(f"default={expr_repr(self.default)}")
+        return f"{prefix}.case({', '.join(args)})"
 
     def iter_children(self):
         if self.switching_on:
