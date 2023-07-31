@@ -139,6 +139,7 @@ def mssql_op_returns_bool_as_bit(implementation: TypedOperatorImpl) -> bool | No
         ops.logical.BooleanBinary,
         ops.logical.Invert,
         ops.logical.Comparison,
+        ops.logical.IsIn,
     ]
 
     operator = implementation.operator

@@ -10,6 +10,7 @@ __all__ = [
     "LessEqual",
     "Greater",
     "GreaterEqual",
+    "IsIn",
     "And",
     "RAnd",
     "Or",
@@ -65,6 +66,14 @@ class Greater(Comparison):
 
 class GreaterEqual(Comparison):
     name = "__ge__"
+
+
+class IsIn(ElementWise):
+    name = "isin"
+    signatures = [
+        # TODO: A signature like "T, const list[const T] -> bool" would be better
+        "T, const T... -> bool",
+    ]
 
 
 #### Boolean Operators ####

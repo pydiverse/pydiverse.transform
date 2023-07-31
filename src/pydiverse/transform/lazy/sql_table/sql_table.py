@@ -651,6 +651,7 @@ class SQLTableImpl(LazyTableImpl):
 
                 kwargs = {
                     "_tbl": self.backend,
+                    "_verb": verb,
                     **(internal_kwargs or {}),
                 }
 
@@ -913,6 +914,17 @@ with SQLTableImpl.op(ops.Strip()) as op:
     @op.auto
     def _strip(x):
         return sa.func.TRIM(x, type_=x.type)
+
+
+with SQLTableImpl.op(ops.IsIn()) as op:
+
+    @op.auto
+    def _isin(x, *values, _verb=None):
+        if _verb == "filter":
+            # In WHERE and HAVING clause, we can use the IN operator
+            return x.in_(values)
+        # In SELECT we must replace it with the corresponding boolean expression
+        return reduce(py_operator.or_, map(lambda v: x == v, values))
 
 
 #### Summarising Functions ####

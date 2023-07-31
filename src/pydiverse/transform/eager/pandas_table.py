@@ -666,6 +666,13 @@ with PandasTableImpl.op(ops.Strip()) as op:
         return x.str.strip()
 
 
+with PandasTableImpl.op(ops.IsIn()) as op:
+
+    @op.auto
+    def _isin(x, *values):
+        return x.isin(values)
+
+
 #### Summarising Functions ####
 
 with PandasTableImpl.op(ops.Mean()) as op:
