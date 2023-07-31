@@ -30,6 +30,8 @@ __all__ = [
     "PandasTableImpl",
 ]
 
+from ..errors import AlignmentError, ExpressionError, FunctionTypeError
+
 
 class PandasTableImpl(EagerTableImpl):
     """Pandas backend
@@ -271,7 +273,7 @@ class PandasTableImpl(EagerTableImpl):
 
         def _translate_literal_col(self, expr, **kwargs):
             if not self.backend.is_aligned_with(expr):
-                raise ValueError(
+                raise AlignmentError(
                     "Literal column isn't aligned with this table. "
                     f"Literal Column: {expr}"
                 )
@@ -281,7 +283,7 @@ class PandasTableImpl(EagerTableImpl):
                 if isinstance(literal_value, pd.Series):
                     literal_len = len(literal_value.index)
                     if len(df.index) != literal_len:
-                        raise ValueError(
+                        raise AlignmentError(
                             "Literal column isn't aligned with this table. Make sure"
                             f" that they have the same length ({len(df.index)} vs"
                             f" {literal_len}). This might be the case if you are using"
@@ -352,7 +354,7 @@ class PandasTableImpl(EagerTableImpl):
 
             if operator.ftype == OPType.WINDOW:
                 if verb != "mutate":
-                    raise ValueError(
+                    raise FunctionTypeError(
                         "Window function are only allowed inside a mutate."
                     )
 
@@ -467,9 +469,9 @@ class PandasTableImpl(EagerTableImpl):
                     len(arg.index) if isinstance(arg, pd.Series) else 1
                     for arg in arguments
                 ]
-                raise ValueError(
+                raise AlignmentError(
                     f"Arguments for function {expr.name} aren't aligned. Specifically,"
-                    f" the inputs are of lenght {arg_lengths}. Instead they must either"
+                    f" the inputs are of length {arg_lengths}. Instead they must either"
                     " all be of the same length or of length 1."
                 )
 
@@ -511,7 +513,7 @@ class PandasTableImpl(EagerTableImpl):
                     return ((c1, c2),)
                 if expr.name == "__and__":
                     return tuple(itertools.chain(*expr.args))
-            raise Exception(
+            raise ExpressionError(
                 f"Invalid ON clause element: {expr}. Only a conjunction of equalities"
                 " is supported by pandas (ands of equals)."
             )

@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 from collections import ChainMap
 from collections.abc import Iterable
+from typing import Literal
 
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.dispatchers import builtin_verb
@@ -19,6 +20,7 @@ from pydiverse.transform.core.util import (
     sign_peeler,
     translate_ordering,
 )
+from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 from pydiverse.transform.ops import OPType
 
 __all__ = [
@@ -90,7 +92,7 @@ def validate_table_args(*tables):
 
     for table in tables:
         if not isinstance(table, AbstractTableImpl):
-            raise ValueError(f"Expected a TableImpl but got {type(table)} instead.")
+            raise TypeError(f"Expected a TableImpl but got {type(table)} instead.")
 
     backend = type(tables[0])
     for table in tables:
@@ -243,7 +245,9 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="mutate")
 
         if dtypes.NoneDType().same_kind(col.dtype):
-            raise TypeError(f"Column '{name}' has an invalid type: {col.dtype}")
+            raise ExpressionTypeError(
+                f"Column '{name}' has an invalid type: {col.dtype}"
+            )
 
         new_tbl.selects.add(name)
         new_tbl.named_cols.fwd[name] = uid
@@ -261,7 +265,7 @@ def join(
     on: SymbolicExpression,
     how: str,
     *,
-    validate: str = None,
+    validate: Literal["1:?", None] = None,
 ):
     validate_table_args(left, right)
 
@@ -379,7 +383,7 @@ def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add=False):
         )
     for col in args:
         if not isinstance(col, (Column, LambdaColumn)):
-            raise ValueError(
+            raise TypeError(
                 "Arguments to group_by verb must be of type 'Column' or 'LambdaColumn'"
                 f" and not '{type(col)}'."
             )
@@ -444,9 +448,11 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
         col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="summarise")
 
         if dtypes.NoneDType().same_kind(col.dtype):
-            raise TypeError(f"Column '{name}' has an invalid type: {col.dtype}")
+            raise ExpressionTypeError(
+                f"Column '{name}' has an invalid type: {col.dtype}"
+            )
         if col.ftype != OPType.AGGREGATE:
-            raise ValueError(
+            raise FunctionTypeError(
                 f"Expression for column '{name}' doesn't summarise any values."
             )
 

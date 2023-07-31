@@ -5,6 +5,7 @@ from pydiverse.transform.core.verbs import (
     mutate,
     select,
 )
+from pydiverse.transform.errors import ExpressionTypeError
 
 from . import assert_result_equal
 
@@ -39,7 +40,9 @@ def test_literals(df1):
 
 
 def test_none(df4):
-    assert_result_equal(df4, lambda t: t >> mutate(x=None), exception=TypeError)
+    assert_result_equal(
+        df4, lambda t: t >> mutate(x=None), exception=ExpressionTypeError
+    )
     assert_result_equal(
         df4,
         lambda t: t

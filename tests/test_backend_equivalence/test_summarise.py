@@ -9,6 +9,7 @@ from pydiverse.transform.core.verbs import (
     select,
     summarise,
 )
+from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 
 from . import assert_result_equal
 
@@ -60,7 +61,7 @@ def test_nested(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean_of_mean3=t.col3.mean().mean()),
-        exception=ValueError,
+        exception=FunctionTypeError,
     )
 
 
@@ -127,11 +128,15 @@ def test_intermediate_select(df3):
 
 
 def test_not_summarising(df4):
-    assert_result_equal(df4, lambda t: t >> summarise(x=λ.col1), exception=ValueError)
+    assert_result_equal(
+        df4, lambda t: t >> summarise(x=λ.col1), exception=FunctionTypeError
+    )
 
 
 def test_none(df4):
-    assert_result_equal(df4, lambda t: t >> summarise(x=None), exception=TypeError)
+    assert_result_equal(
+        df4, lambda t: t >> summarise(x=None), exception=ExpressionTypeError
+    )
 
 
 # TODO: Implement more test cases for summarise verb

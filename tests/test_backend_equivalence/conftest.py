@@ -43,17 +43,6 @@ dataframes = {
             "col5": list("abcdefghijkl") + [None],
         }
     ),
-    "df_left": pd.DataFrame(
-        {
-            "a": [1, 2, 3, 4],
-        }
-    ),
-    "df_right": pd.DataFrame(
-        {
-            "b": [0, 1, 2, 2],
-            "c": [5, 6, 7, 8],
-        }
-    ),
 }
 
 

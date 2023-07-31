@@ -24,4 +24,4 @@ def test_columns_pipeable(df3):
 
     assert_result_equal(df3, lambda t: t.col1 >> mutate(x=λ.col2), exception=ValueError)
 
-    assert_result_equal(df3, lambda t: (t.col1 + 1) >> select(), exception=ValueError)
+    assert_result_equal(df3, lambda t: (t.col1 + 1) >> select(), exception=TypeError)

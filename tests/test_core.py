@@ -359,7 +359,7 @@ class TestBuiltinVerbs:
         assert result._impl.selects == ordered_set(["col1", "x"])
         assert list(result._impl.named_cols.fwd) == ["col1", "x"]
 
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             (tbl1.col1 + 2) >> mutate(x=1)
 
 

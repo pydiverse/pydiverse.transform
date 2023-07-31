@@ -9,6 +9,7 @@ from pydiverse.transform.core.expressions import (
     SymbolicExpression,
     util,
 )
+from pydiverse.transform.errors import AlignmentError
 
 if TYPE_CHECKING:
     from pydiverse.transform.core import AbstractTableImpl, Table
@@ -24,17 +25,17 @@ def aligned(*, with_: str):
     def decorator(func):
         signature = inspect.signature(func)
         if not isinstance(with_, str):
-            raise Exception(
+            raise TypeError(
                 f"Argument 'with_' must be of type str, not '{type(with_).__name__}'."
             )
         if with_ not in signature.parameters:
-            raise Exception(f"Function has no argument named '{with_}'")
+            raise ValueError(f"Function has no argument named '{with_}'")
 
         def wrapper(*args, **kwargs):
             # Execute func
             result = func(*args, **kwargs)
             if not isinstance(result, SymbolicExpression):
-                raise ValueError(
+                raise TypeError(
                     "Aligned function must return a symbolic expression not"
                     f" '{result}'."
                 )
@@ -87,13 +88,13 @@ def eval_aligned(
         if isinstance(with_, Table):
             with_ = with_._impl
         if not isinstance(with_, AbstractTableImpl):
-            raise ValueError(
+            raise TypeError(
                 "'with_' must either be an instance of a Table or TableImpl. Not"
                 f" '{with_}'."
             )
 
         if not with_.is_aligned_with(literal_column):
-            raise ValueError(f"Result of eval_aligned isn't aligned with {with_}.")
+            raise AlignmentError(f"Result of eval_aligned isn't aligned with {with_}.")
 
     # Convert to sexpr so that the user can easily continue transforming
     # it symbolically.

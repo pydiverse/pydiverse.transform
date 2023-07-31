@@ -31,7 +31,7 @@ class Pipeable:
         elif callable(other):
             return Pipeable(calls=self.calls + [other])
 
-        raise Exception
+        raise RuntimeError
 
     def __rrshift__(self, other):
         """
@@ -153,7 +153,7 @@ def col_to_table(arg: Any = None):
         tbl.named_cols = bidict({col.name: col.uuid})
         return tbl
     elif isinstance(arg, LambdaColumn):
-        raise ValueError
+        raise ValueError("Can't start a pipe with a lambda column.")
 
     return arg
 

@@ -7,6 +7,7 @@ from pydiverse.transform.core.verbs import (
     mutate,
     summarise,
 )
+from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 
 from . import assert_result_equal
 
@@ -116,7 +117,7 @@ def test_invalid_value_dtype(df4):
                 (1, 1.1),
             )
         ),
-        exception=ValueError,
+        exception=ExpressionTypeError,
     )
 
 
@@ -130,7 +131,7 @@ def test_invalid_result_dtype(df4):
                 default=None,
             )
         ),
-        exception=TypeError,
+        exception=ExpressionTypeError,
     )
 
 
@@ -144,7 +145,7 @@ def test_invalid_ftype(df1):
                 default=None,
             )
         ),
-        exception=ValueError,
+        exception=FunctionTypeError,
     )
 
     assert_result_equal(
@@ -156,5 +157,5 @@ def test_invalid_ftype(df1):
                 default=None,
             )
         ),
-        exception=ValueError,
+        exception=FunctionTypeError,
     )

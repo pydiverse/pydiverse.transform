@@ -13,6 +13,7 @@ from pydiverse.transform.core.expressions import (
     LiteralColumn,
 )
 from pydiverse.transform.ops.core import Operator, OPType
+from pydiverse.transform.util import reraise
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.dtypes import DType
@@ -35,10 +36,8 @@ class Translator(Generic[T]):
         try:
             return bottom_up_replace(expr, lambda e: self._translate(e, **kwargs))
         except Exception as e:
-            raise ValueError(
-                "An exception occured while trying to translate the expression"
-                f" '{expr}':\n{e}"
-            ) from e
+            msg = f"This exception occurred while translating the expression: {expr}"
+            reraise(e, suffix=msg)
 
     def _translate(self, expr, **kwargs) -> T:
         """Translate an expression non recursively."""
@@ -59,10 +58,8 @@ class DelegatingTranslator(Translator[T], Generic[T]):
         try:
             return self._translate(expr, **kwargs)
         except Exception as e:
-            raise ValueError(
-                "An exception occured while trying to translate the expression"
-                f" '{expr}':\n{e}"
-            ) from e
+            msg = f"This exception occurred while translating the expression: {expr}"
+            reraise(e, suffix=msg)
 
     def _translate(self, expr, **kwargs):
         if isinstance(expr, Column):

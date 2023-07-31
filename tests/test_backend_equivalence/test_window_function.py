@@ -11,6 +11,7 @@ from pydiverse.transform.core.verbs import (
     summarise,
     ungroup,
 )
+from pydiverse.transform.errors import FunctionTypeError
 
 from . import assert_result_equal, full_sort
 
@@ -78,7 +79,7 @@ def test_nested(df3):
     assert_result_equal(
         df3,
         lambda t: t >> mutate(x=(λ.col4.max().min() + λ.col2.mean()).max()),
-        exception=ValueError,
+        exception=FunctionTypeError,
         may_throw=True,
     )
 

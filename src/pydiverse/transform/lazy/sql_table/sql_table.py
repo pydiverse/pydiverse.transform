@@ -27,6 +27,8 @@ from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 from pydiverse.transform.ops import OPType
 
+from ...errors import AlignmentError, FunctionTypeError
+
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions import FunctionCall
     from pydiverse.transform.core.registry import TypedOperatorImpl
@@ -577,7 +579,7 @@ class SQLTableImpl(LazyTableImpl):
 
         def _translate_literal_col(self, expr, **kwargs):
             if not self.backend.is_aligned_with(expr):
-                raise ValueError(
+                raise AlignmentError(
                     "Literal column isn't aligned with this table. "
                     f"Literal Column: {expr}"
                 )
@@ -610,7 +612,7 @@ class SQLTableImpl(LazyTableImpl):
 
             elif operator.ftype == OPType.WINDOW:
                 if verb != "mutate":
-                    raise ValueError(
+                    raise FunctionTypeError(
                         "Window function are only allowed inside a mutate."
                     )
 
@@ -704,7 +706,7 @@ class SQLTableImpl(LazyTableImpl):
         ):
             operator = implementation.operator
             if operator.ftype not in (OPType.AGGREGATE, OPType.WINDOW):
-                raise ValueError
+                raise FunctionTypeError
 
             wants_order_by = operator.ftype == OPType.WINDOW
 
@@ -780,7 +782,7 @@ class SQLTableImpl(LazyTableImpl):
                     if isinstance(col, Column)
                 }
                 if len(alignment_hashes) >= 2:
-                    raise ValueError(
+                    raise AlignmentError(
                         "Expression contains columns from different tables that aren't"
                         " aligned."
                     )

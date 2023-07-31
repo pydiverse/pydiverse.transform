@@ -11,6 +11,7 @@ from pydiverse.transform.core import functions as f
 from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
+from pydiverse.transform.errors import AlignmentError
 from pydiverse.transform.lazy.sql_table import SQLTableImpl
 from pydiverse.transform.util.testing import assert_equal
 
@@ -406,13 +407,13 @@ class TestSQLAligned:
         tbl1_mutate = tbl1 >> mutate(x=tbl1.col1 * 2)
         eval_aligned(tbl1.col1 + tbl1_mutate.x)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl1.col1 + tbl3.col1)
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl_left.a + tbl_right.b)
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl1.col1 + tbl3.col1.mean())
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             tbl1_joined = tbl1 >> join(tbl3, tbl1.col1 == tbl3.col1, how="left")
             eval_aligned(tbl1.col1 + tbl1_joined.col1)
 
@@ -421,13 +422,13 @@ class TestSQLAligned:
         eval_aligned(tbl_left.a * 2, with_=tbl_left)
         eval_aligned(tbl1.col1, with_=tbl1_mutate)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl1.col1.mean(), with_=tbl_left)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl3.col1 * 2, with_=tbl1)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl_left.a, with_=tbl_right)
 
     def test_aligned_decorator(self, tbl1, tbl3, tbl_left, tbl_right):
@@ -438,10 +439,10 @@ class TestSQLAligned:
         f(tbl3.col1, tbl3.col2)
         f(tbl_right.b, tbl_right.c)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             f(tbl1.col1, tbl3.col1)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             f(tbl_left.a, tbl_right.b)
 
         # Check with_ parameter gets enforced
@@ -450,11 +451,11 @@ class TestSQLAligned:
             return b
 
         f(tbl1.col1, tbl1.col2)
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             f(tbl1.col1, tbl3.col1)
 
         # Invalid with_ argument
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             aligned(with_="x")(lambda a: 0)
 
     def test_col_addition(self, tbl3):
@@ -471,8 +472,8 @@ class TestSQLAligned:
         tbl3_mutate = tbl3 >> mutate(x=tbl3.col1 * 2)
         tbl3 >> mutate(x=f(tbl3_mutate.col1, tbl3_mutate.x))
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             tbl3 >> arrange(λ.col1) >> mutate(x=f(tbl3.col1, tbl3.col2))
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             tbl3 >> filter(λ.col1 == 1) >> mutate(x=f(tbl3.col1, tbl3.col2))

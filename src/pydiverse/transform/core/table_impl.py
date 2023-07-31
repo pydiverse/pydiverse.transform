@@ -27,6 +27,7 @@ from pydiverse.transform.core.registry import (
     OperatorRegistry,
 )
 from pydiverse.transform.core.util import bidict, ordered_set
+from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:
@@ -290,7 +291,7 @@ class AbstractTableImpl:
                 result_ftype = OPType.WINDOW
             else:
                 # AGGREGATE and EWISE are incompatible
-                raise ValueError(
+                raise FunctionTypeError(
                     "Incompatible function types found in case statement: "
                     ", ".join(val_ftypes)
                 )
@@ -303,7 +304,10 @@ class AbstractTableImpl:
                 # All conditions must be boolean
                 for cond, _ in cases:
                     if not dtypes.Bool().same_kind(cond.dtype):
-                        raise TypeError
+                        raise ExpressionTypeError(
+                            "All conditions in a case statement return booleans. "
+                            f"{cond} is of type {cond.dtype}."
+                        )
             else:
                 # All conditions must be of the same type as switching_on
                 for cond, _ in cases:
@@ -311,7 +315,10 @@ class AbstractTableImpl:
                         switching_on.dtype.without_modifiers()
                     ):
                         # Can't compare
-                        raise TypeError
+                        raise ExpressionTypeError(
+                            f"Condition value {cond} (dtype: {cond.dtype}) "
+                            f"is incompatible with switch dtype {switching_on.dtype}."
+                        )
 
             return result_dtype, result_ftype
 
@@ -389,7 +396,7 @@ class AbstractTableImpl:
         if op_ftype == OPType.AGGREGATE:
             if OPType.WINDOW in ftypes:
                 if strict:
-                    raise ValueError(
+                    raise FunctionTypeError(
                         "Can't nest a window function inside an aggregate function"
                         f" ({operator.name})."
                     )
@@ -400,7 +407,7 @@ class AbstractTableImpl:
                         " supported by SQL backend."
                     )
             if OPType.AGGREGATE in ftypes:
-                raise ValueError(
+                raise FunctionTypeError(
                     "Can't nest an aggregate function inside an aggregate function"
                     f" ({operator.name})."
                 )
@@ -409,7 +416,7 @@ class AbstractTableImpl:
         if op_ftype == OPType.WINDOW:
             if OPType.WINDOW in ftypes:
                 if strict:
-                    raise ValueError(
+                    raise FunctionTypeError(
                         "Can't nest a window function inside a window function"
                         f" ({operator.name})."
                     )

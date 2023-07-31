@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from pydiverse.transform._typing import T
+from pydiverse.transform.errors import ExpressionTypeError
 
 
 class DType(ABC):
@@ -184,6 +185,6 @@ def promote_dtypes(dtypes: list[DType]) -> DType:
             promoted = dtype
             continue
 
-        raise TypeError(f"Incompatible types {dtype} and {promoted}.")
+        raise ExpressionTypeError(f"Incompatible types {dtype} and {promoted}.")
 
     return promoted

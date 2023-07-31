@@ -12,6 +12,7 @@ from pydiverse.transform.core.dispatchers import Pipeable, verb
 from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
 from pydiverse.transform.eager.pandas_table import PandasTableImpl
+from pydiverse.transform.errors import AlignmentError
 from pydiverse.transform.util.testing import assert_equal
 
 df1 = pd.DataFrame(
@@ -572,7 +573,7 @@ class TestPandasAligned:
         eval_aligned(tbl_left.a + tbl_left.a)
         eval_aligned(tbl_left.a + tbl_right.b)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl1.col1 + tbl3.col1)
 
         # Test aggregate functions still work
@@ -586,7 +587,7 @@ class TestPandasAligned:
             tbl1.col1.mean(), with_=tbl_left
         )  # Aggregate is aligned with everything
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             eval_aligned(tbl3.col1 * 2, with_=tbl1)
 
     def test_aligned_decorator(self, tbl1, tbl3, tbl_left, tbl_right):
@@ -597,7 +598,7 @@ class TestPandasAligned:
         f(tbl3.col1, tbl3.col2)
         f(tbl_left.a, tbl_right.b)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             f(tbl1.col1, tbl3.col1)
 
         # Bad Alignment of return type
@@ -605,11 +606,11 @@ class TestPandasAligned:
         def f(a, b):
             return a.mean() + b
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             f(tbl1.col1, tbl3.col1)
 
         # Invalid with_ argument
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             aligned(with_="x")(lambda a: 0)
 
     def test_col_addition(self, tbl_left, tbl_right):
@@ -622,10 +623,10 @@ class TestPandasAligned:
             pd.DataFrame({"x": (df_left["a"] + df_right["b"])}),
         )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             f(tbl_left.a, (tbl_right >> filter(λ.b == 2)).b)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(AlignmentError):
             x = f(tbl_left.a, tbl_right.b)
             tbl_left >> filter(λ.a <= 3) >> mutate(x=x)
 
