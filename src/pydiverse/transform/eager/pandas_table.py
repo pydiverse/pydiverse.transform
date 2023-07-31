@@ -63,21 +63,21 @@ class PandasTableImpl(EagerTableImpl):
 
         super().__init__(name=name, columns=columns)
 
-    def _dtype_from_pd(self, dtype: Any) -> dtypes.DType:
-        # TODO: Do this better (e.g. how pipedag does it)
-        if pd.api.types.is_integer_dtype(dtype):
+    def _dtype_from_pd(self, type_: Any) -> dtypes.DType:
+        if pd.api.types.is_integer_dtype(type_):
             return dtypes.Int()
-        if pd.api.types.is_float_dtype(dtype):
+        if pd.api.types.is_float_dtype(type_):
             return dtypes.Float()
-        if pd.api.types.is_bool_dtype(dtype):
+        if pd.api.types.is_bool_dtype(type_):
             return dtypes.Bool()
-        if pd.api.types.is_string_dtype(dtype):
+        if pd.api.types.is_string_dtype(type_):
             return dtypes.String()
+        if pd.api.types.is_datetime64_any_dtype(type_):
+            return dtypes.DateTime()
 
-        raise NotImplementedError(f"Invalid type {dtype}.")
+        raise NotImplementedError(f"Unsupported type: {type_}")
 
     def _dtype_to_pd(self, dtype: dtypes.DType) -> Any:
-        # TODO: Do this better (e.g. how pipedag does it)
         if dtypes.Int().same_kind(dtype):
             return pd.Int64Dtype()
         if dtypes.Float().same_kind(dtype):
@@ -86,8 +86,10 @@ class PandasTableImpl(EagerTableImpl):
             return pd.BooleanDtype()
         if dtypes.String().same_kind(dtype):
             return pd.StringDtype()
+        if dtypes.DateTime().same_kind(dtype):
+            return "datetime64[ns]"
 
-        raise NotImplementedError(f"Invalid type {dtype}.")
+        raise NotImplementedError(f"Invalid type: {dtype}")
 
     def is_aligned_with(self, col) -> bool:
         len_self = len(self.df.index)

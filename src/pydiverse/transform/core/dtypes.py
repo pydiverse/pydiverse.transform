@@ -94,6 +94,10 @@ class Bool(DType):
     name = "bool"
 
 
+class DateTime(DType):
+    name = "datetime"
+
+
 class Template(DType):
     name = None
 
@@ -154,6 +158,8 @@ def dtype_from_string(t: str) -> DType:
         return String(const=is_const, vararg=is_vararg)
     if base_type == "bool":
         return Bool(const=is_const, vararg=is_vararg)
+    if base_type == "datetime":
+        return DateTime(const=is_const, vararg=is_vararg)
     if base_type == "none":
         return NoneDType(const=is_const, vararg=is_vararg)
 

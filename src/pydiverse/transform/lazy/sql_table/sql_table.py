@@ -128,7 +128,7 @@ class SQLTableImpl(LazyTableImpl):
 
     @classmethod
     def _html_repr_expr(cls, expr):
-        if isinstance(expr, sa.sql.expression.ColumnElement):
+        if isinstance(expr, sa.sql.ColumnElement):
             return str(expr.compile(compile_kwargs={"literal_binds": True}))
         return super()._html_repr_expr(expr)
 
@@ -139,7 +139,7 @@ class SQLTableImpl(LazyTableImpl):
         :param tbl: a sa.Table or string of form 'table_name'
             or 'schema_name.table_name'.
         """
-        if isinstance(tbl, sa.sql.selectable.FromClause):
+        if isinstance(tbl, sa.sql.FromClause):
             return tbl
 
         if not isinstance(tbl, str):
@@ -168,24 +168,27 @@ class SQLTableImpl(LazyTableImpl):
         :return: Appropriate dtype string.
         """
 
-        # TODO: Cleaner implementation like pydiverse.pipedag
+        type_ = col.type
+        if isinstance(type_, sa.Integer):
+            return dtypes.Int()
+        if isinstance(type_, sa.Numeric):
+            return dtypes.Float()
+        if isinstance(type_, sa.String):
+            return dtypes.String()
+        if isinstance(type_, sa.Boolean):
+            return dtypes.Bool()
+        if isinstance(type_, sa.DateTime):
+            return dtypes.DateTime()
+        if isinstance(type_, sa.Date):
+            raise NotImplementedError("Unsupported type: Date")
+        if isinstance(type_, sa.Time):
+            raise NotImplementedError("Unsupported type: Time")
 
-        try:
-            pytype = col.type.python_type
-            if pytype == int:
-                return dtypes.Int()
-            if pytype == str:
-                return dtypes.String()
-            if pytype == bool:
-                return dtypes.Bool()
-            if pytype == float:
-                return dtypes.Float()
-            raise NotImplementedError(f"Invalid type {col.type}.")
-        except NotImplementedError as e:
-            if hints is not None:
-                if dtype := hints.get(col.name):
-                    return dtype
-            raise e
+        if hints is not None:
+            if dtype := hints.get(col.name):
+                return dtype
+
+        raise NotImplementedError(f"Unsupported type: {type_}")
 
     def replace_tbl(self, new_tbl, columns: dict[str:Column]):
         if isinstance(new_tbl, sql.Select):
@@ -312,7 +315,7 @@ class SQLTableImpl(LazyTableImpl):
         s = []
         for name, uuid_ in self.selected_cols():
             sql_col = self.cols[uuid_].compiled(self.sql_columns)
-            if not isinstance(sql_col, sa.ColumnElement):
+            if not isinstance(sql_col, sa.sql.ColumnElement):
                 sql_col = sa.literal(sql_col)
             s.append(sql_col.label(name))
         return select.with_only_columns(*s)

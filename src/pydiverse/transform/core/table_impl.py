@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import datetime
 import uuid
 import warnings
 from collections.abc import Iterable
@@ -245,6 +246,8 @@ class AbstractTableImpl:
                 return TypedValue(literal, dtypes.Float(const=True))
             if isinstance(expr, str):
                 return TypedValue(literal, dtypes.String(const=True))
+            if isinstance(expr, datetime.datetime):
+                return TypedValue(literal, dtypes.DateTime(const=True))
 
             if expr is None:
                 return TypedValue(literal, dtypes.NoneDType(const=True))
@@ -328,6 +331,8 @@ class AbstractTableImpl:
                 return TypedValue(expr, dtypes.Float(const=True))
             if isinstance(expr, str):
                 return TypedValue(expr, dtypes.String(const=True))
+            if isinstance(expr, datetime.datetime):
+                return TypedValue(expr, dtypes.DateTime(const=True))
 
             if expr is None:
                 return TypedValue(expr, dtypes.NoneDType(const=True))

@@ -20,7 +20,7 @@ class MSSqlTableImpl(SQLTableImpl):
         s = []
         for name, uuid_ in self.selected_cols():
             sql_col = self.cols[uuid_].compiled(self.sql_columns)
-            if not isinstance(sql_col, sa.ColumnElement):
+            if not isinstance(sql_col, sa.sql.ColumnElement):
                 sql_col = sa.literal(sql_col)
             if dtypes.Bool().same_kind(self.cols[uuid_].dtype):
                 # Make sure that any boolean values get stored as bit
