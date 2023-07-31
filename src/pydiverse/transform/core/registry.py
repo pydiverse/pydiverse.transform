@@ -48,24 +48,29 @@ class OperatorImpl:
         # - Find match with the least number templates in the signature
         # - From those take the one with the least number of different templates
         # - From those take the one where the first template appears latest
+        # - From those take the one where the const modifiers match better
         # - From those take the one that isn't a vararg or has the most arguments.
         # - From those take the one that was defined first
 
         num_templates = 0
         templates_set = set()
-        first_template_index = len(signature.args)
+        template_indices = []
+        const_modifiers = []
         for i, dtype in enumerate(signature.args):
             if isinstance(dtype, dtypes.Template):
                 num_templates += 1
                 templates_set.add(dtype.name)
-                first_template_index = min(first_template_index, i)
+                template_indices.append(-i)
+            if dtype.const:
+                const_modifiers.append(i)
         num_different_templates = len(templates_set)
         is_vararg = int(self.signature.is_vararg)
 
         self._precedence = (
             num_templates,
             num_different_templates,
-            -first_template_index,
+            tuple(template_indices),
+            tuple(const_modifiers),
             is_vararg,
             -len(signature.args),
             self.__id,
@@ -456,12 +461,18 @@ class OperatorImplementationStore:
 
         # Find best matching template.
         best_match = None
-        best_score = (0xFFFF,)
+        best_score = ((0x7FFFFFFF,), (0x7FFFFFFF,))
 
-        for match, templates in matches:
-            if match.operator._precedence < best_score:
+        for match, templates, type_promotion_indices in matches:
+            score = (
+                # Prefer operators that didn't need any type promotion
+                tuple(-i for i in type_promotion_indices),
+                # And then match according to signature
+                match.operator._precedence,
+            )
+            if score < best_score:
                 best_match = (match, templates)
-                best_score = match.operator._precedence
+                best_score = score
 
         rtype = best_match[0].operator.signature.rtype
         if isinstance(rtype, dtypes.Template):
@@ -471,13 +482,13 @@ class OperatorImplementationStore:
         return TypedOperatorImpl.from_operator_impl(best_match[0].operator, rtype)
 
     def _find_matches(
-        self, signature: list[dtypes.DType]
-    ) -> Iterable[TrieNode, dict[str, dtypes.DType]]:
+        self, signature: tuple[dtypes.DType]
+    ) -> Iterable[TrieNode, dict[str, dtypes.DType, tuple[int, ...]]]:
         """Yield all operators that match the input signature"""
 
         # Case 0 arguments:
         if len(signature) == 0:
-            yield self.root, dict()
+            yield self.root, dict(), tuple()
             return
 
         # Case 1+ args:
@@ -488,15 +499,15 @@ class OperatorImplementationStore:
         ) -> bool:
             if isinstance(node.value, dtypes.Template):
                 t = templates.get(node.value.name)
-                return t is None or t.same_kind(dtype)
-            return node.value.same_kind(dtype)
+                return t is None or dtype.can_promote_to(t)
+            return dtype.can_promote_to(node.value)
 
-        stack = [
-            (child, 0, dict()) for child in self.root.children
-        ]  # type: list[tuple[OperatorImplementationStore.TrieNode, int, dict]]
+        stack: list[
+            tuple[OperatorImplementationStore.TrieNode, int, dict, tuple[int, ...]]
+        ] = [(child, 0, dict(), tuple()) for child in self.root.children]
 
         while stack:
-            node, s_i, templates = stack.pop()
+            node, s_i, templates, type_promotion_indices = stack.pop()
             dtype = signature[s_i]
 
             if not does_match(dtype, node, templates):
@@ -510,9 +521,15 @@ class OperatorImplementationStore:
                 templates = templates.copy()
                 templates[node.value.name] = dtype
 
+            if not node.value.same_kind(dtype):
+                # Needs type promotion
+                # This only works when types can be promoted once
+                # -> (uint > int) wouldn't be preferred over (uint > int > float)
+                type_promotion_indices = (*type_promotion_indices, s_i)
+
             if s_i + 1 == len(signature):
                 if node.operator is not None:
-                    yield node, templates
+                    yield node, templates, type_promotion_indices
                 continue
 
             children = iter(node.children)
@@ -520,7 +537,7 @@ class OperatorImplementationStore:
                 children = itertools.chain(children, iter((node,)))
 
             for child in children:
-                stack.append((child, s_i + 1, templates))
+                stack.append((child, s_i + 1, templates, type_promotion_indices))
 
 
 class OperatorRegistrationContextManager:

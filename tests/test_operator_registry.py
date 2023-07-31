@@ -154,17 +154,21 @@ class TestOperatorRegistry:
 
         # More template matching... Also check matching precedence
         reg.add_implementation(op2, lambda: 1, "int, int, int -> int")
-        reg.add_implementation(op2, lambda: 2, "int, T, T -> int")
-        reg.add_implementation(op2, lambda: 3, "T, T, T -> int")
-        reg.add_implementation(op2, lambda: 4, "A, T, T -> int")
+        reg.add_implementation(op2, lambda: 2, "int, str, T -> int")
+        reg.add_implementation(op2, lambda: 3, "int, T, str -> int")
+        reg.add_implementation(op2, lambda: 4, "int, T, T -> int")
+        reg.add_implementation(op2, lambda: 5, "T, T, T -> int")
+        reg.add_implementation(op2, lambda: 6, "A, T, T -> int")
 
         assert reg.get_implementation("op2", parse_dtypes("int", "int", "int"))() == 1
         assert reg.get_implementation("op2", parse_dtypes("int", "str", "str"))() == 2
-        assert reg.get_implementation("op2", parse_dtypes("str", "str", "str"))() == 3
-        assert reg.get_implementation("op2", parse_dtypes("float", "str", "str"))() == 4
+        assert reg.get_implementation("op2", parse_dtypes("int", "int", "str"))() == 3
+        assert reg.get_implementation("op2", parse_dtypes("int", "bool", "bool"))() == 4
+        assert reg.get_implementation("op2", parse_dtypes("str", "str", "str"))() == 5
+        assert reg.get_implementation("op2", parse_dtypes("float", "str", "str"))() == 6
 
         with pytest.raises(ValueError):
-            reg.get_implementation("op2", parse_dtypes("int", "str", "float"))
+            reg.get_implementation("op2", parse_dtypes("int", "bool", "float"))
 
         # Return type
         reg.add_implementation(op3, lambda: 1, "T -> T")

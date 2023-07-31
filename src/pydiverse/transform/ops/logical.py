@@ -26,8 +26,6 @@ __all__ = [
 class Comparison(ElementWise, Binary):
     signatures = [
         "int, int -> bool",
-        "int, float -> bool",
-        "float, int -> bool",
         "float, float -> bool",
         "str, str -> bool",
         "bool, bool -> bool",

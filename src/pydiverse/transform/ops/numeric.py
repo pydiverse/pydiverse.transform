@@ -70,8 +70,6 @@ class TrueDiv(ElementWise, Binary):
     name = "__truediv__"
     signatures = [
         "int, int -> float",
-        "int, float -> float",
-        "float, int -> float",
         "float, float -> float",
     ]
 
@@ -95,8 +93,6 @@ class Pow(ElementWise, Binary):
     name = "__pow__"
     signatures = [
         "int, int -> float",
-        "int, float -> float",
-        "float, int -> float",
         "float, float -> float",
     ]
 

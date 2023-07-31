@@ -39,8 +39,6 @@ class Shift(Window):
     signatures = [
         "T, const int -> T",
         "T, const int, const T -> T",
-        # Special case
-        "float, const int, const int -> float",
     ]
 
 
@@ -53,9 +51,13 @@ class RowNumber(Window, Nullary):
 
 class Rank(WindowImplicitArrange, Unary):
     name = "rank"
-    signatures = ["T -> int"]
+    signatures = [
+        "T -> int",
+    ]
 
 
 class DenseRank(WindowImplicitArrange, Unary):
     name = "dense_rank"
-    signatures = ["T -> int"]
+    signatures = [
+        "T -> int",
+    ]

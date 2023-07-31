@@ -12,12 +12,16 @@ __all__ = [
 
 class StringAdd(OperatorExtension):
     operator = Add
-    signatures = ["str, str -> str"]
+    signatures = [
+        "str, str -> str",
+    ]
 
 
 class StringRAdd(OperatorExtension):
     operator = RAdd
-    signatures = ["str, str -> str"]
+    signatures = [
+        "str, str -> str",
+    ]
 
 
 ####
