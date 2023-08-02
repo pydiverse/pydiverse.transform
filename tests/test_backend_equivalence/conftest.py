@@ -43,6 +43,36 @@ dataframes = {
             "col5": list("abcdefghijkl") + [None],
         }
     ),
+    "df_strings": pd.DataFrame(
+        {
+            "col1": [
+                "",
+                " ",
+                "xyz",
+                " x ",
+                "foo",
+                "FooBar",
+                "abracadabra",
+                None,
+                "x",
+                None,
+                "_ %",
+            ],
+            "col2": [
+                "",
+                "test_%",
+                "xyz",
+                " x",
+                "FOO",
+                "FooBar",
+                "AbracadabA",
+                "",
+                "bar",
+                None,
+                "% _",
+            ],
+        }
+    ),
 }
 
 

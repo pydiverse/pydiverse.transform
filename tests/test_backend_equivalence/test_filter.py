@@ -37,3 +37,22 @@ def test_filter_after_mutate(df4):
         df4,
         lambda t: t >> mutate(x=t.col1 <= t.col2) >> filter(λ.x),
     )
+
+
+def test_filter_isin(df4):
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> filter(
+            λ.col1.isin(0, 2),
+        ),
+    )
+
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(x=t.col1.isin(0, 2))
+        >> filter(
+            t.col2.isin(0, 2) & λ.x,
+        ),
+    )
