@@ -195,6 +195,61 @@ with MSSqlTableImpl.op(ops.Equal()) as op:
         return x == y
 
 
+with MSSqlTableImpl.op(ops.NotEqual()) as op:
+
+    @op("str, str -> bool")
+    def _ne(x, y):
+        warnings.warn(
+            "MSSQL ignores trailing whitespace when comparing strings",
+            NonStandardBehaviourWarning,
+        )
+        return x != y
+
+
+with MSSqlTableImpl.op(ops.Less()) as op:
+
+    @op("str, str -> bool")
+    def _lt(x, y):
+        warnings.warn(
+            "MSSQL ignores trailing whitespace when comparing strings",
+            NonStandardBehaviourWarning,
+        )
+        return x < y
+
+
+with MSSqlTableImpl.op(ops.LessEqual()) as op:
+
+    @op("str, str -> bool")
+    def _le(x, y):
+        warnings.warn(
+            "MSSQL ignores trailing whitespace when comparing strings",
+            NonStandardBehaviourWarning,
+        )
+        return x <= y
+
+
+with MSSqlTableImpl.op(ops.Greater()) as op:
+
+    @op("str, str -> bool")
+    def _gt(x, y):
+        warnings.warn(
+            "MSSQL ignores trailing whitespace when comparing strings",
+            NonStandardBehaviourWarning,
+        )
+        return x > y
+
+
+with MSSqlTableImpl.op(ops.GreaterEqual()) as op:
+
+    @op("str, str -> bool")
+    def _ge(x, y):
+        warnings.warn(
+            "MSSQL ignores trailing whitespace when comparing strings",
+            NonStandardBehaviourWarning,
+        )
+        return x >= y
+
+
 with MSSqlTableImpl.op(ops.Pow()) as op:
 
     @op.auto

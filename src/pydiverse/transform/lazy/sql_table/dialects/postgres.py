@@ -10,6 +10,34 @@ class PostgresTableImpl(SQLTableImpl):
     _dialect_name = "postgresql"
 
 
+with PostgresTableImpl.op(ops.Less()) as op:
+
+    @op("str, str -> bool")
+    def _lt(x, y):
+        return x < y.collate("POSIX")
+
+
+with PostgresTableImpl.op(ops.LessEqual()) as op:
+
+    @op("str, str -> bool")
+    def _le(x, y):
+        return x <= y.collate("POSIX")
+
+
+with PostgresTableImpl.op(ops.Greater()) as op:
+
+    @op("str, str -> bool")
+    def _gt(x, y):
+        return x > y.collate("POSIX")
+
+
+with PostgresTableImpl.op(ops.GreaterEqual()) as op:
+
+    @op("str, str -> bool")
+    def _ge(x, y):
+        return x >= y.collate("POSIX")
+
+
 with PostgresTableImpl.op(ops.Round()) as op:
 
     @op.auto

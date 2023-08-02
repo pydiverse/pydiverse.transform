@@ -14,6 +14,32 @@ def test_eq(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 == λ.col2))
 
 
+def test_nq(df_strings):
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 != " "))
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 != "foo"))
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 != λ.col2))
+
+
+def test_lt(df_strings):
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 < " x"))
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 < "E"))
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 < λ.col2))
+
+
+def test_gt(df_strings):
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 > " x"))
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 > "E"))
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 > λ.col2))
+
+
+def test_le(df_strings):
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 <= λ.col2))
+
+
+def test_ge(df_strings):
+    assert_result_equal(df_strings, lambda t: t >> filter(λ.col1 >= λ.col2))
+
+
 def test_strip(df_strings):
     assert_result_equal(
         df_strings,
