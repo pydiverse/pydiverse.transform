@@ -831,10 +831,6 @@ def generate_alignment_hash():
     return uuid.uuid1()
 
 
-# Load SQLTableImpl dialect specific subclasses
-from . import dialects  # noqa
-
-
 #### BACKEND SPECIFIC OPERATORS ################################################
 
 
@@ -915,13 +911,6 @@ with SQLTableImpl.op(ops.Round()) as op:
         return sa.func.ROUND(x, decimals, type_=x.type)
 
 
-with SQLTableImpl.op(ops.Strip()) as op:
-
-    @op.auto
-    def _strip(x):
-        return sa.func.TRIM(x, type_=x.type)
-
-
 with SQLTableImpl.op(ops.IsIn()) as op:
 
     @op.auto
@@ -931,6 +920,65 @@ with SQLTableImpl.op(ops.IsIn()) as op:
             return x.in_(values)
         # In SELECT we must replace it with the corresponding boolean expression
         return reduce(py_operator.or_, map(lambda v: x == v, values))
+
+
+#### String Functions ####
+
+
+with SQLTableImpl.op(ops.Strip()) as op:
+
+    @op.auto
+    def _strip(x):
+        return sa.func.TRIM(x, type_=x.type)
+
+
+with SQLTableImpl.op(ops.StringLength()) as op:
+
+    @op.auto
+    def _str_length(x):
+        return sa.func.LENGTH(x, type_=sa.Integer())
+
+
+with SQLTableImpl.op(ops.Upper()) as op:
+
+    @op.auto
+    def _upper(x):
+        return sa.func.UPPER(x, type_=x.type)
+
+
+with SQLTableImpl.op(ops.Lower()) as op:
+
+    @op.auto
+    def _upper(x):
+        return sa.func.LOWER(x, type_=x.type)
+
+
+with SQLTableImpl.op(ops.Replace()) as op:
+
+    @op.auto
+    def _replace(x, y, z):
+        return sa.func.REPLACE(x, y, z, type_=x.type)
+
+
+with SQLTableImpl.op(ops.StartsWith()) as op:
+
+    @op.auto
+    def _startswith(x, y):
+        return x.startswith(y, autoescape=True)
+
+
+with SQLTableImpl.op(ops.EndsWith()) as op:
+
+    @op.auto
+    def _endswith(x, y):
+        return x.endswith(y, autoescape=True)
+
+
+with SQLTableImpl.op(ops.Contains()) as op:
+
+    @op.auto
+    def _contains(x, y):
+        return x.contains(y, autoescape=True)
 
 
 #### Summarising Functions ####
@@ -1070,3 +1118,10 @@ with SQLTableImpl.op(ops.DenseRank()) as op:
     @op.auto
     def _dense_rank(_):
         return sa.func.dense_rank()
+
+
+####
+
+
+# Load SQLTableImpl dialect specific subclasses
+from . import dialects  # noqa

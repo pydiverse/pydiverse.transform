@@ -709,13 +709,6 @@ with PandasTableImpl.op(ops.Round()) as op:
         return x.round(decimals=decimals)
 
 
-with PandasTableImpl.op(ops.Strip()) as op:
-
-    @op.auto
-    def _strip(x):
-        return x.str.strip()
-
-
 with PandasTableImpl.op(ops.IsIn()) as op:
 
     @op.auto
@@ -731,7 +724,67 @@ with PandasTableImpl.op(ops.IsIn()) as op:
         return y
 
 
+#### String Functions ####
+
+
+with PandasTableImpl.op(ops.Strip()) as op:
+
+    @op.auto
+    def _strip(x):
+        return x.str.strip()
+
+
+with PandasTableImpl.op(ops.StringLength()) as op:
+
+    @op.auto
+    def _str_length(x):
+        return x.str.len()
+
+
+with PandasTableImpl.op(ops.Upper()) as op:
+
+    @op.auto
+    def _upper(x):
+        return x.str.upper()
+
+
+with PandasTableImpl.op(ops.Lower()) as op:
+
+    @op.auto
+    def _upper(x):
+        return x.str.lower()
+
+
+with PandasTableImpl.op(ops.Replace()) as op:
+
+    @op.auto
+    def _replace(x, y, z):
+        return x.str.replace(y, z)
+
+
+with PandasTableImpl.op(ops.StartsWith()) as op:
+
+    @op.auto
+    def _startswith(x, y):
+        return x.str.startswith(y)
+
+
+with PandasTableImpl.op(ops.EndsWith()) as op:
+
+    @op.auto
+    def _endswith(x, y):
+        return x.str.endswith(y)
+
+
+with PandasTableImpl.op(ops.Contains()) as op:
+
+    @op.auto
+    def _contains(x, y):
+        return x.str.contains(y)
+
+
 #### Summarising Functions ####
+
 
 with PandasTableImpl.op(ops.Mean()) as op:
 

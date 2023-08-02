@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform.core import dtypes
-from pydiverse.transform.ops.core import Binary, ElementWise, Unary
+from pydiverse.transform.ops.core import Binary, ElementWise, Operator, Unary
 
 __all__ = [
     "Equal",
@@ -21,10 +21,16 @@ __all__ = [
 ]
 
 
+class Logical(Operator):
+    # Operator that returns a "REAL" boolean.
+    # This is mostly relevant for mssql
+    pass
+
+
 #### Comparison Operators ####
 
 
-class Comparison(ElementWise, Binary):
+class Comparison(ElementWise, Binary, Logical):
     signatures = [
         "int, int -> bool",
         "float, float -> bool",
@@ -68,7 +74,7 @@ class GreaterEqual(Comparison):
     name = "__ge__"
 
 
-class IsIn(ElementWise):
+class IsIn(ElementWise, Logical):
     name = "isin"
     signatures = [
         # TODO: A signature like "T, const list[const T] -> bool" would be better
@@ -79,7 +85,7 @@ class IsIn(ElementWise):
 #### Boolean Operators ####
 
 
-class BooleanBinary(ElementWise, Binary):
+class BooleanBinary(ElementWise, Binary, Logical):
     signatures = [
         "bool, bool -> bool",
     ]
@@ -120,7 +126,7 @@ class RXor(BooleanBinary):
     name = "__rxor__"
 
 
-class Invert(ElementWise, Unary):
+class Invert(ElementWise, Unary, Logical):
     name = "__invert__"
     signatures = [
         "bool -> bool",

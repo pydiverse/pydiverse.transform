@@ -135,17 +135,8 @@ def mssql_op_returns_bool_as_bit(implementation: TypedOperatorImpl) -> bool | No
         return None
 
     # These operations return boolean types (not BIT)
-    exceptions = [
-        ops.logical.BooleanBinary,
-        ops.logical.Invert,
-        ops.logical.Comparison,
-        ops.logical.IsIn,
-    ]
-
-    operator = implementation.operator
-    for exception in exceptions:
-        if isinstance(operator, exception):
-            return False
+    if isinstance(implementation.operator, ops.logical.Logical):
+        return False
 
     return True
 
@@ -187,6 +178,7 @@ def mssql_convert_bool_bit_value(
 
 # Operators
 
+
 with MSSqlTableImpl.op(ops.Pow()) as op:
 
     @op.auto
@@ -222,3 +214,35 @@ with MSSqlTableImpl.op(ops.StringJoin()) as op:
         # and not a window function, thus we don't (yet) support the `arrange`
         # context kwarg
         raise OperatorNotSupportedError
+
+
+with MSSqlTableImpl.op(ops.Replace()) as op:
+
+    @op.auto
+    def _replace(x, y, z):
+        x = x.collate("Latin1_General_CS_AS")
+        return sa.func.REPLACE(x, y, z, type_=x.type)
+
+
+with MSSqlTableImpl.op(ops.StartsWith()) as op:
+
+    @op.auto
+    def _startswith(x, y):
+        x = x.collate("Latin1_General_CS_AS")
+        return x.startswith(y, autoescape=True)
+
+
+with MSSqlTableImpl.op(ops.EndsWith()) as op:
+
+    @op.auto
+    def _endswith(x, y):
+        x = x.collate("Latin1_General_CS_AS")
+        return x.endswith(y, autoescape=True)
+
+
+with MSSqlTableImpl.op(ops.Contains()) as op:
+
+    @op.auto
+    def _contains(x, y):
+        x = x.collate("Latin1_General_CS_AS")
+        return x.contains(y, autoescape=True)
