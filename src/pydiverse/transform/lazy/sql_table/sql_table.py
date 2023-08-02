@@ -24,10 +24,9 @@ from pydiverse.transform.core.expressions import (
 from pydiverse.transform.core.expressions.translator import TypedValue
 from pydiverse.transform.core.table_impl import ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
+from pydiverse.transform.errors import AlignmentError, FunctionTypeError
 from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 from pydiverse.transform.ops import OPType
-
-from ...errors import AlignmentError, FunctionTypeError
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions import FunctionCall
@@ -840,10 +839,17 @@ from . import dialects  # noqa
 
 
 with SQLTableImpl.op(ops.FloorDiv(), check_super=False) as op:
+    if sa.__version__ < "2":
 
-    @op.auto
-    def _floordiv(lhs, rhs):
-        return sa.cast(lhs / rhs, sa.Integer())
+        @op.auto
+        def _floordiv(lhs, rhs):
+            return sa.cast(lhs / rhs, sa.Integer())
+
+    else:
+
+        @op.auto
+        def _floordiv(lhs, rhs):
+            return lhs // rhs
 
 
 with SQLTableImpl.op(ops.RFloorDiv(), check_super=False) as op:

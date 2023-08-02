@@ -34,7 +34,7 @@ _dunder_expr_repr = {
     "__truediv__": lambda lhs, rhs: f"({lhs} / {rhs})",
     "__rtruediv__": lambda rhs, lhs: f"({lhs} / {rhs})",
     "__floordiv__": lambda lhs, rhs: f"({lhs} // {rhs})",
-    "__rfloordiv__": lambda rhs, lhs: f"({lhs} + {rhs})",
+    "__rfloordiv__": lambda rhs, lhs: f"({lhs} // {rhs})",
     "__pow__": lambda lhs, rhs: f"({lhs} ** {rhs})",
     "__rpow__": lambda rhs, lhs: f"({lhs} ** {rhs})",
     "__mod__": lambda lhs, rhs: f"({lhs} % {rhs})",
