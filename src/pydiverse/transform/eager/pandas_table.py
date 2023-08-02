@@ -22,15 +22,17 @@ from pydiverse.transform.core.expressions import (
 )
 from pydiverse.transform.core.expressions.translator import Translator, TypedValue
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
+from pydiverse.transform.eager.eager_table import EagerTableImpl, uuid_to_str
+from pydiverse.transform.errors import (
+    AlignmentError,
+    ExpressionError,
+    FunctionTypeError,
+)
 from pydiverse.transform.ops import OPType
-
-from .eager_table import EagerTableImpl, uuid_to_str
 
 __all__ = [
     "PandasTableImpl",
 ]
-
-from ..errors import AlignmentError, ExpressionError, FunctionTypeError
 
 
 class PandasTableImpl(EagerTableImpl):
@@ -620,12 +622,28 @@ def fast_pd_convert_dtypes(obj: pd._typing.NDFrameT, **kwargs) -> pd._typing.NDF
 #### BACKEND SPECIFIC OPERATORS ################################################
 
 
+def _pandas_nullable_comparison(lhs, rhs, op):
+    """
+    Implement comparison operation between series with non-nullable dtypes.
+    """
+    x = op(lhs, rhs).astype(pd.BooleanDtype(), copy=False)
+    if isinstance(lhs, pd.Series):
+        x.mask(lhs.isna(), pd.NA, inplace=True)
+    if isinstance(rhs, pd.Series):
+        x.mask(rhs.isna(), pd.NA, inplace=True)
+    return x
+
+
 with PandasTableImpl.op(ops.Equal()) as op:
 
     @op("T, const none -> bool")
     def _eq(lhs, rhs):
         assert rhs is None
         return lhs.isna()
+
+    @op("datetime, datetime -> bool")
+    def _eq(lhs, rhs):
+        return _pandas_nullable_comparison(lhs, rhs, py_operator.eq)
 
 
 with PandasTableImpl.op(ops.NotEqual()) as op:
@@ -634,6 +652,38 @@ with PandasTableImpl.op(ops.NotEqual()) as op:
     def _ne(lhs, rhs):
         assert rhs is None
         return lhs.notna()
+
+    @op("datetime, datetime -> bool")
+    def _ne(lhs, rhs):
+        return _pandas_nullable_comparison(lhs, rhs, py_operator.ne)
+
+
+with PandasTableImpl.op(ops.Less()) as op:
+
+    @op("datetime, datetime -> bool")
+    def _lt(lhs, rhs):
+        return _pandas_nullable_comparison(lhs, rhs, py_operator.lt)
+
+
+with PandasTableImpl.op(ops.LessEqual()) as op:
+
+    @op("datetime, datetime -> bool")
+    def _le(lhs, rhs):
+        return _pandas_nullable_comparison(lhs, rhs, py_operator.le)
+
+
+with PandasTableImpl.op(ops.Greater()) as op:
+
+    @op("datetime, datetime -> bool")
+    def _gt(lhs, rhs):
+        return _pandas_nullable_comparison(lhs, rhs, py_operator.gt)
+
+
+with PandasTableImpl.op(ops.GreaterEqual()) as op:
+
+    @op("datetime, datetime -> bool")
+    def _ge(lhs, rhs):
+        return _pandas_nullable_comparison(lhs, rhs, py_operator.ge)
 
 
 with PandasTableImpl.op(ops.Pow()) as op:
@@ -670,7 +720,15 @@ with PandasTableImpl.op(ops.IsIn()) as op:
 
     @op.auto
     def _isin(x, *values):
-        return x.isin(values)
+        y = x.isin(values)
+        y.mask(x.isna(), pd.NA, inplace=True)
+        return y
+
+    @op("datetime, const datetime... -> bool")
+    def _isin(x, *values):
+        y = x.isin(values).astype(pd.BooleanDtype(), copy=False)
+        y.mask(x.isna(), pd.NA, inplace=True)
+        return y
 
 
 #### Summarising Functions ####
