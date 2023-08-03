@@ -23,7 +23,7 @@ class DType(ABC):
         return True
 
     def __hash__(self):
-        return hash((self.name, self.const, self.vararg))
+        return hash((self.name, self.const, self.vararg, type(self).__qualname__))
 
     def __repr__(self):
         dtype_str = ""
@@ -114,6 +114,14 @@ class Template(DType):
             return False
 
         return self.name == other.name
+
+    def modifiers_compatible(self, other: DType) -> bool:
+        """
+        Check if another dtype object is compatible with the modifiers of the template.
+        """
+        if self.const and not other.const:
+            return False
+        return True
 
 
 class NoneDType(DType):

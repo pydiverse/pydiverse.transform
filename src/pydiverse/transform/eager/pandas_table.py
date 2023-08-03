@@ -306,10 +306,13 @@ class PandasTableImpl(EagerTableImpl):
             internal_kwargs = {}
 
             def value(df, *, grouper=None, **kw):
+                result_dtype = self.backend._dtype_to_pd(implementation.rtype)
+
                 args = [arg.value(df, grouper=grouper, **kw) for arg in op_args]
                 kwargs = {
                     "_tbl": self.backend,
                     "_df": df,
+                    "_result_dtype": result_dtype,
                     **internal_kwargs,
                 }
 
@@ -349,8 +352,7 @@ class PandasTableImpl(EagerTableImpl):
                 if verb == "summarise":
                     return scalar
 
-                pd_dtype = self.backend._dtype_to_pd(implementation.rtype)
-                return pd.Series(scalar, index=series.index, dtype=pd_dtype)
+                return pd.Series(scalar, index=series.index, dtype=result_dtype)
 
             operator = implementation.operator
 
@@ -847,6 +849,55 @@ with PandasTableImpl.op(ops.DayOfYear()) as op:
     @op.auto
     def _day_of_year(x):
         return x.dt.day_of_year
+
+
+#### Generic Functions ####
+
+
+with PandasTableImpl.op(ops.Greatest()) as op:
+
+    @op.auto
+    def _greatest(*x, _df, _result_dtype):
+        x_series = []
+        x_literals = []
+
+        for e in x:
+            if isinstance(e, pd.Series):
+                x_series.append(e)
+            else:
+                x_literals.append(e)
+
+        if x_literals:
+            # Calculate max of literals
+            literals_max = pd.Series(x_literals, dtype=_result_dtype).max()
+            x_series.append(
+                pd.Series(literals_max, index=_df.index, dtype=_result_dtype)
+            )
+
+        return pd.concat(x_series, copy=False, axis=1).max(axis=1).astype(_result_dtype)
+
+
+with PandasTableImpl.op(ops.Least()) as op:
+
+    @op.auto
+    def _least(*x, _df, _result_dtype):
+        x_series = []
+        x_literals = []
+
+        for e in x:
+            if isinstance(e, pd.Series):
+                x_series.append(e)
+            else:
+                x_literals.append(e)
+
+        if x_literals:
+            # Calculate max of literals
+            literals_min = pd.Series(x_literals, dtype=_result_dtype).min()
+            x_series.append(
+                pd.Series(literals_min, index=_df.index, dtype=_result_dtype)
+            )
+
+        return pd.concat(x_series, copy=False, axis=1).min(axis=1).astype(_result_dtype)
 
 
 #### Summarising Functions ####

@@ -70,6 +70,22 @@ with PostgresTableImpl.op(ops.Millisecond()) as op:
         return sa.func.FLOOR(sa.extract("milliseconds", x) % _1000, type_=sa.Integer())
 
 
+with PostgresTableImpl.op(ops.Greatest()) as op:
+
+    @op("str... -> str")
+    def _greatest(*x):
+        # TODO: Determine return type
+        return sa.func.GREATEST(*(e.collate("POSIX") for e in x))
+
+
+with PostgresTableImpl.op(ops.Least()) as op:
+
+    @op("str... -> str")
+    def _least(*x):
+        # TODO: Determine return type
+        return sa.func.LEAST(*(e.collate("POSIX") for e in x))
+
+
 with PostgresTableImpl.op(ops.Any()) as op:
 
     @op.auto

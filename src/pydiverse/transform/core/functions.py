@@ -37,3 +37,11 @@ def case(*cases: tuple[Any, Any], default: Any = None):
     )
 
     return SymbolicExpression(case_expression)
+
+
+def min(first: Any, *expr: Any):
+    return _sym_f_call("__least", first, *expr)
+
+
+def max(first: Any, *expr: Any):
+    return _sym_f_call("__greatest", first, *expr)

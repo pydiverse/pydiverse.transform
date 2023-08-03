@@ -150,7 +150,10 @@ class TestOperatorRegistry:
             reg.add_implementation(op1, lambda: 3, "T, U -> U")
 
         assert reg.get_implementation("op1", parse_dtypes("int", "int"))() == 1
-        assert reg.get_implementation("op1", parse_dtypes("int", "float"))() == 2
+        assert reg.get_implementation("op1", parse_dtypes("int", "str"))() == 2
+        # int can be promoted to float; results in "float, float -> bool" signature
+        assert reg.get_implementation("op1", parse_dtypes("int", "float"))() == 1
+        assert reg.get_implementation("op1", parse_dtypes("float", "int"))() == 1
 
         # More template matching... Also check matching precedence
         reg.add_implementation(op2, lambda: 1, "int, int, int -> int")

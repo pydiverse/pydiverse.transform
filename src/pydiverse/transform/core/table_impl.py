@@ -359,8 +359,8 @@ class AbstractTableImpl:
             if isinstance(expr, LambdaColumn):
                 if expr.name not in self.backend.named_cols.fwd:
                     raise ValueError(
-                        f"Invalid lambda column '{expr.name}. No column with this name"
-                        f" found for table '{self.backend.name}'.'"
+                        f"Invalid lambda column '{expr.name}'. No column with this name"
+                        f" found for table '{self.backend.name}'."
                     )
                 uuid = self.backend.named_cols.fwd[expr.name]
                 return self.backend.cols[uuid].as_column(expr.name, self.backend)

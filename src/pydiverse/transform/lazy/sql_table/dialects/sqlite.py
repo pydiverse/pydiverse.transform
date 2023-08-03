@@ -75,6 +75,40 @@ with SQLiteTableImpl.op(ops.Millisecond()) as op:
         return sa.cast((frac_seconds * _1000) % _1000, sa.Integer())
 
 
+with SQLiteTableImpl.op(ops.Greatest()) as op:
+
+    @op.auto
+    def _greatest(*x):
+        # The SQLite MAX function returns NULL if any of the inputs are NULL
+        # -> Use divide and conquer approach with coalesce to ensure correct result
+        if len(x) == 1:
+            return x[0]
+
+        mid = (len(x) + 1) // 2
+        left = _greatest(*x[:mid])
+        right = _greatest(*x[mid:])
+
+        # TODO: Determine return type
+        return sa.func.coalesce(sa.func.MAX(left, right), left, right)
+
+
+with SQLiteTableImpl.op(ops.Least()) as op:
+
+    @op.auto
+    def _least(*x):
+        # The SQLite MIN function returns NULL if any of the inputs are NULL
+        # -> Use divide and conquer approach with coalesce to ensure correct result
+        if len(x) == 1:
+            return x[0]
+
+        mid = (len(x) + 1) // 2
+        left = _least(*x[:mid])
+        right = _least(*x[mid:])
+
+        # TODO: Determine return type
+        return sa.func.coalesce(sa.func.MIN(left, right), left, right)
+
+
 with SQLiteTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto

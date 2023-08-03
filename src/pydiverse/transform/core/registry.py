@@ -10,6 +10,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Callable
 
 from pydiverse.transform.core import dtypes
+from pydiverse.transform.errors import ExpressionTypeError
 
 if TYPE_CHECKING:
     from pydiverse.transform.ops import Operator, OperatorExtension
@@ -495,11 +496,9 @@ class OperatorImplementationStore:
         def does_match(
             dtype: dtypes.DType,
             node: OperatorImplementationStore.TrieNode,
-            templates: dict[str, dtypes.DType],
         ) -> bool:
             if isinstance(node.value, dtypes.Template):
-                t = templates.get(node.value.name)
-                return t is None or dtype.can_promote_to(t)
+                return node.value.modifiers_compatible(dtype)
             return dtype.can_promote_to(node.value)
 
         stack: list[
@@ -510,18 +509,18 @@ class OperatorImplementationStore:
             node, s_i, templates, type_promotion_indices = stack.pop()
             dtype = signature[s_i]
 
-            if not does_match(dtype, node, templates):
+            if not does_match(dtype, node):
                 continue
 
-            if (
-                isinstance(node.value, dtypes.Template)
-                and node.value.name not in templates
-            ):
-                # Insert dtype into templates dict
+            if isinstance(node.value, dtypes.Template):
                 templates = templates.copy()
-                templates[node.value.name] = dtype
-
-            if not node.value.same_kind(dtype):
+                if node.value.name not in templates:
+                    templates[node.value.name] = [dtype.without_modifiers()]
+                else:
+                    templates[node.value.name] = templates[node.value.name] + [
+                        dtype.without_modifiers()
+                    ]
+            elif not node.value.same_kind(dtype):
                 # Needs type promotion
                 # This only works when types can be promoted once
                 # -> (uint > int) wouldn't be preferred over (uint > int > float)
@@ -529,7 +528,17 @@ class OperatorImplementationStore:
 
             if s_i + 1 == len(signature):
                 if node.operator is not None:
-                    yield node, templates, type_promotion_indices
+                    # Find compatible type for templates
+                    try:
+                        templates = {
+                            name: dtypes.promote_dtypes(types_)
+                            for name, types_ in templates.items()
+                        }
+                        yield node, templates, type_promotion_indices
+                    except ExpressionTypeError:
+                        print(f"Can't promote: {templates}")
+                        pass
+
                 continue
 
             children = iter(node.children)

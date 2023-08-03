@@ -1047,6 +1047,25 @@ with SQLTableImpl.op(ops.DayOfYear()) as op:
         return sa.extract("doy", x)
 
 
+#### Generic Functions ####
+
+
+with SQLTableImpl.op(ops.Greatest()) as op:
+
+    @op.auto
+    def _greatest(*x):
+        # TODO: Determine return type
+        return sa.func.GREATEST(*x)
+
+
+with SQLTableImpl.op(ops.Least()) as op:
+
+    @op.auto
+    def _least(*x):
+        # TODO: Determine return type
+        return sa.func.LEAST(*x)
+
+
 #### Summarising Functions ####
 
 
