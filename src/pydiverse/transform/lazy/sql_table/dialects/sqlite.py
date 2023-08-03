@@ -62,6 +62,19 @@ with SQLiteTableImpl.op(ops.Contains()) as op:
         return x.contains(y, autoescape=True)
 
 
+with SQLiteTableImpl.op(ops.Millisecond()) as op:
+
+    @op.auto
+    def _millisecond(x):
+        warnings.warn(
+            "SQLite returns rounded milliseconds",
+            NonStandardBehaviourWarning,
+        )
+        _1000 = sa.literal_column("1000")
+        frac_seconds = sa.cast(sa.func.STRFTIME("%f", x), sa.Numeric())
+        return sa.cast((frac_seconds * _1000) % _1000, sa.Integer())
+
+
 with SQLiteTableImpl.op(ops.StringJoin()) as op:
 
     @op.auto

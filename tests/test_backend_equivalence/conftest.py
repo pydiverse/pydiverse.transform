@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import functools
+from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import pytest
 import sqlalchemy as sa
@@ -73,6 +75,32 @@ dataframes = {
             ],
         }
     ),
+    "df_datetime": pd.DataFrame(
+        {
+            "col1": [
+                datetime(2000, 1, 1),
+                datetime(2000, 1, 1, 12, 15, 59),
+                datetime(1970, 1, 1, 12, 30, 30, 987_123),
+                datetime(1700, 4, 27, 1, 2, 3),
+                None,
+                datetime(2250, 12, 24, 23, 0, 0),
+                datetime(2023, 7, 31, 10, 16, 13),
+                datetime(2004, 12, 31),
+                datetime(1970, 1, 1),
+            ],
+            "col2": [
+                datetime(2023, 7, 31, 10, 16, 13),
+                datetime(2023, 7, 31, 10, 16, 14),
+                datetime(1900, 1, 2, 3, 4, 5),
+                datetime(1988, 5, 3, 12, 4, 54),
+                None,
+                datetime(2023, 7, 31, 10, 16, 13),
+                None,
+                datetime(2004, 12, 31, 23, 59, 59, 456_789),
+                datetime(1970, 1, 1),
+            ],
+        }
+    ),
 }
 
 
@@ -81,12 +109,22 @@ def pandas_impls():
     return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
 
 
-def sql_conn_to_impls(conn: str):
+def sql_conn_to_impls(conn: str, dtypes_map: dict = None):
+    dtypes_map = dtypes_map or {}
+
     engine = sa.create_engine(conn)
     impls = {}
     for name, df in dataframes.items():
-        df.to_sql(name, engine, index=False, if_exists="replace")
+        df = df.convert_dtypes()
+
+        sql_dtypes = {}
+        for col, dtype_ in df.dtypes.items():
+            if dtype_ in dtypes_map:
+                sql_dtypes[col] = dtypes_map[dtype_]
+
+        df.to_sql(name, engine, index=False, if_exists="replace", dtype=sql_dtypes)
         impls[name] = SQLTableImpl(engine, name)
+
     return impls
 
 
@@ -102,12 +140,19 @@ def duckdb_impls():
 
 @functools.cache
 def mssql_impls():
+    from sqlalchemy.dialects.mssql import DATETIME2
+
     user = "sa"
     password = "PydiQuant27"
     localhost = "127.0.0.1"
     db_name = "master"
     local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    return sql_conn_to_impls(local_conn)
+    return sql_conn_to_impls(
+        local_conn,
+        dtypes_map={
+            np.dtype("datetime64[ns]"): DATETIME2(),
+        },
+    )
 
 
 @functools.cache

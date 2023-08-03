@@ -268,25 +268,6 @@ with MSSqlTableImpl.op(ops.RPow()) as op:
         return _pow(lhs, rhs)
 
 
-with MSSqlTableImpl.op(ops.Mean()) as op:
-
-    @op.auto
-    def _mean(x):
-        return sa.func.AVG(sa.cast(x, sa.Double()), type_=sa.Double())
-
-
-with MSSqlTableImpl.op(ops.StringJoin()) as op:
-
-    @op.auto
-    def _join(x, sep: str):
-        # We could do something like this:
-        #     return sa.func.STRING_AGG(x, sep, type_=x.type).within_group(...)
-        # but the problem is, that the StringJoin function is an aggregate function
-        # and not a window function, thus we don't (yet) support the `arrange`
-        # context kwarg
-        raise OperatorNotSupportedError
-
-
 with MSSqlTableImpl.op(ops.StringLength()) as op:
 
     @op.auto
@@ -328,3 +309,33 @@ with MSSqlTableImpl.op(ops.Contains()) as op:
     def _contains(x, y):
         x = x.collate("Latin1_General_CS_AS")
         return x.contains(y, autoescape=True)
+
+
+with MSSqlTableImpl.op(ops.DayOfWeek()) as op:
+
+    @op.auto
+    def _day_of_week(x):
+        # Offset DOW such that Mon=1, Sun=7
+        _1 = sa.literal_column("1")
+        _2 = sa.literal_column("2")
+        _7 = sa.literal_column("7")
+        return (sa.extract("dow", x) + sa.text("@@DATEFIRST") - _2) % _7 + _1
+
+
+with MSSqlTableImpl.op(ops.Mean()) as op:
+
+    @op.auto
+    def _mean(x):
+        return sa.func.AVG(sa.cast(x, sa.Double()), type_=sa.Double())
+
+
+with MSSqlTableImpl.op(ops.StringJoin()) as op:
+
+    @op.auto
+    def _join(x, sep: str):
+        # We could do something like this:
+        #     return sa.func.STRING_AGG(x, sep, type_=x.type).within_group(...)
+        # but the problem is, that the StringJoin function is an aggregate function
+        # and not a window function, thus we don't (yet) support the `arrange`
+        # context kwarg
+        raise OperatorNotSupportedError

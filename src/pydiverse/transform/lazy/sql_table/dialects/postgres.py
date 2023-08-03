@@ -55,6 +55,21 @@ with PostgresTableImpl.op(ops.Round()) as op:
         return sa.func.ROUND(x, decimals, type_=x.type)
 
 
+with PostgresTableImpl.op(ops.Second()) as op:
+
+    @op.auto
+    def _second(x):
+        return sa.func.FLOOR(sa.extract("second", x), type_=sa.Integer())
+
+
+with PostgresTableImpl.op(ops.Millisecond()) as op:
+
+    @op.auto
+    def _millisecond(x):
+        _1000 = sa.literal_column("1000")
+        return sa.func.FLOOR(sa.extract("milliseconds", x) % _1000, type_=sa.Integer())
+
+
 with PostgresTableImpl.op(ops.Any()) as op:
 
     @op.auto

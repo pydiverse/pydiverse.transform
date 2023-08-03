@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform.lazy.sql_table.dialects.postgres import PostgresTableImpl
+from pydiverse.transform.lazy.sql_table import SQLTableImpl
 
 
-class DuckDBTableImpl(PostgresTableImpl):
+class DuckDBTableImpl(SQLTableImpl):
     _dialect_name = "duckdb"

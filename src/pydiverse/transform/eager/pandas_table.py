@@ -783,6 +783,72 @@ with PandasTableImpl.op(ops.Contains()) as op:
         return x.str.contains(y)
 
 
+#### Datetime Functions ####
+
+
+with PandasTableImpl.op(ops.Year()) as op:
+
+    @op.auto
+    def _year(x):
+        return x.dt.year
+
+
+with PandasTableImpl.op(ops.Month()) as op:
+
+    @op.auto
+    def _month(x):
+        return x.dt.month
+
+
+with PandasTableImpl.op(ops.Day()) as op:
+
+    @op.auto
+    def _day(x):
+        return x.dt.day
+
+
+with PandasTableImpl.op(ops.Hour()) as op:
+
+    @op.auto
+    def _hour(x):
+        return x.dt.hour
+
+
+with PandasTableImpl.op(ops.Minute()) as op:
+
+    @op.auto
+    def _minute(x):
+        return x.dt.minute
+
+
+with PandasTableImpl.op(ops.Second()) as op:
+
+    @op.auto
+    def _second(x):
+        return x.dt.second
+
+
+with PandasTableImpl.op(ops.Millisecond()) as op:
+
+    @op.auto
+    def _millisecond(x):
+        return x.dt.microsecond // 1000
+
+
+with PandasTableImpl.op(ops.DayOfWeek()) as op:
+
+    @op.auto
+    def _day_of_week(x):
+        return x.dt.day_of_week + 1
+
+
+with PandasTableImpl.op(ops.DayOfYear()) as op:
+
+    @op.auto
+    def _day_of_year(x):
+        return x.dt.day_of_year
+
+
 #### Summarising Functions ####
 
 
