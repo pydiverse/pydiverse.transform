@@ -47,6 +47,9 @@ class Strip(StringUnary):
 
 class StringLength(StringUnary):
     name = "len"
+    signatures = [
+        "str -> int",
+    ]
 
 
 class Upper(StringUnary):
