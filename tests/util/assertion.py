@@ -2,14 +2,32 @@ from __future__ import annotations
 
 import contextlib
 import warnings
-from collections.abc import Iterable
 
 import pytest
 from pandas._testing import assert_frame_equal
 
-from pydiverse.transform import Table, verb
-from pydiverse.transform.core.verbs import arrange, collect, show_query
+from pydiverse.transform import Table
+from pydiverse.transform.core.verbs import collect, show_query
 from pydiverse.transform.errors import NonStandardBehaviourWarning
+
+
+def assert_equal(left, right, check_dtype=False):
+    left_df = left >> collect() if isinstance(left, Table) else left
+    right_df = right >> collect() if isinstance(right, Table) else right
+
+    try:
+        assert_frame_equal(left_df, right_df, check_dtype=check_dtype)
+    except AssertionError as e:
+        print("First dataframe:")
+        print(left_df)
+        if isinstance(left, Table):
+            left >> show_query()
+        print()
+        print("Second dataframe:")
+        print(right_df)
+        if isinstance(right, Table):
+            right >> show_query()
+        raise e
 
 
 @contextlib.contextmanager
@@ -95,12 +113,3 @@ def assert_result_equal(
         query_y >> show_query()
         print("")
         raise e
-
-
-@verb
-def full_sort(t: Table):
-    """
-    Ordering after join is not determined.
-    This helper applies a deterministic ordering to a table.
-    """
-    return t >> arrange(*t)

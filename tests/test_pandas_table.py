@@ -13,7 +13,7 @@ from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
 from pydiverse.transform.eager.pandas_table import PandasTableImpl
 from pydiverse.transform.errors import AlignmentError
-from pydiverse.transform.util.testing import assert_equal
+from tests.util import assert_equal
 
 df1 = pd.DataFrame(
     {

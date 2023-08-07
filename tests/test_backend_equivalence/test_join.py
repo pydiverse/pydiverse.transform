@@ -9,8 +9,7 @@ from pydiverse.transform.core.verbs import (
     join,
     select,
 )
-
-from . import assert_result_equal, full_sort
+from tests.util import assert_result_equal, full_sort
 
 
 @pytest.mark.parametrize(

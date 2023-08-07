@@ -6,8 +6,7 @@ from pydiverse.transform.core.verbs import (
     mutate,
 )
 from tests.fixtures.backend import skip_backends
-
-from . import assert_result_equal
+from tests.util import assert_result_equal
 
 
 def test_noop(df1):

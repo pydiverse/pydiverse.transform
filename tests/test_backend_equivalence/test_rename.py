@@ -3,8 +3,7 @@ from __future__ import annotations
 from pydiverse.transform.core.verbs import (
     rename,
 )
-
-from . import assert_result_equal
+from tests.util import assert_result_equal
 
 
 def test_noop(df3):

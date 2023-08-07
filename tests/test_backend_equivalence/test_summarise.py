@@ -10,8 +10,7 @@ from pydiverse.transform.core.verbs import (
     summarise,
 )
 from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
-
-from . import assert_result_equal
+from tests.util import assert_result_equal
 
 
 def test_ungrouped(df3):

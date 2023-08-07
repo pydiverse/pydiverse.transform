@@ -12,8 +12,7 @@ from pydiverse.transform.core.verbs import (
     ungroup,
 )
 from pydiverse.transform.errors import FunctionTypeError
-
-from . import assert_result_equal, full_sort
+from tests.util import assert_result_equal, full_sort
 
 
 def test_simple_ungrouped(df3):

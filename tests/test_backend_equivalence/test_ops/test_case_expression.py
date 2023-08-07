@@ -8,7 +8,7 @@ from pydiverse.transform.core.verbs import (
     summarise,
 )
 from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
-from tests.test_backend_equivalence import assert_result_equal
+from tests.util import assert_result_equal
 
 
 def test_mutate_case_ewise(df4):

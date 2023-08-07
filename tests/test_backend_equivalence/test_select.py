@@ -5,8 +5,7 @@ from pydiverse.transform.core.verbs import (
     mutate,
     select,
 )
-
-from . import assert_result_equal
+from tests.util import assert_result_equal
 
 
 def test_simple_select(df1):

@@ -7,7 +7,7 @@ from pydiverse.transform.core.verbs import (
     filter,
     mutate,
 )
-from tests.test_backend_equivalence import assert_result_equal
+from tests.util import assert_result_equal
 
 
 def test_eq(df_datetime):

@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-import functools
 from datetime import datetime
 
-import numpy as np
 import pandas as pd
 import pytest
-import sqlalchemy as sa
 
-from pydiverse.transform import Table
-from pydiverse.transform.eager import PandasTableImpl
-from pydiverse.transform.lazy import SQLTableImpl
-from tests.fixtures.backend import flatten
+from tests.fixtures.backend import BACKEND_MARKS, flatten
+from tests.util.backend import BACKEND_TABLES
 
 dataframes = {
     "df1": pd.DataFrame(
@@ -103,74 +98,6 @@ dataframes = {
     ),
 }
 
-
-@functools.cache
-def pandas_impls():
-    return {name: PandasTableImpl(name, df) for name, df in dataframes.items()}
-
-
-def sql_conn_to_impls(conn: str, dtypes_map: dict = None):
-    dtypes_map = dtypes_map or {}
-
-    engine = sa.create_engine(conn)
-    impls = {}
-    for name, df in dataframes.items():
-        df = df.convert_dtypes()
-
-        sql_dtypes = {}
-        for col, dtype_ in df.dtypes.items():
-            if dtype_ in dtypes_map:
-                sql_dtypes[col] = dtypes_map[dtype_]
-
-        df.to_sql(name, engine, index=False, if_exists="replace", dtype=sql_dtypes)
-        impls[name] = SQLTableImpl(engine, name)
-
-    return impls
-
-
-@functools.cache
-def sqlite_impls():
-    return sql_conn_to_impls("sqlite:///:memory:")
-
-
-@functools.cache
-def duckdb_impls():
-    return sql_conn_to_impls("duckdb:///:memory:")
-
-
-@functools.cache
-def mssql_impls():
-    from sqlalchemy.dialects.mssql import DATETIME2
-
-    user = "sa"
-    password = "PydiQuant27"
-    localhost = "127.0.0.1"
-    db_name = "master"
-    local_conn = f"mssql+pyodbc://{user}:{password}@{localhost}:1433/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    return sql_conn_to_impls(
-        local_conn,
-        dtypes_map={
-            np.dtype("datetime64[ns]"): DATETIME2(),
-        },
-    )
-
-
-@functools.cache
-def postgresql_impls():
-    user = "sa"
-    password = "Pydiverse23"
-    local_conn = f"postgresql://{user}:{password}@localhost:6543/"
-    return sql_conn_to_impls(local_conn)
-
-
-backend_impls = {
-    "pandas": pandas_impls,
-    "sqlite": sqlite_impls,
-    "duckdb": duckdb_impls,
-    "postgres": postgresql_impls,
-    "mssql": mssql_impls,
-}
-
 # compare one dataframe and one SQL backend to all others
 # (some tests are ignored if either backend does not support a feature)
 reference_backends = ["pandas", "duckdb"]
@@ -179,9 +106,7 @@ reference_backends = ["pandas", "duckdb"]
 def pytest_generate_tests(metafunc: pytest.Metafunc):
     # Parametrize tests based on `backends` and `skip_backends` mark.
 
-    from tests.fixtures.backend import BACKEND_MARKS
-
-    backends = dict.fromkeys(backend_impls)
+    backends = dict.fromkeys(BACKEND_TABLES)
     # if mark := metafunc.definition.get_closest_marker("backends"):
     #     backends = dict.fromkeys(mark.args)
     if mark := metafunc.definition.get_closest_marker("skip_backends"):
@@ -236,8 +161,11 @@ def generate_df_fixtures():
     def gen_fixture(table_name):
         @pytest.fixture(scope="function")
         def table_fixture(request):
-            table_x = Table(backend_impls[request.param[0]]()[table_name])
-            table_y = Table(backend_impls[request.param[1]]()[table_name])
+            df = dataframes[table_name]
+            name = f"equiv_{table_name}"
+
+            table_x = BACKEND_TABLES[request.param[0]](df, name)
+            table_y = BACKEND_TABLES[request.param[1]](df, name)
             return table_x, table_y
 
         return table_fixture

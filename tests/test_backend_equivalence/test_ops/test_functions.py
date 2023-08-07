@@ -4,7 +4,7 @@ from pydiverse.transform import functions as f
 from pydiverse.transform import λ
 from pydiverse.transform.core.verbs import mutate
 from tests.fixtures.backend import skip_backends
-from tests.test_backend_equivalence import assert_result_equal
+from tests.util import assert_result_equal
 
 
 def test_count(df4):
