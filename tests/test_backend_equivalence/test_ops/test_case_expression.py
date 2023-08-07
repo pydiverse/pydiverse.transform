@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from test_backend_equivalence import assert_result_equal
-
 from pydiverse.transform import functions as f
 from pydiverse.transform import λ
 from pydiverse.transform.core.verbs import (
@@ -10,6 +8,7 @@ from pydiverse.transform.core.verbs import (
     summarise,
 )
 from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
+from tests.test_backend_equivalence import assert_result_equal
 
 
 def test_mutate_case_ewise(df4):

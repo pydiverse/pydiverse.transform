@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import warnings
-
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.errors import NonStandardBehaviourWarning
 from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
+from pydiverse.transform.util.warnings import warn_non_standard
 
 
 class SQLiteTableImpl(SQLTableImpl):
@@ -27,11 +25,10 @@ with SQLiteTableImpl.op(ops.StartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
-        warnings.warn(
+        warn_non_standard(
             "SQLite: startswith is case-insensitive by default. "
             "Use the 'case_sensitive_like' pragma to change this behaviour. "
             "See https://www.sqlite.org/pragma.html#pragma_case_sensitive_like",
-            NonStandardBehaviourWarning,
         )
         return x.startswith(y, autoescape=True)
 
@@ -40,11 +37,10 @@ with SQLiteTableImpl.op(ops.EndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
-        warnings.warn(
+        warn_non_standard(
             "SQLite: endswith is case-insensitive by default. "
             "Use the 'case_sensitive_like' pragma to change this behaviour. "
             "See https://www.sqlite.org/pragma.html#pragma_case_sensitive_like",
-            NonStandardBehaviourWarning,
         )
         return x.endswith(y, autoescape=True)
 
@@ -53,11 +49,10 @@ with SQLiteTableImpl.op(ops.Contains()) as op:
 
     @op.auto
     def _contains(x, y):
-        warnings.warn(
+        warn_non_standard(
             "SQLite: contains is case-insensitive by default. "
             "Use the 'case_sensitive_like' pragma to change this behaviour. "
             "See https://www.sqlite.org/pragma.html#pragma_case_sensitive_like",
-            NonStandardBehaviourWarning,
         )
         return x.contains(y, autoescape=True)
 
@@ -66,9 +61,8 @@ with SQLiteTableImpl.op(ops.Millisecond()) as op:
 
     @op.auto
     def _millisecond(x):
-        warnings.warn(
+        warn_non_standard(
             "SQLite returns rounded milliseconds",
-            NonStandardBehaviourWarning,
         )
         _1000 = sa.literal_column("1000")
         frac_seconds = sa.cast(sa.func.STRFTIME("%f", x), sa.Numeric())

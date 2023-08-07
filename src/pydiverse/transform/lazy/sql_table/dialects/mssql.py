@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import warnings
-
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
@@ -10,12 +8,10 @@ from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import TypedValue
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.util import OrderingDescriptor
-from pydiverse.transform.errors import (
-    NonStandardBehaviourWarning,
-    OperatorNotSupportedError,
-)
+from pydiverse.transform.errors import OperatorNotSupportedError
 from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
 from pydiverse.transform.ops import Operator, OPType
+from pydiverse.transform.util.warnings import warn_non_standard
 
 
 class MSSqlTableImpl(SQLTableImpl):
@@ -188,9 +184,8 @@ with MSSqlTableImpl.op(ops.Equal()) as op:
 
     @op("str, str -> bool")
     def _eq(x, y):
-        warnings.warn(
+        warn_non_standard(
             "MSSQL ignores trailing whitespace when comparing strings",
-            NonStandardBehaviourWarning,
         )
         return x == y
 
@@ -199,9 +194,8 @@ with MSSqlTableImpl.op(ops.NotEqual()) as op:
 
     @op("str, str -> bool")
     def _ne(x, y):
-        warnings.warn(
+        warn_non_standard(
             "MSSQL ignores trailing whitespace when comparing strings",
-            NonStandardBehaviourWarning,
         )
         return x != y
 
@@ -210,9 +204,8 @@ with MSSqlTableImpl.op(ops.Less()) as op:
 
     @op("str, str -> bool")
     def _lt(x, y):
-        warnings.warn(
+        warn_non_standard(
             "MSSQL ignores trailing whitespace when comparing strings",
-            NonStandardBehaviourWarning,
         )
         return x < y
 
@@ -221,9 +214,8 @@ with MSSqlTableImpl.op(ops.LessEqual()) as op:
 
     @op("str, str -> bool")
     def _le(x, y):
-        warnings.warn(
+        warn_non_standard(
             "MSSQL ignores trailing whitespace when comparing strings",
-            NonStandardBehaviourWarning,
         )
         return x <= y
 
@@ -232,9 +224,8 @@ with MSSqlTableImpl.op(ops.Greater()) as op:
 
     @op("str, str -> bool")
     def _gt(x, y):
-        warnings.warn(
+        warn_non_standard(
             "MSSQL ignores trailing whitespace when comparing strings",
-            NonStandardBehaviourWarning,
         )
         return x > y
 
@@ -243,9 +234,8 @@ with MSSqlTableImpl.op(ops.GreaterEqual()) as op:
 
     @op("str, str -> bool")
     def _ge(x, y):
-        warnings.warn(
+        warn_non_standard(
             "MSSQL ignores trailing whitespace when comparing strings",
-            NonStandardBehaviourWarning,
         )
         return x >= y
 
@@ -272,9 +262,8 @@ with MSSqlTableImpl.op(ops.StringLength()) as op:
 
     @op.auto
     def _str_length(x):
-        warnings.warn(
+        warn_non_standard(
             "MSSQL ignores trailing whitespace when computing string length",
-            NonStandardBehaviourWarning,
         )
         return sa.func.LENGTH(x, type_=sa.Integer())
 
