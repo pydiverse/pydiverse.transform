@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
+import sqlalchemy.dialects.mssql
 
 from pydiverse.transform import ops
 from pydiverse.transform._typing import CallableT
@@ -256,6 +257,70 @@ with MSSqlTableImpl.op(ops.RPow()) as op:
     @op.auto
     def _rpow(rhs, lhs):
         return _pow(lhs, rhs)
+
+
+with MSSqlTableImpl.op(ops.Xor()) as op:
+
+    @op.auto
+    def _xor(lhs, rhs):
+        return (lhs & sa.not_(rhs)) | (sa.not_(lhs) & rhs)
+
+
+with MSSqlTableImpl.op(ops.RXor()) as op:
+
+    @op.auto
+    def _rxor(rhs, lhs):
+        return (lhs & sa.not_(rhs)) | (sa.not_(lhs) & rhs)
+
+
+with MSSqlTableImpl.op(ops.Any()) as op:
+
+    @op.auto
+    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+        if isinstance(x.type, sa.dialects.mssql.BIT):
+            # BIT isn't supported in max function
+            x = sa.cast(x, type_=sa.dialects.mssql.TINYINT())
+        # TODO: GET SUPER IMPLEMENTATION...
+        return sa.func.coalesce(sa.func.max(x), sa.false())
+
+    @op.auto(variant="window")
+    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+        if isinstance(x.type, sa.dialects.mssql.BIT):
+            # BIT isn't supported in max function
+            x = sa.cast(x, type_=sa.dialects.mssql.TINYINT())
+        # TODO: GET SUPER IMPLEMENTATION...
+        return sa.func.coalesce(
+            sa.func.max(x).over(
+                partition_by=_window_partition_by,
+                order_by=_window_order_by,
+            ),
+            sa.false(),
+        )
+
+
+with MSSqlTableImpl.op(ops.All()) as op:
+
+    @op.auto
+    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+        if isinstance(x.type, sa.dialects.mssql.BIT):
+            # BIT isn't supported in min function
+            x = sa.cast(x, type_=sa.dialects.mssql.TINYINT())
+        # TODO: GET SUPER IMPLEMENTATION...
+        return sa.func.coalesce(sa.func.min(x), sa.false())
+
+    @op.auto(variant="window")
+    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+        if isinstance(x.type, sa.dialects.mssql.BIT):
+            # BIT isn't supported in min function
+            x = sa.cast(x, type_=sa.dialects.mssql.TINYINT())
+        # TODO: GET SUPER IMPLEMENTATION...
+        return sa.func.coalesce(
+            sa.func.min(x).over(
+                partition_by=_window_partition_by,
+                order_by=_window_order_by,
+            ),
+            sa.false(),
+        )
 
 
 with MSSqlTableImpl.op(ops.StringLength()) as op:
