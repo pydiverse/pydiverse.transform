@@ -14,10 +14,10 @@ on:
 
 jobs:
 
-  Linting:
+  lint:
     name: "Linting - pre-commit hooks - Python 3.9"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
@@ -30,7 +30,7 @@ jobs:
       - name: Linting - Run pre-commit checks
         uses: pre-commit/action@v3.0.0
 
-  Tests:
+  test:
     name: "${{ matrix.os }} / ${{ matrix.python-version }}"
     runs-on: ${{ matrix.os }}-latest
     strategy:
@@ -66,3 +66,41 @@ jobs:
         uses: ./.github/actions/test
         with:
           arguments: --postgres --mssql
+
+  fuzzing:
+    name: 'Fuzz Testing - Python 3.11'
+    needs: [test]
+    runs-on: ubuntu-latest
+    env:
+      TQDM_MININTERVAL: 5
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          python-version: 3.11
+          poetry-flags: --all-extras --with=tests
+
+      - name: Start Docker Compose
+        uses: isbang/compose-action@v1.4.1
+        with:
+          compose-file: ./docker-compose.yaml
+
+      - name: Install Microsoft ODBC
+        run: sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+
+      - name: Wait for Docker Servers
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          until bash ./.github/workflows/resources/docker_compose_ready.sh; do
+            sleep 2
+          done
+
+      - name: Run Tests
+        uses: ./.github/actions/test
+        with:
+          path: tests/test_fuzzing
+          arguments: -s -v --fuzzing --postgres --mssql
