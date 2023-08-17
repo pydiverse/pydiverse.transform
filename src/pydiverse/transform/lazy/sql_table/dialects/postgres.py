@@ -3,7 +3,10 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
+from pydiverse.transform.lazy.sql_table.sql_table import (
+    SQLTableImpl,
+    determine_sa_type_union,
+)
 
 
 class PostgresTableImpl(SQLTableImpl):
@@ -74,16 +77,16 @@ with PostgresTableImpl.op(ops.Greatest()) as op:
 
     @op("str... -> str")
     def _greatest(*x):
-        # TODO: Determine return type
-        return sa.func.GREATEST(*(e.collate("POSIX") for e in x))
+        type_ = determine_sa_type_union([y.type for y in x])
+        return sa.func.GREATEST(*(e.collate("POSIX") for e in x), type_=type_)
 
 
 with PostgresTableImpl.op(ops.Least()) as op:
 
     @op("str... -> str")
     def _least(*x):
-        # TODO: Determine return type
-        return sa.func.LEAST(*(e.collate("POSIX") for e in x))
+        type_ = determine_sa_type_union([y.type for y in x])
+        return sa.func.LEAST(*(e.collate("POSIX") for e in x), type_=type_)
 
 
 with PostgresTableImpl.op(ops.Any()) as op:

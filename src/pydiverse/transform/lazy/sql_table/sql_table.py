@@ -825,7 +825,7 @@ def determine_sa_type_union(types: list[sa.types.TypeEngine]):
 
     candidate = types[0]
     for t in types[1:]:
-        if isinstance(t, type(candidate)):
+        if t == type(candidate):
             continue
 
         if isinstance(candidate, sa.Integer):

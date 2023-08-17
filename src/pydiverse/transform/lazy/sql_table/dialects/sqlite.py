@@ -3,7 +3,10 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
+from pydiverse.transform.lazy.sql_table.sql_table import (
+    SQLTableImpl,
+    determine_sa_type_union,
+)
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
@@ -82,8 +85,8 @@ with SQLiteTableImpl.op(ops.Greatest()) as op:
         left = _greatest(*x[:mid])
         right = _greatest(*x[mid:])
 
-        # TODO: Determine return type
-        return sa.func.coalesce(sa.func.MAX(left, right), left, right)
+        type_ = determine_sa_type_union([left.type, right.type])
+        return sa.func.coalesce(sa.func.MAX(left, right, type_=type_), left, right)
 
 
 with SQLiteTableImpl.op(ops.Least()) as op:
@@ -99,8 +102,8 @@ with SQLiteTableImpl.op(ops.Least()) as op:
         left = _least(*x[:mid])
         right = _least(*x[mid:])
 
-        # TODO: Determine return type
-        return sa.func.coalesce(sa.func.MIN(left, right), left, right)
+        type_ = determine_sa_type_union([left.type, right.type])
+        return sa.func.coalesce(sa.func.MIN(left, right, type_=type_), left, right)
 
 
 with SQLiteTableImpl.op(ops.StringJoin()) as op:
