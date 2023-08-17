@@ -36,6 +36,7 @@ pre-commit = ">=2.20.0"
 
 duckdb = "^0.8.1"
 duckdb-engine = "^0.9.1"
+tqdm = "^4.65.0"
 
 [tool.poetry.group.tests]
 optional = true

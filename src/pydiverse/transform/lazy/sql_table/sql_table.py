@@ -427,22 +427,9 @@ class SQLTableImpl(LazyTableImpl):
     def collect(self):
         select = self.build_select()
         with self.engine.connect() as conn:
-            try:
-                # TODO: check for which pandas versions this is needed:
-                # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
-                # Taken from siuba
-                from pandas.io import sql as _pd_sql
+            import pandas as pd
 
-                class _FixedSqlDatabase(_pd_sql.SQLDatabase):
-                    def execute(self, *args, **kwargs):
-                        return self.connectable.execute(*args, **kwargs)
-
-                sql_db = _FixedSqlDatabase(conn)
-                result = sql_db.read_sql(select).convert_dtypes()
-            except AttributeError:
-                import pandas as pd
-
-                result = pd.read_sql_query(select, con=conn)
+            result = pd.read_sql_query(select, con=conn)
 
         # Add metadata
         result.attrs["name"] = self.name
@@ -831,6 +818,29 @@ def generate_alignment_hash():
     return uuid.uuid1()
 
 
+def determine_sa_type_union(types: list[sa.types.TypeEngine]):
+    types = [t for t in types if not isinstance(t, sa.types.NullType)]
+    if len(types) == 0:
+        return sa.types.NullType()
+
+    candidate = types[0]
+    for t in types[1:]:
+        if isinstance(t, type(candidate)):
+            continue
+
+        if isinstance(candidate, sa.Integer):
+            if isinstance(t, sa.Numeric):
+                candidate = t
+            continue
+
+        if isinstance(candidate, sa.Numeric):
+            if isinstance(t, sa.Float):
+                candidate = t
+            continue
+
+    return candidate
+
+
 #### BACKEND SPECIFIC OPERATORS ################################################
 
 
@@ -1054,16 +1064,16 @@ with SQLTableImpl.op(ops.Greatest()) as op:
 
     @op.auto
     def _greatest(*x):
-        # TODO: Determine return type
-        return sa.func.GREATEST(*x)
+        type_ = determine_sa_type_union([y.type for y in x])
+        return sa.func.GREATEST(*x, type_=type_)
 
 
 with SQLTableImpl.op(ops.Least()) as op:
 
     @op.auto
     def _least(*x):
-        # TODO: Determine return type
-        return sa.func.LEAST(*x)
+        type_ = determine_sa_type_union([y.type for y in x])
+        return sa.func.LEAST(*x, type_=type_)
 
 
 #### Summarising Functions ####
