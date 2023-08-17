@@ -67,6 +67,10 @@ acceptable_errors = {
         "InvalidArgumentForPowerFunction",
         "NumericValueOutOfRange",
     ],
+    "sqlite": [
+        "Expression tree is too large",
+        "parser stack overflow",
+    ],
     "duckdb": [
         "Out of Range Error: Overflow in",  # DuckDB: #8359
     ],
@@ -105,6 +109,9 @@ acceptable_errors = {
     ],
 )
 def test_basic(backend: str, max_depth: int, num_expr: int):
+    if backend == "sqlite" and max_depth > 4:
+        pytest.skip("Sipping because of exponentially growing SQLite expressions")
+
     table = BACKEND_TABLES[backend](fuzz_df, "fuzz_basic")
     acceptable_errors_ = acceptable_errors.get(backend, ())
 
@@ -133,7 +140,11 @@ def test_basic(backend: str, max_depth: int, num_expr: int):
             pass
         except OperatorNotSupportedError:
             pass
-        except (sa.exc.DataError, sa.exc.ProgrammingError) as e:
+        except (
+            sa.exc.DataError,
+            sa.exc.ProgrammingError,
+            sa.exc.OperationalError,
+        ) as e:
             e_str = str(e)
             if not any(msg in e_str for msg in acceptable_errors_):
                 exception = e
