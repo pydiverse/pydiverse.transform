@@ -685,3 +685,10 @@ with PandasTableImpl.op(ops.Rank()) as op:
     @op.auto(variant="transform")
     def _rank(x: pd.Series):
         return x.transform("rank", method="min")
+
+
+with PandasTableImpl.op(ops.Isin()) as op:
+
+    @op.auto
+    def _isin(x: pd.Series, *args):
+        return x.isin(args)

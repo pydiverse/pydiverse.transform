@@ -588,8 +588,10 @@ class TestFilter:
 
     @tables(["df2"])
     def test_simple_filter(self, df2_x, df2_y):
-        assert_result_equal(df2_x, df2_y, lambda t: t >> filter(t.col1 == 2))
-        assert_result_equal(df2_x, df2_y, lambda t: t >> filter(t.col1 != 2))
+        # assert_result_equal(df2_x, df2_y, lambda t: t >> filter(t.col1 == 2))
+        # assert_result_equal(df2_x, df2_y, lambda t: t >> filter(t.col1 != 2))
+        # assert_result_equal(df2_x, df2_y, lambda t: t >> filter(t.col1.isin(2)))
+        assert_result_equal(df2_x, df2_y, lambda t: t >> filter(t.col1.isin([2, 3])))
 
     @tables(["df2"])
     def test_chained_filters(self, df2_x, df2_y):

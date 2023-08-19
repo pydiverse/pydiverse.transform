@@ -249,6 +249,23 @@ class AbstractTableImpl(metaclass=_TableImplMeta):
                 return TypedValue(literal_func, "float", const_value=const_func)
             if isinstance(expr, str):
                 return TypedValue(literal_func, "str", const_value=const_func)
+            if isinstance(expr, list):
+
+                def assert_func(*args, **kwargs):
+                    raise ValueError(
+                        "List type is currently only supported for constants, "
+                        f"not: {expr}"
+                    )
+
+                if all(isinstance(exp, bool) for exp in expr):
+                    return TypedValue(assert_func, "bool-list", const_value=const_func)
+                if all(isinstance(exp, int) for exp in expr):
+                    return TypedValue(assert_func, "int-list", const_value=const_func)
+                if all(isinstance(exp, float) for exp in expr):
+                    return TypedValue(assert_func, "float-list", const_value=const_func)
+                if all(isinstance(exp, str) for exp in expr):
+                    return TypedValue(assert_func, "str-list", const_value=const_func)
+            raise ValueError(f"Unknown expression type: {expr}")
 
     class AlignedExpressionEvaluator(Generic[AlignedT], DelegatingTranslator[AlignedT]):
         """

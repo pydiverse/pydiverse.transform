@@ -16,6 +16,7 @@ __all__ = [
     "Xor",
     "RXor",
     "Invert",
+    "Isin",
 ]
 
 
@@ -103,4 +104,11 @@ class Invert(ElementWise, Unary):
     name = "__invert__"
     signatures = [
         "bool -> bool",
+    ]
+
+
+class Isin(Comparison):
+    name = "isin"
+    signatures = [
+        "T, const-T-list -> bool",
     ]

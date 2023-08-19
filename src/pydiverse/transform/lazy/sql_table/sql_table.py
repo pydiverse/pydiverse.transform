@@ -913,3 +913,10 @@ with SQLTableImpl.op(ops.Rank()) as op:
         # row_number() is like rank(method="first")
         # rank() is like method="min"
         return sa.func.RANK(), ImplicitArrange(sql.expression.ClauseList(x))
+
+
+with SQLTableImpl.op(ops.Isin()) as op:
+
+    @op.auto
+    def _isin(x, *args):
+        return x.in_(args)

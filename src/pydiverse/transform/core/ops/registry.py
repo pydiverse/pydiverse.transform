@@ -323,6 +323,8 @@ class OperatorSignature:
         for type_ in (*base_args_types, base_rtype):
             if type_.startswith("const-"):
                 type_ = type_[6:]  # only look at type after dash
+            if type_.endswith("-list"):
+                type_ = type_[:-5]  # only look at type before dash
             if not type_.isalnum():
                 raise ValueError(f"Invalid type '{type_}'. Types must be alphanumeric.")
 
