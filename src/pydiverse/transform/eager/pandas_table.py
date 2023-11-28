@@ -44,8 +44,11 @@ class PandasTableImpl(EagerTableImpl):
             computed at some point. This allows for a more lazy style API.
     """
 
-    def __init__(self, name: str, df: pd.DataFrame):
-        self.df = fast_pd_convert_dtypes(df)
+    def __init__(self, name: str, df: pd.DataFrame, convert_dtypes_to_ensure_semantics=True):
+        if convert_dtypes_to_ensure_semantics:
+            self.df = fast_pd_convert_dtypes(df)
+        else:
+            self.df = df
         self.join_translator = self.JoinTranslator()
 
         columns = {
@@ -132,6 +135,11 @@ class PandasTableImpl(EagerTableImpl):
         # Add metadata
         result.attrs["name"] = self.name
         return result
+
+    def collect_scalar(self) -> int | float | str | bool:  # TODO-in-this-pr: maybe-more?
+        collect = self.collect()
+        assert collect.shape == (1, 1)  # TODO in this PR: assert with if
+        return self.collect().iloc[0, 0]
 
     def mutate(self, **kwargs):
         uuid_kwargs = {self.named_cols.fwd[k]: (k, v) for k, v in kwargs.items()}

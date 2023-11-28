@@ -117,6 +117,12 @@ def collect(tbl: AbstractTableImpl):
 
 
 @builtin_verb()
+def collect_scalar(tbl: AbstractTableImpl):
+    validate_table_args(tbl)
+    return tbl.collect_scalar()
+
+
+@builtin_verb()
 def build_query(tbl: AbstractTableImpl):
     return tbl.build_query()
 

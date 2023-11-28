@@ -181,6 +181,9 @@ class AbstractTableImpl:
     def collect(self):
         ...
 
+    def collect_scalar(self):
+        ...
+
     def build_query(self):
         ...
 
