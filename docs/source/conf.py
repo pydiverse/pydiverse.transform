@@ -12,7 +12,7 @@ import sphinx.util
 from sphinx.ext.napoleon import GoogleDocstring
 
 
-sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, os.path.abspath("../../src"))
 os.environ["SPHINX_BUILD"] = "1"
 
 _mod = importlib.import_module("pydiverse.transform")
