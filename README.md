@@ -82,3 +82,11 @@ Afterwards you can run:
 ```bash
 poetry run pytest --ibm_db2
 ```
+
+## Packaging and publishing to pypi and conda-forge using github actions
+
+- `poetry version prerelease` or `poetry version patch`
+- set correct release date in changelog.md
+- push increased version number to `main` branch
+- tag commit with `git tag <version>`, e.g. `git tag 0.7.0`
+- `git push --tags`

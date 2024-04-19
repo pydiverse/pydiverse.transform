@@ -64,19 +64,45 @@ df_right = pd.DataFrame(
 )
 
 
-@pytest.fixture
-def tbl1():
-    return Table(PandasTableImpl("df1", df1.copy()))
+def create_table(name: str, df: pd.DataFrame, dtype_backend: str) -> Table:
+    if dtype_backend == "numpy":
+        return Table(PandasTableImpl(name, df.copy()))
+    elif dtype_backend == "arrow":
+        import pyarrow as pa
+
+        def types_mapper(dtype):
+            if dtype == pa.string():
+                return pd.StringDtype(storage="pyarrow")
+            return pd.ArrowDtype(dtype)
+
+        df2 = pa.Table.from_pandas(df).to_pandas(types_mapper=types_mapper)
+        # convert for example nullable int column represented as float in df to Int64
+        for col in df2.columns:
+            df2[col] = df2[col].astype(
+                pd.core.dtypes.cast.convert_dtypes(df[col]._values)
+            )
+        return Table(PandasTableImpl(name, df2))
+    raise ValueError(f"Unknown dtype_backend: {dtype_backend}")
+
+
+@pytest.fixture(params=["numpy", "arrow"])
+def dtype_backend(request):
+    return request.param
 
 
 @pytest.fixture
-def tbl2():
-    return Table(PandasTableImpl("df2", df2.copy()))
+def tbl1(dtype_backend):
+    return create_table("df1", df1, dtype_backend)
 
 
 @pytest.fixture
-def tbl3():
-    return Table(PandasTableImpl("df3", df3.copy()))
+def tbl2(dtype_backend):
+    return create_table("df2", df2, dtype_backend)
+
+
+@pytest.fixture
+def tbl3(dtype_backend):
+    return create_table("df3", df3, dtype_backend)
 
 
 @pytest.fixture
