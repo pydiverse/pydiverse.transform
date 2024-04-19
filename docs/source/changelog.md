@@ -1,6 +1,7 @@
 # Changelog
 
-## Latest
+## 0.1.4 (2024-04-20)
+- better support for apache arrow backed pandas dataframes
 - fix handling of boolean literals
 - fix literal handling within SQL expressions
 - support for operators/functions that take constant arguments

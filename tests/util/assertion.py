@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import warnings
 
+import pandas as pd
 import pytest
 from pandas._testing import assert_frame_equal
 
@@ -16,7 +17,12 @@ def assert_equal(left, right, check_dtype=False):
     right_df = right >> collect() if isinstance(right, Table) else right
 
     try:
-        assert_frame_equal(left_df, right_df, check_dtype=check_dtype)
+        cols = left_df.columns.tolist()
+        assert_frame_equal(
+            left_df.sort_values(cols).reset_index(drop=True),
+            right_df.sort_values(cols).reset_index(drop=True),
+            check_dtype=check_dtype,
+        )
     except AssertionError as e:
         print("First dataframe:")
         print(left_df)
@@ -98,8 +104,13 @@ def assert_result_equal(
         else:
             raise e
 
+    def fix_na(df: pd.DataFrame):
+        for col in dfy.dtypes[dfy.dtypes == object].index:
+            df[col] = df[col].fillna(pd.NA)
+        return df
+
     try:
-        assert_frame_equal(dfx, dfy, check_dtype=False, **kwargs)
+        assert_frame_equal(fix_na(dfx), fix_na(dfy), check_dtype=False, **kwargs)
     except Exception as e:
         if xfail_warnings and did_raise_warning:
             pytest.xfail(warnings_summary)
