@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.5 (2024-04-20)
+- support ArrowDtype based columns in pandas dataframes
+
 ## 0.1.4 (2024-04-20)
 - better support for apache arrow backed pandas dataframes
 - fix handling of boolean literals

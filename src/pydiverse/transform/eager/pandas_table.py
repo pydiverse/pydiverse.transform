@@ -68,6 +68,9 @@ class PandasTableImpl(EagerTableImpl):
         super().__init__(name=name, columns=columns)
 
     def _dtype_from_pd(self, type_: Any) -> dtypes.DType:
+        if hasattr(type_, "numpy_dtype"):
+            # support for ArrowDtype based pandas columns
+            type_ = type_.numpy_dtype
         if pd.api.types.is_integer_dtype(type_):
             return dtypes.Int()
         if pd.api.types.is_float_dtype(type_):
