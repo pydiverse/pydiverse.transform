@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pydiverse-transform"
-version = "0.1.4"
+version = "0.1.5"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
   "QuantCo, Inc.",
