@@ -6,9 +6,16 @@ Pipe based dataframe manipulation library that can also transform data on SQL da
 
 ## Installation
 
-To install the package locally in development mode, you first have to install
-[Poetry](https://python-poetry.org/docs/#installation).
-After that, install pydiverse transform like this:
+To install the package locally in development mode, you will need to install
+[pixi](https://pixi.sh/latest/). For those who haven't used pixi before, it is a
+poetry style dependency management tool based on conda/micromamba/conda-forge package
+ecosystem. The conda-forge repository has well maintained packages for Linux, macOS,
+and Windows supporting both ARM and X86 architectures. Especially, installing
+psycopg2 in a portable way got much easier with pixi. In addition, pixi is really
+strong in creating lock files for reproducible environments (including system libraries)
+with many essential features missing in alternative tools like poetry (see [pixi.toml](pixi.toml)).
+
+To start developing, you can run the following commands:
 
 ```bash
 git clone https://github.com/pydiverse/pydiverse.transform.git
@@ -35,7 +42,7 @@ Just run `docker compose up` in the root directory of the project to start every
 Afterwards you can run:
 
 ```bash
-poetry run pytest --postgres --mssql
+pixi run pytest --postgres --mssql
 ```
 
 ## Testing db2 functionality
@@ -52,7 +59,7 @@ Then check `docker logs db2server | grep -i completed` until you see `(*) Setup 
 Afterwards you can run:
 
 ```bash
-poetry run pytest --ibm_db2
+pixi run -e py312ibm pytest --ibm_db2
 ```
 
 ## Packaging and publishing to pypi and conda-forge using github actions

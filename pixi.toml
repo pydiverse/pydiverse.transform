@@ -70,8 +70,8 @@ py39 = ["py39", "dev", "duckdb", "postgres", "mssql"]
 py310 = ["py310", "dev", "duckdb", "postgres", "mssql"]
 py311 = ["py311", "dev", "duckdb", "postgres", "mssql"]
 py312 = ["py312", "dev", "duckdb", "postgres", "mssql"]
-py39ibmdb = ["py39", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
-py312ibmdb = ["py312", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
+py39ibm = ["py39", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
+py312ibm = ["py312", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
 docs = ["docs"]
 release = { features=["release"], no-default-feature=true }
 
