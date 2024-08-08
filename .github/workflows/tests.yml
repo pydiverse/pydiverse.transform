@@ -70,5 +70,5 @@ jobs:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}        
         run: |
-          pixi run -e ${{ matrix.environment }} pytest tests -ra ${RUNNER_DEBUG:+-v} --color=yes --workers=4 --postgres --mssql
+          pixi run -e ${{ matrix.environment }} pytest tests -ra ${RUNNER_DEBUG:+-v} --color=yes --postgres --mssql
   
