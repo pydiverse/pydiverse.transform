@@ -105,7 +105,7 @@ def assert_result_equal(
             raise e
 
     def fix_na(df: pd.DataFrame):
-        for col in dfy.dtypes[dfy.dtypes == object].index:
+        for col in dfy.dtypes[dfy.dtypes == object].index:  # noqa: E721
             df[col] = df[col].fillna(pd.NA)
         return df
 

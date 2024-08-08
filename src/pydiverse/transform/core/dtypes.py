@@ -12,7 +12,7 @@ class DType(ABC):
         self.vararg = vararg
 
     def __eq__(self, other):
-        if type(self) != type(other):
+        if type(self) is not type(other):
             return False
         if self.const != other.const:
             return False
