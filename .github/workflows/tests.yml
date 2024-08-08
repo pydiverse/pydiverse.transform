@@ -40,7 +40,6 @@ jobs:
           - py39
           - py310
           - py311
-          - py312ibmdb
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
