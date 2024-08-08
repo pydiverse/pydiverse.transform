@@ -19,7 +19,7 @@ class ordered_set(MutableSet[T]):
         return len(self.__data)
 
     def __repr__(self):
-        return "{%s}" % ", ".join(repr(e) for e in self)
+        return f'{", ".join(repr(e) for e in self)}'
 
     def __copy__(self):
         return self.__class__(self)

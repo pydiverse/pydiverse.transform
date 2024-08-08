@@ -230,7 +230,7 @@ class TestSQLTable:
             tbl2 >> arrange(tbl2.col2) >> arrange(tbl2.col1),
         )
 
-        assert_equal(tbl2 >> arrange(--tbl2.col3), tbl2 >> arrange(tbl2.col3))
+        assert_equal(tbl2 >> arrange(--tbl2.col3), tbl2 >> arrange(tbl2.col3))  # noqa: B002
 
     def test_summarise(self, tbl3):
         assert_equal(

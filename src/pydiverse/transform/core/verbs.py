@@ -96,7 +96,7 @@ def validate_table_args(*tables):
 
     backend = type(tables[0])
     for table in tables:
-        if type(table) != backend:
+        if type(table) is not backend:
             raise ValueError(
                 f"Can't mix tables with different backends. Expected '{backend}' but"
                 f" found '{type(table)}'."

@@ -219,7 +219,7 @@ class TestBuiltinVerbs:
         with pytest.raises(TypeError):
             tbl1 >> select(..., -λ.col2)
 
-        assert (tbl1 >> select(--λ.col1) >> collect()) == ["col1"]
+        assert (tbl1 >> select(--λ.col1) >> collect()) == ["col1"]  # noqa: B002
         assert (tbl1 >> select(+-+-λ.col1) >> collect()) == ["col1"]
 
     def test_rename(self, tbl2):
@@ -443,8 +443,8 @@ class TestUtil:
         assert sign_peeler(sx._) == (x, True)
         assert sign_peeler((+sx)._) == (x, True)
         assert sign_peeler((-sx)._) == (x, False)
-        assert sign_peeler((--sx)._) == (x, True)
-        assert sign_peeler((--+sx)._) == (x, True)
+        assert sign_peeler((--sx)._) == (x, True)  # noqa: B002
+        assert sign_peeler((--+sx)._) == (x, True)  # noqa: B002
         assert sign_peeler((-++--sx)._) == (x, False)  # noqa: B002
 
 

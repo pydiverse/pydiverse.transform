@@ -77,7 +77,7 @@ class Operator:
         setattr(cls, _OPERATOR_MISSING_ATTR, not_implemented)
 
     def __eq__(self, other):
-        return type(self) == type(other)
+        return type(self) is type(other)
 
     def __hash__(self):
         return hash(type(self))

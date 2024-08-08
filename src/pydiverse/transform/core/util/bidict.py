@@ -40,12 +40,8 @@ class bidict(Generic[KT, VT]):
                 " unique."
             )
 
-        self.fwd = _BidictInterface(
-            self.__fwd, self.__bwd
-        )  # type: _BidictInterface[KT, VT]
-        self.bwd = _BidictInterface(
-            self.__bwd, self.__fwd
-        )  # type: _BidictInterface[VT, KT]
+        self.fwd = _BidictInterface(self.__fwd, self.__bwd)  # type: _BidictInterface[KT, VT]
+        self.bwd = _BidictInterface(self.__bwd, self.__fwd)  # type: _BidictInterface[VT, KT]
 
     def __copy__(self):
         return bidict(fwd=self.__fwd.copy(), bwd=self.__bwd.copy())

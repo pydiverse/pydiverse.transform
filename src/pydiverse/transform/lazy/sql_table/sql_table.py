@@ -144,9 +144,7 @@ class SQLTableImpl(LazyTableImpl):
             return tbl
 
         if not isinstance(tbl, str):
-            raise ValueError(
-                "tbl must be a sqlalchemy Table or string, but was %s" % type(tbl)
-            )
+            raise ValueError(f"tbl must be a sqlalchemy Table or string, but was {tbl}")
 
         schema, table_name = tbl.split(".") if "." in tbl else [None, tbl]
         return sa.Table(

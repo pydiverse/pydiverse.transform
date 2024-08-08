@@ -1,5 +1,9 @@
 # Changelog
 
+## unreleased
+
+- migrate project to pixi
+
 ## 0.1.5 (2024-04-20)
 - support ArrowDtype based columns in pandas dataframes
 
