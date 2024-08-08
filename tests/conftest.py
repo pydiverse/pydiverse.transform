@@ -9,6 +9,7 @@ supported_options = [
     "postgres",
     "mssql",
     "ibm_db2",
+    "snowflake",
 ]
 
 

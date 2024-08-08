@@ -25,9 +25,22 @@ jobs:
       - name: Linting - Run pre-commit checks
         uses: pre-commit/action@v3.0.1
 
-  test:
-    name: pytest
-    runs-on: ${{ matrix.os }}
+  smoke_test:
+    name: Smoke Test
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        environment:
+          - py312
+    uses: ./.github/workflows/test.yml
+    with:
+      os: ${{ matrix.os }}
+      environment: ${{ matrix.environment }}
+
+  postgres_test:
+    name: Postgres Tests
+    needs: [smoke_test]
     strategy:
       matrix:
         os:
@@ -36,34 +49,73 @@ jobs:
           - py39
           - py310
           - py311
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
+          - py312
+    uses: ./.github/workflows/test.yml
+    with:
+      os: ${{ matrix.os }}
+      environment: ${{ matrix.environment }}
+      docker-services: |
+        postgres
+      pytest-arguments: --postgres
 
-      - name: Setup Pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
-        with:
-          environments: ${{ matrix.environment }}
+  mssql_test:
+    name: MSSql Tests
+    needs: [smoke_test]
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        environment:
+          - py39
+          - py311
+          - py312
+    uses: ./.github/workflows/test.yml
+    with:
+      os: ${{ matrix.os }}
+      environment: ${{ matrix.environment }}
+      docker-services: |
+        mssql
+      pytest-arguments: --mssql
 
-      - name: Start Docker Compose
-        uses: isbang/compose-action@e5813a5909aca4ae36058edae58f6e52b9c971f8
-        with:
-          compose-file: docker-compose.yaml
+  db2_test:
+    name: DB2 Tests
+    needs: [smoke_test]
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        environment:
+          - py39ibm
+          - py312ibm
+    uses: ./.github/workflows/test.yml
+    with:
+      os: ${{ matrix.os }}
+      environment: ${{ matrix.environment }}
+      docker-services: |
+        ibm_db2
+      pytest-arguments: --ibm_db2
 
-      - name: Install Microsoft ODBC
-        run: sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
-
-      - name: Wait for Docker Servers
-        run: |
-          until bash ./.github/scripts/docker_compose_ready.sh; do
-            sleep 1
-          done
-
-      - name: Run tests
-        env:
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}        
-        run: |
-          pixi run -e ${{ matrix.environment }} pytest tests -ra ${RUNNER_DEBUG:+-v} --color=yes --postgres --mssql
-  
+# ## Deactivated since snowflake requires pandas < 2 and pydiverse transform does not support it
+#  snowflake_test:
+#    name: Snowflake Tests
+#    needs: [smoke_test]
+#    strategy:
+#      matrix:
+#        os:
+#          - ubuntu-latest
+#        environment:
+#          - py311pdsa1
+#    uses: ./.github/workflows/test.yml
+#    secrets:
+#      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+#      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+#      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+#    with:
+#      os: ${{ matrix.os }}
+#      environment: ${{ matrix.environment }}
+#      workers: 1  # tests are often waiting on snowflake
+#      timeout-minutes: 40
+#      docker-services: |
+#        postgres
+#        zoo
+#      pytest-arguments: --snowflake

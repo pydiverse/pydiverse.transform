@@ -46,6 +46,18 @@ ibm_db = ">=3.1.4"
 [feature.ibm-db.dependencies]
 ibm_db_sa = ">=0.3.8"
 
+[feature.snowflake.dependencies]
+snowflake-sqlalchemy = ">=1.6.1"
+
+[feature.pd1.dependencies]
+pandas = ">=1.4.3, <2"
+[feature.pd2.dependencies]
+pandas = ">=2"
+[feature.sa1.dependencies]
+sqlalchemy = ">=1.4.39, <2"
+[feature.sa2.dependencies]
+sqlalchemy = ">=2"
+
 [feature.docs.dependencies]
 Sphinx = ">=7.3.7"
 furo = ">=2023.5.20"
@@ -65,13 +77,14 @@ python = "3.11.*"
 python = "3.12.*"
 
 [environments]
-default = ["py312", "dev", "duckdb", "postgres", "mssql"]
-py39 = ["py39", "dev", "duckdb", "postgres", "mssql"]
-py310 = ["py310", "dev", "duckdb", "postgres", "mssql"]
-py311 = ["py311", "dev", "duckdb", "postgres", "mssql"]
-py312 = ["py312", "dev", "duckdb", "postgres", "mssql"]
-py39ibm = ["py39", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
-py312ibm = ["py312", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
+default = ["py312", "dev", "duckdb", "postgres", "mssql", "pd2", "sa2"]
+py39 = ["py39", "dev", "duckdb", "postgres", "mssql", "pd2", "sa2"]
+py310 = ["py310", "dev", "duckdb", "postgres", "mssql", "pd2", "sa2"]
+py311 = ["py311", "dev", "duckdb", "postgres", "mssql", "pd2", "sa2"]
+py312 = ["py312", "dev", "duckdb", "postgres", "mssql", "pd2", "sa2"]
+py311pdsa1snow = ["py311", "dev", "duckdb", "snowflake", "pd1", "sa1"]
+py39ibm = ["py39", "dev", "duckdb", "postgres", "mssql", "ibm-db", "pd2", "sa2"]
+py312ibm = ["py312", "dev", "duckdb", "postgres", "mssql", "ibm-db", "pd2", "sa2"]
 docs = ["docs"]
 release = { features=["release"], no-default-feature=true }
 
