@@ -31,6 +31,11 @@ pyarrow = [
 packages = ["src/pydiverse"]
 
 [tool.ruff]
+target-version = "py38"
+extend-exclude = ["docs/*"]
+fix = true
+
+[tool.ruff.lint]
 select = [
     "F",
     "E",
@@ -47,16 +52,13 @@ ignore = [
     "A001",  # Keep while filter verb still is called filter
     "A003",  # Keep while filter verb still is called filter
 ]
-extend-exclude = ["docs/*"]
 ignore-init-module-imports = true
-fix = true
-target-version = "py38"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
 "tests/*" = ["F403", "F405", "E711"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["pydiverse"]
 required-imports = ["from __future__ import annotations"]
 
