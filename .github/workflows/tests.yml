@@ -13,56 +13,62 @@ on:
       - '**'
 
 jobs:
-
-  Linting:
-    name: "Linting - pre-commit hooks - Python 3.9"
+  lint:
+    name: Pre-commit Checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Python 3.9
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.9
 
       - name: Linting - Run pre-commit checks
-        uses: pre-commit/action@v3.0.0
+        uses: pre-commit/action@v3.0.1
 
-  Tests:
-    name: "${{ matrix.os }} / ${{ matrix.python-version }}"
-    runs-on: ${{ matrix.os }}-latest
+  test:
+    name: pytest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [Ubuntu]
-        python-version: ['3.9', '3.10', '3.11']
+        os:
+          - ubuntu-latest
+        environment:
+          - py39
+          - py310
+          - py311
+          - py312ibmdb
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Environment
-        uses: ./.github/actions/setup
+      - name: Setup Pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
         with:
-          python-version: ${{ matrix.python-version }}
-          poetry-flags: --all-extras --with=tests
+          environments: ${{ matrix.environment }}
 
       - name: Start Docker Compose
-        uses: isbang/compose-action@v1.4.1
+        uses: isbang/compose-action@e5813a5909aca4ae36058edae58f6e52b9c971f8
         with:
-          compose-file: ./docker-compose.yaml
+          compose-file: docker-compose.yaml
 
       - name: Install Microsoft ODBC
         run: sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
 
       - name: Wait for Docker Servers
-        timeout-minutes: 1
-        shell: bash
         run: |
-          until bash ./.github/workflows/resources/docker_compose_ready.sh; do
-            sleep 2
+          until bash ./.github/scripts/docker_compose_ready.sh; do
+            sleep 1
           done
 
-      - name: Run Tests
-        uses: ./.github/actions/test
-        with:
-          arguments: --postgres --mssql
+      - name: Run tests
+        env:
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}        
+        run: |
+          pixi run -e ${{ matrix.environment }} pytest tests -ra ${RUNNER_DEBUG:+-v} --color=yes --workers=4 --postgres --mssql
+  

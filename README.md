@@ -15,9 +15,8 @@ git clone https://github.com/pydiverse/pydiverse.transform.git
 cd pydiverse.transform
 
 # Create the environment, activate it and install the pre-commit hooks
-poetry install
-poetry shell
-pre-commit install
+pixi install
+pixi run pre-commit install
 ```
 
 ## Testing
@@ -25,35 +24,8 @@ pre-commit install
 After installation, you should be able to run:
 
 ```bash
-poetry run pytest
+pixi run pytest
 ```
-
-## Packaging
-
-For publishing with poetry to pypi, see:
-https://www.digitalocean.com/community/tutorials/how-to-publish-python-packages-to-pypi-using-poetry-on-ubuntu-22-04
-
-Packages are first released on test.pypi.org:
-
-- see https://stackoverflow.com/questions/68882603/using-python-poetry-to-publish-to-test-pypi-org
-- `poetry version prerelease` or `poetry version patch`
-- push increased version number to `main` branch
-- `poetry build`
-- `poetry publish -r test-pypi`
-- verify with https://test.pypi.org/search/?q=pydiverse.transform
-
-Finally, they are published via:
-
-- `git tag `\<version>
-- `git push --tags`
-- `poetry publish`
-
-Conda-forge packages are updated via:
-
-- https://github.com/conda-forge/pydiverse-transform-feedstock#updating-pydiverse-transform-feedstock
-- update `recipe/meta.yaml`
-- test meta.yaml in transform repo: `conda-build build ../pydiverse-transform-feedstock/recipe/meta.yaml`
-- commit `recipe/meta.yaml` to branch of fork and submit PR
 
 ## Testing more database backends
 
@@ -85,8 +57,39 @@ poetry run pytest --ibm_db2
 
 ## Packaging and publishing to pypi and conda-forge using github actions
 
-- `poetry version prerelease` or `poetry version patch`
-- set correct release date in changelog.md
+- bump version number in [pyproject.toml](pyproject.toml)
+- set correct release date in [changelog.md](docs/source/changelog.md)
 - push increased version number to `main` branch
 - tag commit with `git tag <version>`, e.g. `git tag 0.7.0`
 - `git push --tags`
+
+The package should appear on https://pypi.org/project/pydiverse-transform/ in a timely manner. It is normal that it takes
+a few hours until the new package version is available on https://conda-forge.org/packages/.
+
+### Packaging and publishing to Pypi manually
+
+Packages are first released on test.pypi.org:
+
+- bump version number in [pyproject.toml](pyproject.toml) (check consistency with [changelog.md](docs/source/changelog.md))
+- push increased version number to `main` branch
+- `pixi run -e release hatch build`
+- `pixi run -e release twine upload --repository testpypi dist/*`
+- verify with https://test.pypi.org/search/?q=pydiverse.transform
+
+Finally, they are published via:
+
+- `git tag <version>`
+- `git push --tags`
+- Attention: Please, only continue here, if automatic publishing fails for some reason!
+- `pixi run -e release hatch build`
+- `pixi run -e release twine upload --repository pypi dist/*`
+
+### Publishing package on conda-forge manually
+
+Conda-forge packages are updated via:
+
+- Attention: Please, only continue here, if automatic conda-forge publishing fails for longer than 24h!
+- https://github.com/conda-forge/pydiverse-transform-feedstock#updating-pydiverse-transform-feedstock
+- update `recipe/meta.yaml`
+- test meta.yaml in transform repo: `conda-build build ../pydiverse-transform-feedstock/recipe/meta.yaml`
+- commit `recipe/meta.yaml` to branch of fork and submit PR
