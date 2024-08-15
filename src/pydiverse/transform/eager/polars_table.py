@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import itertools
 import uuid
-from typing import Callable
+from typing import Any, Callable
 
 import polars as pl
 
 from pydiverse.transform.core import dtypes
-from pydiverse.transform.core.expressions.expressions import Column, FunctionCall
+from pydiverse.transform.core.expressions.expressions import (
+    BaseExpression,
+    Column,
+    FunctionCall,
+)
 from pydiverse.transform.core.expressions.symbolic_expressions import SymbolicExpression
 from pydiverse.transform.core.expressions.translator import (
     Translator,
     TypedValue,
 )
+from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import AbstractTableImpl
 from pydiverse.transform.errors import ExpressionError
 
@@ -33,6 +38,24 @@ class PolarsEager(AbstractTableImpl):
             {col.name: self.underlying_col_name[col.uuid] for col in cols.values()}
         )
         super().__init__(name, cols)
+
+    def mutate(self, **kwargs):
+        uuid_to_kwarg: dict[uuid.UUID, (str, BaseExpression)] = {
+            self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
+        }
+        self.underlying_col_name.update(
+            {
+                uuid: f"{self.name}_{col_name}_mut_{uuid.int}"
+                for uuid, (col_name, _) in uuid_to_kwarg.items()
+            }
+        )
+
+        # TODO: grouper
+        polars_exprs = [
+            self.cols[uuid].compiled().alias(self.underlying_col_name[uuid])
+            for uuid in uuid_to_kwarg.keys()
+        ]
+        self.df = self.df.with_columns(*polars_exprs)
 
     def join(
         self,
@@ -68,6 +91,25 @@ class PolarsEager(AbstractTableImpl):
                 return pl.col(self.backend.underlying_col_name[expr.uuid])
 
             return TypedValue(value, expr.dtype)
+
+        def _translate_function(
+            self,
+            expr: FunctionCall,
+            implementation: TypedOperatorImpl,
+            op_args: list[TypedValue[Callable[[], pl.Expr]]],
+            context_kwargs: dict[str, Any],
+            **kwargs,
+        ) -> TypedValue[Callable[[], pl.Expr]]:
+            pl_result_type = _pl_dtype(implementation.rtype)
+
+            def value(**kw):
+                return implementation(
+                    *[arg.value(**kw) for arg in op_args],
+                    _tbl=self.backend,
+                    _result_type=pl_result_type,
+                )
+
+            return TypedValue(value, implementation.rtype)
 
 
 class JoinTranslator(Translator[tuple]):
@@ -110,4 +152,15 @@ def _pdt_dtype(t: pl.DataType) -> dtypes.DType:
 
 
 def _pl_dtype(t: dtypes.DType) -> pl.DataType:
-    pass
+    if isinstance(t, dtypes.Float):
+        return pl.Float64()
+    elif isinstance(t, dtypes.Int):
+        return pl.Int64()
+    elif isinstance(t, dtypes.Bool):
+        return pl.Boolean()
+    elif isinstance(t, dtypes.String):
+        return pl.String()
+    elif isinstance(t, dtypes.DateTime):
+        return pl.Datetime()
+
+    raise TypeError(f"pydiverse.transform type {t} not supported for polars")
