@@ -117,3 +117,9 @@ class Table(Generic[ImplT]):
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+    def cols(self) -> list[Column]:
+        return [
+            self._impl.cols[uuid].as_column(name, self._impl)
+            for (name, uuid) in self._impl.selected_cols()
+        ]

@@ -41,6 +41,7 @@ __all__ = [
     "ungroup",
     "summarise",
     "slice_head",
+    "export",
 ]
 
 
@@ -114,6 +115,12 @@ def alias(tbl: AbstractTableImpl, name: str = None):
 def collect(tbl: AbstractTableImpl):
     validate_table_args(tbl)
     return tbl.collect()
+
+
+@builtin_verb()
+def export(tbl: AbstractTableImpl):
+    validate_table_args(tbl)
+    return tbl.export()
 
 
 @builtin_verb()

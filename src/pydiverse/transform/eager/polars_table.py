@@ -111,6 +111,14 @@ class PolarsEager(AbstractTableImpl):
 
             return TypedValue(value, implementation.rtype)
 
+    def export(self) -> pl.DataFrame:
+        return self.df.select(
+            **{
+                name: self.underlying_col_name[uuid]
+                for (name, uuid) in self.selected_cols()
+            }
+        )
+
 
 class JoinTranslator(Translator[tuple]):
     """

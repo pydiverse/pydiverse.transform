@@ -181,11 +181,6 @@ class PandasTableImpl(EagerTableImpl):
             else:
                 raise Exception
 
-        if validate is not None:
-            pd_validate = {"1:?": "1:1"}[validate]
-        else:
-            pd_validate = None
-
         # Perform Join
         left_on, right_on = zip(*on_cols)
         left_on = [self.df_name_mapping[col.uuid] for col in left_on]
@@ -203,7 +198,7 @@ class PandasTableImpl(EagerTableImpl):
                 how=how,
                 left_on=left_on,
                 right_on=right_on,
-                validate=pd_validate,
+                validate=validate,
             ).loc[tmp_df.index]
             merged_df.index = original_index
             self.df = merged_df
@@ -213,7 +208,7 @@ class PandasTableImpl(EagerTableImpl):
                 how=how,
                 left_on=left_on,
                 right_on=right_on,
-                validate=pd_validate,
+                validate=validate,
             )
 
     def filter(self, *args: SymbolicExpression):
