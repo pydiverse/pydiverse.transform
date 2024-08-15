@@ -185,7 +185,7 @@ class AbstractTableImpl:
 
     def mutate(self, **kwargs): ...
 
-    def join(self, right, on, how, *, validate=None): ...
+    def join(self, right, on, how, *, validate="m:m"): ...
 
     def filter(self, *args): ...
 
@@ -427,7 +427,7 @@ class ColumnMetaData:
 
     @classmethod
     def from_expr(cls, uuid, expr, table: AbstractTableImpl, **kwargs):
-        v = table.compiler.translate(expr, **kwargs)
+        v: TypedValue = table.compiler.translate(expr, **kwargs)
         return cls(
             uuid=uuid,
             expr=expr,

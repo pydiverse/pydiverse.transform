@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import uuid
+from typing import Callable
 
 import polars as pl
 
@@ -10,6 +11,7 @@ from pydiverse.transform.core.expressions.expressions import Column, FunctionCal
 from pydiverse.transform.core.expressions.symbolic_expressions import SymbolicExpression
 from pydiverse.transform.core.expressions.translator import (
     Translator,
+    TypedValue,
 )
 from pydiverse.transform.core.table_impl import AbstractTableImpl
 from pydiverse.transform.errors import ExpressionError
@@ -25,12 +27,12 @@ class PolarsEager(AbstractTableImpl):
             for col in df.iter_columns()
         }
         self.underlying_col_name: dict[uuid.UUID, str] = {
-            col.uuid: f"{self.name}_{col.name}_{col.uuid.int}" for col in cols.values()
+            col.uuid: f"{name}_{col.name}_{col.uuid.int}" for col in cols.values()
         }
-        self.df.rename(
+        self.df = self.df.rename(
             {col.name: self.underlying_col_name[col.uuid] for col in cols.values()}
         )
-        super.__init__(name, cols)
+        super().__init__(name, cols)
 
     def join(
         self,
@@ -38,7 +40,7 @@ class PolarsEager(AbstractTableImpl):
         on: SymbolicExpression,
         how: str,
         *,
-        validate=None,
+        validate="m:m",
     ):
         # get the columns on which the data frames are joined
         left_on: list[str] = []
@@ -53,8 +55,19 @@ class PolarsEager(AbstractTableImpl):
         self.underlying_col_name.update(right.underlying_col_name)
 
         self.df = self.df.join(
-            right, how=how, left_on=left_on, right_on=right_on, validate=validate
+            right.df, how=how, left_on=left_on, right_on=right_on, validate=validate
         )
+
+    class ExpressionCompiler(
+        AbstractTableImpl.ExpressionCompiler[
+            "PolarsEager", TypedValue[Callable[[], pl.Expr]]
+        ]
+    ):
+        def _translate_col(self, expr, **kwargs):
+            def value():
+                return pl.col(self.backend.underlying_col_name[expr.uuid])
+
+            return TypedValue(value, expr.dtype)
 
 
 class JoinTranslator(Translator[tuple]):
@@ -83,15 +96,15 @@ class JoinTranslator(Translator[tuple]):
 
 def _pdt_dtype(t: pl.DataType) -> dtypes.DType:
     if isinstance(t, pl.Float64):
-        return dtypes.Float
+        return dtypes.Float()
     elif isinstance(t, pl.Int64):
-        return dtypes.Int
+        return dtypes.Int()
     elif isinstance(t, pl.Boolean):
-        return dtypes.Bool
+        return dtypes.Bool()
     elif isinstance(t, pl.String):
-        return dtypes.String
+        return dtypes.String()
     elif isinstance(t, pl.Datetime):
-        return dtypes.DateTime
+        return dtypes.DateTime()
 
     raise TypeError(f"polars type {t} is not supported")
 

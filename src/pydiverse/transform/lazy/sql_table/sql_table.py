@@ -454,7 +454,7 @@ class SQLTableImpl(LazyTableImpl):
             )
         )
 
-    def join(self, right, on, how, *, validate=None):
+    def join(self, right, on, how, *, validate="m:m"):
         self.alignment_hash = generate_alignment_hash()
 
         # If right has joins already, merging them becomes extremely difficult
@@ -495,7 +495,7 @@ class SQLTableImpl(LazyTableImpl):
                     " subquery to fix this."
                 )
 
-        if validate is not None:
+        if validate != "m:m":
             warnings.warn("SQL table backend ignores join validation argument.")
 
         descriptor = JoinDescriptor(right, on, how)

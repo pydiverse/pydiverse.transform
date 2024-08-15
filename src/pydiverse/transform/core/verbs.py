@@ -265,7 +265,7 @@ def join(
     on: SymbolicExpression,
     how: str,
     *,
-    validate: Literal["1:?", None] = None,
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
 ):
     validate_table_args(left, right)
 
@@ -279,12 +279,6 @@ def join(
         raise ValueError(
             "Join type must be one of 'inner', 'left' or 'outer' (value provided:"
             f" {how})"
-        )
-
-    # TODO:  Decide on validation options.
-    if validate not in (None, "1:?"):
-        raise ValueError(
-            f"Validate must be either None or '1:?' (value provided: {validate})."
         )
 
     # Construct new table
