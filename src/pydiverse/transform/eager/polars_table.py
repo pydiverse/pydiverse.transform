@@ -125,9 +125,17 @@ class PolarsEager(AbstractTableImpl):
             **kwargs,
         ) -> TypedValue[Callable[[], pl.Expr]]:
             def value():
-                pl_expr = pl.when(cases[0][0].value()).then(cases[0][1].value())
-                for condition, value in cases[1:]:
-                    pl_expr = pl_expr.when(condition.value()).then(value.value())
+                if switching_on is not None:
+                    switching_on_v = switching_on.value()
+                    conds = [
+                        match_expr.value() == switching_on_v for match_expr, _ in cases
+                    ]
+                else:
+                    conds = [case[0].value() for case in cases]
+
+                pl_expr = pl.when(conds[0]).then(cases[0][1].value())
+                for cond, (_, value) in zip(conds[1:], cases[1:]):
+                    pl_expr = pl_expr.when(cond).then(value.value())
                 return pl_expr.otherwise(default.value())
 
             result_dtype, result_ftype = self._translate_case_common(
