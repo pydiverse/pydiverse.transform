@@ -79,7 +79,12 @@ class PolarsEager(AbstractTableImpl):
         self.underlying_col_name.update(right.underlying_col_name)
 
         self.df = self.df.join(
-            right.df, how=how, left_on=left_on, right_on=right_on, validate=validate
+            right.df,
+            how=how,
+            left_on=left_on,
+            right_on=right_on,
+            validate=validate,
+            coalesce=False,
         )
 
     class ExpressionCompiler(
