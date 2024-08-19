@@ -20,7 +20,6 @@ def assert_equal(left, right, check_dtype=False):
             left_df,
             right_df,
             check_column_order=False,
-            check_row_order=False,
             check_dtypes=check_dtype,
         )
     except AssertionError as e:

@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from functools import reduce
 from typing import TYPE_CHECKING, Callable
 
+import polars as pl
 import sqlalchemy as sa
 from sqlalchemy import sql
 
@@ -444,6 +445,12 @@ class SQLTableImpl(LazyTableImpl):
 
         # Add metadata
         result.attrs["name"] = self.name
+        return result
+
+    def export(self):
+        select = self.build_select()
+        with self.engine.connect() as conn:
+            result = pl.read_database(select, connection=conn)
         return result
 
     def build_query(self) -> str:
