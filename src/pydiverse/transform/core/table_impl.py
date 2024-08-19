@@ -77,13 +77,13 @@ class AbstractTableImpl:
         self.compiler = self.ExpressionCompiler(self)
         self.lambda_translator = self.LambdaTranslator(self)
 
-        self.selects = ordered_set()  # type: ordered_set[str]
-        self.named_cols = bidict()  # type: bidict[str: uuid.UUID]
-        self.available_cols = set()  # type: set[uuid.UUID]
-        self.cols = {}  # type: dict[uuid.UUID: ColumnMetaData]
+        self.selects: ordered_set[str] = ordered_set()
+        self.named_cols: bidict[str, uuid.UUID] = bidict()
+        self.available_cols: set[uuid.UUID] = set()
+        self.cols: dict[uuid.UUID, ColumnMetaData] = dict()
 
-        self.grouped_by = ordered_set()  # type: ordered_set[Column]
-        self.intrinsic_grouped_by = ordered_set()  # type: ordered_set[Column]
+        self.grouped_by: ordered_set[Column] = ordered_set()
+        self.intrinsic_grouped_by: ordered_set[Column] = ordered_set()
 
         # Init Values
         for name, col in columns.items():
@@ -198,6 +198,8 @@ class AbstractTableImpl:
     def summarise(self, **kwargs): ...
 
     def slice_head(self, n: int, offset: int): ...
+
+    def export(self): ...
 
     #### Symbolic Operators ####
 
