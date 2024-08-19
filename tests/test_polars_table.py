@@ -214,21 +214,22 @@ class TestPolarsEager:
         )
 
     def test_arrange(self, tbl2, tbl4):
+        tbl4.col1.nulls_first()
         assert_not_inplace(tbl2, arrange(tbl2.col2))
 
         assert_equal(
             tbl2 >> arrange(tbl2.col3) >> select(tbl2.col3),
-            df2[["col3"]].sort_values("col3", ascending=True, kind="mergesort"),
+            df2.select(pl.col("col3")).sort("col3", descending=False),
         )
 
         assert_equal(
             tbl2 >> arrange(-tbl2.col3) >> select(tbl2.col3),
-            df2[["col3"]].sort_values("col3", ascending=False, kind="mergesort"),
+            df2.select(pl.col("col3")).sort("col3", descending=True),
         )
 
         assert_equal(
             tbl2 >> arrange(tbl2.col1, tbl2.col2),
-            df2.sort_values(["col1", "col2"], ascending=[True, True], kind="mergesort"),
+            df2.sort(["col1", "col2"], descending=[False, False]),
         )
 
         assert_equal(
@@ -238,11 +239,10 @@ class TestPolarsEager:
                 -tbl4.col2.nulls_first(),
                 -tbl4.col5.nulls_first(),
             ),
-            df4.sort_values(
+            df4.sort(
                 ["col1", "col2", "col5"],
-                ascending=[True, False, False],
-                kind="mergesort",
-                na_position="first",
+                descending=[False, True, True],
+                nulls_last=False,
             ),
         )
 
@@ -253,11 +253,10 @@ class TestPolarsEager:
                 -tbl4.col2.nulls_last(),
                 -tbl4.col5.nulls_last(),
             ),
-            df4.sort_values(
+            df4.sort(
                 ["col1", "col2", "col5"],
-                ascending=[True, False, False],
-                kind="mergesort",
-                na_position="last",
+                descending=[False, True, True],
+                nulls_last=True,
             ),
         )
 

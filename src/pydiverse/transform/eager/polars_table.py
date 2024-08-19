@@ -22,6 +22,7 @@ from pydiverse.transform.core.expressions.translator import (
 )
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import AbstractTableImpl
+from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.errors import ExpressionError
 
 
@@ -99,6 +100,13 @@ class PolarsEager(AbstractTableImpl):
     def alias(self, new_name: str | None = None):
         new_name = new_name or self.name
         return self.__class__(new_name, self.export())
+
+    def arrange(self, ordering: list[OrderingDescriptor]):
+        self.df = self.df.sort(
+            by=[self.compiler.translate(o.order).value() for o in ordering],
+            nulls_last=[not o.nulls_first for o in ordering],
+            descending=[not o.asc for o in ordering],
+        )
 
     class ExpressionCompiler(
         AbstractTableImpl.ExpressionCompiler[
