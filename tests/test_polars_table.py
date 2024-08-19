@@ -188,8 +188,8 @@ class TestPolarsEager:
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame(
                 {
-                    "a": [1, 2, 2, 3, 4, None],
-                    "b_df_right": [1, 2, 2, None, None, 0],
+                    "a": [None, 1, 2, 2, 3, 4],
+                    "b_df_right": [0, 1, 2, 2, None, None],
                 }
             ),
         )
@@ -200,17 +200,17 @@ class TestPolarsEager:
         # Simple filter expressions
         assert_equal(tbl1 >> filter(), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == tbl1.col1), df1)
-        assert_equal(tbl1 >> filter(tbl1.col1 == 3), df1[df1["col1"] == 3])
+        assert_equal(tbl1 >> filter(tbl1.col1 == 3), df1.filter(pl.col("col1") == 3))
 
         # More complex expressions
         assert_equal(
             tbl1 >> filter(tbl1.col1 // 2 == 1),
-            pl.DataFrame({"col1": [2, 3], "col2": ["b", "c"]}, index=[1, 2]),
+            pl.DataFrame({"col1": [2, 3], "col2": ["b", "c"]}),
         )
 
         assert_equal(
             tbl1 >> filter(1 < tbl1.col1) >> filter(tbl1.col1 < 4),
-            df1.loc[(1 < df1["col1"]) & (df1["col1"] < 4)],
+            df1.filter((1 < pl.col("col1")) & (pl.col("col1") < 4)),
         )
 
     def test_arrange(self, tbl2, tbl4):
