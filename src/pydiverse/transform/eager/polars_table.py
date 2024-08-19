@@ -9,6 +9,7 @@ import polars as pl
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions.expressions import (
     BaseExpression,
+    CaseExpression,
     Column,
     FunctionCall,
 )
@@ -110,6 +111,30 @@ class PolarsEager(AbstractTableImpl):
                 )
 
             return TypedValue(value, implementation.rtype)
+
+        def _translate_case(
+            self,
+            expr: CaseExpression,
+            switching_on: TypedValue[Callable[[], pl.Expr]] | None,
+            cases: list[
+                tuple[
+                    TypedValue[Callable[[], pl.Expr]], TypedValue[Callable[[], pl.Expr]]
+                ]
+            ],
+            default: TypedValue[Callable[[], pl.Expr]],
+            **kwargs,
+        ) -> TypedValue[Callable[[], pl.Expr]]:
+            def value():
+                pl_expr = pl.when(cases[0][0].value()).then(cases[0][1].value())
+                for condition, value in cases[1:]:
+                    pl_expr = pl_expr.when(condition.value()).then(value.value())
+                return pl_expr.otherwise(default.value())
+
+            result_dtype, result_ftype = self._translate_case_common(
+                expr, switching_on, cases, default, **kwargs
+            )
+
+            return TypedValue(value, result_dtype, result_ftype)
 
     def export(self) -> pl.DataFrame:
         return self.df.select(
