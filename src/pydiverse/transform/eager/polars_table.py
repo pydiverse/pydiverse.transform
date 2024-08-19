@@ -87,6 +87,10 @@ class PolarsEager(AbstractTableImpl):
             coalesce=False,
         )
 
+    def alias(self, new_name: str | None = None):
+        new_name = new_name or self.name
+        return self.__class__(new_name, self.export())
+
     class ExpressionCompiler(
         AbstractTableImpl.ExpressionCompiler[
             "PolarsEager", TypedValue[Callable[[], pl.Expr]]

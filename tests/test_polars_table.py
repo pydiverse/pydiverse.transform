@@ -332,13 +332,14 @@ class TestPolarsEager:
         # Self Join
         assert_equal(
             tbl2 >> join(x, tbl2.col1 == x.col1, "left"),
-            df2.merge(
+            df2.join(
                 df2.rename(
-                    columns={"col1": "col1_x", "col2": "col2_x", "col3": "col3_x"}
+                    mapping={"col1": "col1_x", "col2": "col2_x", "col3": "col3_x"}
                 ),
                 how="left",
                 left_on="col1",
                 right_on="col1_x",
+                coalesce=False,
             ),
         )
 
