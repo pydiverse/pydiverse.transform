@@ -24,7 +24,8 @@ from pydiverse.transform.core.expressions.translator import (
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import AbstractTableImpl
 from pydiverse.transform.core.util import OrderingDescriptor
-from pydiverse.transform.errors import ExpressionError
+from pydiverse.transform.core.util.util import translate_ordering
+from pydiverse.transform.errors import ExpressionError, FunctionTypeError
 from pydiverse.transform.ops.core import OPType
 
 
@@ -56,7 +57,6 @@ class PolarsEager(AbstractTableImpl):
             }
         )
 
-        # TODO: grouper
         polars_exprs = [
             self.cols[uuid].compiled().alias(self.underlying_col_name[uuid])
             for uuid in uuid_to_kwarg.keys()
@@ -158,14 +158,54 @@ class PolarsEager(AbstractTableImpl):
         ) -> TypedValue[Callable[[], pl.Expr]]:
             pl_result_type = _pl_dtype(implementation.rtype)
 
+            internal_kwargs = {}
+
             def value(**kw):
                 return implementation(
                     *[arg.value(**kw) for arg in op_args],
                     _tbl=self.backend,
                     _result_type=pl_result_type,
+                    **internal_kwargs,
                 )
 
             op = implementation.operator
+
+            if op.ftype == OPType.WINDOW:
+                if verb != "mutate":
+                    raise FunctionTypeError(
+                        "window function are only allowed inside a mutate"
+                    )
+
+                if arrange := context_kwargs.get("arrange"):
+                    ordering = translate_ordering(self.backend, arrange)
+                    internal_kwargs["_ordering"] = ordering
+
+                    # emulate that the function is computed on a table sorted by
+                    # `ordering`. then restore the original order. this is equivalent
+                    # to giving `pl.Expr.sort_by()` the permutation inverse to
+                    # `ordering`.
+                    def sorted_value(value):
+                        inv_permutation = pl.int_range(
+                            pl.len(), dtype=pl.Int64
+                        ).sort_by(
+                            by=[self.translate(o.order).value() for o in ordering],
+                            nulls_last=[not o.nulls_first for o in ordering],
+                            descending=[not o.asc for o in ordering],
+                        )
+                        return value().sort_by(inv_permutation)
+
+                    value = functools.partial(sorted_value, value)
+
+                if self.backend.grouped_by:
+
+                    def partitioned_value(value):
+                        group_exprs: list[pl.Expr] = [
+                            pl.col(self.backend.underlying_col_name[col.uuid])
+                            for col in self.backend.grouped_by
+                        ]
+                        return value().over(*group_exprs)
+
+                    value = functools.partial(partitioned_value, value)
 
             return TypedValue(
                 value,
@@ -293,3 +333,10 @@ with PolarsEager.op(ops.Max()) as op:
     @op.auto
     def _mean(x):
         return x.max()
+
+
+with PolarsEager.op(ops.RowNumber()) as op:
+
+    @op.auto
+    def _row_number():
+        return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)

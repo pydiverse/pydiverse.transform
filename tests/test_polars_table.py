@@ -350,14 +350,12 @@ class TestPolarsEager:
             tbl3 >> mutate(x=f.row_number(arrange=[-λ.col4])) >> select(*tbl3), df3
         )
 
-        # Assert correct result
         assert_equal(
             (
                 tbl3
                 >> group_by(λ.col2)
                 >> select()
                 >> mutate(x=f.row_number(arrange=[-λ.col4]))
-                >> collect()
             ),
             pl.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
         )
@@ -401,9 +399,8 @@ class TestPolarsEager:
                         default=-1,
                     )
                 )
-                >> collect()
             ),
-            (df3[["col1"]] + 1),
+            (df3.select("col1") + 1),
         )
 
         assert_equal(
@@ -417,7 +414,6 @@ class TestPolarsEager:
                         default=0,
                     )
                 )
-                >> collect()
             ),
             pl.DataFrame({"x": [1, 1, 0, 0, 0, 2, 1, 1, 0, 0, 2, 0]}),
         )
@@ -433,7 +429,6 @@ class TestPolarsEager:
                         default=λ.col4,
                     )
                 )
-                >> collect()
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
         )
