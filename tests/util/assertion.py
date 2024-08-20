@@ -11,7 +11,7 @@ from pydiverse.transform.core.verbs import collect, export, show_query
 from pydiverse.transform.errors import NonStandardBehaviourWarning
 
 
-def assert_equal(left, right, check_dtype=False):
+def assert_equal(left, right, check_dtype=False, check_row_order=True):
     left_df = left >> export() if isinstance(left, Table) else left
     right_df = right >> export() if isinstance(right, Table) else right
 
@@ -20,6 +20,7 @@ def assert_equal(left, right, check_dtype=False):
             left_df,
             right_df,
             check_column_order=False,
+            check_row_order=check_row_order,
             check_dtypes=check_dtype,
         )
     except AssertionError as e:

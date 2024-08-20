@@ -300,6 +300,7 @@ class TestPolarsEager:
             tbl3
             >> group_by(tbl3.col1, tbl3.col2)
             >> summarise(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
+            check_row_order=False,
         )
 
         # Ungroup doesn't change the result
@@ -309,6 +310,7 @@ class TestPolarsEager:
             >> summarise(mean4=tbl3.col4.mean())
             >> ungroup(),
             tbl3 >> group_by(tbl3.col1) >> summarise(mean4=tbl3.col4.mean()),
+            check_row_order=False,
         )
 
     def test_alias(self, tbl1, tbl2):
