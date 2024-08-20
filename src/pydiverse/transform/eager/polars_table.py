@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 import polars as pl
 
+from pydiverse.transform import ops
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions.expressions import (
     BaseExpression,
@@ -24,6 +25,7 @@ from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import AbstractTableImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.errors import ExpressionError
+from pydiverse.transform.ops.core import OPType
 
 
 class PolarsEager(AbstractTableImpl):
@@ -108,6 +110,31 @@ class PolarsEager(AbstractTableImpl):
             descending=[not o.asc for o in ordering],
         )
 
+    def summarise(self, **kwargs):
+        uuid_to_kwarg: dict[uuid.UUID, (str, BaseExpression)] = {
+            self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
+        }
+        self.underlying_col_name.update(
+            {
+                uuid: f"{self.name}_{col_name}_summarise_{uuid.int}"
+                for uuid, (col_name, _) in uuid_to_kwarg.items()
+            }
+        )
+
+        agg_exprs: list[pl.Expr] = [
+            self.cols[uuid].compiled().alias(self.underlying_col_name[uuid])
+            for uuid in uuid_to_kwarg.keys()
+        ]
+        group_exprs: list[pl.Expr] = [
+            pl.col(self.underlying_col_name[col.uuid]) for col in self.grouped_by
+        ]
+
+        if self.grouped_by:
+            # retain the cols the table was grouped by and add the aggregation cols
+            self.df = self.df.group_by(*group_exprs).agg(*agg_exprs)
+        else:
+            self.df = self.df.select(*agg_exprs)
+
     class ExpressionCompiler(
         AbstractTableImpl.ExpressionCompiler[
             "PolarsEager", TypedValue[Callable[[], pl.Expr]]
@@ -125,6 +152,8 @@ class PolarsEager(AbstractTableImpl):
             implementation: TypedOperatorImpl,
             op_args: list[TypedValue[Callable[[], pl.Expr]]],
             context_kwargs: dict[str, Any],
+            *,
+            verb: str | None = None,
             **kwargs,
         ) -> TypedValue[Callable[[], pl.Expr]]:
             pl_result_type = _pl_dtype(implementation.rtype)
@@ -136,7 +165,19 @@ class PolarsEager(AbstractTableImpl):
                     _result_type=pl_result_type,
                 )
 
-            return TypedValue(value, implementation.rtype)
+            op = implementation.operator
+
+            return TypedValue(
+                value,
+                implementation.rtype,
+                PolarsEager._get_op_ftype(
+                    op_args,
+                    op,
+                    OPType.WINDOW
+                    if op.ftype == OPType.AGGREGATE and verb == "mutate"
+                    else None,
+                ),
+            )
 
         def _translate_case(
             self,
@@ -231,3 +272,24 @@ def _pl_dtype(t: dtypes.DType) -> pl.DataType:
         return pl.Datetime()
 
     raise TypeError(f"pydiverse.transform type {t} not supported for polars")
+
+
+with PolarsEager.op(ops.Mean()) as op:
+
+    @op.auto
+    def _mean(x):
+        return x.mean()
+
+
+with PolarsEager.op(ops.Min()) as op:
+
+    @op.auto
+    def _mean(x):
+        return x.min()
+
+
+with PolarsEager.op(ops.Max()) as op:
+
+    @op.auto
+    def _mean(x):
+        return x.max()
