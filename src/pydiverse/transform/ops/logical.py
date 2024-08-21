@@ -10,6 +10,7 @@ __all__ = [
     "LessEqual",
     "Greater",
     "GreaterEqual",
+    "IsNull",
     "IsIn",
     "And",
     "RAnd",
@@ -46,16 +47,17 @@ class Comparison(ElementWise, Binary, Logical):
 
 class Equal(Comparison):
     name = "__eq__"
-    signatures = Comparison.signatures + [
-        "T, const none -> bool",
-    ]
+    signatures = Comparison.signatures
 
 
 class NotEqual(Comparison):
     name = "__ne__"
-    signatures = Comparison.signatures + [
-        "T, const none -> bool",
-    ]
+    signatures = Comparison.signatures
+
+
+class IsNull(ElementWise, Unary, Logical):
+    name = "is_null"
+    signatures = ["T -> bool"]
 
 
 class Less(Comparison):

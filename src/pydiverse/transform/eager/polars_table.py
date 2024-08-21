@@ -415,3 +415,10 @@ with PolarsEager.op(ops.RowNumber()) as op:
     @op.auto
     def _row_number():
         return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)
+
+
+with PolarsEager.op(ops.IsNull()) as op:
+
+    @op.auto
+    def _is_null(x):
+        return x.is_null()

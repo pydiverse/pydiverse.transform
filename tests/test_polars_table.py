@@ -530,6 +530,17 @@ class TestPolarsEager:
 
         assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=λ.col1 * 2))
 
+    def test_null_comparison(self, tbl4):
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col1 == tbl4.col3),
+            df4.with_columns((pl.col("col1") == pl.col("col3")).alias("u")),
+        )
+
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col3.is_null()),
+            df4.with_columns(pl.col("col3").is_null().alias("u")),
+        )
+
 
 class TestPolarsAligned:
     def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):

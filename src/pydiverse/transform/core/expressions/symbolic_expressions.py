@@ -39,7 +39,7 @@ class SymbolicExpression(Generic[T]):
     def __getitem__(self, item):
         return SymbolicExpression(FunctionCall("__getitem__", self, item))
 
-    def case(self, *cases: tuple[Any, Any], default: Any = None):
+    def case(self, *cases: tuple[Any, Any], default: Any = None) -> SymbolicExpression:
         case_expression = CaseExpression(
             switching_on=self,
             cases=cases,
@@ -47,6 +47,9 @@ class SymbolicExpression(Generic[T]):
         )
 
         return SymbolicExpression(case_expression)
+
+    def is_null(self) -> SymbolicExpression:
+        return SymbolicExpression(FunctionCall("is_null", self))
 
     def __dir__(self):
         # TODO: Instead of displaying all available operators, translate the
