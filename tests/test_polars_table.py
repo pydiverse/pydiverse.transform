@@ -173,6 +173,7 @@ class TestPolarsEager:
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame({"a": [1, 2, 2, 3, 4], "b_df_right": [1, 2, 2, None, None]}),
+            check_row_order=False,
         )
 
         assert_equal(
@@ -180,6 +181,7 @@ class TestPolarsEager:
             >> join(tbl_right, tbl_left.a == tbl_right.b, "inner")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame({"a": [1, 2, 2], "b_df_right": [1, 2, 2]}),
+            check_row_order=False,
         )
 
         assert_equal(
@@ -192,6 +194,7 @@ class TestPolarsEager:
                     "b_df_right": [0, 1, 2, 2, None, None],
                 }
             ),
+            check_row_order=False,
         )
 
     def test_filter(self, tbl1, tbl2):
@@ -528,7 +531,7 @@ class TestPolarsEager:
         assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=λ.col1 * 2))
 
 
-class TestPandasAligned:
+class TestPolarsAligned:
     def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):
         # No exception with correct length
         eval_aligned(tbl_left.a + tbl_left.a)
@@ -581,7 +584,7 @@ class TestPandasAligned:
 
         assert_equal(
             tbl_left >> mutate(x=f(tbl_left.a, tbl_right.b)) >> select(λ.x),
-            pl.DataFrame({"x": (df_left["a"] + df_right["b"])}),
+            pl.DataFrame({"x": (df_left.get_column("a") + df_right.get_column("b"))}),
         )
 
         with pytest.raises(AlignmentError):

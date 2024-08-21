@@ -165,11 +165,26 @@ class PolarsEager(AbstractTableImpl):
             "PolarsEager", TypedValue[Callable[[], pl.Expr]]
         ]
     ):
-        def _translate_col(self, expr, **kwargs):
+        def _translate_col(
+            self, expr: Column, **kwargs
+        ) -> TypedValue[Callable[[], pl.Expr]]:
             def value():
                 return pl.col(self.backend.underlying_col_name[expr.uuid])
 
             return TypedValue(value, expr.dtype)
+
+        def _translate_literal_col(
+            self, expr: LiteralColumn, **kwargs
+        ) -> TypedValue[Callable[[], pl.Expr]]:
+            if not self.backend.is_aligned_with(expr):
+                raise AlignmentError(
+                    f"literal column {expr} not aligned with table {self.backend.name}."
+                )
+
+            def value(**kw):
+                return expr.typed_value.value
+
+            return TypedValue(value, expr.typed_value.dtype, expr.typed_value.ftype)
 
         def _translate_function(
             self,
