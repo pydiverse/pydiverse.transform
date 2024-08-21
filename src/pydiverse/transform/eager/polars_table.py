@@ -15,6 +15,7 @@ from pydiverse.transform.core.expressions.expressions import (
     CaseExpression,
     Column,
     FunctionCall,
+    LiteralColumn,
 )
 from pydiverse.transform.core.expressions.symbolic_expressions import SymbolicExpression
 from pydiverse.transform.core.expressions.translator import (
@@ -135,6 +136,26 @@ class PolarsEager(AbstractTableImpl):
         else:
             self.df = self.df.select(*agg_exprs)
 
+    def export(self) -> pl.DataFrame:
+        return self.df.select(
+            **{
+                name: self.underlying_col_name[uuid]
+                for (name, uuid) in self.selected_cols()
+            }
+        )
+
+    def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
+        if isinstance(col, Column):
+            return (
+                isinstance(col.table, type(self))
+                and col.table.df.height == self.df.height
+            )
+        if isinstance(col, LiteralColumn):
+            return issubclass(col.backend, type(self)) and (
+                not isinstance(col.typed_value.value, pl.Series)
+                or len(col.typed_value.value) == self.df.height
+            )  # not a series => scalar
+
     class ExpressionCompiler(
         AbstractTableImpl.ExpressionCompiler[
             "PolarsEager", TypedValue[Callable[[], pl.Expr]]
@@ -194,6 +215,8 @@ class PolarsEager(AbstractTableImpl):
                         )
                         return value().sort_by(inv_permutation)
 
+                    # need to bind `value` inside `sorted_value` so that it refers to
+                    # the original `value`.
                     value = functools.partial(sorted_value, value)
 
                 if self.backend.grouped_by:
@@ -251,13 +274,14 @@ class PolarsEager(AbstractTableImpl):
 
             return TypedValue(value, result_dtype, result_ftype)
 
-    def export(self) -> pl.DataFrame:
-        return self.df.select(
-            **{
-                name: self.underlying_col_name[uuid]
-                for (name, uuid) in self.selected_cols()
-            }
-        )
+    class AlignedExpressionEvaluator(
+        AbstractTableImpl.AlignedExpressionEvaluator[TypedValue[pl.Series]]
+    ):
+        def _translate_col(self, expr: Column, **kwargs) -> TypedValue[pl.Series]:
+            return TypedValue(
+                expr.table.df.get_column(expr.table.underlying_col_name[expr.uuid]),
+                expr.table.cols[expr.uuid].dtype,
+            )
 
 
 class JoinTranslator(Translator[tuple]):

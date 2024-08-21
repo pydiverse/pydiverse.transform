@@ -622,7 +622,9 @@ class TestPrintAndRepr:
         # Name: df1_col1_XXXXXXXX, dtype: Int64
 
         col1_str = str(tbl1.col1)
-        series = tbl1._impl.df[tbl1._impl.df_name_mapping[tbl1.col1._.uuid]]
+        series = tbl1._impl.df.get_column(
+            tbl1._impl.underlying_col_name[tbl1.col1._.uuid]
+        )
 
         assert str(series) in col1_str
         assert "exception" not in col1_str
