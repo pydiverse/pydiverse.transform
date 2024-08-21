@@ -6,6 +6,7 @@ from pydiverse.transform import ops
 from pydiverse.transform._typing import CallableT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import TypedValue
+from pydiverse.transform.core.expressions.expressions import Column
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.errors import OperatorNotSupportedError
@@ -65,27 +66,27 @@ class MSSqlTableImpl(SQLTableImpl):
 
             return super()._translate(expr, **kwargs)
 
-        def _translate_col(self, expr, **kwargs):
+        def _translate_col(self, col: Column, **kwargs):
             # If mssql_bool_as_bit is true, then we can just return the
             # precompiled col. Otherwise, we must recompile it to ensure
             # we return booleans as bools and not as bits.
             if kwargs.get("mssql_bool_as_bit") is True:
-                return super()._translate_col(expr, **kwargs)
+                return super()._translate_col(col, **kwargs)
 
             # Can either be a base SQL column, or a reference to an expression
-            if expr.uuid in self.backend.sql_columns:
-                is_bool = dtypes.Bool().same_kind(self.backend.cols[expr.uuid].dtype)
+            if col.uuid in self.backend.sql_columns:
+                is_bool = dtypes.Bool().same_kind(self.backend.cols[col.uuid].dtype)
 
                 def sql_col(cols, **kw):
-                    col = cols[expr.uuid]
+                    sql_col = cols[col.uuid]
                     if is_bool:
-                        return mssql_convert_bit_to_bool(col)
-                    return col
+                        return mssql_convert_bit_to_bool(sql_col)
+                    return sql_col
 
-                return TypedValue(sql_col, expr.dtype, OPType.EWISE)
+                return TypedValue(sql_col, col.dtype, OPType.EWISE)
 
-            col = self.backend.cols[expr.uuid]
-            return self._translate(col.expr, **kwargs)
+            meta_data = self.backend.cols[col.uuid]
+            return self._translate(meta_data.expr, **kwargs)
 
         def _translate_function_value(
             self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs

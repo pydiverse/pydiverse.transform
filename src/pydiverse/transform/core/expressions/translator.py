@@ -88,7 +88,7 @@ class DelegatingTranslator(Translator[T], Generic[T]):
             )
 
             return self._translate_function(
-                expr, implementation, op_args, context_kwargs, **kwargs
+                implementation, op_args, context_kwargs, **kwargs
             )
 
         if isinstance(expr, CaseExpression):
@@ -118,15 +118,14 @@ class DelegatingTranslator(Translator[T], Generic[T]):
             f" {expr}."
         )
 
-    def _translate_col(self, expr: Column, **kwargs) -> T:
+    def _translate_col(self, col: Column, **kwargs) -> T:
         raise NotImplementedError
 
-    def _translate_literal_col(self, expr: LiteralColumn, **kwargs) -> T:
+    def _translate_literal_col(self, col: LiteralColumn, **kwargs) -> T:
         raise NotImplementedError
 
     def _translate_function(
         self,
-        expr: FunctionCall,
         implementation: registry.TypedOperatorImpl,
         op_args: list[T],
         context_kwargs: dict[str, Any],

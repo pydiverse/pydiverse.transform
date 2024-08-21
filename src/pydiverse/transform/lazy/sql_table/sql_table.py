@@ -30,7 +30,6 @@ from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:
-    from pydiverse.transform.core.expressions import FunctionCall
     from pydiverse.transform.core.registry import TypedOperatorImpl
 
 
@@ -569,17 +568,17 @@ class SQLTableImpl(LazyTableImpl):
             TypedValue[Callable[[dict[uuid.UUID, sa.Column]], sql.ColumnElement]],
         ]
     ):
-        def _translate_col(self, expr, **kwargs):
+        def _translate_col(self, col, **kwargs):
             # Can either be a base SQL column, or a reference to an expression
-            if expr.uuid in self.backend.sql_columns:
+            if col.uuid in self.backend.sql_columns:
 
                 def sql_col(cols, **kw):
-                    return cols[expr.uuid]
+                    return cols[col.uuid]
 
-                return TypedValue(sql_col, expr.dtype, OPType.EWISE)
+                return TypedValue(sql_col, col.dtype, OPType.EWISE)
 
-            col = self.backend.cols[expr.uuid]
-            return TypedValue(col.compiled, col.dtype, col.ftype)
+            meta_data = self.backend.cols[col.uuid]
+            return TypedValue(meta_data.compiled, meta_data.dtype, meta_data.ftype)
 
         def _translate_literal_col(self, expr, **kwargs):
             if not self.backend.is_aligned_with(expr):
@@ -594,10 +593,9 @@ class SQLTableImpl(LazyTableImpl):
             return TypedValue(sql_col, expr.typed_value.dtype, expr.typed_value.ftype)
 
         def _translate_function(
-            self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
+            self, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             value = self._translate_function_value(
-                expr,
                 implementation,
                 op_args,
                 context_kwargs,
@@ -630,7 +628,6 @@ class SQLTableImpl(LazyTableImpl):
 
         def _translate_function_value(
             self,
-            expr: FunctionCall,
             implementation: TypedOperatorImpl,
             op_args: list,
             context_kwargs: dict,
@@ -794,21 +791,25 @@ class SQLTableImpl(LazyTableImpl):
 
             return super().translate(expr, check_alignment=check_alignment, **kwargs)
 
-        def _translate_col(self, expr, **kwargs):
-            backend = expr.table
-            if expr.uuid in backend.sql_columns:
-                sql_col = backend.sql_columns[expr.uuid]
-                return TypedValue(sql_col, expr.dtype)
+        def _translate_col(self, col, **kwargs):
+            backend = col.table
+            if col.uuid in backend.sql_columns:
+                sql_col = backend.sql_columns[col.uuid]
+                return TypedValue(sql_col, col.dtype)
 
-            col = backend.cols[expr.uuid]
-            return TypedValue(col.compiled(backend.sql_columns), col.dtype, col.ftype)
+            meta_data = backend.cols[col.uuid]
+            return TypedValue(
+                meta_data.compiled(backend.sql_columns),
+                meta_data.dtype,
+                meta_data.ftype,
+            )
 
         def _translate_literal_col(self, expr, **kwargs):
             assert issubclass(expr.backend, SQLTableImpl)
             return expr.typed_value
 
         def _translate_function(
-            self, expr, implementation, op_args, context_kwargs, **kwargs
+            self, implementation, op_args, context_kwargs, **kwargs
         ):
             # Aggregate function -> window function
             value = implementation(*(arg.value for arg in op_args))

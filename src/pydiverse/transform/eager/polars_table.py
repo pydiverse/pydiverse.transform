@@ -115,7 +115,7 @@ class PolarsEager(AbstractTableImpl):
             descending=[not o.asc for o in ordering],
         )
 
-    def summarise(self, **kwargs):
+    def summarise(self, **kwargs: SymbolicExpression):
         uuid_to_kwarg: dict[uuid.UUID, (str, BaseExpression)] = {
             self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
         }
@@ -166,29 +166,28 @@ class PolarsEager(AbstractTableImpl):
         ]
     ):
         def _translate_col(
-            self, expr: Column, **kwargs
+            self, col: Column, **kwargs
         ) -> TypedValue[Callable[[], pl.Expr]]:
             def value():
-                return pl.col(self.backend.underlying_col_name[expr.uuid])
+                return pl.col(self.backend.underlying_col_name[col.uuid])
 
-            return TypedValue(value, expr.dtype)
+            return TypedValue(value, col.dtype)
 
         def _translate_literal_col(
-            self, expr: LiteralColumn, **kwargs
+            self, col: LiteralColumn, **kwargs
         ) -> TypedValue[Callable[[], pl.Expr]]:
-            if not self.backend.is_aligned_with(expr):
+            if not self.backend.is_aligned_with(col):
                 raise AlignmentError(
-                    f"literal column {expr} not aligned with table {self.backend.name}."
+                    f"literal column {col} not aligned with table {self.backend.name}."
                 )
 
             def value(**kw):
-                return expr.typed_value.value
+                return col.typed_value.value
 
-            return TypedValue(value, expr.typed_value.dtype, expr.typed_value.ftype)
+            return TypedValue(value, col.typed_value.dtype, col.typed_value.ftype)
 
         def _translate_function(
             self,
-            expr: FunctionCall,
             implementation: TypedOperatorImpl,
             op_args: list[TypedValue[Callable[[], pl.Expr]]],
             context_kwargs: dict[str, Any],
@@ -296,10 +295,10 @@ class PolarsEager(AbstractTableImpl):
     class AlignedExpressionEvaluator(
         AbstractTableImpl.AlignedExpressionEvaluator[TypedValue[pl.Series]]
     ):
-        def _translate_col(self, expr: Column, **kwargs) -> TypedValue[pl.Series]:
+        def _translate_col(self, col: Column, **kwargs) -> TypedValue[pl.Series]:
             return TypedValue(
-                expr.table.df.get_column(expr.table.underlying_col_name[expr.uuid]),
-                expr.table.cols[expr.uuid].dtype,
+                col.table.df.get_column(col.table.underlying_col_name[col.uuid]),
+                col.table.cols[col.uuid].dtype,
             )
 
         def _translate_literal_col(
@@ -309,7 +308,6 @@ class PolarsEager(AbstractTableImpl):
 
         def _translate_function(
             self,
-            expr: FunctionCall,
             implementation: TypedOperatorImpl,
             op_args: list[TypedValue[pl.Series]],
             context_kwargs: dict[str, Any],
@@ -321,8 +319,9 @@ class PolarsEager(AbstractTableImpl):
             arg_lens = {arg.len() for arg in args if isinstance(arg, pl.Series)}
             if len(arg_lens) >= 2:
                 raise AlignmentError(
-                    f"arguments for function {expr.name} are not aligned. they have "
-                    f"lengths {list(arg_lens)} but all lengths must be equal."
+                    f"arguments for function {implementation.operator.name} are not "
+                    f"aligned. they have lengths {list(arg_lens)} but all lengths must "
+                    f"be equal."
                 )
 
             value = implementation(*args)
