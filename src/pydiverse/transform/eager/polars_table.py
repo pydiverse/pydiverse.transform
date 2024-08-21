@@ -26,7 +26,11 @@ from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import AbstractTableImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.core.util.util import translate_ordering
-from pydiverse.transform.errors import ExpressionError, FunctionTypeError
+from pydiverse.transform.errors import (
+    AlignmentError,
+    ExpressionError,
+    FunctionTypeError,
+)
 from pydiverse.transform.ops.core import OPType
 
 
@@ -281,6 +285,39 @@ class PolarsEager(AbstractTableImpl):
             return TypedValue(
                 expr.table.df.get_column(expr.table.underlying_col_name[expr.uuid]),
                 expr.table.cols[expr.uuid].dtype,
+            )
+
+        def _translate_literal_col(
+            self, expr: LiteralColumn, **kwargs
+        ) -> TypedValue[pl.Series]:
+            return expr.typed_value
+
+        def _translate_function(
+            self,
+            expr: FunctionCall,
+            implementation: TypedOperatorImpl,
+            op_args: list[TypedValue[pl.Series]],
+            context_kwargs: dict[str, Any],
+            **kwargs,
+        ) -> TypedValue[pl.Series]:
+            args = [arg.value for arg in op_args]
+            op = implementation.operator
+
+            arg_lens = {arg.len() for arg in args if isinstance(arg, pl.Series)}
+            if len(arg_lens) >= 2:
+                raise AlignmentError(
+                    f"arguments for function {expr.name} are not aligned. they have "
+                    f"lengths {list(arg_lens)} but all lengths must be equal."
+                )
+
+            value = implementation(*args)
+
+            return TypedValue(
+                value,
+                implementation.rtype,
+                PolarsEager._get_op_ftype(
+                    op_args, op, OPType.WINDOW if op.ftype == OPType.AGGREGATE else None
+                ),
             )
 
 
