@@ -3,15 +3,16 @@ from __future__ import annotations
 import contextlib
 import warnings
 
+import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
 from pydiverse.transform import Table
-from pydiverse.transform.core.verbs import collect, export, show_query
+from pydiverse.transform.core.verbs import export, show_query
 from pydiverse.transform.errors import NonStandardBehaviourWarning
 
 
-def assert_equal(left, right, check_dtype=False, check_row_order=True):
+def assert_equal(left, right, check_dtypes=False, check_row_order=True):
     left_df = left >> export() if isinstance(left, Table) else left
     right_df = right >> export() if isinstance(right, Table) else right
 
@@ -21,7 +22,7 @@ def assert_equal(left, right, check_dtype=False, check_row_order=True):
             right_df,
             check_column_order=False,
             check_row_order=check_row_order,
-            check_dtypes=check_dtype,
+            check_dtypes=check_dtypes,
         )
     except AssertionError as e:
         print("First dataframe:")
@@ -54,10 +55,9 @@ def assert_result_equal(
     pipe_factory,
     *,
     exception=None,
-    check_order=False,
+    check_row_order=False,
     may_throw=False,
     xfail_warnings=True,
-    **kwargs,
 ):
     if not isinstance(input_tables[0], (tuple, list)):
         input_tables = (input_tables,)
@@ -65,9 +65,9 @@ def assert_result_equal(
 
     if exception and not may_throw:
         with pytest.raises(exception):
-            pipe_factory(*x) >> collect()
+            pipe_factory(*x) >> export()
         with pytest.raises(exception):
-            pipe_factory(*y) >> collect()
+            pipe_factory(*y) >> export()
         return
 
     did_raise_warning = False
@@ -77,17 +77,14 @@ def assert_result_equal(
             query_x = pipe_factory(*x)
             query_y = pipe_factory(*y)
 
-            dfx = (query_x >> collect()).reset_index(drop=True)
-            dfy = (query_y >> collect()).reset_index(drop=True)
+            dfx: pl.DataFrame = query_x >> export()
+            dfy: pl.DataFrame = query_y >> export()
 
         warnings_record = get_transform_warnings(warnings_record)
         if len(warnings_record):
             did_raise_warning = True
             warnings_summary = "\n".join({str(w.message) for w in warnings_record})
 
-        if not check_order:
-            dfx.sort_values(by=dfx.columns.tolist(), inplace=True, ignore_index=True)
-            dfy.sort_values(by=dfy.columns.tolist(), inplace=True, ignore_index=True)
     except Exception as e:
         if may_throw:
             if exception is not None:
@@ -106,7 +103,7 @@ def assert_result_equal(
 
     try:
         assert_frame_equal(
-            dfx, dfy, check_dtypes=False, check_row_order=check_order, **kwargs
+            dfx, dfy, check_dtypes=False, check_row_order=check_row_order
         )
     except Exception as e:
         if xfail_warnings and did_raise_warning:

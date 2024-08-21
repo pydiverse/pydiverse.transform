@@ -2,27 +2,27 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pandas as pd
+import polars as pl
 import pytest
 
 from tests.fixtures.backend import BACKEND_MARKS, flatten
 from tests.util.backend import BACKEND_TABLES
 
 dataframes = {
-    "df1": pd.DataFrame(
+    "df1": pl.DataFrame(
         {
             "col1": [1, 2, 3, 4],
             "col2": ["a", "b", "c", "d"],
         }
     ),
-    "df2": pd.DataFrame(
+    "df2": pl.DataFrame(
         {
             "col1": [1, 2, 2, 4, 5, 6],
             "col2": [2, 2, 0, 0, 2, None],
             "col3": [0.0, 0.1, 0.2, 0.3, 0.01, 0.02],
         }
     ),
-    "df3": pd.DataFrame(
+    "df3": pl.DataFrame(
         {
             "col1": [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2],
             "col2": [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
@@ -31,7 +31,7 @@ dataframes = {
             "col5": list("abcdefghijkl"),
         }
     ),
-    "df4": pd.DataFrame(
+    "df4": pl.DataFrame(
         {
             "col1": [None, 0, 0, 0, 0, None, 1, 1, 1, 2, 2, 2, 2],
             "col2": [0, 0, 1, 1, 0, 0, 1, None, 1, 0, 0, 1, 1],
@@ -40,7 +40,7 @@ dataframes = {
             "col5": list("abcdefghijkl") + [None],
         }
     ),
-    "df_strings": pd.DataFrame(
+    "df_strings": pl.DataFrame(
         {
             "col1": [
                 "",
@@ -70,7 +70,7 @@ dataframes = {
             ],
         }
     ),
-    "df_datetime": pd.DataFrame(
+    "df_datetime": pl.DataFrame(
         {
             "col1": [
                 datetime(2000, 1, 1),
@@ -100,7 +100,7 @@ dataframes = {
 
 # compare one dataframe and one SQL backend to all others
 # (some tests are ignored if either backend does not support a feature)
-reference_backends = ["pandas", "duckdb"]
+reference_backends = ["polars", "duckdb"]
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc):

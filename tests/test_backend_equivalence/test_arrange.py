@@ -21,8 +21,10 @@ def test_arrange(df2):
 
 
 def test_arrange_expression(df3):
-    assert_result_equal(df3, lambda t: t >> arrange(t.col4 + t.col2), check_order=True)
-    assert_result_equal(df3, lambda t: t >> arrange(-t.col4 * 2), check_order=True)
+    assert_result_equal(
+        df3, lambda t: t >> arrange(t.col4 + t.col2), check_row_order=True
+    )
+    assert_result_equal(df3, lambda t: t >> arrange(-t.col4 * 2), check_row_order=True)
 
 
 def test_arrange_null(df2):
@@ -57,7 +59,7 @@ def test_nulls_first(df4):
             -t.col2.nulls_first(),
             t.col5.nulls_first(),
         ),
-        check_order=True,
+        check_row_order=True,
     )
 
 
@@ -70,7 +72,7 @@ def test_nulls_last(df4):
             -t.col2.nulls_last(),
             t.col5.nulls_last(),
         ),
-        check_order=True,
+        check_row_order=True,
     )
 
 
@@ -84,7 +86,7 @@ def test_nulls_first_last_mixed(df4):
             -t.col2.nulls_last(),
             -t.col5,
         ),
-        check_order=True,
+        check_row_order=True,
     )
 
 
@@ -92,5 +94,5 @@ def test_arrange_after_mutate(df4):
     assert_result_equal(
         df4,
         lambda t: t >> mutate(x=t.col1 <= t.col2) >> arrange(λ.x, λ.col4),
-        check_order=True,
+        check_row_order=True,
     )
