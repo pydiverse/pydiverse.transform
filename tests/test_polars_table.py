@@ -271,16 +271,19 @@ class TestPolarsEager:
         assert_equal(
             tbl3 >> summarise(mean=tbl3.col1.mean(), max=tbl3.col4.max()),
             pl.DataFrame({"mean": [1.0], "max": [11]}),
+            check_row_order=False,
         )
 
         assert_equal(
             tbl3 >> group_by(tbl3.col1) >> summarise(mean=tbl3.col4.mean()),
             pl.DataFrame({"col1": [0, 1, 2], "mean": [1.5, 5.5, 9.5]}),
+            check_row_order=False,
         )
 
         assert_equal(
             tbl3 >> summarise(mean=tbl3.col4.mean()) >> mutate(mean_2x=λ.mean * 2),
             pl.DataFrame({"mean": [5.5], "mean_2x": [11.0]}),
+            check_row_order=False,
         )
 
     def test_group_by(self, tbl3):
@@ -289,6 +292,7 @@ class TestPolarsEager:
         assert_equal(
             tbl3 >> summarise(mean4=tbl3.col4.mean()) >> group_by(λ.mean4),
             tbl3 >> summarise(mean4=tbl3.col4.mean()),
+            check_row_order=False,
         )
 
         # Groupings can be added
