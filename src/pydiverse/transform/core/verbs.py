@@ -270,7 +270,7 @@ def join(
     left: AbstractTableImpl,
     right: AbstractTableImpl,
     on: SymbolicExpression,
-    how: str,
+    how: Literal["inner", "left", "outer"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
 ):

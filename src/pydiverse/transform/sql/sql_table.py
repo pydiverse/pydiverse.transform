@@ -9,7 +9,7 @@ import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import reduce
-from typing import TYPE_CHECKING, Any, Callable, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
 
 import polars as pl
 import sqlalchemy as sa
@@ -213,7 +213,7 @@ class SQLTableImpl(AbstractTableImpl):
         self.wheres: list[SymbolicExpression] = []
         self.having: list[SymbolicExpression] = []
         self.order_bys: list[OrderingDescriptor] = []
-        self.limit_offset: tuple[int, int] = None
+        self.limit_offset: tuple[int, int] | None = None
 
     def build_select(self) -> sql.Select:
         # Validate current state
@@ -461,7 +461,14 @@ class SQLTableImpl(AbstractTableImpl):
             )
         )
 
-    def join(self, right, on, how, *, validate="m:m"):
+    def join(
+        self,
+        right: SQLTableImpl,
+        on: SymbolicExpression,
+        how: Literal["inner", "left", "outer"],
+        *,
+        validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    ):
         self.alignment_hash = generate_alignment_hash()
 
         # If right has joins already, merging them becomes extremely difficult

@@ -4,7 +4,7 @@ import functools
 import itertools
 import operator
 import uuid
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import polars as pl
 
@@ -72,9 +72,9 @@ class PolarsEager(AbstractTableImpl):
         self,
         right: PolarsEager,
         on: SymbolicExpression,
-        how: str,
+        how: Literal["inner", "left", "outer"],
         *,
-        validate="m:m",
+        validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     ):
         # get the columns on which the data frames are joined
         left_on: list[str] = []
