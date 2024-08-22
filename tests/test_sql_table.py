@@ -40,6 +40,16 @@ df3 = pl.DataFrame(
     }
 )
 
+df4 = pl.DataFrame(
+    {
+        "col1": [None, 0, 0, 0, 0, None, 1, 1, 1, 2, 2, 2, 2],
+        "col2": [0, 0, 1, 1, 0, 0, 1, None, 1, 0, 0, 1, 1],
+        "col3": [None, None, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+        "col4": [None, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        "col5": list("abcdefghijkl") + [None],
+    }
+)
+
 df_left = pl.DataFrame(
     {
         "a": [1, 2, 3, 4],
@@ -60,6 +70,7 @@ def engine():
     df1.write_database("df1", engine, if_table_exists="replace")
     df2.write_database("df2", engine, if_table_exists="replace")
     df3.write_database("df3", engine, if_table_exists="replace")
+    df4.write_database("df4", engine, if_table_exists="replace")
     df_left.write_database("df_left", engine, if_table_exists="replace")
     df_right.write_database("df_right", engine, if_table_exists="replace")
     return engine
@@ -78,6 +89,11 @@ def tbl2(engine):
 @pytest.fixture
 def tbl3(engine):
     return Table(SQLTableImpl(engine, "df3"))
+
+
+@pytest.fixture
+def tbl4(engine):
+    return Table(SQLTableImpl(engine, "df4"))
 
 
 @pytest.fixture
@@ -378,6 +394,17 @@ class TestSQLTable:
 
         assert_equal(
             tbl2 >> summarise(count=f.count()), pl.DataFrame({"count": [len(df2)]})
+        )
+
+    def test_null_comparison(self, tbl4):
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col1 == tbl4.col3),
+            df4.with_columns((pl.col("col1") == pl.col("col3")).alias("u")),
+        )
+
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col3.is_null()),
+            df4.with_columns(pl.col("col3").is_null().alias("u")),
         )
 
 

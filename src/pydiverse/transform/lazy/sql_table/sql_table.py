@@ -928,6 +928,13 @@ with SQLTableImpl.op(ops.IsIn()) as op:
         return reduce(py_operator.or_, map(lambda v: x == v, values))
 
 
+with SQLTableImpl.op(ops.IsNull()) as op:
+
+    @op.auto
+    def _is_null(x):
+        return x.is_(sa.null())
+
+
 #### String Functions ####
 
 
