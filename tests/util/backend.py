@@ -53,7 +53,9 @@ def _sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
         if dtype in dtypes_map:
             sql_dtypes[col] = dtypes_map[dtype]
 
-    df.write_database(name, engine, if_table_exists="replace")
+    df.write_database(
+        name, engine, if_table_exists="replace", engine_options={"dtype": sql_dtypes}
+    )
     return SQLTableImpl(engine, name)
 
 
@@ -75,7 +77,6 @@ def postgres_impl(df: pl.DataFrame, name: str):
 
 @_cached_impl
 def mssql_impl(df: pl.DataFrame, name: str):
-    import numpy as np
     from sqlalchemy.dialects.mssql import DATETIME2
 
     url = (
@@ -87,7 +88,7 @@ def mssql_impl(df: pl.DataFrame, name: str):
         name,
         url,
         dtypes_map={
-            np.dtype("datetime64[ns]"): DATETIME2(),
+            pl.Datetime(): DATETIME2(),
         },
     )
 
