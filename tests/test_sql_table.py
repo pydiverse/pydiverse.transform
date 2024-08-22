@@ -12,7 +12,7 @@ from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
 from pydiverse.transform.errors import AlignmentError
-from pydiverse.transform.lazy.sql_table import SQLTableImpl
+from pydiverse.transform.sql.sql_table import SQLTableImpl
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(

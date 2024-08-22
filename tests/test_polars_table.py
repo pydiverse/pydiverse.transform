@@ -10,8 +10,8 @@ from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.dispatchers import Pipeable, verb
 from pydiverse.transform.core.table import Table
 from pydiverse.transform.core.verbs import *
-from pydiverse.transform.eager.polars_table import PolarsEager
 from pydiverse.transform.errors import AlignmentError
+from pydiverse.transform.polars.polars_table import PolarsEager
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(

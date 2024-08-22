@@ -10,8 +10,8 @@ from pydiverse.transform.core.expressions.expressions import Column
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.errors import OperatorNotSupportedError
-from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
 from pydiverse.transform.ops import Operator, OPType
+from pydiverse.transform.sql.sql_table import SQLTableImpl
 from pydiverse.transform.util.warnings import warn_non_standard
 
 

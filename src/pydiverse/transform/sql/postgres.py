@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
+from pydiverse.transform.sql.sql_table import SQLTableImpl
 
 
 class PostgresTableImpl(SQLTableImpl):

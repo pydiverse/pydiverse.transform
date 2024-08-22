@@ -7,14 +7,16 @@ import operator as py_operator
 import uuid
 import warnings
 from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import reduce
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable, Generic
 
 import polars as pl
 import sqlalchemy as sa
 from sqlalchemy import sql
 
 from pydiverse.transform import ops
+from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import (
     Column,
@@ -23,17 +25,16 @@ from pydiverse.transform.core.expressions import (
     iterate_over_expr,
 )
 from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.table_impl import ColumnMetaData
+from pydiverse.transform.core.table_impl import AbstractTableImpl, ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.errors import AlignmentError, FunctionTypeError
-from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.registry import TypedOperatorImpl
 
 
-class SQLTableImpl(LazyTableImpl):
+class SQLTableImpl(AbstractTableImpl):
     """SQL backend
 
     Attributes:
@@ -563,7 +564,7 @@ class SQLTableImpl(LazyTableImpl):
         return [col]
 
     class ExpressionCompiler(
-        LazyTableImpl.ExpressionCompiler[
+        AbstractTableImpl.ExpressionCompiler[
             "SQLTableImpl",
             TypedValue[Callable[[dict[uuid.UUID, sa.Column]], sql.ColumnElement]],
         ]
@@ -774,7 +775,7 @@ class SQLTableImpl(LazyTableImpl):
             return over_value
 
     class AlignedExpressionEvaluator(
-        LazyTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]
+        AbstractTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]
     ):
         def translate(self, expr, check_alignment=True, **kwargs):
             if check_alignment:
@@ -827,6 +828,15 @@ class SQLTableImpl(LazyTableImpl):
                 raise NotImplementedError("How to handle window functions?")
 
             return TypedValue(value, implementation.rtype, ftype)
+
+
+@dataclass
+class JoinDescriptor(Generic[ImplT]):
+    __slots__ = ("right", "on", "how")
+
+    right: ImplT
+    on: Any
+    how: str
 
 
 def generate_alignment_hash():
@@ -1218,8 +1228,7 @@ with SQLTableImpl.op(ops.DenseRank()) as op:
         return sa.func.dense_rank()
 
 
-####
-
-
-# Load SQLTableImpl dialect specific subclasses
-from . import dialects  # noqa
+from .mssql import MSSqlTableImpl  # noqa
+from .duckdb import DuckDBTableImpl  # noqa
+from .postgres import PostgresTableImpl  # noqa
+from .sqlite import SQLiteTableImpl  # noqa
