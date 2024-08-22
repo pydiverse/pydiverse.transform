@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core.verbs import (
     mutate,
     select,
@@ -27,7 +27,7 @@ def test_reorder(df2):
         df2,
         lambda t: t
         >> mutate(col1=t.col2, col2=t.col1)
-        >> mutate(col1=t.col2, col2=λ.col3, col3=λ.col2),
+        >> mutate(col1=t.col2, col2=C.col3, col3=C.col2),
     )
 
 
@@ -58,6 +58,6 @@ def test_mutate_bool_expr(df4):
     assert_result_equal(
         df4,
         lambda t: t
-        >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= λ.col4)
-        >> mutate(xAndY=λ.x & λ.y),
+        >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= C.col4)
+        >> mutate(xAndY=C.x & C.y),
     )

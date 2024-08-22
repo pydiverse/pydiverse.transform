@@ -324,7 +324,7 @@ def join(
 
     # By resolving lambdas this late, we enable the user to use lambda columns
     # to reference mutated columns from the right side of the join.
-    # -> `λ.columnname_righttablename` is a valid lambda in the on condition.
+    # -> `C.columnname_righttablename` is a valid lambda in the on condition.
     check_lambdas_valid(new_left, on)
     on = new_left.resolve_lambda_cols(on)
 

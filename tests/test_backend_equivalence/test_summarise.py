@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core.verbs import (
     arrange,
     filter,
@@ -41,16 +41,16 @@ def test_chained_summarised(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
-        >> summarise(mean_of_mean3=λ.mean3.mean()),
+        >> summarise(mean_of_mean3=C.mean3.mean()),
     )
 
     assert_result_equal(
         df3,
         lambda t: t
-        >> mutate(k=(λ.col1 + λ.col2) * λ.col4)
-        >> group_by(λ.k)
-        >> summarise(x=λ.col4.mean())
-        >> summarise(y=λ.k.mean()),
+        >> mutate(k=(C.col1 + C.col2) * C.col4)
+        >> group_by(C.k)
+        >> summarise(x=C.col4.mean())
+        >> summarise(y=C.k.mean()),
     )
 
 
@@ -70,7 +70,7 @@ def test_select(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
-        >> select(t.col1, λ.mean3, t.col2),
+        >> select(t.col1, C.mean3, t.col2),
     )
 
 
@@ -80,7 +80,7 @@ def test_mutate(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
-        >> mutate(x10=λ.mean3 * 10),
+        >> mutate(x10=C.mean3 * 10),
     )
 
 
@@ -90,7 +90,7 @@ def test_filter(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
-        >> filter(λ.mean3 <= 2.0),
+        >> filter(C.mean3 <= 2.0),
     )
 
 
@@ -100,7 +100,7 @@ def test_arrange(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
-        >> arrange(λ.mean3),
+        >> arrange(C.mean3),
     )
 
     assert_result_equal(
@@ -109,7 +109,7 @@ def test_arrange(df3):
         >> arrange(-t.col4)
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
-        >> arrange(λ.mean3),
+        >> arrange(C.mean3),
     )
 
 
@@ -120,15 +120,15 @@ def test_intermediate_select(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(x=t.col4.mean())
-        >> mutate(x2=λ.x * 2)
+        >> mutate(x2=C.x * 2)
         >> select()
-        >> summarise(y=(λ.x - λ.x2).min()),
+        >> summarise(y=(C.x - C.x2).min()),
     )
 
 
 def test_not_summarising(df4):
     assert_result_equal(
-        df4, lambda t: t >> summarise(x=λ.col1), exception=FunctionTypeError
+        df4, lambda t: t >> summarise(x=C.col1), exception=FunctionTypeError
     )
 
 
@@ -165,20 +165,20 @@ def test_op_max(df4):
 def test_op_any(df4):
     assert_result_equal(
         df4,
-        lambda t: t >> group_by(t.col1) >> summarise(any=(λ.col1 == λ.col2).any()),
+        lambda t: t >> group_by(t.col1) >> summarise(any=(C.col1 == C.col2).any()),
     )
     assert_result_equal(
         df4,
-        lambda t: t >> group_by(t.col1) >> mutate(any=(λ.col1 == λ.col2).any()),
+        lambda t: t >> group_by(t.col1) >> mutate(any=(C.col1 == C.col2).any()),
     )
 
 
 def test_op_all(df4):
     assert_result_equal(
         df4,
-        lambda t: t >> group_by(t.col1) >> summarise(all=(λ.col2 != λ.col3).all()),
+        lambda t: t >> group_by(t.col1) >> summarise(all=(C.col2 != C.col3).all()),
     )
     assert_result_equal(
         df4,
-        lambda t: t >> group_by(t.col1) >> mutate(all=(λ.col2 != λ.col3).all()),
+        lambda t: t >> group_by(t.col1) >> mutate(all=(C.col2 != C.col3).all()),
     )

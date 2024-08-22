@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core.expressions import FunctionCall, SymbolicExpression
 
 
@@ -28,8 +28,8 @@ class TestExpressions:
         compare_sexpr(s1.argument(s2, 3), FunctionCall("argument", 1, 2, 3))
 
     def test_lambda_col(self):
-        compare_sexpr(λ.something, λ["something"])
-        compare_sexpr(λ.something.chained(), λ["something"].chained())
+        compare_sexpr(C.something, C["something"])
+        compare_sexpr(C.something.chained(), C["something"].chained())
 
     def test_banned_methods(self):
         s1 = SymbolicExpression(1)

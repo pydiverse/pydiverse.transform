@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core import functions as f
 from pydiverse.transform.core.verbs import (
     arrange,
@@ -52,7 +52,7 @@ def test_chained(df3):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(min=t.col4.min(), max=t.col4.max())
-        >> mutate(span=λ.max - λ.min),
+        >> mutate(span=C.max - C.min),
     )
 
 
@@ -63,21 +63,21 @@ def test_nested(df3):
         >> group_by(t.col1)
         >> mutate(range=t.col4.max() - 10)
         >> ungroup()
-        >> mutate(range_mean=λ.range.mean()),
+        >> mutate(range_mean=C.range.mean()),
     )
 
     assert_result_equal(
         df3,
         lambda t: t
-        >> mutate(x=λ.col4.max())
-        >> mutate(y=λ.x.min() * 1)
-        >> mutate(z=λ.y.mean())
-        >> mutate(w=λ.x / λ.y),
+        >> mutate(x=C.col4.max())
+        >> mutate(y=C.x.min() * 1)
+        >> mutate(z=C.y.mean())
+        >> mutate(w=C.x / C.y),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t >> mutate(x=(λ.col4.max().min() + λ.col2.mean()).max()),
+        lambda t: t >> mutate(x=(C.col4.max().min() + C.col2.mean()).max()),
         exception=FunctionTypeError,
         may_throw=True,
     )
@@ -89,7 +89,7 @@ def test_filter(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(mean3=t.col3.mean())
-        >> filter(λ.mean3 <= 2.0),
+        >> filter(C.mean3 <= 2.0),
     )
 
 
@@ -99,7 +99,7 @@ def test_arrange(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(mean3=t.col3.mean())
-        >> arrange(λ.mean3),
+        >> arrange(C.mean3),
     )
 
     assert_result_equal(
@@ -108,7 +108,7 @@ def test_arrange(df3):
         >> arrange(-t.col4)
         >> group_by(t.col1, t.col2)
         >> mutate(mean3=t.col3.mean())
-        >> arrange(λ.mean3),
+        >> arrange(C.mean3),
     )
 
 
@@ -118,7 +118,7 @@ def test_summarise(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(range=t.col4.max() - t.col4.min())
-        >> summarise(mean_range=λ.range.mean()),
+        >> summarise(mean_range=C.range.mean()),
     )
 
     assert_result_equal(
@@ -126,7 +126,7 @@ def test_summarise(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(range=t.col4.max() - t.col4.min())
-        >> mutate(mean_range=λ.range.mean()),
+        >> mutate(mean_range=C.range.mean()),
     )
 
 
@@ -138,9 +138,9 @@ def test_intermediate_select(df3):
         >> group_by(t.col1, t.col2)
         >> mutate(x=t.col4.mean())
         >> select()
-        >> mutate(y=λ.x.min())
+        >> mutate(y=C.x.min())
         >> select()
-        >> mutate(z=(λ.x - λ.y).mean()),
+        >> mutate(z=(C.x - C.y).mean()),
     )
 
 
@@ -150,35 +150,35 @@ def test_arrange_argument(df3):
         df3,
         lambda t: t
         >> group_by(t.col1)
-        >> mutate(x=λ.col4.shift(1, arrange=[-λ.col3]))
+        >> mutate(x=C.col4.shift(1, arrange=[-C.col3]))
         >> full_sort()
-        >> select(λ.x),
+        >> select(C.x),
     )
 
     assert_result_equal(
         df3,
         lambda t: t
         >> group_by(t.col2)
-        >> mutate(x=f.row_number(arrange=[-λ.col4]))
+        >> mutate(x=f.row_number(arrange=[-C.col4]))
         >> full_sort()
-        >> select(λ.x),
+        >> select(C.x),
     )
 
     # Ungrouped
     assert_result_equal(
         df3,
         lambda t: t
-        >> mutate(x=λ.col4.shift(1, arrange=[-λ.col3]))
+        >> mutate(x=C.col4.shift(1, arrange=[-C.col3]))
         >> full_sort()
-        >> select(λ.x),
+        >> select(C.x),
     )
 
     assert_result_equal(
         df3,
         lambda t: t
-        >> mutate(x=f.row_number(arrange=[-λ.col4]))
+        >> mutate(x=f.row_number(arrange=[-C.col4]))
         >> full_sort()
-        >> select(λ.x),
+        >> select(C.x),
     )
 
 
@@ -188,12 +188,12 @@ def test_complex(df3):
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
-        >> mutate(mean3=t.col3.mean(), rn=f.row_number(arrange=[λ.col1, λ.col2]))
-        >> filter(λ.mean3 > λ.rn)
-        >> summarise(meta_mean=λ.mean3.mean())
-        >> filter(t.col1 >= λ.meta_mean)
+        >> mutate(mean3=t.col3.mean(), rn=f.row_number(arrange=[C.col1, C.col2]))
+        >> filter(C.mean3 > C.rn)
+        >> summarise(meta_mean=C.mean3.mean())
+        >> filter(t.col1 >= C.meta_mean)
         >> filter(t.col1 != 1)
-        >> arrange(λ.meta_mean),
+        >> arrange(C.meta_mean),
     )
 
     # Window function after summarise
@@ -202,10 +202,10 @@ def test_complex(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarise(mean3=t.col3.mean())
-        >> mutate(minM3=λ.mean3.min(), maxM3=λ.mean3.max())
-        >> mutate(span=λ.maxM3 - λ.minM3)
-        >> filter(λ.span < 3)
-        >> arrange(λ.span),
+        >> mutate(minM3=C.mean3.min(), maxM3=C.mean3.max())
+        >> mutate(span=C.maxM3 - C.minM3)
+        >> filter(C.span < 3)
+        >> arrange(C.span),
     )
 
 
@@ -214,12 +214,12 @@ def test_nested_bool(df4):
         df4,
         lambda t: t
         >> group_by(t.col1)
-        >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= λ.col4)
+        >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= C.col4)
         >> mutate(
-            xshift=λ.x.shift(1, arrange=[t.col4]),
-            yshift=λ.y.shift(-1, arrange=[t.col4]),
+            xshift=C.x.shift(1, arrange=[t.col4]),
+            yshift=C.y.shift(-1, arrange=[t.col4]),
         )
-        >> mutate(xAndY=λ.x & λ.y, xAndYshifted=λ.xshift & λ.yshift),
+        >> mutate(xAndY=C.x & C.y, xAndYshifted=C.xshift & C.yshift),
     )
 
 
@@ -245,8 +245,8 @@ def test_op_row_number(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            row_number1=f.row_number(arrange=[λ.col4]),
-            row_number2=f.row_number(arrange=[λ.col2, λ.col3]),
+            row_number1=f.row_number(arrange=[C.col4]),
+            row_number2=f.row_number(arrange=[C.col2, C.col3]),
         ),
     )
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import polars as pl
 import pytest
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core import functions as f
 from pydiverse.transform.core.alignment import aligned, eval_aligned
@@ -284,7 +284,7 @@ class TestPolarsEager:
         )
 
         assert_equal(
-            tbl3 >> summarise(mean=tbl3.col4.mean()) >> mutate(mean_2x=λ.mean * 2),
+            tbl3 >> summarise(mean=tbl3.col4.mean()) >> mutate(mean_2x=C.mean * 2),
             pl.DataFrame({"mean": [5.5], "mean_2x": [11.0]}),
             check_row_order=False,
         )
@@ -293,7 +293,7 @@ class TestPolarsEager:
         # Grouping doesn't change the result
         assert_equal(tbl3 >> group_by(tbl3.col1), tbl3)
         assert_equal(
-            tbl3 >> summarise(mean4=tbl3.col4.mean()) >> group_by(λ.mean4),
+            tbl3 >> summarise(mean4=tbl3.col4.mean()) >> group_by(C.mean4),
             tbl3 >> summarise(mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
@@ -331,7 +331,7 @@ class TestPolarsEager:
             tbl1
             >> mutate(xyz=(tbl1.col1 * tbl1.col1) // 2)
             >> join(tbl2, tbl1.col1 == tbl2.col1, "left")
-            >> mutate(col1=tbl1.col1 - λ.xyz)
+            >> mutate(col1=tbl1.col1 - C.xyz)
         )
         b = a >> alias("b")
 
@@ -354,15 +354,15 @@ class TestPolarsEager:
     def test_window_functions(self, tbl3):
         # Everything else should stay the same
         assert_equal(
-            tbl3 >> mutate(x=f.row_number(arrange=[-λ.col4])) >> select(*tbl3), df3
+            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3), df3
         )
 
         assert_equal(
             (
                 tbl3
-                >> group_by(λ.col2)
+                >> group_by(C.col2)
                 >> select()
-                >> mutate(x=f.row_number(arrange=[-λ.col4]))
+                >> mutate(x=f.row_number(arrange=[-C.col4]))
             ),
             pl.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
         )
@@ -374,7 +374,7 @@ class TestPolarsEager:
                 tbl
                 >> mutate(_n=f.row_number(arrange=[]))
                 >> alias()
-                >> filter((offset < λ._n) & (λ._n <= (n + offset)))
+                >> filter((offset < C._n) & (C._n <= (n + offset)))
             )
             return t >> select(*[c for c in t if c._.name != "_n"])
 
@@ -399,7 +399,7 @@ class TestPolarsEager:
                 tbl3
                 >> select()
                 >> mutate(
-                    col1=λ.col1.case(
+                    col1=C.col1.case(
                         (0, 1),
                         (1, 2),
                         (2, 3),
@@ -415,9 +415,9 @@ class TestPolarsEager:
                 tbl3
                 >> select()
                 >> mutate(
-                    x=λ.col1.case(
-                        (λ.col2, 1),
-                        (λ.col3, 2),
+                    x=C.col1.case(
+                        (C.col2, 1),
+                        (C.col3, 2),
                         default=0,
                     )
                 )
@@ -431,9 +431,9 @@ class TestPolarsEager:
                 >> select()
                 >> mutate(
                     x=f.case(
-                        (λ.col1 == λ.col2, 1),
-                        (λ.col1 == λ.col3, 2),
-                        default=λ.col4,
+                        (C.col1 == C.col2, 1),
+                        (C.col1 == C.col3, 2),
+                        default=C.col4,
                     )
                 )
             ),
@@ -442,19 +442,19 @@ class TestPolarsEager:
 
     def test_lambda_column(self, tbl1, tbl2):
         # Select
-        assert_equal(tbl1 >> select(λ.col1), tbl1 >> select(tbl1.col1))
+        assert_equal(tbl1 >> select(C.col1), tbl1 >> select(tbl1.col1))
 
         # Mutate
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> select() >> mutate(b=λ.a * 2),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> select() >> mutate(b=C.a * 2),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
         assert_equal(
             tbl1
             >> mutate(a=tbl1.col1 * 2)
-            >> mutate(b=λ.a * 2, a=tbl1.col1)
-            >> select(λ.b),
+            >> mutate(b=C.a * 2, a=tbl1.col1)
+            >> select(C.b),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
@@ -463,7 +463,7 @@ class TestPolarsEager:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, λ.a == tbl2.col1, "left"),
+            >> join(tbl2, C.a == tbl2.col1, "left"),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
@@ -475,7 +475,7 @@ class TestPolarsEager:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, λ.a == λ.col1_df2, "left"),
+            >> join(tbl2, C.a == C.col1_df2, "left"),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
@@ -484,13 +484,13 @@ class TestPolarsEager:
 
         # Filter
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> filter(λ.a % 2 == 0),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> filter(C.a % 2 == 0),
             tbl1 >> mutate(a=tbl1.col1 * 2) >> filter((tbl1.col1 * 2) % 2 == 0),
         )
 
         # Arrange
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> arrange(λ.a),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> arrange(C.a),
             tbl1 >> arrange(tbl1.col1) >> mutate(a=tbl1.col1 * 2),
         )
 
@@ -506,14 +506,14 @@ class TestPolarsEager:
 
         # Check if it worked...
         assert_equal(
-            (tl >> join(tr, λ.a == λ.b_df_right, "left")),
+            (tl >> join(tr, C.a == C.b_df_right, "left")),
             (
                 tbl_left
                 >> mutate(a=(tbl_left.a * 2) % 3)
                 >> join(
                     tbl_right
                     >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    λ.a == λ.b_df_right,
+                    C.a == C.b_df_right,
                     "left",
                 )
             ),
@@ -522,13 +522,13 @@ class TestPolarsEager:
     def test_custom_verb(self, tbl1):
         @verb
         def double_col1(tbl):
-            tbl[λ.col1] = λ.col1 * 2
+            tbl[C.col1] = C.col1 * 2
             return tbl
 
         # Custom verb should not mutate input object
         assert_not_inplace(tbl1, double_col1())
 
-        assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=λ.col1 * 2))
+        assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=C.col1 * 2))
 
     def test_null_comparison(self, tbl4):
         assert_equal(
@@ -594,16 +594,16 @@ class TestPolarsAligned:
             return a + b
 
         assert_equal(
-            tbl_left >> mutate(x=f(tbl_left.a, tbl_right.b)) >> select(λ.x),
+            tbl_left >> mutate(x=f(tbl_left.a, tbl_right.b)) >> select(C.x),
             pl.DataFrame({"x": (df_left.get_column("a") + df_right.get_column("b"))}),
         )
 
         with pytest.raises(AlignmentError):
-            f(tbl_left.a, (tbl_right >> filter(λ.b == 2)).b)
+            f(tbl_left.a, (tbl_right >> filter(C.b == 2)).b)
 
         with pytest.raises(AlignmentError):
             x = f(tbl_left.a, tbl_right.b)
-            tbl_left >> filter(λ.a <= 3) >> mutate(x=x)
+            tbl_left >> filter(C.a <= 3) >> mutate(x=x)
 
 
 class TestPrintAndRepr:
@@ -654,12 +654,12 @@ class TestPrintAndRepr:
         assert "exception" not in (tbl1.col1 * 2)._repr_html_()
 
     def test_lambda_str(self, tbl1):
-        assert "exception" in str(λ.col)
-        assert "exception" in str(λ.col1 + tbl1.col1)
+        assert "exception" in str(C.col)
+        assert "exception" in str(C.col1 + tbl1.col1)
 
     def test_eval_expr_str(self, tbl_left, tbl_right):
         valid = tbl_left.a + tbl_right.b
-        invalid = tbl_left.a + (tbl_right >> filter(λ.b == 2)).b
+        invalid = tbl_left.a + (tbl_right >> filter(C.b == 2)).b
 
         assert "exception" not in str(valid)
         assert "exception" in str(invalid)

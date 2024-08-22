@@ -106,7 +106,7 @@ class LambdaColumn(BaseExpression):
       The following fails because `table.a` gets referenced before it gets created.
         table >> mutate(a = table.x) >> mutate(b = table.a)
       Instead you can use a lambda column to achieve this:
-        table >> mutate(a = table.x) >> mutate(b = λ.a)
+        table >> mutate(a = table.x) >> mutate(b = C.a)
     """
 
     __slots__ = "name"
@@ -115,10 +115,10 @@ class LambdaColumn(BaseExpression):
         self.name = name
 
     def __repr__(self):
-        return f"<λ.{self.name}>"
+        return f"<C.{self.name}>"
 
     def _expr_repr(self) -> str:
-        return f"λ.{self.name}"
+        return f"C.{self.name}"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -129,7 +129,7 @@ class LambdaColumn(BaseExpression):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(("λ", self.name))
+        return hash(("C", self.name))
 
 
 class LiteralColumn(BaseExpression, Generic[T]):

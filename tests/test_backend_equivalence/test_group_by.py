@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core.verbs import (
     arrange,
     filter,
@@ -29,7 +29,7 @@ def test_select(df3):
 def test_mutate(df3):
     assert_result_equal(
         df3,
-        lambda t: t >> mutate(c1xc2=t.col1 * t.col2) >> group_by(λ.c1xc2),
+        lambda t: t >> mutate(c1xc2=t.col1 * t.col2) >> group_by(C.c1xc2),
     )
 
     assert_result_equal(
@@ -47,13 +47,13 @@ def test_grouped_join(df1, df3):
     # Joining a grouped table should always throw an exception
     assert_result_equal(
         (df1, df3),
-        lambda t, u: t >> group_by(λ.col1) >> join(u, t.col1 == u.col1, how="left"),
+        lambda t, u: t >> group_by(C.col1) >> join(u, t.col1 == u.col1, how="left"),
         exception=ValueError,
     )
 
     assert_result_equal(
         (df1, df3),
-        lambda t, u: t >> join(u >> group_by(λ.col1), t.col1 == u.col1, how="left"),
+        lambda t, u: t >> join(u >> group_by(C.col1), t.col1 == u.col1, how="left"),
         exception=ValueError,
     )
 
@@ -88,6 +88,6 @@ def test_group_by_bool_col(df4):
         df4,
         lambda t: t
         >> mutate(x=t.col1 <= t.col2)
-        >> group_by(λ.x)
-        >> mutate(y=λ.col4.mean()),
+        >> group_by(C.x)
+        >> mutate(y=C.col4.mean()),
     )

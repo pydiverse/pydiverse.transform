@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 import sqlalchemy as sa
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core import functions as f
 from pydiverse.transform.core.alignment import aligned, eval_aligned
 from pydiverse.transform.core.table import Table
@@ -243,7 +243,7 @@ class TestSQLTable:
         )
 
         assert_equal(
-            tbl3 >> summarise(mean=tbl3.col4.mean()) >> mutate(mean_2x=λ.mean * 2),
+            tbl3 >> summarise(mean=tbl3.col4.mean()) >> mutate(mean_2x=C.mean * 2),
             pl.DataFrame({"mean": [5.5], "mean_2x": [11]}),
         )
 
@@ -251,7 +251,7 @@ class TestSQLTable:
         # Grouping doesn't change the result
         assert_equal(tbl3 >> group_by(tbl3.col1), tbl3)
         assert_equal(
-            tbl3 >> summarise(mean4=tbl3.col4.mean()) >> group_by(λ.mean4),
+            tbl3 >> summarise(mean4=tbl3.col4.mean()) >> group_by(C.mean4),
             tbl3 >> summarise(mean4=tbl3.col4.mean()),
         )
 
@@ -284,7 +284,7 @@ class TestSQLTable:
             tbl1
             >> mutate(xyz=(tbl1.col1 * tbl1.col1) // 2)
             >> join(tbl2, tbl1.col1 == tbl2.col1, "left")
-            >> mutate(col1=tbl1.col1 - λ.xyz)
+            >> mutate(col1=tbl1.col1 - C.xyz)
         )
         b = a >> alias("b")
 
@@ -309,19 +309,19 @@ class TestSQLTable:
 
     def test_lambda_column(self, tbl1, tbl2):
         # Select
-        assert_equal(tbl1 >> select(λ.col1), tbl1 >> select(tbl1.col1))
+        assert_equal(tbl1 >> select(C.col1), tbl1 >> select(tbl1.col1))
 
         # Mutate
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> select() >> mutate(b=λ.a * 2),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> select() >> mutate(b=C.a * 2),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
         assert_equal(
             tbl1
             >> mutate(a=tbl1.col1 * 2)
-            >> mutate(b=λ.a * 2, a=tbl1.col1)
-            >> select(λ.b),
+            >> mutate(b=C.a * 2, a=tbl1.col1)
+            >> select(C.b),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
@@ -330,7 +330,7 @@ class TestSQLTable:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1 * 2)
-            >> join(tbl2, λ.a == tbl2.col1, "left"),
+            >> join(tbl2, C.a == tbl2.col1, "left"),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1 * 2)
@@ -342,7 +342,7 @@ class TestSQLTable:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, λ.a == λ.col1_df2, "left"),
+            >> join(tbl2, C.a == C.col1_df2, "left"),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
@@ -351,13 +351,13 @@ class TestSQLTable:
 
         # Filter
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> filter(λ.a % 2 == 0),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> filter(C.a % 2 == 0),
             tbl1 >> mutate(a=tbl1.col1 * 2) >> filter((tbl1.col1 * 2) % 2 == 0),
         )
 
         # Arrange
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> arrange(λ.a),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> arrange(C.a),
             tbl1 >> arrange(tbl1.col1) >> mutate(a=tbl1.col1 * 2),
         )
 
@@ -373,14 +373,14 @@ class TestSQLTable:
 
         # Check if it worked...
         assert_equal(
-            (tl >> join(tr, λ.a == λ.b_df_right, "left")),
+            (tl >> join(tr, C.a == C.b_df_right, "left")),
             (
                 tbl_left
                 >> mutate(a=(tbl_left.a * 2) % 3)
                 >> join(
                     tbl_right
                     >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    λ.a == λ.b_df_right,
+                    C.a == C.b_df_right,
                     "left",
                 )
             ),
@@ -475,7 +475,7 @@ class TestSQLAligned:
             return a + b
 
         assert_equal(
-            tbl3 >> mutate(x=f(tbl3.col1, tbl3.col2)) >> select(λ.x),
+            tbl3 >> mutate(x=f(tbl3.col1, tbl3.col2)) >> select(C.x),
             pl.DataFrame({"x": [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3]}),
         )
 
@@ -484,7 +484,7 @@ class TestSQLAligned:
         tbl3 >> mutate(x=f(tbl3_mutate.col1, tbl3_mutate.x))
 
         with pytest.raises(AlignmentError):
-            tbl3 >> arrange(λ.col1) >> mutate(x=f(tbl3.col1, tbl3.col2))
+            tbl3 >> arrange(C.col1) >> mutate(x=f(tbl3.col1, tbl3.col2))
 
         with pytest.raises(AlignmentError):
-            tbl3 >> filter(λ.col1 == 1) >> mutate(x=f(tbl3.col1, tbl3.col2))
+            tbl3 >> filter(C.col1 == 1) >> mutate(x=f(tbl3.col1, tbl3.col2))

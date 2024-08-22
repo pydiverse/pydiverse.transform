@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core.verbs import (
     arrange,
     mutate,
@@ -46,7 +46,7 @@ def test_multiple(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(t.col2, λ.col2),
+        lambda t: t >> arrange(t.col2, C.col2),
     )
 
 
@@ -93,6 +93,6 @@ def test_nulls_first_last_mixed(df4):
 def test_arrange_after_mutate(df4):
     assert_result_equal(
         df4,
-        lambda t: t >> mutate(x=t.col1 <= t.col2) >> arrange(λ.x, λ.col4),
+        lambda t: t >> mutate(x=t.col1 <= t.col2) >> arrange(C.x, C.col4),
         check_row_order=True,
     )
