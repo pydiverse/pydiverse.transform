@@ -89,10 +89,9 @@ class MSSqlTableImpl(SQLTableImpl):
             return self._translate(meta_data.expr, **kwargs)
 
         def _translate_function_value(
-            self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
+            self, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             value = super()._translate_function_value(
-                expr,
                 implementation,
                 op_args,
                 context_kwargs,
