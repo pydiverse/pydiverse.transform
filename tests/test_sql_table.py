@@ -166,14 +166,14 @@ class TestSQLTable:
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
             >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b_df_right": [1, 2, 2, None, None]}),
+            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
         )
 
         assert_equal(
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "inner")
             >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2], "b_df_right": [1, 2, 2]}),
+            pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
         )
 
         if sqlite3.sqlite_version_info >= (3, 39, 0):
@@ -186,7 +186,7 @@ class TestSQLTable:
                 pl.DataFrame(
                     {
                         "a": [1.0, 2.0, 2.0, 3.0, 4.0, None],
-                        "b_df_right": [1.0, 2.0, 2.0, None, None, 0.0],
+                        "b": [1.0, 2.0, 2.0, None, None, 0.0],
                     }
                 ),
             )
@@ -291,15 +291,20 @@ class TestSQLTable:
         assert_equal(a, b)
 
         # Self Join
-        self_join = tbl2 >> join(x, tbl2.col1 == x.col1, "left") >> alias("self_join")
+        self_join = (
+            tbl2
+            >> join(x, tbl2.col1 == x.col1, "left", suffix="42")
+            >> alias("self_join")
+        )
         self_join >>= arrange(*self_join)
 
         self_join_expected = df2.join(
-            df2.rename(mapping={"col1": "col1_x", "col2": "col2_x", "col3": "col3_x"}),
+            df2,
             how="left",
             left_on="col1",
-            right_on="col1_x",
+            right_on="col1",
             coalesce=False,
+            suffix="42",
         )
         self_join_expected = self_join_expected.sort(
             by=[col._.name for col in self_join]
@@ -342,7 +347,7 @@ class TestSQLTable:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == C.col1_df2, "left"),
+            >> join(tbl2, C.a == C.col1_right, "left"),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
@@ -373,14 +378,14 @@ class TestSQLTable:
 
         # Check if it worked...
         assert_equal(
-            (tl >> join(tr, C.a == C.b_df_right, "left")),
+            (tl >> join(tr, C.a == tr.b, "left")),
             (
                 tbl_left
                 >> mutate(a=(tbl_left.a * 2) % 3)
                 >> join(
                     tbl_right
                     >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    C.a == C.b_df_right,
+                    C.a == C.b,
                     "left",
                 )
             ),

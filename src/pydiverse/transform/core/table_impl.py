@@ -77,7 +77,7 @@ class AbstractTableImpl:
         self.compiler = self.ExpressionCompiler(self)
         self.lambda_translator = self.LambdaTranslator(self)
 
-        self.selects: ordered_set[str] = ordered_set()
+        self.selects: ordered_set[str] = ordered_set()  # subset of named_cols
         self.named_cols: bidict[str, uuid.UUID] = bidict()
         self.available_cols: set[uuid.UUID] = set()
         self.cols: dict[uuid.UUID, ColumnMetaData] = dict()

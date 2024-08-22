@@ -172,7 +172,7 @@ class TestPolarsEager:
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
             >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b_df_right": [1, 2, 2, None, None]}),
+            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
             check_row_order=False,
         )
 
@@ -180,7 +180,7 @@ class TestPolarsEager:
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "inner")
             >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2], "b_df_right": [1, 2, 2]}),
+            pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
             check_row_order=False,
         )
 
@@ -191,7 +191,7 @@ class TestPolarsEager:
             pl.DataFrame(
                 {
                     "a": [None, 1, 2, 2, 3, 4],
-                    "b_df_right": [0, 1, 2, 2, None, None],
+                    "b": [0, 1, 2, 2, None, None],
                 }
             ),
             check_row_order=False,
@@ -341,12 +341,10 @@ class TestPolarsEager:
         assert_equal(
             tbl2 >> join(x, tbl2.col1 == x.col1, "left"),
             df2.join(
-                df2.rename(
-                    mapping={"col1": "col1_x", "col2": "col2_x", "col3": "col3_x"}
-                ),
+                df2,
                 how="left",
                 left_on="col1",
-                right_on="col1_x",
+                right_on="col1",
                 coalesce=False,
             ),
         )
@@ -475,11 +473,11 @@ class TestPolarsEager:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == C.col1_df2, "left"),
+            >> join(tbl2, C.a == C.col1_custom_suffix, "left", suffix="_custom_suffix"),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left"),
+            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_custom_suffix"),
         )
 
         # Filter
@@ -506,14 +504,14 @@ class TestPolarsEager:
 
         # Check if it worked...
         assert_equal(
-            (tl >> join(tr, C.a == C.b_df_right, "left")),
+            (tl >> join(tr, C.a == C.b, "left")),
             (
                 tbl_left
                 >> mutate(a=(tbl_left.a * 2) % 3)
                 >> join(
                     tbl_right
                     >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    C.a == C.b_df_right,
+                    C.a == C.b,
                     "left",
                 )
             ),

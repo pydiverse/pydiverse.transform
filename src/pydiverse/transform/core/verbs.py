@@ -187,7 +187,6 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
             if name not in exclude:
                 selects.append(name)
 
-    # SELECT
     new_tbl = tbl.copy()
     new_tbl.preverb_hook("select", *args)
     new_tbl.selects = ordered_set(selects)
@@ -273,6 +272,7 @@ def join(
     how: Literal["inner", "left", "outer"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    suffix: str = "_right",  # appended to cols of the right table with duplicate name
 ):
     validate_table_args(left, right)
 
@@ -284,41 +284,34 @@ def join(
 
     if how not in ("inner", "left", "outer"):
         raise ValueError(
-            "Join type must be one of 'inner', 'left' or 'outer' (value provided:"
+            "join type must be one of 'inner', 'left' or 'outer' (value provided:"
             f" {how})"
         )
 
-    # Construct new table
-    # JOIN -> Merge the left and right table
     new_left = left.copy()
     new_left.preverb_hook("join", right, on, how, validate=validate)
 
-    # Update selects
-    right_renamed_selects = ordered_set(
-        name + "_" + right.name for name in right.selects
-    )
-    right_renamed_cols = {
-        k + "_" + right.name: v for k, v in right.named_cols.fwd.items()
-    }
-
-    # Check for collisions
-    # TODO: Review...
-    if ambiguous_column_names := new_left.selects & right_renamed_selects:
-        raise ValueError("Ambiguous column names: " + ", ".join(ambiguous_column_names))
+    # the joined table should only contain the cols currently selected in the left and
+    # right table
+    new_names_right = {name: name for name in right.selects}
     if (
-        ambiguous_column_names := set(new_left.named_cols.fwd.keys())
-        & right_renamed_cols.keys()
+        col_name_duplicates := new_left.named_cols.fwd.keys()
+        & right.named_cols.fwd.keys()
     ):
-        raise ValueError("Ambiguous column names: " + ", ".join(ambiguous_column_names))
+        for name in col_name_duplicates:
+            new_names_right[name] = name + suffix
+
     if ambiguous_column_uuids := set(new_left.named_cols.fwd.values()) & set(
-        right_renamed_cols.values()
+        right.named_cols.fwd.values()
     ):
         raise ValueError(
-            "Ambiguous column uuids: " + ", ".join(map(str, ambiguous_column_uuids))
+            "ambiguous column uuids: " + ", ".join(map(str, ambiguous_column_uuids))
         )
 
-    new_left.selects |= right_renamed_selects
-    new_left.named_cols.fwd.update(right_renamed_cols)
+    new_left.selects |= {new_names_right[name] for name in right.selects}
+    new_left.named_cols.fwd.update(
+        {new_names_right[name]: uuid for name, uuid in right.named_cols.fwd.items()}
+    )
     new_left.available_cols.update(right.available_cols)
     new_left.cols.update(right.cols)
 
