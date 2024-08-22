@@ -105,8 +105,9 @@ def validate_table_args(*tables):
 
 
 @builtin_verb()
-def alias(tbl: AbstractTableImpl, name: str = None):
-    """Creates a new table object with a different name."""
+def alias(tbl: AbstractTableImpl, name: str | None = None):
+    """Creates a new table object with a different name and reassigns column UUIDs.
+    Must be used before performing a self-join."""
     validate_table_args(tbl)
     return tbl.alias(name)
 
@@ -291,26 +292,20 @@ def join(
     new_left = left.copy()
     new_left.preverb_hook("join", right, on, how, validate=validate)
 
-    # the joined table should only contain the cols currently selected in the left and
-    # right table
-    new_names_right = {name: name for name in right.selects}
+    if set(new_left.named_cols.fwd.values()) & set(right.named_cols.fwd.values()):
+        raise ValueError("cannot do a self-join without precedent `alias`.")
+
+    new_name_right = {name: name for name in right.selects}
     if (
         col_name_duplicates := new_left.named_cols.fwd.keys()
         & right.named_cols.fwd.keys()
     ):
         for name in col_name_duplicates:
-            new_names_right[name] = name + suffix
+            new_name_right[name] = name + suffix
 
-    if ambiguous_column_uuids := set(new_left.named_cols.fwd.values()) & set(
-        right.named_cols.fwd.values()
-    ):
-        raise ValueError(
-            "ambiguous column uuids: " + ", ".join(map(str, ambiguous_column_uuids))
-        )
-
-    new_left.selects |= {new_names_right[name] for name in right.selects}
+    new_left.selects |= {new_name_right[name] for name in right.selects}
     new_left.named_cols.fwd.update(
-        {new_names_right[name]: uuid for name, uuid in right.named_cols.fwd.items()}
+        {new_name_right[name]: uuid for name, uuid in right.named_cols.fwd.items()}
     )
     new_left.available_cols.update(right.available_cols)
     new_left.cols.update(right.cols)
