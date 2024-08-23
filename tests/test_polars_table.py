@@ -197,6 +197,29 @@ class TestPolarsEager:
             check_row_order=False,
         )
 
+        # test self-join
+        assert_equal(
+            tbl_left
+            >> inner_join(
+                tbl_left2 := tbl_left >> alias(),
+                tbl_left.a == tbl_left2.a,
+            ),
+            df_left.join(df_left, on="a", coalesce=False, suffix="_df_left"),
+        )
+
+        assert_equal(
+            tbl_right
+            >> inner_join(
+                tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
+            )
+            >> inner_join(
+                tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
+            ),
+            df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
+                df_right, "b", suffix="_df_right1", coalesce=False
+            ),
+        )
+
     def test_filter(self, tbl1, tbl2):
         assert_not_inplace(tbl1, filter(tbl1.col1 == 3))
 
