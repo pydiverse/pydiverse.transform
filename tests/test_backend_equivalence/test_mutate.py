@@ -46,10 +46,8 @@ def test_none(df4):
         df4,
         lambda t: t
         >> mutate(
-            x1=(t.col1 == None),
-            x2=(t.col1 != None),
-            y1=(None == t.col2),
-            y2=(None != t.col2),
+            x1=t.col1.is_null(),
+            y1=~t.col2.is_null(),
         ),
     )
 

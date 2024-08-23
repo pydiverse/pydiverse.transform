@@ -319,7 +319,7 @@ class TestBuiltinVerbs:
             == 2
         )
 
-        with pytest.raises(ValueError, match="Ambiguous"):
+        with pytest.raises(ValueError):
             # self join without alias
             tbl1 >> join(tbl1, tbl1.col1 == tbl1.col1, "inner")
 

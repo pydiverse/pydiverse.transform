@@ -228,6 +228,9 @@ class PolarsEager(AbstractTableImpl):
                         "window function are not allowed inside summarise"
                     )
 
+                # if verb != "muatate", we should give a warning that this only works
+                # for polars
+
                 if arrange := context_kwargs.get("arrange"):
                     ordering = translate_ordering(self.backend, arrange)
                     internal_kwargs["_ordering"] = ordering
@@ -453,13 +456,6 @@ with PolarsEager.op(ops.Any()) as op:
         return x.any()
 
 
-with PolarsEager.op(ops.RowNumber()) as op:
-
-    @op.auto
-    def _row_number():
-        return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)
-
-
 with PolarsEager.op(ops.IsNull()) as op:
 
     @op.auto
@@ -535,3 +531,10 @@ with PolarsEager.op(ops.DayOfYear()) as op:
     @op.auto
     def _dt_day_of_year(x):
         return x.dt.ordinal_day()
+
+
+with PolarsEager.op(ops.RowNumber()) as op:
+
+    @op.auto
+    def _row_number():
+        return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)

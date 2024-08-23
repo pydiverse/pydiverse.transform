@@ -35,9 +35,6 @@ class SymbolicExpression(Generic[T]):
                 " underscore."
             )
 
-        if item in ["dt", "str"]:
-            return FnNamespace(item, self)
-
         return SymbolAttribute(item, self)
 
     def __getitem__(self, item):
@@ -132,18 +129,6 @@ class SymbolAttribute:
             f" attribute name '{self.__name}' of '{self.__on}'? Maybe you forgot a"
             " leading underscore."
         )
-
-
-# returned from SymbolicExpression.__getitem__ in case the attribute name is `dt` or
-# `str` to create a virtual namespace.
-# TODO: __dir__
-class FnNamespace:
-    def __init__(self, prefix: str, expr: SymbolicExpression):
-        self.prefix = prefix
-        self.expr = expr
-
-    def __getattr__(self, item: str) -> str:
-        return SymbolAttribute(f"{self.prefix}_{item}", self.expr)
 
 
 def unwrap_symbolic_expressions(arg: Any = None):
