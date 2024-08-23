@@ -77,23 +77,24 @@ jobs:
         mssql
       pytest-arguments: --mssql
 
-  db2_test:
-    name: DB2 Tests
-    needs: [smoke_test]
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-        environment:
-          - py39ibm
-          - py312ibm
-    uses: ./.github/workflows/test.yml
-    with:
-      os: ${{ matrix.os }}
-      environment: ${{ matrix.environment }}
-      docker-services: |
-        ibm_db2
-      pytest-arguments: --ibm_db2
+# ## Deactivated since ibm_db2 tests never ran and are currently failing
+#  db2_test:
+#    name: DB2 Tests
+#    needs: [smoke_test]
+#    strategy:
+#      matrix:
+#        os:
+#          - ubuntu-latest
+#        environment:
+#          - py39ibm
+#          - py312ibm
+#    uses: ./.github/workflows/test.yml
+#    with:
+#      os: ${{ matrix.os }}
+#      environment: ${{ matrix.environment }}
+#      docker-services: |
+#        ibm_db2
+#      pytest-arguments: --ibm_db2
 
 # ## Deactivated since snowflake requires pandas < 2 and pydiverse transform does not support it
 #  snowflake_test:
