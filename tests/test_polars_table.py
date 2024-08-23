@@ -388,6 +388,21 @@ class TestPolarsEager:
             pl.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
         )
 
+        # group_by and partition_by should lead to the same result
+        assert_equal(
+            (
+                tbl3
+                >> group_by(C.col2)
+                >> select()
+                >> mutate(x=f.row_number(arrange=[-C.col4]))
+            ),
+            (
+                tbl3
+                >> select()
+                >> mutate(x=f.row_number(arrange=[-C.col4], partition_by=[C.col2]))
+            ),
+        )
+
     def test_slice_head(self, tbl3):
         @verb
         def slice_head_custom(tbl: Table, n: int, *, offset: int = 0):

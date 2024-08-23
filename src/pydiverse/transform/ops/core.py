@@ -145,12 +145,16 @@ class ElementWise(Operator):
 
 class Aggregate(Operator):
     ftype = OPType.AGGREGATE
+    context_kwargs = {
+        "partition_by",  # list[Column, LambdaColumn]
+    }
 
 
 class Window(Operator):
     ftype = OPType.WINDOW
     context_kwargs = {
-        "arrange",  # List[Column | LambdaColumn]
+        "arrange",  # list[Column | LambdaColumn]
+        "partition_by",
     }
 
 

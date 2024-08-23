@@ -209,7 +209,20 @@ class PolarsEager(AbstractTableImpl):
 
             op = implementation.operator
 
-            if op.ftype == OPType.WINDOW:
+            ftype = (
+                OPType.WINDOW
+                if op.ftype == OPType.AGGREGATE and verb != "summarise"
+                else op.ftype
+            )
+
+            if ftype == OPType.AGGREGATE and context_kwargs.get("partition_by"):
+                assert verb == "summarise"
+                raise ValueError(
+                    f"cannot use keyword argument `partition_by` for the aggregation "
+                    f"function `{op.name}` inside `summarise`."
+                )
+
+            if ftype == OPType.WINDOW:
                 if verb != "mutate":
                     raise FunctionTypeError(
                         "window function are only allowed inside a mutate"
@@ -237,12 +250,21 @@ class PolarsEager(AbstractTableImpl):
                     # the original `value`.
                     value = functools.partial(sorted_value, value)
 
-                if self.backend.grouped_by:
+                grouping = context_kwargs.get("partition_by")
+                # the `partition_by=` grouping overrides the `group_by` grouping
+                if grouping is not None:  # translate possible lambda cols
+                    grouping = [
+                        self.backend.resolve_lambda_cols(col) for col in grouping
+                    ]
+                else:  # use the current grouping of the table
+                    grouping = self.backend.grouped_by
+
+                if grouping:
 
                     def partitioned_value(value):
                         group_exprs: list[pl.Expr] = [
                             pl.col(self.backend.underlying_col_name[col.uuid])
-                            for col in self.backend.grouped_by
+                            for col in grouping
                         ]
                         return value().over(*group_exprs)
 
@@ -255,7 +277,7 @@ class PolarsEager(AbstractTableImpl):
                     op_args,
                     op,
                     OPType.WINDOW
-                    if op.ftype == OPType.AGGREGATE and verb == "mutate"
+                    if op.ftype == OPType.AGGREGATE and verb != "summarise"
                     else None,
                 ),
             )

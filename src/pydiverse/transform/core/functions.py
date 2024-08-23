@@ -25,8 +25,8 @@ def count(expr: SymbolicExpression = None):
         return _sym_f_call("count", expr)
 
 
-def row_number(*, arrange: list):
-    return _sym_f_call("row_number", arrange=arrange)
+def row_number(*, arrange: list, partition_by: list | None = None):
+    return _sym_f_call("row_number", arrange=arrange, partition_by=partition_by)
 
 
 def case(*cases: tuple[Any, Any], default: Any = None):
