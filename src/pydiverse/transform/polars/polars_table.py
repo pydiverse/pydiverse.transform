@@ -385,9 +385,9 @@ class JoinTranslator(Translator[tuple]):
 
 
 def _pdt_dtype(t: pl.DataType) -> dtypes.DType:
-    if isinstance(t, pl.Float64):
+    if t.is_float():
         return dtypes.Float()
-    elif isinstance(t, pl.Int64):
+    elif t.is_integer():
         return dtypes.Int()
     elif isinstance(t, pl.Boolean):
         return dtypes.Bool()
