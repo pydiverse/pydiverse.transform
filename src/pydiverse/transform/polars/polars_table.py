@@ -399,15 +399,36 @@ with PolarsEager.op(ops.Mean()) as op:
 with PolarsEager.op(ops.Min()) as op:
 
     @op.auto
-    def _mean(x):
+    def _min(x):
         return x.min()
 
 
 with PolarsEager.op(ops.Max()) as op:
 
     @op.auto
-    def _mean(x):
+    def _max(x):
         return x.max()
+
+
+with PolarsEager.op(ops.Sum()) as op:
+
+    @op.auto
+    def _sum(x):
+        return x.sum()
+
+
+with PolarsEager.op(ops.All()) as op:
+
+    @op.auto
+    def _all(x):
+        return x.all()
+
+
+with PolarsEager.op(ops.Any()) as op:
+
+    @op.auto
+    def _any(x):
+        return x.any()
 
 
 with PolarsEager.op(ops.RowNumber()) as op:
