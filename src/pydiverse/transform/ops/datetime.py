@@ -20,36 +20,36 @@ class DatetimeExtractComponent(ElementWise, Unary):
 
 
 class Year(DatetimeExtractComponent):
-    name = "year"
+    name = "dt_year"
 
 
 class Month(DatetimeExtractComponent):
-    name = "month"
+    name = "dt_month"
 
 
 class Day(DatetimeExtractComponent):
-    name = "day"
+    name = "dt_day"
 
 
 class Hour(DatetimeExtractComponent):
-    name = "hour"
+    name = "dt_hour"
 
 
 class Minute(DatetimeExtractComponent):
-    name = "minute"
+    name = "dt_minute"
 
 
 class Second(DatetimeExtractComponent):
-    name = "second"
+    name = "dt_second"
 
 
 class Millisecond(DatetimeExtractComponent):
-    name = "millisecond"
+    name = "dt_millisecond"
 
 
 class DayOfWeek(DatetimeExtractComponent):
-    name = "day_of_week"
+    name = "dt_day_of_week"
 
 
 class DayOfYear(DatetimeExtractComponent):
-    name = "day_of_year"
+    name = "dt_day_of_year"

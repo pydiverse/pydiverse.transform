@@ -472,3 +472,66 @@ with PolarsEager.op(ops.FillNull()) as op:
     @op.auto
     def _fill_null(x, y):
         return x.fill_null(y)
+
+
+with PolarsEager.op(ops.Year()) as op:
+
+    @op.auto
+    def _dt_year(x):
+        return x.dt.year()
+
+
+with PolarsEager.op(ops.Month()) as op:
+
+    @op.auto
+    def _dt_month(x):
+        return x.dt.month()
+
+
+with PolarsEager.op(ops.Day()) as op:
+
+    @op.auto
+    def _dt_day(x):
+        return x.dt.day()
+
+
+with PolarsEager.op(ops.Hour()) as op:
+
+    @op.auto
+    def _dt_hour(x):
+        return x.dt.hour()
+
+
+with PolarsEager.op(ops.Minute()) as op:
+
+    @op.auto
+    def _dt_minute(x):
+        return x.dt.minute()
+
+
+with PolarsEager.op(ops.Second()) as op:
+
+    @op.auto
+    def _dt_second(x):
+        return x.dt.second()
+
+
+with PolarsEager.op(ops.Millisecond()) as op:
+
+    @op.auto
+    def _dt_millisecond(x):
+        return x.dt.millisecond()
+
+
+with PolarsEager.op(ops.DayOfWeek()) as op:
+
+    @op.auto
+    def _dt_day_of_week(x):
+        return x.dt.weekday()
+
+
+with PolarsEager.op(ops.DayOfYear()) as op:
+
+    @op.auto
+    def _dt_day_of_year(x):
+        return x.dt.ordinal_day()

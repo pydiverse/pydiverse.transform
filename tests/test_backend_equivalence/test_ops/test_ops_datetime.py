@@ -63,8 +63,8 @@ def test_year(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.year(),
-            y=C.col2.year(),
+            x=C.col1.dt.year(),
+            y=C.col2.dt.year(),
         ),
     )
 
@@ -74,8 +74,8 @@ def test_month(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.month(),
-            y=C.col2.month(),
+            x=C.col1.dt.month(),
+            y=C.col2.dt.month(),
         ),
     )
 
@@ -85,8 +85,8 @@ def test_day(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.day(),
-            y=C.col2.day(),
+            x=C.col1.dt.day(),
+            y=C.col2.dt.day(),
         ),
     )
 
@@ -96,8 +96,8 @@ def test_hour(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.hour(),
-            y=C.col2.hour(),
+            x=C.col1.dt.hour(),
+            y=C.col2.dt.hour(),
         ),
     )
 
@@ -107,8 +107,8 @@ def test_minute(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.minute(),
-            y=C.col2.minute(),
+            x=C.col1.dt.minute(),
+            y=C.col2.dt.minute(),
         ),
     )
 
@@ -118,8 +118,8 @@ def test_second(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.second(),
-            y=C.col2.second(),
+            x=C.col1.dt.second(),
+            y=C.col2.dt.second(),
         ),
     )
 
@@ -129,8 +129,8 @@ def test_millisecond(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.millisecond(),
-            y=C.col2.millisecond(),
+            x=C.col1.dt.millisecond(),
+            y=C.col2.dt.millisecond(),
         ),
     )
 
@@ -140,8 +140,8 @@ def test_day_of_week(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.day_of_week(),
-            y=C.col2.day_of_week(),
+            x=C.col1.dt.day_of_week(),
+            y=C.col2.dt.day_of_week(),
         ),
     )
 
@@ -151,7 +151,7 @@ def test_day_of_year(df_datetime):
         df_datetime,
         lambda t: t
         >> mutate(
-            x=C.col1.day_of_year(),
-            y=C.col2.day_of_year(),
+            x=C.col1.dt.day_of_year(),
+            y=C.col2.dt.day_of_year(),
         ),
     )
