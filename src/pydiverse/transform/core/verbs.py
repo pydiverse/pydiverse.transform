@@ -273,7 +273,7 @@ def join(
     how: Literal["inner", "left", "outer"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
-    suffix: str = "_right",  # appended to cols of the right table with duplicate name
+    suffix: str | None = None,  # appended to cols of the right table
 ):
     validate_table_args(left, right)
 
@@ -293,19 +293,34 @@ def join(
     new_left.preverb_hook("join", right, on, how, validate=validate)
 
     if set(new_left.named_cols.fwd.values()) & set(right.named_cols.fwd.values()):
-        raise ValueError("cannot do a self-join without precedent `alias`.")
+        raise ValueError(
+            f"{how} join of `{left.name}` and `{right.name}` failed: "
+            f"duplicate columns detected. If you want to do a self-join or join a "
+            f"table twice, use `alias` on one table before the join."
+        )
 
-    new_name_right = {name: name for name in right.selects}
-    if (
-        col_name_duplicates := new_left.named_cols.fwd.keys()
-        & right.named_cols.fwd.keys()
-    ):
-        for name in col_name_duplicates:
-            new_name_right[name] = name + suffix
+    if suffix is not None:
+        # check that the user-provided suffix does not lead to collisions
+        if collisions := set(new_left.named_cols.fwd.keys()) & set(
+            name + suffix for name in right.named_cols.fwd.keys()
+        ):
+            raise ValueError(
+                f"{how} join of `{left.name}` and `{right.name}` failed: "
+                f"using the suffix `{suffix}` for right columns, the following column "
+                f"names appear both in the left and right table: {collisions}"
+            )
+    else:
+        # try `_{right.name}`, then `_{right.name}1`, `_{right.name}2` and so on
+        cnt = 0
+        suffix = "_" + right.name
+        for rname in right.named_cols.fwd.keys():
+            while rname + suffix in new_left.named_cols.fwd.keys():
+                cnt += 1
+                suffix = "_" + right.name + str(cnt)
 
-    new_left.selects |= {new_name_right[name] for name in right.selects}
+    new_left.selects |= {name + suffix for name in right.selects}
     new_left.named_cols.fwd.update(
-        {new_name_right[name]: uuid for name, uuid in right.named_cols.fwd.items()}
+        {name + suffix: uuid for name, uuid in right.named_cols.fwd.items()}
     )
     new_left.available_cols.update(right.available_cols)
     new_left.cols.update(right.cols)

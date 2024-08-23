@@ -164,14 +164,14 @@ class TestSQLTable:
     def test_join(self, tbl_left, tbl_right):
         assert_equal(
             tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "left", suffix="")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
         )
 
         assert_equal(
             tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "inner")
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "inner", suffix="")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
         )
@@ -180,13 +180,15 @@ class TestSQLTable:
             assert_equal(
                 (
                     tbl_left
-                    >> join(tbl_right, tbl_left.a == tbl_right.b, "outer")
+                    >> join(
+                        tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="_1729"
+                    )
                     >> select(tbl_left.a, tbl_right.b)
                 ),
                 pl.DataFrame(
                     {
                         "a": [1.0, 2.0, 2.0, 3.0, 4.0, None],
-                        "b": [1.0, 2.0, 2.0, None, None, 0.0],
+                        "b_1729": [1.0, 2.0, 2.0, None, None, 0.0],
                     }
                 ),
             )
@@ -347,7 +349,7 @@ class TestSQLTable:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == C.col1_right, "left"),
+            >> join(tbl2, C.a == C.col1_df2, "left"),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
@@ -385,7 +387,7 @@ class TestSQLTable:
                 >> join(
                     tbl_right
                     >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    C.a == C.b,
+                    C.a == C.b_df_right,
                     "left",
                 )
             ),

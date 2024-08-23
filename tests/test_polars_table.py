@@ -172,13 +172,13 @@ class TestPolarsEager:
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
             >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
+            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b_df_right": [1, 2, 2, None, None]}),
             check_row_order=False,
         )
 
         assert_equal(
             tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "inner")
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "inner", suffix="")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
             check_row_order=False,
@@ -186,12 +186,12 @@ class TestPolarsEager:
 
         assert_equal(
             tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "outer")
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="42")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame(
                 {
                     "a": [None, 1, 2, 2, 3, 4],
-                    "b": [0, 1, 2, 2, None, None],
+                    "b42": [0, 1, 2, 2, None, None],
                 }
             ),
             check_row_order=False,
@@ -330,7 +330,7 @@ class TestPolarsEager:
         a = (
             tbl1
             >> mutate(xyz=(tbl1.col1 * tbl1.col1) // 2)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left")
+            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_right")
             >> mutate(col1=tbl1.col1 - C.xyz)
         )
         b = a >> alias("b")
@@ -339,7 +339,7 @@ class TestPolarsEager:
 
         # Self Join
         assert_equal(
-            tbl2 >> join(x, tbl2.col1 == x.col1, "left"),
+            tbl2 >> join(x, tbl2.col1 == x.col1, "left", suffix="_right"),
             df2.join(
                 df2,
                 how="left",
@@ -504,7 +504,7 @@ class TestPolarsEager:
 
         # Check if it worked...
         assert_equal(
-            (tl >> join(tr, C.a == C.b, "left")),
+            (tl >> join(tr, C.a == C.b, "left", suffix="")),
             (
                 tbl_left
                 >> mutate(a=(tbl_left.a * 2) % 3)
@@ -513,6 +513,7 @@ class TestPolarsEager:
                     >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
                     C.a == C.b,
                     "left",
+                    suffix="",
                 )
             ),
         )
