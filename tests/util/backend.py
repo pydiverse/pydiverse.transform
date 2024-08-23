@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import os
 
 import pandas as pd
 
@@ -34,7 +35,9 @@ def pandas_impl(df: pd.DataFrame, name: str):
 _sql_engine_cache = {}
 
 
-def _sql_table(df: pd.DataFrame, name: str, url: str, dtypes_map: dict = None):
+def _sql_table(
+    df: pd.DataFrame, name: str, url: str, dtypes_map: dict = None, schema=None
+):
     import sqlalchemy as sa
 
     from pydiverse.transform.lazy import SQLTableImpl
@@ -55,8 +58,10 @@ def _sql_table(df: pd.DataFrame, name: str, url: str, dtypes_map: dict = None):
         if dtype_ in dtypes_map:
             sql_dtypes[col] = dtypes_map[dtype_]
 
-    df.to_sql(name, engine, index=False, if_exists="replace", dtype=sql_dtypes)
-    return SQLTableImpl(engine, name)
+    df.to_sql(
+        name, engine, schema=schema, index=False, if_exists="replace", dtype=sql_dtypes
+    )
+    return SQLTableImpl(engine, name if schema is None else f"{schema}.{name}")
 
 
 @_cached_impl
@@ -94,6 +99,24 @@ def mssql_impl(df: pd.DataFrame, name: str):
     )
 
 
+@_cached_impl
+def ibm_db2_impl(df: pd.DataFrame, name: str):
+    url = "db2+ibm_db://db2inst1:password@localhost:50000/testdb"
+    return _sql_table(df, name, url)
+
+
+@_cached_impl
+def snowflake_impl(df: pd.DataFrame, name: str):
+    user = os.environ["SNOWFLAKE_USER"]
+    password = os.environ["SNOWFLAKE_PASSWORD"]
+    account = os.environ["SNOWFLAKE_ACCOUNT"]
+    url = (
+        f"snowflake://{user}:{password}@{account}/pipedag/DBO?"
+        "warehouse=pipedag&role=accountadmin"
+    )
+    return _sql_table(df, name, url, schema="public")
+
+
 def impl_to_table_callable(fn):
     @functools.wraps(fn)
     def wrapped(df: pd.DataFrame, name: str):
@@ -109,4 +132,6 @@ BACKEND_TABLES = {
     "duckdb": impl_to_table_callable(duckdb_impl),
     "postgres": impl_to_table_callable(postgres_impl),
     "mssql": impl_to_table_callable(mssql_impl),
+    "ibm_db2": impl_to_table_callable(ibm_db2_impl),
+    "snowflake": impl_to_table_callable(snowflake_impl),
 }

@@ -9,6 +9,7 @@ BACKEND_MARKS = {
     "postgres": pytest.mark.postgres,
     "mssql": pytest.mark.mssql,
     "ibm_db2": pytest.mark.ibm_db2,
+    "snowflake": pytest.mark.snowflake,
 }
 
 
