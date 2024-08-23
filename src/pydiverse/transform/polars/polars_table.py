@@ -395,6 +395,8 @@ def _pdt_dtype(t: pl.DataType) -> dtypes.DType:
         return dtypes.String()
     elif isinstance(t, pl.Datetime):
         return dtypes.DateTime()
+    elif isinstance(t, pl.Date):
+        return dtypes.Date()
 
     raise TypeError(f"polars type {t} is not supported")
 
@@ -410,6 +412,8 @@ def _pl_dtype(t: dtypes.DType) -> pl.DataType:
         return pl.String()
     elif isinstance(t, dtypes.DateTime):
         return pl.Datetime()
+    elif isinstance(t, dtypes.Date):
+        return pl.Date()
 
     raise TypeError(f"pydiverse.transform type {t} not supported for polars")
 

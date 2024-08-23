@@ -19,15 +19,19 @@ class DatetimeExtractComponent(ElementWise, Unary):
     signatures = ["datetime -> int"]
 
 
-class Year(DatetimeExtractComponent):
+class DateExtractComponent(ElementWise, Unary):
+    signatures = ["date -> int"]
+
+
+class Year(DatetimeExtractComponent, DateExtractComponent):
     name = "dt.year"
 
 
-class Month(DatetimeExtractComponent):
+class Month(DatetimeExtractComponent, DateExtractComponent):
     name = "dt.month"
 
 
-class Day(DatetimeExtractComponent):
+class Day(DatetimeExtractComponent, DateExtractComponent):
     name = "dt.day"
 
 
@@ -47,9 +51,9 @@ class Millisecond(DatetimeExtractComponent):
     name = "dt.millisecond"
 
 
-class DayOfWeek(DatetimeExtractComponent):
+class DayOfWeek(DatetimeExtractComponent, DateExtractComponent):
     name = "dt.day_of_week"
 
 
-class DayOfYear(DatetimeExtractComponent):
+class DayOfYear(DatetimeExtractComponent, DateExtractComponent):
     name = "dt.day_of_year"

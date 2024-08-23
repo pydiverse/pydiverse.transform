@@ -180,7 +180,7 @@ class SQLTableImpl(AbstractTableImpl):
         if isinstance(type_, sa.DateTime):
             return dtypes.DateTime()
         if isinstance(type_, sa.Date):
-            raise NotImplementedError("Unsupported type: Date")
+            return dtypes.Date()
         if isinstance(type_, sa.Time):
             raise NotImplementedError("Unsupported type: Time")
 
