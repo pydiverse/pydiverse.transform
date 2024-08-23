@@ -11,6 +11,7 @@ __all__ = [
     "Greater",
     "GreaterEqual",
     "IsNull",
+    "FillNull",
     "IsIn",
     "And",
     "RAnd",
@@ -58,6 +59,11 @@ class NotEqual(Comparison):
 class IsNull(ElementWise, Unary, Logical):
     name = "is_null"
     signatures = ["T -> bool"]
+
+
+class FillNull(ElementWise, Binary):
+    name = "fill_null"
+    signatures = ["T, T -> T"]
 
 
 class Less(Comparison):

@@ -223,9 +223,9 @@ class PolarsEager(AbstractTableImpl):
                 )
 
             if ftype == OPType.WINDOW:
-                if verb != "mutate":
+                if verb == "summarise":
                     raise FunctionTypeError(
-                        "window function are only allowed inside a mutate"
+                        "window function are not allowed inside summarise"
                     )
 
                 if arrange := context_kwargs.get("arrange"):
@@ -465,3 +465,10 @@ with PolarsEager.op(ops.IsNull()) as op:
     @op.auto
     def _is_null(x):
         return x.is_null()
+
+
+with PolarsEager.op(ops.FillNull()) as op:
+
+    @op.auto
+    def _fill_null(x, y):
+        return x.fill_null(y)

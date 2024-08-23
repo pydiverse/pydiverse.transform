@@ -567,7 +567,8 @@ class TestPolarsEager:
 
         assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=C.col1 * 2))
 
-    def test_null_comparison(self, tbl4):
+    def test_null(self, tbl4):
+        # see if we can compare to null
         assert_equal(
             tbl4 >> mutate(u=tbl4.col1 == tbl4.col3),
             df4.with_columns((pl.col("col1") == pl.col("col3")).alias("u")),
@@ -576,6 +577,17 @@ class TestPolarsEager:
         assert_equal(
             tbl4 >> mutate(u=tbl4.col3.is_null()),
             df4.with_columns(pl.col("col3").is_null().alias("u")),
+        )
+
+        # test fill_null
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
+            df4.with_columns(pl.col("col3").fill_null(pl.col("col2")).alias("u")),
+        )
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
+            tbl4
+            >> mutate(u=f.case((tbl4.col3.is_null(), tbl4.col2), default=tbl4.col3)),
         )
 
 

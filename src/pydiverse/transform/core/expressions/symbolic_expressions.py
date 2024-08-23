@@ -48,9 +48,6 @@ class SymbolicExpression(Generic[T]):
 
         return SymbolicExpression(case_expression)
 
-    def is_null(self) -> SymbolicExpression:
-        return SymbolicExpression(FunctionCall("is_null", self))
-
     def __dir__(self):
         # TODO: Instead of displaying all available operators, translate the
         #       expression and according to the dtype and backend only display
