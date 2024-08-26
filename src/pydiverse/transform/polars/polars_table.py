@@ -199,39 +199,76 @@ class PolarsEager(AbstractTableImpl):
 
             internal_kwargs = {}
 
-            def value(**kw):
-                return implementation(
-                    *[arg.value(**kw) for arg in op_args],
-                    _tbl=self.backend,
-                    _result_type=pl_result_type,
-                    **internal_kwargs,
-                )
-
             op = implementation.operator
-
             ftype = (
                 OPType.WINDOW
                 if op.ftype == OPType.AGGREGATE and verb != "summarise"
                 else op.ftype
             )
 
-            if ftype == OPType.AGGREGATE and context_kwargs.get("partition_by"):
-                assert verb == "summarise"
-                raise ValueError(
-                    f"cannot use keyword argument `partition_by` for the aggregation "
-                    f"function `{op.name}` inside `summarise`."
+            # filtering needs to be done before applying the operator. We filter all
+            # non-constant arguments, although there should always be only one of
+            # these.
+            if ftype == OPType.AGGREGATE and (
+                filter_cond := context_kwargs.get("filter")
+            ):
+                translated_filter = self.translate(
+                    self.backend.resolve_lambda_cols(filter_cond)
                 )
 
+                def filtered_value(value):
+                    return value().filter(translated_filter.value())
+
+                assert len(filter(lambda arg: not arg.dtype.const, op_args)) == 1
+                filtered_args = [
+                    functools.partial(filtered_value, arg.value)
+                    if not arg.dtype.const
+                    else arg
+                    for arg in op_args
+                ]
+            else:
+                filtered_args = op_args
+
+            def value(**kw):
+                return implementation(
+                    *[arg.value(**kw) for arg in filtered_args],
+                    _tbl=self.backend,
+                    _result_type=pl_result_type,
+                    **internal_kwargs,
+                )
+
+            if ftype == OPType.AGGREGATE:
+                if context_kwargs.get("filter"):
+                    # TODO: allow AGGRRGATE + `filter` context_kwarg
+                    raise NotImplementedError
+
+                if context_kwargs.get("partition_by"):
+                    # technically, it probably wouldn't be too hard to support this in
+                    # polars.
+                    assert verb == "summarise"
+                    raise ValueError(
+                        f"cannot use keyword argument `partition_by` for the "
+                        f"aggregation function `{op.name}` inside `summarise`."
+                    )
+
+            # TODO: in the grouping / filter expressions, we should probably call
+            # validate_table_args. look what it does and use it.
+            # TODO: what happens if I put None or similar in a filter / partition_by?
             if ftype == OPType.WINDOW:
                 if verb == "summarise":
                     raise FunctionTypeError(
                         "window function are not allowed inside summarise"
                     )
 
-                # if verb != "muatate", we should give a warning that this only works
+                # if `verb` != "muatate", we should give a warning that this only works
                 # for polars
 
                 if arrange := context_kwargs.get("arrange"):
+                    if op.ftype == OPType.AGGREGATE:
+                        # TODO: don't fail, but give a warning that `arrange` is useless
+                        # here
+                        ...
+
                     ordering = translate_ordering(self.backend, arrange)
                     internal_kwargs["_ordering"] = ordering
 
@@ -239,6 +276,8 @@ class PolarsEager(AbstractTableImpl):
                     # `ordering`. then restore the original order. this is equivalent
                     # to giving `pl.Expr.sort_by()` the permutation inverse to
                     # `ordering`.
+                    # TODO: maybe it is easier to do the sorting before applying the
+                    # the operator and we don't need two sorts.
                     def sorted_value(value):
                         inv_permutation = pl.int_range(
                             pl.len(), dtype=pl.Int64
@@ -249,7 +288,7 @@ class PolarsEager(AbstractTableImpl):
                         )
                         return value().sort_by(inv_permutation)
 
-                    # need to bind `value` inside `sorted_value` so that it refers to
+                    # need to bind `value` inside `filtered_value` so that it refers to
                     # the original `value`.
                     value = functools.partial(sorted_value, value)
 
@@ -581,6 +620,9 @@ with PolarsEager.op(ops.Sub()) as op:
     @op.extension(ops.DatetimeSub)
     def _datetime_sub(lhs, rhs):
         return lhs - rhs
+
+
+with PolarsEager.op(ops.RSub()) as op:
 
     @op.extension(ops.DatetimeRSub)
     def _datetime_rsub(rhs, lhs):

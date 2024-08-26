@@ -147,6 +147,7 @@ class Aggregate(Operator):
     ftype = OPType.AGGREGATE
     context_kwargs = {
         "partition_by",  # list[Column, LambdaColumn]
+        "filter",  # SymbolicExpression (NOT a list)
     }
 
 
