@@ -38,6 +38,12 @@ def test_simple_grouped(df3):
     )
 
 
+def test_partition_by_argument(df3):
+    assert_result_equal(df3, lambda t: t >> mutate(u=t.col1.min(partition_by=[t.col3])))
+
+    assert_result_equal(df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=[t.col2])))
+
+
 def test_chained(df3):
     assert_result_equal(
         df3,
@@ -98,7 +104,11 @@ def test_filter_argument(df3, df4):
         df4, lambda t: t >> mutate(u=t.col2.mean(filter=~t.col2.is_null()))
     )
 
-    assert_result_equal(df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=t.col2)))
+    assert_result_equal(
+        df4, lambda t: t >> mutate(u=t.col2.mean(filter=~(t.col4 % 3 == 0)))
+    )
+
+    assert_result_equal(df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=[t.col2])))
 
     assert_result_equal(
         df4,

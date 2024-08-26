@@ -209,9 +209,7 @@ class PolarsEager(AbstractTableImpl):
             # filtering needs to be done before applying the operator. We filter all
             # non-constant arguments, although there should always be only one of
             # these.
-            if ftype == OPType.AGGREGATE and (
-                filter_cond := context_kwargs.get("filter")
-            ):
+            if ftype == OPType.WINDOW and (filter_cond := context_kwargs.get("filter")):
                 translated_filter = self.translate(
                     self.backend.resolve_lambda_cols(filter_cond)
                 )
@@ -219,7 +217,7 @@ class PolarsEager(AbstractTableImpl):
                 def filtered_value(value):
                     return value().filter(translated_filter.value())
 
-                assert len(filter(lambda arg: not arg.dtype.const, op_args)) == 1
+                assert len(list(filter(lambda arg: not arg.dtype.const, op_args))) == 1
                 filtered_args = [
                     functools.partial(filtered_value, arg.value)
                     if not arg.dtype.const
@@ -227,11 +225,11 @@ class PolarsEager(AbstractTableImpl):
                     for arg in op_args
                 ]
             else:
-                filtered_args = op_args
+                filtered_args = [arg.value for arg in op_args]
 
             def value(**kw):
                 return implementation(
-                    *[arg.value(**kw) for arg in filtered_args],
+                    *[arg(**kw) for arg in filtered_args],
                     _tbl=self.backend,
                     _result_type=pl_result_type,
                     **internal_kwargs,
