@@ -541,6 +541,41 @@ with PolarsEager.op(ops.DayOfYear()) as op:
         return x.dt.ordinal_day()
 
 
+with PolarsEager.op(ops.Days()) as op:
+
+    @op.auto
+    def _days(x):
+        return x.dt.total_days()
+
+
+with PolarsEager.op(ops.Hours()) as op:
+
+    @op.auto
+    def _hours(x):
+        return x.dt.total_hours()
+
+
+with PolarsEager.op(ops.Minutes()) as op:
+
+    @op.auto
+    def _minutes(x):
+        return x.dt.total_minutes()
+
+
+with PolarsEager.op(ops.Seconds()) as op:
+
+    @op.auto
+    def _seconds(x):
+        return x.dt.total_seconds()
+
+
+with PolarsEager.op(ops.Milliseconds()) as op:
+
+    @op.auto
+    def _milliseconds(x):
+        return x.dt.total_milliseconds()
+
+
 with PolarsEager.op(ops.RowNumber()) as op:
 
     @op.auto
