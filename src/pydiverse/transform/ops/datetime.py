@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import ElementWise, Unary
+from pydiverse.transform.ops.core import ElementWise, OperatorExtension, Unary
+from pydiverse.transform.ops.numeric import RSub, Sub
 
 __all__ = [
     "Year",
@@ -17,6 +18,8 @@ __all__ = [
     "Minutes",
     "Seconds",
     "Milliseconds",
+    "DatetimeSub",
+    "DatetimeRSub",
 ]
 
 
@@ -86,3 +89,13 @@ class Seconds(DurationToUnit):
 
 class Milliseconds(DurationToUnit):
     name = "dt.milliseconds"
+
+
+class DatetimeSub(OperatorExtension):
+    operator = Sub
+    signatures = ["datetime, datetime -> duration", "date, date -> duration"]
+
+
+class DatetimeRSub(OperatorExtension):
+    operator = RSub
+    signatures = ["datetime, datetime -> duration", "date, date -> duration"]

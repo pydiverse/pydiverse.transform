@@ -576,6 +576,17 @@ with PolarsEager.op(ops.Milliseconds()) as op:
         return x.dt.total_milliseconds()
 
 
+with PolarsEager.op(ops.Sub()) as op:
+
+    @op.extension(ops.DatetimeSub)
+    def _datetime_sub(lhs, rhs):
+        return lhs - rhs
+
+    @op.extension(ops.DatetimeRSub)
+    def _datetime_rsub(rhs, lhs):
+        return lhs - rhs
+
+
 with PolarsEager.op(ops.RowNumber()) as op:
 
     @op.auto

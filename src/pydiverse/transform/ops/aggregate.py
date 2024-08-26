@@ -21,6 +21,7 @@ class Min(Aggregate, Unary):
         "float -> float",
         "str -> str",
         "datetime -> datetime",
+        "date -> date",
     ]
 
 
@@ -31,6 +32,7 @@ class Max(Aggregate, Unary):
         "float -> float",
         "str -> str",
         "datetime -> datetime",
+        "date -> date",
     ]
 
 
