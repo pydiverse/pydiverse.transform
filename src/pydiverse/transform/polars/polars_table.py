@@ -640,3 +640,10 @@ with PolarsEager.op(ops.RowNumber()) as op:
     @op.auto
     def _row_number():
         return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)
+
+
+with PolarsEager.op(ops.IsIn()) as op:
+
+    @op.auto
+    def _isin(x, *values):
+        return x.is_in([pl.select(v).item() for v in values])
