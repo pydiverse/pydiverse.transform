@@ -55,9 +55,9 @@ def assert_result_equal(
     pipe_factory,
     *,
     exception=None,
-    check_row_order=False,
-    may_throw=False,
-    xfail_warnings=True,
+    check_row_order: bool = False,
+    may_throw: bool = False,
+    xfail_warnings: bool = True,
 ):
     if not isinstance(input_tables[0], (tuple, list)):
         input_tables = (input_tables,)

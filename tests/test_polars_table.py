@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime as dt
+
 import polars as pl
 import pytest
 
@@ -62,6 +64,18 @@ df_right = pl.DataFrame(
     }
 )
 
+df_dt = pl.DataFrame(
+    {
+        "dt1": [
+            dt.datetime(1999, 10, 31, hour=15),
+            dt.datetime(2013, 7, 14, second=13, minute=55),
+        ],
+        "dur1": [dt.timedelta(days=5), dt.timedelta(minutes=4, microseconds=197)],
+        "dt2": [dt.datetime(1974, 12, 31), dt.datetime(2020, 2, 14, microsecond=43)],
+        "d1": [dt.date(2002, 6, 28), dt.date(2003, 1, 1)],
+    }
+)
+
 
 @pytest.fixture(params=["numpy", "arrow"])
 def dtype_backend(request):
@@ -96,6 +110,11 @@ def tbl_left():
 @pytest.fixture
 def tbl_right():
     return Table(PolarsEager("df_right", df_right.clone()))
+
+
+@pytest.fixture
+def tbl_dt():
+    return Table(PolarsEager("df_dt", df_dt))
 
 
 def assert_not_inplace(tbl: Table[PolarsEager], operation: Pipeable):
@@ -588,6 +607,17 @@ class TestPolarsEager:
             tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
             tbl4
             >> mutate(u=f.case((tbl4.col3.is_null(), tbl4.col2), default=tbl4.col3)),
+        )
+
+    def test_datetime(self, tbl_dt):
+        assert_equal(
+            tbl_dt >> mutate(u=(tbl_dt.dt1 - tbl_dt.dt2)),
+            df_dt.with_columns((pl.col("dt1") - pl.col("dt2")).alias("u")),
+        )
+
+        assert_equal(
+            tbl_dt >> mutate(u=tbl_dt.d1 - tbl_dt.d1),
+            df_dt.with_columns(pl.duration().alias("u")),
         )
 
 
