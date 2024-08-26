@@ -356,6 +356,12 @@ class PolarsEager(AbstractTableImpl):
 
             return TypedValue(value, result_dtype, result_ftype)
 
+        def _translate_literal_value(self, expr):
+            def value():
+                return pl.lit(expr)
+
+            return value
+
     class AlignedExpressionEvaluator(
         AbstractTableImpl.AlignedExpressionEvaluator[TypedValue[pl.Series]]
     ):
