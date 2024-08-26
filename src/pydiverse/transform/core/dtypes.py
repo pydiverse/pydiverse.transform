@@ -103,6 +103,10 @@ class Date(DType):
     name = "date"
 
 
+class Duration(DType):
+    name = "duration"
+
+
 class Template(DType):
     name = None
 
@@ -175,6 +179,8 @@ def dtype_from_string(t: str) -> DType:
         return Date(const=is_const, vararg=is_vararg)
     if base_type == "datetime":
         return DateTime(const=is_const, vararg=is_vararg)
+    if base_type == "duration":
+        return Duration(const=is_const, vararg=is_vararg)
     if base_type == "none":
         return NoneDType(const=is_const, vararg=is_vararg)
 

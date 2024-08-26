@@ -12,6 +12,11 @@ __all__ = [
     "Millisecond",
     "DayOfWeek",
     "DayOfYear",
+    "Days",
+    "Hours",
+    "Minutes",
+    "Seconds",
+    "Milliseconds",
 ]
 
 
@@ -57,3 +62,27 @@ class DayOfWeek(DatetimeExtractComponent, DateExtractComponent):
 
 class DayOfYear(DatetimeExtractComponent, DateExtractComponent):
     name = "dt.day_of_year"
+
+
+class DurationToUnit(ElementWise, Unary):
+    signatures = ["duration -> int"]
+
+
+class Days(DurationToUnit):
+    name = "dt.days"
+
+
+class Hours(DurationToUnit):
+    name = "dt.hours"
+
+
+class Minutes(DurationToUnit):
+    name = "dt.minutes"
+
+
+class Seconds(DurationToUnit):
+    name = "dt.seconds"
+
+
+class Milliseconds(DurationToUnit):
+    name = "dt.milliseconds"

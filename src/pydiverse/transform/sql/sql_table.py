@@ -181,6 +181,8 @@ class SQLTableImpl(AbstractTableImpl):
             return dtypes.DateTime()
         if isinstance(type_, sa.Date):
             return dtypes.Date()
+        if isinstance(type_, sa.Interval):
+            return dtypes.Duration()
         if isinstance(type_, sa.Time):
             raise NotImplementedError("Unsupported type: Time")
 
