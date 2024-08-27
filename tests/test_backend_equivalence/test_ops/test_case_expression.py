@@ -60,10 +60,11 @@ def test_mutate_case_window(df4):
         df4,
         lambda t: t
         >> mutate(
+            u=C.col1.shift(1, 1729, arrange=[-t.col3, t.col4]),
             x=C.col1.shift(1, 0, arrange=[C.col4]).case(
                 (1, C.col2.shift(1, -1, arrange=[C.col2, C.col4])),
                 (2, C.col3.shift(2, -2, arrange=[C.col3, C.col4])),
-            )
+            ),
         ),
     )
 
@@ -139,7 +140,7 @@ def test_invalid_ftype(df1):
         df1,
         lambda t: t
         >> summarise(
-            x=C.col1.rank().case(
+            x=f.rank(arrange=[C.col1]).case(
                 (1, C.col1.max()),
                 default=None,
             )
@@ -152,7 +153,7 @@ def test_invalid_ftype(df1):
         lambda t: t
         >> summarise(
             x=f.case(
-                (C.col1.rank() == 1, 1),
+                (f.rank(arrange=[C.col1]) == 1, 1),
                 default=None,
             )
         ),

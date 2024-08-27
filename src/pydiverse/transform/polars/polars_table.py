@@ -206,26 +206,55 @@ class PolarsEager(AbstractTableImpl):
                 else op.ftype
             )
 
-            # filtering needs to be done before applying the operator. We filter all
-            # non-constant arguments, although there should always be only one of
-            # these.
-            if ftype == OPType.WINDOW and (filter_cond := context_kwargs.get("filter")):
-                translated_filter = self.translate(
+            grouping = context_kwargs.get("partition_by")
+            # the `partition_by=` grouping overrides the `group_by` grouping
+            if grouping is not None:  # translate possible lambda cols
+                grouping = [self.backend.resolve_lambda_cols(col) for col in grouping]
+            else:  # use the current grouping of the table
+                grouping = self.backend.grouped_by
+
+            ordering = context_kwargs.get("arrange")
+            if ordering:
+                ordering = translate_ordering(self.backend, ordering)
+                by = [self._translate(o.order).value() for o in ordering]
+                descending = [not o.asc for o in ordering]
+                nulls_last = [not o.nulls_first for o in ordering]
+
+            filter_cond = context_kwargs.get("filter")
+            if filter_cond:
+                filter_cond = self.translate(
                     self.backend.resolve_lambda_cols(filter_cond)
                 )
 
-                def filtered_value(value):
-                    return value().filter(translated_filter.value())
+            args: list[Callable[[], pl.Expr]] = [arg.value for arg in op_args]
+            dtypes: list[dtypes.DType] = [arg.dtype for arg in op_args]
+            if ftype == OPType.WINDOW:
+                if ordering:
+                    # order the args
+                    def ordered_arg(arg):
+                        return arg().sort_by(
+                            by=by, descending=descending, nulls_last=nulls_last
+                        )
 
-                assert len(list(filter(lambda arg: not arg.dtype.const, op_args))) == 1
-                args = [
-                    functools.partial(filtered_value, arg.value)
-                    if not arg.dtype.const
-                    else arg
-                    for arg in op_args
-                ]
-            else:
-                args = [arg.value for arg in op_args]
+                    args = [
+                        arg if dtype.const else functools.partial(ordered_arg, arg)
+                        for arg, dtype in zip(args, dtypes)
+                    ]
+
+                if filter_cond := context_kwargs.get("filter"):
+                    # filtering needs to be done before applying the operator. We filter
+                    # all non-constant arguments, although there should always be only
+                    # one of these.
+                    def filtered_value(value):
+                        return value().filter(filter_cond.value())
+
+                    assert (
+                        len(list(filter(lambda arg: not arg.dtype.const, op_args))) == 1
+                    )
+                    args = [
+                        arg if dtype.const else functools.partial(filtered_value, arg)
+                        for arg, dtype in zip(args, dtypes)
+                    ]
 
             if op.name == "rank" or op.name == "dense_rank":
                 assert len(args) == 0
@@ -270,19 +299,6 @@ class PolarsEager(AbstractTableImpl):
                 # if `verb` != "muatate", we should give a warning that this only works
                 # for polars
 
-                grouping = context_kwargs.get("partition_by")
-                # the `partition_by=` grouping overrides the `group_by` grouping
-                if grouping is not None:  # translate possible lambda cols
-                    grouping = [
-                        self.backend.resolve_lambda_cols(col) for col in grouping
-                    ]
-                else:  # use the current grouping of the table
-                    grouping = self.backend.grouped_by
-
-                ordering = context_kwargs.get("arrange")
-                if ordering:
-                    ordering = translate_ordering(self.backend, ordering)
-
                 if grouping:
                     # when doing sort_by -> over or in polars, for whatever reason the
                     # `nulls_last` argument is ignored. thus when both a grouping and an
@@ -307,19 +323,15 @@ class PolarsEager(AbstractTableImpl):
                         # here
                         ...
 
-                    # emulate that the function is computed on a table sorted by
-                    # `ordering`. then restore the original order. this is equivalent
-                    # to giving `pl.Expr.sort_by()` the permutation inverse to
-                    # `ordering`.
-                    # TODO: maybe it is easier to do the sorting before applying the
-                    # the operator and we don't need two sorts.
+                    # the function was executed on the ordered arguments. here we
+                    # restore the original order of the table.
                     def sorted_value(value):
                         inv_permutation = pl.int_range(
-                            pl.len(), dtype=pl.Int64
+                            0, pl.len(), dtype=pl.Int64
                         ).sort_by(
-                            by=[self.translate(o.order).value() for o in ordering],
-                            nulls_last=[not o.nulls_first for o in ordering],
-                            descending=[not o.asc for o in ordering],
+                            by=by,
+                            descending=descending,
+                            nulls_last=nulls_last,
                         )
                         return value().sort_by(inv_permutation)
 

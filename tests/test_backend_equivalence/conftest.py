@@ -32,7 +32,7 @@ dataframes = {
         }
     ),
     "df4": pl.DataFrame(
-        {
+        {  # tests rely on col4 having a unique ordering
             "col1": [None, 0, 0, 0, 0, None, 1, 1, 1, 2, 3, 2, 2],
             "col2": [0, 20, 1, 1, 0, 0, 1, None, 1, 0, 0, 0, 1],
             "col3": [None, None, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],

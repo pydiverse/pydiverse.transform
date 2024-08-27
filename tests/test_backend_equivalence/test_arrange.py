@@ -5,7 +5,6 @@ from pydiverse.transform.core.verbs import (
     arrange,
     mutate,
 )
-from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
@@ -76,7 +75,6 @@ def test_nulls_last(df4):
     )
 
 
-@skip_backends("pandas")
 def test_nulls_first_last_mixed(df4):
     assert_result_equal(
         df4,

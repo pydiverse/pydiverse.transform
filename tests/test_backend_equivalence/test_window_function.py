@@ -266,6 +266,16 @@ def test_op_shift(df4):
             shift1=t.col2.shift(1, arrange=[t.col4]),
             shift2=t.col4.shift(-2, 0, arrange=[t.col4]),
             shift3=t.col4.shift(0, arrange=[t.col4]),
+            u=C.col1.shift(1, 0, arrange=[t.col4]),
+        ),
+    )
+
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            u=t.col1.shift(1, 0, arrange=[t.col2, t.col4]),
+            v=t.col1.shift(2, 1, arrange=[-t.col4.nulls_first()]),
         ),
     )
 
@@ -277,7 +287,16 @@ def test_op_row_number(df4):
         >> group_by(t.col1)
         >> mutate(
             row_number1=f.row_number(arrange=[-C.col4.nulls_last()]),
-            row_number2=f.row_number(arrange=[C.col2, C.col3]),
+            row_number2=f.row_number(arrange=[C.col2, C.col3, t.col4]),
+        ),
+    )
+
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            u=f.row_number(arrange=[-C.col4.nulls_last()]),
+            v=f.row_number(arrange=[-t.col3, t.col4]),
         ),
     )
 
