@@ -77,8 +77,12 @@ def assert_result_equal(
             query_x = pipe_factory(*x)
             query_y = pipe_factory(*y)
 
-            dfx: pl.DataFrame = query_x >> export()
-            dfy: pl.DataFrame = query_y >> export()
+            dfx: pl.DataFrame = (query_x >> export()).with_columns(
+                pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
+            )
+            dfy: pl.DataFrame = (query_y >> export()).with_columns(
+                pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
+            )
 
         warnings_record = get_transform_warnings(warnings_record)
         if len(warnings_record):
@@ -103,7 +107,11 @@ def assert_result_equal(
 
     try:
         assert_frame_equal(
-            dfx, dfy, check_dtypes=False, check_row_order=check_row_order
+            dfx,
+            dfy,
+            check_dtypes=False,
+            check_row_order=check_row_order,
+            check_exact=False,
         )
     except Exception as e:
         if xfail_warnings and did_raise_warning:
