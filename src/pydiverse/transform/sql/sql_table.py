@@ -957,56 +957,56 @@ with SQLTableImpl.op(ops.IsNull()) as op:
 #### String Functions ####
 
 
-with SQLTableImpl.op(ops.Strip()) as op:
+with SQLTableImpl.op(ops.StrStrip()) as op:
 
     @op.auto
     def _strip(x):
         return sa.func.TRIM(x, type_=x.type)
 
 
-with SQLTableImpl.op(ops.StringLength()) as op:
+with SQLTableImpl.op(ops.StrLen()) as op:
 
     @op.auto
     def _str_length(x):
         return sa.func.LENGTH(x, type_=sa.Integer())
 
 
-with SQLTableImpl.op(ops.Upper()) as op:
+with SQLTableImpl.op(ops.StrToUpper()) as op:
 
     @op.auto
     def _upper(x):
         return sa.func.UPPER(x, type_=x.type)
 
 
-with SQLTableImpl.op(ops.Lower()) as op:
+with SQLTableImpl.op(ops.StrToLower()) as op:
 
     @op.auto
     def _upper(x):
         return sa.func.LOWER(x, type_=x.type)
 
 
-with SQLTableImpl.op(ops.Replace()) as op:
+with SQLTableImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
     def _replace(x, y, z):
         return sa.func.REPLACE(x, y, z, type_=x.type)
 
 
-with SQLTableImpl.op(ops.StartsWith()) as op:
+with SQLTableImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
         return x.startswith(y, autoescape=True)
 
 
-with SQLTableImpl.op(ops.EndsWith()) as op:
+with SQLTableImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
         return x.endswith(y, autoescape=True)
 
 
-with SQLTableImpl.op(ops.Contains()) as op:
+with SQLTableImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):

@@ -258,7 +258,7 @@ with MSSqlTableImpl.op(ops.RPow()) as op:
         return _pow(lhs, rhs)
 
 
-with MSSqlTableImpl.op(ops.StringLength()) as op:
+with MSSqlTableImpl.op(ops.StrLen()) as op:
 
     @op.auto
     def _str_length(x):
@@ -268,7 +268,7 @@ with MSSqlTableImpl.op(ops.StringLength()) as op:
         return sa.func.LENGTH(x, type_=sa.Integer())
 
 
-with MSSqlTableImpl.op(ops.Replace()) as op:
+with MSSqlTableImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
     def _replace(x, y, z):
@@ -276,7 +276,7 @@ with MSSqlTableImpl.op(ops.Replace()) as op:
         return sa.func.REPLACE(x, y, z, type_=x.type)
 
 
-with MSSqlTableImpl.op(ops.StartsWith()) as op:
+with MSSqlTableImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
@@ -284,7 +284,7 @@ with MSSqlTableImpl.op(ops.StartsWith()) as op:
         return x.startswith(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.EndsWith()) as op:
+with MSSqlTableImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
@@ -292,7 +292,7 @@ with MSSqlTableImpl.op(ops.EndsWith()) as op:
         return x.endswith(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.Contains()) as op:
+with MSSqlTableImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):

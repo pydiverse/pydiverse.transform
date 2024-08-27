@@ -5,27 +5,27 @@ from pydiverse.transform.ops.logical import Logical
 from pydiverse.transform.ops.numeric import Add, RAdd
 
 __all__ = [
-    "StringAdd",
-    "StringRAdd",
-    "Strip",
-    "StringLength",
-    "Upper",
-    "Lower",
-    "Replace",
-    "StartsWith",
-    "EndsWith",
-    "Contains",
+    "StrAdd",
+    "StrRAdd",
+    "StrStrip",
+    "StrLen",
+    "StrToUpper",
+    "StrToLower",
+    "StrReplaceAll",
+    "StrStartsWith",
+    "StrEndsWith",
+    "StrContains",
 ]
 
 
-class StringAdd(OperatorExtension):
+class StrAdd(OperatorExtension):
     operator = Add
     signatures = [
         "str, str -> str",
     ]
 
 
-class StringRAdd(OperatorExtension):
+class StrRAdd(OperatorExtension):
     operator = RAdd
     signatures = [
         "str, str -> str",
@@ -35,54 +35,54 @@ class StringRAdd(OperatorExtension):
 ####
 
 
-class StringUnary(ElementWise, Unary):
+class StrUnary(ElementWise, Unary):
     signatures = [
         "str -> str",
     ]
 
 
-class Strip(StringUnary):
-    name = "strip"
+class StrStrip(StrUnary):
+    name = "str.strip"
 
 
-class StringLength(StringUnary):
-    name = "len"
+class StrLen(StrUnary):
+    name = "str.len"
     signatures = [
         "str -> int",
     ]
 
 
-class Upper(StringUnary):
-    name = "upper"
+class StrToUpper(StrUnary):
+    name = "str.to_upper"
 
 
-class Lower(StringUnary):
-    name = "lower"
+class StrToLower(StrUnary):
+    name = "str.to_lower"
 
 
-class Replace(ElementWise):
-    name = "replace"
+class StrReplaceAll(ElementWise):
+    name = "str.replace_all"
     signatures = [
         "str, const str, const str -> str",
     ]
 
 
-class StartsWith(ElementWise, Logical):
-    name = "startswith"
+class StrStartsWith(ElementWise, Logical):
+    name = "str.starts_with"
     signatures = [
         "str, const str -> bool",
     ]
 
 
-class EndsWith(ElementWise, Logical):
-    name = "endswith"
+class StrEndsWith(ElementWise, Logical):
+    name = "str.ends_with"
     signatures = [
         "str, const str -> bool",
     ]
 
 
-class Contains(ElementWise, Logical):
-    name = "contains"
+class StrContains(ElementWise, Logical):
+    name = "str.contains"
     signatures = [
         "str, const str -> bool",
     ]

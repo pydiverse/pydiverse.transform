@@ -21,7 +21,7 @@ with SQLiteTableImpl.op(ops.Round()) as op:
         return sa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
 
 
-with SQLiteTableImpl.op(ops.StartsWith()) as op:
+with SQLiteTableImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
@@ -33,7 +33,7 @@ with SQLiteTableImpl.op(ops.StartsWith()) as op:
         return x.startswith(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.EndsWith()) as op:
+with SQLiteTableImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
@@ -45,7 +45,7 @@ with SQLiteTableImpl.op(ops.EndsWith()) as op:
         return x.endswith(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.Contains()) as op:
+with SQLiteTableImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):

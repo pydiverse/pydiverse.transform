@@ -700,56 +700,56 @@ with PolarsEager.op(ops.IsIn()) as op:
         return x.is_in([pl.select(v).item() for v in values])
 
 
-with PolarsEager.op(ops.Contains()) as op:
+with PolarsEager.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):
         return x.str.contains(y)
 
 
-with PolarsEager.op(ops.StartsWith()) as op:
+with PolarsEager.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _starts_with(x, y):
         return x.str.starts_with(y)
 
 
-with PolarsEager.op(ops.EndsWith()) as op:
+with PolarsEager.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _ends_with(x, y):
         return x.str.ends_with(y)
 
 
-with PolarsEager.op(ops.Lower()) as op:
+with PolarsEager.op(ops.StrToLower()) as op:
 
     @op.auto
     def _lower(x):
         return x.str.to_lowercase()
 
 
-with PolarsEager.op(ops.Upper()) as op:
+with PolarsEager.op(ops.StrToUpper()) as op:
 
     @op.auto
     def _upper(x):
         return x.str.to_uppercase()
 
 
-with PolarsEager.op(ops.Replace()) as op:
+with PolarsEager.op(ops.StrReplaceAll()) as op:
 
     @op.auto
-    def _replace(x, to_replace, replacement):
+    def _replace_all(x, to_replace, replacement):
         return x.str.replace_all(to_replace, replacement)
 
 
-with PolarsEager.op(ops.StringLength()) as op:
+with PolarsEager.op(ops.StrLen()) as op:
 
     @op.auto
     def _string_length(x):
         return x.str.len_chars()
 
 
-with PolarsEager.op(ops.Strip()) as op:
+with PolarsEager.op(ops.StrStrip()) as op:
 
     @op.auto
     def _str_strip(x):

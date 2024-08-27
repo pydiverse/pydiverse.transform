@@ -479,7 +479,7 @@ with AbstractTableImpl.op(ops.Add()) as op:
     def _add(lhs, rhs):
         return lhs + rhs
 
-    @op.extension(ops.StringAdd)
+    @op.extension(ops.StrAdd)
     def _str_add(lhs, rhs):
         return lhs + rhs
 
@@ -490,7 +490,7 @@ with AbstractTableImpl.op(ops.RAdd()) as op:
     def _radd(rhs, lhs):
         return lhs + rhs
 
-    @op.extension(ops.StringRAdd)
+    @op.extension(ops.StrRAdd)
     def _str_radd(lhs, rhs):
         return lhs + rhs
 
