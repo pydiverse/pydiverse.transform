@@ -698,3 +698,59 @@ with PolarsEager.op(ops.IsIn()) as op:
     @op.auto
     def _isin(x, *values):
         return x.is_in([pl.select(v).item() for v in values])
+
+
+with PolarsEager.op(ops.Contains()) as op:
+
+    @op.auto
+    def _contains(x, y):
+        return x.str.contains(y)
+
+
+with PolarsEager.op(ops.StartsWith()) as op:
+
+    @op.auto
+    def _starts_with(x, y):
+        return x.str.starts_with(y)
+
+
+with PolarsEager.op(ops.EndsWith()) as op:
+
+    @op.auto
+    def _ends_with(x, y):
+        return x.str.ends_with(y)
+
+
+with PolarsEager.op(ops.Lower()) as op:
+
+    @op.auto
+    def _lower(x):
+        return x.str.to_lowercase()
+
+
+with PolarsEager.op(ops.Upper()) as op:
+
+    @op.auto
+    def _upper(x):
+        return x.str.to_uppercase()
+
+
+with PolarsEager.op(ops.Replace()) as op:
+
+    @op.auto
+    def _replace(x, to_replace, replacement):
+        return x.str.replace_all(to_replace, replacement)
+
+
+with PolarsEager.op(ops.StringLength()) as op:
+
+    @op.auto
+    def _string_length(x):
+        return x.str.len_chars()
+
+
+with PolarsEager.op(ops.Strip()) as op:
+
+    @op.auto
+    def _str_strip(x):
+        return x.str.strip_chars()
