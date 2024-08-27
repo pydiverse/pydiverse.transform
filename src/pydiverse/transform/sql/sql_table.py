@@ -1226,14 +1226,14 @@ with SQLTableImpl.op(ops.RowNumber()) as op:
 with SQLTableImpl.op(ops.Rank()) as op:
 
     @op.auto
-    def _rank(_):
+    def _rank():
         return sa.func.rank()
 
 
 with SQLTableImpl.op(ops.DenseRank()) as op:
 
     @op.auto
-    def _dense_rank(_):
+    def _dense_rank():
         return sa.func.dense_rank()
 
 

@@ -218,18 +218,27 @@ class PolarsEager(AbstractTableImpl):
                     return value().filter(translated_filter.value())
 
                 assert len(list(filter(lambda arg: not arg.dtype.const, op_args))) == 1
-                filtered_args = [
+                args = [
                     functools.partial(filtered_value, arg.value)
                     if not arg.dtype.const
                     else arg
                     for arg in op_args
                 ]
             else:
-                filtered_args = [arg.value for arg in op_args]
+                args = [arg.value for arg in op_args]
+
+            if op.name == "rank" or op.name == "dense_rank":
+                assert len(args) == 0
+                args = [
+                    self.backend._ordering_to_expr(
+                        translate_ordering(self.backend, context_kwargs["arrange"])
+                    ).value
+                ]
+                del context_kwargs["arrange"]
 
             def value(**kw):
                 return implementation(
-                    *[arg(**kw) for arg in filtered_args],
+                    *[arg(**kw) for arg in args],
                     _tbl=self.backend,
                     _result_type=pl_result_type,
                     **internal_kwargs,
@@ -401,6 +410,24 @@ class PolarsEager(AbstractTableImpl):
                     op_args, op, OPType.WINDOW if op.ftype == OPType.AGGREGATE else None
                 ),
             )
+
+    def _ordering_to_expr(
+        self, ordering: list[OrderingDescriptor]
+    ) -> TypedValue[Callable[[], pl.Expr]]:
+        with_signs = []
+        for o in ordering:
+            numeric = (
+                self.compiler.translate(o.order).value().rank("dense").cast(pl.Int64)
+            )
+            with_signs.append(numeric if o.asc else -numeric)
+        return TypedValue(
+            lambda: pl.struct(
+                x.fill_null(x.min() - 1) if o.nulls_first else x.fill_null(x.max() + 1)
+                for x, o in zip(with_signs, ordering)
+            ),
+            dtype=dtypes.Int,
+            ftype=OPType.EWISE,
+        )
 
 
 class JoinTranslator(Translator[tuple]):
@@ -638,6 +665,20 @@ with PolarsEager.op(ops.RowNumber()) as op:
     @op.auto
     def _row_number():
         return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)
+
+
+with PolarsEager.op(ops.Rank()) as op:
+
+    @op.auto
+    def _rank(x):
+        return x.rank().cast(pl.Int64)
+
+
+with PolarsEager.op(ops.DenseRank()) as op:
+
+    @op.auto
+    def _dense_rank(x):
+        return x.rank("dense").cast(pl.Int64)
 
 
 with PolarsEager.op(ops.IsIn()) as op:

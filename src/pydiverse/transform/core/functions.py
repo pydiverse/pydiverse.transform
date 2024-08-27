@@ -18,7 +18,7 @@ def _sym_f_call(name, *args, **kwargs) -> SymbolicExpression[FunctionCall]:
     return SymbolicExpression(FunctionCall(name, *args, **kwargs))
 
 
-def count(expr: SymbolicExpression = None):
+def count(expr: SymbolicExpression | None = None):
     if expr is None:
         return _sym_f_call("count")
     else:
@@ -27,6 +27,14 @@ def count(expr: SymbolicExpression = None):
 
 def row_number(*, arrange: list, partition_by: list | None = None):
     return _sym_f_call("row_number", arrange=arrange, partition_by=partition_by)
+
+
+def rank(*, arrange: list, partition_by: list | None = None):
+    return _sym_f_call("rank", arrange=arrange, partition_by=partition_by)
+
+
+def dense_rank(*, arrange: list, partition_by: list | None = None):
+    return _sym_f_call("dense_rank", arrange=arrange, partition_by=partition_by)
 
 
 def case(*cases: tuple[Any, Any], default: Any = None):
