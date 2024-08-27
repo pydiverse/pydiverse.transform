@@ -693,6 +693,13 @@ with PolarsEager.op(ops.DenseRank()) as op:
         return x.rank("dense").cast(pl.Int64)
 
 
+with PolarsEager.op(ops.Shift()) as op:
+
+    @op.auto
+    def _shift(x, n, fill_value=None):
+        return x.shift(n, fill_value=fill_value)
+
+
 with PolarsEager.op(ops.IsIn()) as op:
 
     @op.auto
@@ -761,3 +768,17 @@ with PolarsEager.op(ops.Count()) as op:
     @op.auto
     def _count(x=None):
         return pl.len() if x is None else x.count()
+
+
+with PolarsEager.op(ops.Greatest()) as op:
+
+    @op.auto
+    def _greatest(*x):
+        return pl.max_horizontal(*x)
+
+
+with PolarsEager.op(ops.Least()) as op:
+
+    @op.auto
+    def _least(*x):
+        return pl.min_horizontal(*x)
