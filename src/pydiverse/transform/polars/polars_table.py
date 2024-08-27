@@ -671,7 +671,7 @@ with PolarsEager.op(ops.Rank()) as op:
 
     @op.auto
     def _rank(x):
-        return x.rank().cast(pl.Int64)
+        return x.rank("min").cast(pl.Int64)
 
 
 with PolarsEager.op(ops.DenseRank()) as op:

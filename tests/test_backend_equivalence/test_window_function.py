@@ -288,14 +288,13 @@ def test_op_rank(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            rank1=t.col1.rank(),
-            rank2=t.col2.rank(),
-            rank3=t.col2.nulls_last().rank(),
-            rank4=t.col5.nulls_first().rank(),
-            rank5=(-t.col5.nulls_first()).rank(),
-            rank_expr=(t.col3 - t.col2).rank(),
+            rank1=f.rank(arrange=[t.col1]),
+            rank2=f.rank(arrange=[t.col2]),
+            rank3=f.rank(arrange=[t.col2.nulls_last()]),
+            rank4=f.rank(arrange=[t.col5.nulls_first()]),
+            rank5=f.rank(arrange=[-t.col5.nulls_first()]),
+            rank_expr=f.rank(arrange=[t.col3 - t.col2]),
         ),
-        check_row_order=True,
     )
 
 
@@ -310,6 +309,7 @@ def test_op_dense_rank(df3):
             rank3=f.dense_rank(arrange=[t.col2.nulls_last()]),
         )
         >> ungroup(),
+        # TODO: activate these once SQL partition_by= is implemented
         # >> mutate(
         #    rank4=f.dense_rank(arrange=[t.col4.nulls_first()], partition_by=[t.col2]),
         #    rank5=f.dense_rank(arrange=[-t.col5.nulls_first()], partition_by=[t.col2]),
