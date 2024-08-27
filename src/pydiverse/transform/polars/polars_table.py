@@ -148,6 +148,9 @@ class PolarsEager(AbstractTableImpl):
             }
         )
 
+    def slice_head(self, n: int, offset: int):
+        self.df = self.df.slice(offset, n)
+
     def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
         if isinstance(col, Column):
             return (
