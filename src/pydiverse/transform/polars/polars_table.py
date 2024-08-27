@@ -754,3 +754,10 @@ with PolarsEager.op(ops.StrStrip()) as op:
     @op.auto
     def _str_strip(x):
         return x.str.strip_chars()
+
+
+with PolarsEager.op(ops.Count()) as op:
+
+    @op.auto
+    def _count(x=None):
+        return pl.len() if x is None else x.count()
