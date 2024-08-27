@@ -270,35 +270,6 @@ class PolarsEager(AbstractTableImpl):
                 # if `verb` != "muatate", we should give a warning that this only works
                 # for polars
 
-                if arrange := context_kwargs.get("arrange"):
-                    if op.ftype == OPType.AGGREGATE:
-                        # TODO: don't fail, but give a warning that `arrange` is useless
-                        # here
-                        ...
-
-                    ordering = translate_ordering(self.backend, arrange)
-                    internal_kwargs["_ordering"] = ordering
-
-                    # emulate that the function is computed on a table sorted by
-                    # `ordering`. then restore the original order. this is equivalent
-                    # to giving `pl.Expr.sort_by()` the permutation inverse to
-                    # `ordering`.
-                    # TODO: maybe it is easier to do the sorting before applying the
-                    # the operator and we don't need two sorts.
-                    def sorted_value(value):
-                        inv_permutation = pl.int_range(
-                            pl.len(), dtype=pl.Int64
-                        ).sort_by(
-                            by=[self.translate(o.order).value() for o in ordering],
-                            nulls_last=[not o.nulls_first for o in ordering],
-                            descending=[not o.asc for o in ordering],
-                        )
-                        return value().sort_by(inv_permutation)
-
-                    # need to bind `value` inside `filtered_value` so that it refers to
-                    # the original `value`.
-                    value = functools.partial(sorted_value, value)
-
                 grouping = context_kwargs.get("partition_by")
                 # the `partition_by=` grouping overrides the `group_by` grouping
                 if grouping is not None:  # translate possible lambda cols
@@ -307,6 +278,58 @@ class PolarsEager(AbstractTableImpl):
                     ]
                 else:  # use the current grouping of the table
                     grouping = self.backend.grouped_by
+
+                if arrange := context_kwargs.get("arrange"):
+                    if op.ftype == OPType.AGGREGATE:
+                        # TODO: don't fail, but give a warning that `arrange` is useless
+                        # here
+                        ...
+
+                    ordering = translate_ordering(self.backend, arrange)
+
+                    # emulate that the function is computed on a table sorted by
+                    # `ordering`. then restore the original order. this is equivalent
+                    # to giving `pl.Expr.sort_by()` the permutation inverse to
+                    # `ordering`.
+                    # TODO: maybe it is easier to do the sorting before applying the
+                    # the operator and we don't need two sorts.
+                    def sorted_value(value):
+                        if grouping:
+                            # when doing sort_by -> over in polars, for whatever reason
+                            # the `nulls_last` argument is ignored. thus we need to
+                            # account for it here manually.
+                            numeric_order = [
+                                self.translate(o.order)
+                                .value()
+                                .rank("dense")
+                                .cast(pl.Int64)
+                                for o in ordering
+                            ]
+                            order_by = [
+                                num.fill_null(
+                                    num.min() - 1 if o.nulls_first else num.max() + 1
+                                )
+                                for num, o in zip(numeric_order, ordering)
+                            ]
+                            nulls_last = [True] * len(ordering)
+                        else:
+                            order_by = [
+                                self.translate(o.order).value() for o in ordering
+                            ]
+                            nulls_last = [not o.nulls_first for o in ordering]
+
+                        inv_permutation = pl.int_range(
+                            pl.len(), dtype=pl.Int64
+                        ).sort_by(
+                            by=order_by,
+                            nulls_last=nulls_last,
+                            descending=[not o.asc for o in ordering],
+                        )
+                        return value().sort_by(inv_permutation)
+
+                    # need to bind `value` inside `filtered_value` so that it refers to
+                    # the original `value`.
+                    value = functools.partial(sorted_value, value)
 
                 if grouping:
 
@@ -422,7 +445,11 @@ class PolarsEager(AbstractTableImpl):
             with_signs.append(numeric if o.asc else -numeric)
         return TypedValue(
             lambda: pl.struct(
-                x.fill_null(x.min() - 1) if o.nulls_first else x.fill_null(x.max() + 1)
+                x.fill_null(
+                    -(pl.len().cast(pl.Int64) + 1)
+                    if o.nulls_first
+                    else pl.len().cast(pl.Int64) + 1
+                )
                 for x, o in zip(with_signs, ordering)
             ),
             dtype=dtypes.Int,
