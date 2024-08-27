@@ -1016,63 +1016,63 @@ with SQLTableImpl.op(ops.StrContains()) as op:
 #### Datetime Functions ####
 
 
-with SQLTableImpl.op(ops.Year()) as op:
+with SQLTableImpl.op(ops.DtYear()) as op:
 
     @op.auto
     def _year(x):
         return sa.extract("year", x)
 
 
-with SQLTableImpl.op(ops.Month()) as op:
+with SQLTableImpl.op(ops.DtMonth()) as op:
 
     @op.auto
     def _month(x):
         return sa.extract("month", x)
 
 
-with SQLTableImpl.op(ops.Day()) as op:
+with SQLTableImpl.op(ops.DtDay()) as op:
 
     @op.auto
     def _day(x):
         return sa.extract("day", x)
 
 
-with SQLTableImpl.op(ops.Hour()) as op:
+with SQLTableImpl.op(ops.DtHour()) as op:
 
     @op.auto
     def _hour(x):
         return sa.extract("hour", x)
 
 
-with SQLTableImpl.op(ops.Minute()) as op:
+with SQLTableImpl.op(ops.DtMinute()) as op:
 
     @op.auto
     def _minute(x):
         return sa.extract("minute", x)
 
 
-with SQLTableImpl.op(ops.Second()) as op:
+with SQLTableImpl.op(ops.DtSecond()) as op:
 
     @op.auto
     def _second(x):
         return sa.extract("second", x)
 
 
-with SQLTableImpl.op(ops.Millisecond()) as op:
+with SQLTableImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _millisecond(x):
         return sa.extract("milliseconds", x) % 1000
 
 
-with SQLTableImpl.op(ops.DayOfWeek()) as op:
+with SQLTableImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _day_of_week(x):
         return sa.extract("dow", x)
 
 
-with SQLTableImpl.op(ops.DayOfYear()) as op:
+with SQLTableImpl.op(ops.DtDayOfYear()) as op:
 
     @op.auto
     def _day_of_year(x):

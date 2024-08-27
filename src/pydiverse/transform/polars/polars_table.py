@@ -560,98 +560,98 @@ with PolarsEager.op(ops.FillNull()) as op:
         return x.fill_null(y)
 
 
-with PolarsEager.op(ops.Year()) as op:
+with PolarsEager.op(ops.DtYear()) as op:
 
     @op.auto
     def _dt_year(x):
         return x.dt.year()
 
 
-with PolarsEager.op(ops.Month()) as op:
+with PolarsEager.op(ops.DtMonth()) as op:
 
     @op.auto
     def _dt_month(x):
         return x.dt.month()
 
 
-with PolarsEager.op(ops.Day()) as op:
+with PolarsEager.op(ops.DtDay()) as op:
 
     @op.auto
     def _dt_day(x):
         return x.dt.day()
 
 
-with PolarsEager.op(ops.Hour()) as op:
+with PolarsEager.op(ops.DtHour()) as op:
 
     @op.auto
     def _dt_hour(x):
         return x.dt.hour()
 
 
-with PolarsEager.op(ops.Minute()) as op:
+with PolarsEager.op(ops.DtMinute()) as op:
 
     @op.auto
     def _dt_minute(x):
         return x.dt.minute()
 
 
-with PolarsEager.op(ops.Second()) as op:
+with PolarsEager.op(ops.DtSecond()) as op:
 
     @op.auto
     def _dt_second(x):
         return x.dt.second()
 
 
-with PolarsEager.op(ops.Millisecond()) as op:
+with PolarsEager.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _dt_millisecond(x):
         return x.dt.millisecond()
 
 
-with PolarsEager.op(ops.DayOfWeek()) as op:
+with PolarsEager.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _dt_day_of_week(x):
         return x.dt.weekday()
 
 
-with PolarsEager.op(ops.DayOfYear()) as op:
+with PolarsEager.op(ops.DtDayOfYear()) as op:
 
     @op.auto
     def _dt_day_of_year(x):
         return x.dt.ordinal_day()
 
 
-with PolarsEager.op(ops.Days()) as op:
+with PolarsEager.op(ops.DtDays()) as op:
 
     @op.auto
     def _days(x):
         return x.dt.total_days()
 
 
-with PolarsEager.op(ops.Hours()) as op:
+with PolarsEager.op(ops.DtHours()) as op:
 
     @op.auto
     def _hours(x):
         return x.dt.total_hours()
 
 
-with PolarsEager.op(ops.Minutes()) as op:
+with PolarsEager.op(ops.DtMinutes()) as op:
 
     @op.auto
     def _minutes(x):
         return x.dt.total_minutes()
 
 
-with PolarsEager.op(ops.Seconds()) as op:
+with PolarsEager.op(ops.DtSeconds()) as op:
 
     @op.auto
     def _seconds(x):
         return x.dt.total_seconds()
 
 
-with PolarsEager.op(ops.Milliseconds()) as op:
+with PolarsEager.op(ops.DtMilliseconds()) as op:
 
     @op.auto
     def _milliseconds(x):
@@ -660,14 +660,14 @@ with PolarsEager.op(ops.Milliseconds()) as op:
 
 with PolarsEager.op(ops.Sub()) as op:
 
-    @op.extension(ops.DatetimeSub)
+    @op.extension(ops.DtSub)
     def _datetime_sub(lhs, rhs):
         return lhs - rhs
 
 
 with PolarsEager.op(ops.RSub()) as op:
 
-    @op.extension(ops.DatetimeRSub)
+    @op.extension(ops.DtRSub)
     def _datetime_rsub(rhs, lhs):
         return lhs - rhs
 

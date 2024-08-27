@@ -300,7 +300,7 @@ with MSSqlTableImpl.op(ops.StrContains()) as op:
         return x.contains(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.DayOfWeek()) as op:
+with MSSqlTableImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _day_of_week(x):

@@ -57,7 +57,7 @@ with SQLiteTableImpl.op(ops.StrContains()) as op:
         return x.contains(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.Millisecond()) as op:
+with SQLiteTableImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _millisecond(x):

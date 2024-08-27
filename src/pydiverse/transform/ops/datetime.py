@@ -4,66 +4,66 @@ from pydiverse.transform.ops.core import ElementWise, OperatorExtension, Unary
 from pydiverse.transform.ops.numeric import RSub, Sub
 
 __all__ = [
-    "Year",
-    "Month",
-    "Day",
-    "Hour",
-    "Minute",
-    "Second",
-    "Millisecond",
-    "DayOfWeek",
-    "DayOfYear",
-    "Days",
-    "Hours",
-    "Minutes",
-    "Seconds",
-    "Milliseconds",
-    "DatetimeSub",
-    "DatetimeRSub",
+    "DtYear",
+    "DtMonth",
+    "DtDay",
+    "DtHour",
+    "DtMinute",
+    "DtSecond",
+    "DtMillisecond",
+    "DtDayOfWeek",
+    "DtDayOfYear",
+    "DtDays",
+    "DtHours",
+    "DtMinutes",
+    "DtSeconds",
+    "DtMilliseconds",
+    "DtSub",
+    "DtRSub",
 ]
 
 
-class DatetimeExtractComponent(ElementWise, Unary):
+class DtExtract(ElementWise, Unary):
     signatures = ["datetime -> int"]
 
 
-class DateExtractComponent(ElementWise, Unary):
+class DateExtract(ElementWise, Unary):
     signatures = ["date -> int"]
 
 
-class Year(DatetimeExtractComponent, DateExtractComponent):
+class DtYear(DtExtract, DateExtract):
     name = "dt.year"
 
 
-class Month(DatetimeExtractComponent, DateExtractComponent):
+class DtMonth(DtExtract, DateExtract):
     name = "dt.month"
 
 
-class Day(DatetimeExtractComponent, DateExtractComponent):
+class DtDay(DtExtract, DateExtract):
     name = "dt.day"
 
 
-class Hour(DatetimeExtractComponent):
+class DtHour(DtExtract):
     name = "dt.hour"
 
 
-class Minute(DatetimeExtractComponent):
+class DtMinute(DtExtract):
     name = "dt.minute"
 
 
-class Second(DatetimeExtractComponent):
+class DtSecond(DtExtract):
     name = "dt.second"
 
 
-class Millisecond(DatetimeExtractComponent):
+class DtMillisecond(DtExtract):
     name = "dt.millisecond"
 
 
-class DayOfWeek(DatetimeExtractComponent, DateExtractComponent):
+class DtDayOfWeek(DtExtract, DateExtract):
     name = "dt.day_of_week"
 
 
-class DayOfYear(DatetimeExtractComponent, DateExtractComponent):
+class DtDayOfYear(DtExtract, DateExtract):
     name = "dt.day_of_year"
 
 
@@ -71,31 +71,31 @@ class DurationToUnit(ElementWise, Unary):
     signatures = ["duration -> int"]
 
 
-class Days(DurationToUnit):
+class DtDays(DurationToUnit):
     name = "dt.days"
 
 
-class Hours(DurationToUnit):
+class DtHours(DurationToUnit):
     name = "dt.hours"
 
 
-class Minutes(DurationToUnit):
+class DtMinutes(DurationToUnit):
     name = "dt.minutes"
 
 
-class Seconds(DurationToUnit):
+class DtSeconds(DurationToUnit):
     name = "dt.seconds"
 
 
-class Milliseconds(DurationToUnit):
+class DtMilliseconds(DurationToUnit):
     name = "dt.milliseconds"
 
 
-class DatetimeSub(OperatorExtension):
+class DtSub(OperatorExtension):
     operator = Sub
     signatures = ["datetime, datetime -> duration", "date, date -> duration"]
 
 
-class DatetimeRSub(OperatorExtension):
+class DtRSub(OperatorExtension):
     operator = RSub
     signatures = ["datetime, datetime -> duration", "date, date -> duration"]
