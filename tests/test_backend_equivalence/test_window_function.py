@@ -276,7 +276,7 @@ def test_op_row_number(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            row_number1=f.row_number(arrange=[C.col4]),
+            row_number1=f.row_number(arrange=[-C.col4.nulls_last()]),
             row_number2=f.row_number(arrange=[C.col2, C.col3]),
         ),
     )

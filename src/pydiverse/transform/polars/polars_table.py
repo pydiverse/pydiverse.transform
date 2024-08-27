@@ -279,13 +279,33 @@ class PolarsEager(AbstractTableImpl):
                 else:  # use the current grouping of the table
                     grouping = self.backend.grouped_by
 
-                if arrange := context_kwargs.get("arrange"):
+                ordering = context_kwargs.get("arrange")
+                if ordering:
+                    ordering = translate_ordering(self.backend, ordering)
+
+                if grouping:
+                    # when doing sort_by -> over or in polars, for whatever reason the
+                    # `nulls_last` argument is ignored. thus when both a grouping and an
+                    # arrangment are specified, we translate the arrangement to a single
+                    # expression and pass it to order_by=.
+                    order_by = None
+                    if ordering:
+                        order_by = self.backend._ordering_to_expr(ordering).value()
+
+                    def partitioned_value(value):
+                        group_exprs: list[pl.Expr] = [
+                            pl.col(self.backend.underlying_col_name[col.uuid])
+                            for col in grouping
+                        ]
+                        return value().over(*group_exprs, order_by=order_by)
+
+                    value = functools.partial(partitioned_value, value)
+
+                elif ordering:
                     if op.ftype == OPType.AGGREGATE:
                         # TODO: don't fail, but give a warning that `arrange` is useless
                         # here
                         ...
-
-                    ordering = translate_ordering(self.backend, arrange)
 
                     # emulate that the function is computed on a table sorted by
                     # `ordering`. then restore the original order. this is equivalent
@@ -294,35 +314,11 @@ class PolarsEager(AbstractTableImpl):
                     # TODO: maybe it is easier to do the sorting before applying the
                     # the operator and we don't need two sorts.
                     def sorted_value(value):
-                        if grouping:
-                            # when doing sort_by -> over in polars, for whatever reason
-                            # the `nulls_last` argument is ignored. thus we need to
-                            # account for it here manually.
-                            numeric_order = [
-                                self.translate(o.order)
-                                .value()
-                                .rank("dense")
-                                .cast(pl.Int64)
-                                for o in ordering
-                            ]
-                            order_by = [
-                                num.fill_null(
-                                    num.min() - 1 if o.nulls_first else num.max() + 1
-                                )
-                                for num, o in zip(numeric_order, ordering)
-                            ]
-                            nulls_last = [True] * len(ordering)
-                        else:
-                            order_by = [
-                                self.translate(o.order).value() for o in ordering
-                            ]
-                            nulls_last = [not o.nulls_first for o in ordering]
-
                         inv_permutation = pl.int_range(
                             pl.len(), dtype=pl.Int64
                         ).sort_by(
-                            by=order_by,
-                            nulls_last=nulls_last,
+                            by=[self.translate(o.order).value() for o in ordering],
+                            nulls_last=[not o.nulls_first for o in ordering],
                             descending=[not o.asc for o in ordering],
                         )
                         return value().sort_by(inv_permutation)
@@ -330,17 +326,6 @@ class PolarsEager(AbstractTableImpl):
                     # need to bind `value` inside `filtered_value` so that it refers to
                     # the original `value`.
                     value = functools.partial(sorted_value, value)
-
-                if grouping:
-
-                    def partitioned_value(value):
-                        group_exprs: list[pl.Expr] = [
-                            pl.col(self.backend.underlying_col_name[col.uuid])
-                            for col in grouping
-                        ]
-                        return value().over(*group_exprs)
-
-                    value = functools.partial(partitioned_value, value)
 
             return TypedValue(
                 value,
