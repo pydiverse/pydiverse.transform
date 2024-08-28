@@ -723,9 +723,13 @@ class SQLTableImpl(AbstractTableImpl):
             wants_order_by = operator.ftype == OPType.WINDOW
 
             # PARTITION BY
-            compiled_pb = tuple(
-                self.translate(group_by).value for group_by in self.backend.grouped_by
-            )
+            grouping = context_kwargs.get("partition_by")
+            if grouping is not None:
+                grouping = [self.backend.resolve_lambda_cols(col) for col in grouping]
+            else:
+                grouping = self.backend.grouped_by
+
+            compiled_pb = tuple(self.translate(col).value for col in grouping)
 
             # ORDER BY
             def order_by_clause_generator(ordering: OrderingDescriptor):
