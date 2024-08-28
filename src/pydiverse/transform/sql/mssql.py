@@ -9,7 +9,6 @@ from pydiverse.transform.core.expressions import TypedValue
 from pydiverse.transform.core.expressions.expressions import Column
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.util import OrderingDescriptor
-from pydiverse.transform.errors import OperatorNotSupportedError
 from pydiverse.transform.ops import Operator, OPType
 from pydiverse.transform.sql.sql_table import SQLTableImpl
 from pydiverse.transform.util.warnings import warn_non_standard
@@ -316,15 +315,3 @@ with MSSqlTableImpl.op(ops.Mean()) as op:
     @op.auto
     def _mean(x):
         return sa.func.AVG(sa.cast(x, sa.Double()), type_=sa.Double())
-
-
-with MSSqlTableImpl.op(ops.StringJoin()) as op:
-
-    @op.auto
-    def _join(x, sep: str):
-        # We could do something like this:
-        #     return sa.func.STRING_AGG(x, sep, type_=x.type).within_group(...)
-        # but the problem is, that the StringJoin function is an aggregate function
-        # and not a window function, thus we don't (yet) support the `arrange`
-        # context kwarg
-        raise OperatorNotSupportedError

@@ -59,7 +59,6 @@ def test_partition_by_argument(df3):
         >> mutate(
             u=t.col3.sum(),
             v=t.col2.sum(partition_by=[t.col2]),
-            # w=t.col5.join(partition_by=[t.col1]),
         ),
     )
 

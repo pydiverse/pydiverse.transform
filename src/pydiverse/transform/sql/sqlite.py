@@ -101,10 +101,3 @@ with SQLiteTableImpl.op(ops.Least()) as op:
 
         # TODO: Determine return type
         return sa.func.coalesce(sa.func.MIN(left, right), left, right)
-
-
-with SQLiteTableImpl.op(ops.StringJoin()) as op:
-
-    @op.auto
-    def _join(x, sep: str):
-        return sa.func.GROUP_CONCAT(x, sep, type_=x.type)

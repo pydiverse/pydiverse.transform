@@ -964,7 +964,7 @@ with SQLTableImpl.op(ops.IsNull()) as op:
 with SQLTableImpl.op(ops.StrStrip()) as op:
 
     @op.auto
-    def _strip(x):
+    def _str_strip(x):
         return sa.func.TRIM(x, type_=x.type)
 
 
@@ -1169,13 +1169,6 @@ with SQLTableImpl.op(ops.All()) as op:
             ),
             sa.false(),
         )
-
-
-with SQLTableImpl.op(ops.StringJoin()) as op:
-
-    @op.auto
-    def _join(x, sep: str):
-        return sa.func.STRING_AGG(x, sep, type_=x.type)
 
 
 with SQLTableImpl.op(ops.Count()) as op:

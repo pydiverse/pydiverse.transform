@@ -9,7 +9,6 @@ __all__ = [
     "Sum",
     "Any",
     "All",
-    "StringJoin",
     "Count",
 ]
 
@@ -63,13 +62,6 @@ class All(Aggregate, Unary):
     name = "all"
     signatures = [
         "bool -> bool",
-    ]
-
-
-class StringJoin(Aggregate):
-    name = "join"
-    signatures = [
-        "str, const str -> str",
     ]
 
 
