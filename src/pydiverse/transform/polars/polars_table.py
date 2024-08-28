@@ -231,40 +231,37 @@ class PolarsEager(AbstractTableImpl):
 
             args: list[Callable[[], pl.Expr]] = [arg.value for arg in op_args]
             dtypes: list[dtypes.DType] = [arg.dtype for arg in op_args]
-            if ftype == OPType.WINDOW:
-                if ordering:
-                    # order the args
-                    def ordered_arg(arg):
-                        return arg().sort_by(
-                            by=by, descending=descending, nulls_last=nulls_last
-                        )
-
-                    args = [
-                        arg if dtype.const else functools.partial(ordered_arg, arg)
-                        for arg, dtype in zip(args, dtypes)
-                    ]
-
-                if filter_cond := context_kwargs.get("filter"):
-                    # filtering needs to be done before applying the operator. We filter
-                    # all non-constant arguments, although there should always be only
-                    # one of these.
-                    def filtered_value(value):
-                        return value().filter(filter_cond.value())
-
-                    assert (
-                        len(list(filter(lambda arg: not arg.dtype.const, op_args))) == 1
+            if ftype == OPType.WINDOW and ordering and not grouping:
+                # order the args. if the table is grouped by group_by or
+                # partition_by=, the groups will be sorted via over(order_by=)
+                # anyways so it need not be done here.
+                def ordered_arg(arg):
+                    return arg().sort_by(
+                        by=by, descending=descending, nulls_last=nulls_last
                     )
-                    args = [
-                        arg if dtype.const else functools.partial(filtered_value, arg)
-                        for arg, dtype in zip(args, dtypes)
-                    ]
 
-            if op.name == "rank" or op.name == "dense_rank":
+                args = [
+                    arg if dtype.const else functools.partial(ordered_arg, arg)
+                    for arg, dtype in zip(args, dtypes)
+                ]
+
+            if ftype in (OPType.WINDOW, OPType.AGGREGATE) and filter_cond:
+                # filtering needs to be done before applying the operator. We filter
+                # all non-constant arguments, although there should always be only
+                # one of these.
+                def filtered_value(value):
+                    return value().filter(filter_cond.value())
+
+                assert len(list(filter(lambda arg: not arg.dtype.const, op_args))) == 1
+                args = [
+                    arg if dtype.const else functools.partial(filtered_value, arg)
+                    for arg, dtype in zip(args, dtypes)
+                ]
+
+            if op.name in ("rank", "dense_rank"):
                 assert len(args) == 0
                 args = [
-                    self.backend._ordering_to_expr(
-                        translate_ordering(self.backend, context_kwargs["arrange"])
-                    ).value
+                    lambda: pl.struct(*self.backend._merge_desc_nulls_last(ordering))
                 ]
                 del context_kwargs["arrange"]
 
@@ -303,13 +300,13 @@ class PolarsEager(AbstractTableImpl):
                 # for polars
 
                 if grouping:
-                    # when doing sort_by -> over or in polars, for whatever reason the
+                    # when doing sort_by -> over in polars, for whatever reason the
                     # `nulls_last` argument is ignored. thus when both a grouping and an
-                    # arrangment are specified, we translate the arrangement to a single
-                    # expression and pass it to order_by=.
+                    # arrangment are specified, we manually add the descending and
+                    # nulls_last markers to the ordering.
                     order_by = None
                     if ordering:
-                        order_by = self.backend._ordering_to_expr(ordering).value()
+                        order_by = self.backend._merge_desc_nulls_last(ordering)
 
                     def partitioned_value(value):
                         group_exprs: list[pl.Expr] = [
@@ -434,27 +431,24 @@ class PolarsEager(AbstractTableImpl):
                 ),
             )
 
-    def _ordering_to_expr(
+    # merges descending and null_last markers into the ordering expression
+    def _merge_desc_nulls_last(
         self, ordering: list[OrderingDescriptor]
-    ) -> TypedValue[Callable[[], pl.Expr]]:
+    ) -> list[pl.Expr]:
         with_signs = []
         for o in ordering:
             numeric = (
                 self.compiler.translate(o.order).value().rank("dense").cast(pl.Int64)
             )
             with_signs.append(numeric if o.asc else -numeric)
-        return TypedValue(
-            lambda: pl.struct(
-                x.fill_null(
-                    -(pl.len().cast(pl.Int64) + 1)
-                    if o.nulls_first
-                    else pl.len().cast(pl.Int64) + 1
-                )
-                for x, o in zip(with_signs, ordering)
-            ),
-            dtype=dtypes.Int,
-            ftype=OPType.EWISE,
-        )
+        return [
+            x.fill_null(
+                -(pl.len().cast(pl.Int64) + 1)
+                if o.nulls_first
+                else pl.len().cast(pl.Int64) + 1
+            )
+            for x, o in zip(with_signs, ordering)
+        ]
 
 
 class JoinTranslator(Translator[tuple]):
