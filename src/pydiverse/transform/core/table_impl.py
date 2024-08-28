@@ -242,7 +242,7 @@ class AbstractTableImpl:
             if isinstance(expr, datetime.date):
                 return TypedValue(literal, dtypes.Date(const=True))
             if isinstance(expr, datetime.timedelta):
-                return TypedValue(literal, dtypes.Duration)
+                return TypedValue(literal, dtypes.Duration(const=True))
 
             if expr is None:
                 return TypedValue(literal, dtypes.NoneDType(const=True))

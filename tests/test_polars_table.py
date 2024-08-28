@@ -611,13 +611,21 @@ class TestPolarsEager:
 
     def test_datetime(self, tbl_dt):
         assert_equal(
-            tbl_dt >> mutate(u=(tbl_dt.dt1 - tbl_dt.dt2)),
-            df_dt.with_columns((pl.col("dt1") - pl.col("dt2")).alias("u")),
-        )
-
-        assert_equal(
-            tbl_dt >> mutate(u=tbl_dt.d1 - tbl_dt.d1),
-            df_dt.with_columns(pl.duration().alias("u")),
+            tbl_dt
+            >> mutate(
+                u=(tbl_dt.dt1 - tbl_dt.dt2),
+                v=tbl_dt.d1 - tbl_dt.d1,
+                w=(tbl_dt.d1 - tbl_dt.dt2) + tbl_dt.dur1 + dt.timedelta(days=1),
+            ),
+            df_dt.with_columns(
+                (pl.col("dt1") - pl.col("dt2")).alias("u"),
+                pl.duration().alias("v"),
+                (
+                    (pl.col("d1") - pl.col("dt2"))
+                    + pl.col("dur1")
+                    + pl.lit(dt.timedelta(days=1))
+                ).alias("w"),
+            ),
         )
 
 

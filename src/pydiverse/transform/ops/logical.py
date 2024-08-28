@@ -39,6 +39,9 @@ class Comparison(ElementWise, Binary, Logical):
         "str, str -> bool",
         "bool, bool -> bool",
         "datetime, datetime -> bool",
+        "datetime, date -> bool",
+        "date, datetime -> bool",
+        "date, date -> bool",
     ]
 
     def validate_signature(self, signature):

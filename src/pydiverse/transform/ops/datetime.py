@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform.ops.core import ElementWise, OperatorExtension, Unary
-from pydiverse.transform.ops.numeric import RSub, Sub
+from pydiverse.transform.ops.numeric import Add, RAdd, RSub, Sub
 
 __all__ = [
     "DtYear",
@@ -20,6 +20,8 @@ __all__ = [
     "DtMilliseconds",
     "DtSub",
     "DtRSub",
+    "DtDurAdd",
+    "DtDurRAdd",
 ]
 
 
@@ -93,9 +95,29 @@ class DtMilliseconds(DurationToUnit):
 
 class DtSub(OperatorExtension):
     operator = Sub
-    signatures = ["datetime, datetime -> duration", "date, date -> duration"]
+    signatures = [
+        "datetime, datetime -> duration",
+        "datetime, date -> duration",
+        "date, datetime -> duration",
+        "date, date -> duration",
+    ]
 
 
 class DtRSub(OperatorExtension):
     operator = RSub
-    signatures = ["datetime, datetime -> duration", "date, date -> duration"]
+    signatures = [
+        "datetime, datetime -> duration",
+        "datetime, date -> duration",
+        "date, datetime -> duration",
+        "date, date -> duration",
+    ]
+
+
+class DtDurAdd(OperatorExtension):
+    operator = Add
+    signatures = ["duration, duration -> duration"]
+
+
+class DtDurRAdd(OperatorExtension):
+    operator = RAdd
+    signatures = ["duration, duration -> duration"]

@@ -670,15 +670,29 @@ with PolarsEager.op(ops.DtMilliseconds()) as op:
 with PolarsEager.op(ops.Sub()) as op:
 
     @op.extension(ops.DtSub)
-    def _datetime_sub(lhs, rhs):
+    def _dt_sub(lhs, rhs):
         return lhs - rhs
 
 
 with PolarsEager.op(ops.RSub()) as op:
 
     @op.extension(ops.DtRSub)
-    def _datetime_rsub(rhs, lhs):
+    def _dt_rsub(rhs, lhs):
         return lhs - rhs
+
+
+with PolarsEager.op(ops.Add()) as op:
+
+    @op.extension(ops.DtDurAdd)
+    def _dt_dur_add(lhs, rhs):
+        return lhs + rhs
+
+
+with PolarsEager.op(ops.RAdd()) as op:
+
+    @op.extension(ops.DtDurRAdd)
+    def _dt_dur_radd(rhs, lhs):
+        return lhs + rhs
 
 
 with PolarsEager.op(ops.RowNumber()) as op:
