@@ -77,13 +77,13 @@ class AbstractTableImpl:
         self.compiler = self.ExpressionCompiler(self)
         self.lambda_translator = self.LambdaTranslator(self)
 
-        self.selects = ordered_set()  # type: ordered_set[str]
-        self.named_cols = bidict()  # type: bidict[str: uuid.UUID]
-        self.available_cols = set()  # type: set[uuid.UUID]
-        self.cols = {}  # type: dict[uuid.UUID: ColumnMetaData]
+        self.selects: ordered_set[str] = ordered_set()  # subset of named_cols
+        self.named_cols: bidict[str, uuid.UUID] = bidict()
+        self.available_cols: set[uuid.UUID] = set()
+        self.cols: dict[uuid.UUID, ColumnMetaData] = dict()
 
-        self.grouped_by = ordered_set()  # type: ordered_set[Column]
-        self.intrinsic_grouped_by = ordered_set()  # type: ordered_set[Column]
+        self.grouped_by: ordered_set[Column] = ordered_set()
+        self.intrinsic_grouped_by: ordered_set[Column] = ordered_set()
 
         # Init Values
         for name, col in columns.items():
@@ -185,7 +185,7 @@ class AbstractTableImpl:
 
     def mutate(self, **kwargs): ...
 
-    def join(self, right, on, how, *, validate=None): ...
+    def join(self, right, on, how, *, validate="m:m"): ...
 
     def filter(self, *args): ...
 
@@ -198,6 +198,8 @@ class AbstractTableImpl:
     def summarise(self, **kwargs): ...
 
     def slice_head(self, n: int, offset: int): ...
+
+    def export(self): ...
 
     #### Symbolic Operators ####
 
@@ -237,6 +239,10 @@ class AbstractTableImpl:
                 return TypedValue(literal, dtypes.String(const=True))
             if isinstance(expr, datetime.datetime):
                 return TypedValue(literal, dtypes.DateTime(const=True))
+            if isinstance(expr, datetime.date):
+                return TypedValue(literal, dtypes.Date(const=True))
+            if isinstance(expr, datetime.timedelta):
+                return TypedValue(literal, dtypes.Duration(const=True))
 
             if expr is None:
                 return TypedValue(literal, dtypes.NoneDType(const=True))
@@ -329,6 +335,10 @@ class AbstractTableImpl:
                 return TypedValue(expr, dtypes.String(const=True))
             if isinstance(expr, datetime.datetime):
                 return TypedValue(expr, dtypes.DateTime(const=True))
+            if isinstance(expr, datetime.date):
+                return TypedValue(expr, dtypes.Date(const=True))
+            if isinstance(expr, datetime.timedelta):
+                return TypedValue(expr, dtypes.Duration(const=True))
 
             if expr is None:
                 return TypedValue(expr, dtypes.NoneDType(const=True))
@@ -427,7 +437,7 @@ class ColumnMetaData:
 
     @classmethod
     def from_expr(cls, uuid, expr, table: AbstractTableImpl, **kwargs):
-        v = table.compiler.translate(expr, **kwargs)
+        v: TypedValue = table.compiler.translate(expr, **kwargs)
         return cls(
             uuid=uuid,
             expr=expr,
@@ -469,7 +479,7 @@ with AbstractTableImpl.op(ops.Add()) as op:
     def _add(lhs, rhs):
         return lhs + rhs
 
-    @op.extension(ops.StringAdd)
+    @op.extension(ops.StrAdd)
     def _str_add(lhs, rhs):
         return lhs + rhs
 
@@ -480,7 +490,7 @@ with AbstractTableImpl.op(ops.RAdd()) as op:
     def _radd(rhs, lhs):
         return lhs + rhs
 
-    @op.extension(ops.StringRAdd)
+    @op.extension(ops.StrRAdd)
     def _str_radd(lhs, rhs):
         return lhs + rhs
 

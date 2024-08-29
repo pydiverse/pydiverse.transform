@@ -10,6 +10,9 @@ __all__ = [
     "LessEqual",
     "Greater",
     "GreaterEqual",
+    "IsNull",
+    "IsNotNull",
+    "FillNull",
     "IsIn",
     "And",
     "RAnd",
@@ -37,6 +40,9 @@ class Comparison(ElementWise, Binary, Logical):
         "str, str -> bool",
         "bool, bool -> bool",
         "datetime, datetime -> bool",
+        "datetime, date -> bool",
+        "date, datetime -> bool",
+        "date, date -> bool",
     ]
 
     def validate_signature(self, signature):
@@ -46,16 +52,27 @@ class Comparison(ElementWise, Binary, Logical):
 
 class Equal(Comparison):
     name = "__eq__"
-    signatures = Comparison.signatures + [
-        "T, const none -> bool",
-    ]
+    signatures = Comparison.signatures
 
 
 class NotEqual(Comparison):
     name = "__ne__"
-    signatures = Comparison.signatures + [
-        "T, const none -> bool",
-    ]
+    signatures = Comparison.signatures
+
+
+class IsNull(ElementWise, Unary, Logical):
+    name = "is_null"
+    signatures = ["T -> bool"]
+
+
+class IsNotNull(ElementWise, Unary, Logical):
+    name = "is_not_null"
+    signatures = ["T -> bool"]
+
+
+class FillNull(ElementWise, Binary):
+    name = "fill_null"
+    signatures = ["T, T -> T"]
 
 
 class Less(Comparison):

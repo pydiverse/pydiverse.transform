@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core import AbstractTableImpl, Table, dtypes
 from pydiverse.transform.core.dispatchers import (
     col_to_table,
@@ -48,12 +48,12 @@ class TestTable:
         assert tbl1.col2._ == tbl1["col2"]._
 
         assert tbl1.col2._ == tbl1[tbl1.col2]._
-        assert tbl1.col2._ == tbl1[λ.col2]._
+        assert tbl1.col2._ == tbl1[C.col2]._
 
     def test_setitem(self, tbl1):
         tbl1["col1"] = 1
         tbl1[tbl1.col1] = 1
-        tbl1[λ.col1] = 1
+        tbl1[C.col1] = 1
 
     def test_iter(self, tbl1, tbl2):
         assert len(list(tbl1)) == len(list(tbl1._impl.selected_cols()))
@@ -78,14 +78,14 @@ class TestTable:
         assert tbl1.col1 not in tbl2
         assert tbl1.col2 not in tbl2
 
-        assert λ.col1 in tbl1
-        assert λ.col2 in tbl1
-        assert λ.col3 not in tbl1
+        assert C.col1 in tbl1
+        assert C.col2 in tbl1
+        assert C.col3 not in tbl1
 
-        assert λ.col1 in tbl2
-        assert λ.col2 in tbl2
-        assert λ.col3 in tbl2
-        assert λ.col4 not in tbl2
+        assert C.col1 in tbl2
+        assert C.col2 in tbl2
+        assert C.col3 in tbl2
+        assert C.col4 not in tbl2
 
         assert all(col in tbl1 for col in tbl1)
         assert all(col in tbl2 for col in tbl2)
@@ -180,7 +180,7 @@ class TestBuiltinVerbs:
         # Selection with Ellipsis ...
         assert (tbl1 >> select(...) >> collect()) == ["col1", "col2"]
         assert (tbl1 >> select() >> select(...) >> collect()) == ["col1", "col2"]
-        assert (tbl1 >> mutate(x=λ.col1) >> select(...) >> collect()) == [
+        assert (tbl1 >> mutate(x=C.col1) >> select(...) >> collect()) == [
             "col1",
             "col2",
             "x",
@@ -188,39 +188,39 @@ class TestBuiltinVerbs:
         assert (
             tbl1
             >> select()
-            >> mutate(x=λ.col1, col1=λ.col2)
+            >> mutate(x=C.col1, col1=C.col2)
             >> select(...)
-            >> select(λ.col1)
+            >> select(C.col1)
             >> select(...)
             >> collect()
         ) == ["col1", "col2", "x"]
 
         # Negative Selection
-        assert (tbl1 >> select(-λ.col1) >> collect()) == ["col2"]
-        assert (tbl1 >> select(λ.col1) >> select(-λ.col1) >> collect()) == []
-        assert (tbl1 >> mutate(x=λ.col1) >> select(-λ.x) >> collect()) == [
+        assert (tbl1 >> select(-C.col1) >> collect()) == ["col2"]
+        assert (tbl1 >> select(C.col1) >> select(-C.col1) >> collect()) == []
+        assert (tbl1 >> mutate(x=C.col1) >> select(-C.x) >> collect()) == [
             "col1",
             "col2",
         ]
-        assert (tbl1 >> mutate(x=λ.col1) >> select(-λ.col1) >> collect()) == [
+        assert (tbl1 >> mutate(x=C.col1) >> select(-C.col1) >> collect()) == [
             "col2",
             "x",
         ]
         assert (
-            tbl1 >> mutate(x=λ.col1, y=λ.col2) >> select(-λ.col1, -λ.y) >> collect()
+            tbl1 >> mutate(x=C.col1, y=C.col2) >> select(-C.col1, -C.y) >> collect()
         ) == ["col2", "x"]
 
         with pytest.raises(ValueError):
-            tbl1 >> select(-λ.col1, λ.col1)
+            tbl1 >> select(-C.col1, C.col1)
         with pytest.raises(ValueError):
-            tbl1 >> select(-λ.col1, λ.col2)
+            tbl1 >> select(-C.col1, C.col2)
         with pytest.raises(ValueError):
-            tbl1 >> select(λ.col1, -λ.col2)
+            tbl1 >> select(C.col1, -C.col2)
         with pytest.raises(TypeError):
-            tbl1 >> select(..., -λ.col2)
+            tbl1 >> select(..., -C.col2)
 
-        assert (tbl1 >> select(--λ.col1) >> collect()) == ["col1"]  # noqa: B002
-        assert (tbl1 >> select(+-+-λ.col1) >> collect()) == ["col1"]
+        assert (tbl1 >> select(--C.col1) >> collect()) == ["col1"]  # noqa: B002
+        assert (tbl1 >> select(+-+-C.col1) >> collect()) == ["col1"]
 
     def test_rename(self, tbl2):
         def assert_rename(name_map, expected):
@@ -239,11 +239,11 @@ class TestBuiltinVerbs:
         assert_rename({"col1": "col2", "col2": "col1"}, ["col2", "col1", "col3"])
 
         # Rename + Select
-        assert tbl2 >> select(λ.col1) >> rename(
+        assert tbl2 >> select(C.col1) >> rename(
             {"col1": "A", "col2": "col1"}
         ) >> collect() == ["A"]
 
-        assert tbl2 >> select(-λ.col1) >> rename(
+        assert tbl2 >> select(-C.col1) >> rename(
             {"col1": "A", "col2": "col1", "col3": "col2"}
         ) >> select(*tbl2) >> collect() == ["A", "col1", "col2"]
 
@@ -275,7 +275,7 @@ class TestBuiltinVerbs:
         with pytest.raises(ValueError):
             tbl2 >> rename({"col1": "A"}) >> rename({"col2": "A"})
         with pytest.raises(ValueError):
-            tbl2 >> mutate(A=λ.col1) >> select(-λ.A) >> rename({"col1": "A"})
+            tbl2 >> mutate(A=C.col1) >> select(-C.A) >> rename({"col1": "A"})
 
     def test_mutate(self, tbl1, tbl2):
         assert (tbl1 >> mutate() >> collect()) == ["col1", "col2"]
@@ -319,7 +319,7 @@ class TestBuiltinVerbs:
             == 2
         )
 
-        with pytest.raises(ValueError, match="Ambiguous"):
+        with pytest.raises(ValueError):
             # self join without alias
             tbl1 >> join(tbl1, tbl1.col1 == tbl1.col1, "inner")
 

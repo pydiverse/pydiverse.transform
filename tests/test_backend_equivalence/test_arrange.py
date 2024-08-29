@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from pydiverse.transform import λ
+from pydiverse.transform import C
 from pydiverse.transform.core.verbs import (
     arrange,
     mutate,
 )
-from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
@@ -21,8 +20,10 @@ def test_arrange(df2):
 
 
 def test_arrange_expression(df3):
-    assert_result_equal(df3, lambda t: t >> arrange(t.col4 + t.col2), check_order=True)
-    assert_result_equal(df3, lambda t: t >> arrange(-t.col4 * 2), check_order=True)
+    assert_result_equal(
+        df3, lambda t: t >> arrange(t.col2, t.col4), check_row_order=True
+    )
+    assert_result_equal(df3, lambda t: t >> arrange(-t.col4 * 2), check_row_order=True)
 
 
 def test_arrange_null(df2):
@@ -44,7 +45,7 @@ def test_multiple(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(t.col2, λ.col2),
+        lambda t: t >> arrange(t.col2, C.col2),
     )
 
 
@@ -57,7 +58,7 @@ def test_nulls_first(df4):
             -t.col2.nulls_first(),
             t.col5.nulls_first(),
         ),
-        check_order=True,
+        check_row_order=True,
     )
 
 
@@ -70,11 +71,10 @@ def test_nulls_last(df4):
             -t.col2.nulls_last(),
             t.col5.nulls_last(),
         ),
-        check_order=True,
+        check_row_order=True,
     )
 
 
-@skip_backends("pandas")
 def test_nulls_first_last_mixed(df4):
     assert_result_equal(
         df4,
@@ -84,13 +84,13 @@ def test_nulls_first_last_mixed(df4):
             -t.col2.nulls_last(),
             -t.col5,
         ),
-        check_order=True,
+        check_row_order=True,
     )
 
 
 def test_arrange_after_mutate(df4):
     assert_result_equal(
         df4,
-        lambda t: t >> mutate(x=t.col1 <= t.col2) >> arrange(λ.x, λ.col4),
-        check_order=True,
+        lambda t: t >> mutate(x=t.col1 <= t.col2) >> arrange(C.x, C.col4),
+        check_row_order=True,
     )

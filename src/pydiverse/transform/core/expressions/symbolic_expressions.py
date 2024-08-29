@@ -34,12 +34,13 @@ class SymbolicExpression(Generic[T]):
                 f"Invalid attribute {item}. Attributes can't begin and end with an"
                 " underscore."
             )
+
         return SymbolAttribute(item, self)
 
     def __getitem__(self, item):
         return SymbolicExpression(FunctionCall("__getitem__", self, item))
 
-    def case(self, *cases: tuple[Any, Any], default: Any = None):
+    def case(self, *cases: tuple[Any, Any], default: Any = None) -> SymbolicExpression:
         case_expression = CaseExpression(
             switching_on=self,
             cases=cases,

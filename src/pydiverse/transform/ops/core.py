@@ -85,12 +85,6 @@ class Operator:
     def validate_signature(self, signature: OperatorSignature):
         pass
 
-    def mutate_args(self, args, kwargs):
-        """
-        Allows the operator to modify the arguments passed to it before translation
-        """
-        return args, kwargs
-
 
 class OperatorExtension:
     """
@@ -145,12 +139,17 @@ class ElementWise(Operator):
 
 class Aggregate(Operator):
     ftype = OPType.AGGREGATE
+    context_kwargs = {
+        "partition_by",  # list[Column, LambdaColumn]
+        "filter",  # SymbolicExpression (NOT a list)
+    }
 
 
 class Window(Operator):
     ftype = OPType.WINDOW
     context_kwargs = {
-        "arrange",  # List[Column | LambdaColumn]
+        "arrange",  # list[Column | LambdaColumn]
+        "partition_by",
     }
 
 

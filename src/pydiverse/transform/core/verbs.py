@@ -41,6 +41,7 @@ __all__ = [
     "ungroup",
     "summarise",
     "slice_head",
+    "export",
 ]
 
 
@@ -104,8 +105,9 @@ def validate_table_args(*tables):
 
 
 @builtin_verb()
-def alias(tbl: AbstractTableImpl, name: str = None):
-    """Creates a new table object with a different name."""
+def alias(tbl: AbstractTableImpl, name: str | None = None):
+    """Creates a new table object with a different name and reassigns column UUIDs.
+    Must be used before performing a self-join."""
     validate_table_args(tbl)
     return tbl.alias(name)
 
@@ -114,6 +116,12 @@ def alias(tbl: AbstractTableImpl, name: str = None):
 def collect(tbl: AbstractTableImpl):
     validate_table_args(tbl)
     return tbl.collect()
+
+
+@builtin_verb()
+def export(tbl: AbstractTableImpl):
+    validate_table_args(tbl)
+    return tbl.export()
 
 
 @builtin_verb()
@@ -180,7 +188,6 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
             if name not in exclude:
                 selects.append(name)
 
-    # SELECT
     new_tbl = tbl.copy()
     new_tbl.preverb_hook("select", *args)
     new_tbl.selects = ordered_set(selects)
@@ -263,9 +270,10 @@ def join(
     left: AbstractTableImpl,
     right: AbstractTableImpl,
     on: SymbolicExpression,
-    how: str,
+    how: Literal["inner", "left", "outer"],
     *,
-    validate: Literal["1:?", None] = None,
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    suffix: str | None = None,  # appended to cols of the right table
 ):
     validate_table_args(left, right)
 
@@ -277,53 +285,49 @@ def join(
 
     if how not in ("inner", "left", "outer"):
         raise ValueError(
-            "Join type must be one of 'inner', 'left' or 'outer' (value provided:"
+            "join type must be one of 'inner', 'left' or 'outer' (value provided:"
             f" {how})"
         )
 
-    # TODO:  Decide on validation options.
-    if validate not in (None, "1:?"):
-        raise ValueError(
-            f"Validate must be either None or '1:?' (value provided: {validate})."
-        )
-
-    # Construct new table
-    # JOIN -> Merge the left and right table
     new_left = left.copy()
     new_left.preverb_hook("join", right, on, how, validate=validate)
 
-    # Update selects
-    right_renamed_selects = ordered_set(
-        name + "_" + right.name for name in right.selects
-    )
-    right_renamed_cols = {
-        k + "_" + right.name: v for k, v in right.named_cols.fwd.items()
-    }
-
-    # Check for collisions
-    # TODO: Review...
-    if ambiguous_column_names := new_left.selects & right_renamed_selects:
-        raise ValueError("Ambiguous column names: " + ", ".join(ambiguous_column_names))
-    if (
-        ambiguous_column_names := set(new_left.named_cols.fwd.keys())
-        & right_renamed_cols.keys()
-    ):
-        raise ValueError("Ambiguous column names: " + ", ".join(ambiguous_column_names))
-    if ambiguous_column_uuids := set(new_left.named_cols.fwd.values()) & set(
-        right_renamed_cols.values()
-    ):
+    if set(new_left.named_cols.fwd.values()) & set(right.named_cols.fwd.values()):
         raise ValueError(
-            "Ambiguous column uuids: " + ", ".join(map(str, ambiguous_column_uuids))
+            f"{how} join of `{left.name}` and `{right.name}` failed: "
+            f"duplicate columns detected. If you want to do a self-join or join a "
+            f"table twice, use `alias` on one table before the join."
         )
 
-    new_left.selects |= right_renamed_selects
-    new_left.named_cols.fwd.update(right_renamed_cols)
+    if suffix is not None:
+        # check that the user-provided suffix does not lead to collisions
+        if collisions := set(new_left.named_cols.fwd.keys()) & set(
+            name + suffix for name in right.named_cols.fwd.keys()
+        ):
+            raise ValueError(
+                f"{how} join of `{left.name}` and `{right.name}` failed: "
+                f"using the suffix `{suffix}` for right columns, the following column "
+                f"names appear both in the left and right table: {collisions}"
+            )
+    else:
+        # try `_{right.name}`, then `_{right.name}1`, `_{right.name}2` and so on
+        cnt = 0
+        suffix = "_" + right.name
+        for rname in right.named_cols.fwd.keys():
+            while rname + suffix in new_left.named_cols.fwd.keys():
+                cnt += 1
+                suffix = "_" + right.name + str(cnt)
+
+    new_left.selects |= {name + suffix for name in right.selects}
+    new_left.named_cols.fwd.update(
+        {name + suffix: uuid for name, uuid in right.named_cols.fwd.items()}
+    )
     new_left.available_cols.update(right.available_cols)
     new_left.cols.update(right.cols)
 
     # By resolving lambdas this late, we enable the user to use lambda columns
     # to reference mutated columns from the right side of the join.
-    # -> `λ.columnname_righttablename` is a valid lambda in the on condition.
+    # -> `C.columnname_righttablename` is a valid lambda in the on condition.
     check_lambdas_valid(new_left, on)
     on = new_left.resolve_lambda_cols(on)
 

@@ -7,13 +7,16 @@ import operator as py_operator
 import uuid
 import warnings
 from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import reduce
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal
 
+import polars as pl
 import sqlalchemy as sa
 from sqlalchemy import sql
 
 from pydiverse.transform import ops
+from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import (
     Column,
@@ -22,18 +25,16 @@ from pydiverse.transform.core.expressions import (
     iterate_over_expr,
 )
 from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.table_impl import ColumnMetaData
+from pydiverse.transform.core.table_impl import AbstractTableImpl, ColumnMetaData
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.errors import AlignmentError, FunctionTypeError
-from pydiverse.transform.lazy.lazy_table import JoinDescriptor, LazyTableImpl
 from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:
-    from pydiverse.transform.core.expressions import FunctionCall
     from pydiverse.transform.core.registry import TypedOperatorImpl
 
 
-class SQLTableImpl(LazyTableImpl):
+class SQLTableImpl(AbstractTableImpl):
     """SQL backend
 
     Attributes:
@@ -179,7 +180,9 @@ class SQLTableImpl(LazyTableImpl):
         if isinstance(type_, sa.DateTime):
             return dtypes.DateTime()
         if isinstance(type_, sa.Date):
-            raise NotImplementedError("Unsupported type: Date")
+            return dtypes.Date()
+        if isinstance(type_, sa.Interval):
+            return dtypes.Duration()
         if isinstance(type_, sa.Time):
             raise NotImplementedError("Unsupported type: Time")
 
@@ -212,7 +215,7 @@ class SQLTableImpl(LazyTableImpl):
         self.wheres: list[SymbolicExpression] = []
         self.having: list[SymbolicExpression] = []
         self.order_bys: list[OrderingDescriptor] = []
-        self.limit_offset: tuple[int, int] = None
+        self.limit_offset: tuple[int, int] | None = None
 
     def build_select(self) -> sql.Select:
         # Validate current state
@@ -446,6 +449,14 @@ class SQLTableImpl(LazyTableImpl):
         result.attrs["name"] = self.name
         return result
 
+    def export(self):
+        with self.engine.connect() as conn:
+            if isinstance(self, DuckDBTableImpl):
+                result = pl.read_database(self.build_query(), connection=conn)
+            else:
+                result = pl.read_database(self.build_select(), connection=conn)
+        return result
+
     def build_query(self) -> str:
         query = self.build_select()
         return str(
@@ -454,7 +465,14 @@ class SQLTableImpl(LazyTableImpl):
             )
         )
 
-    def join(self, right, on, how, *, validate=None):
+    def join(
+        self,
+        right: SQLTableImpl,
+        on: SymbolicExpression,
+        how: Literal["inner", "left", "outer"],
+        *,
+        validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    ):
         self.alignment_hash = generate_alignment_hash()
 
         # If right has joins already, merging them becomes extremely difficult
@@ -495,7 +513,7 @@ class SQLTableImpl(LazyTableImpl):
                     " subquery to fix this."
                 )
 
-        if validate is not None:
+        if validate != "m:m":
             warnings.warn("SQL table backend ignores join validation argument.")
 
         descriptor = JoinDescriptor(right, on, how)
@@ -557,22 +575,22 @@ class SQLTableImpl(LazyTableImpl):
         return [col]
 
     class ExpressionCompiler(
-        LazyTableImpl.ExpressionCompiler[
+        AbstractTableImpl.ExpressionCompiler[
             "SQLTableImpl",
             TypedValue[Callable[[dict[uuid.UUID, sa.Column]], sql.ColumnElement]],
         ]
     ):
-        def _translate_col(self, expr, **kwargs):
+        def _translate_col(self, col, **kwargs):
             # Can either be a base SQL column, or a reference to an expression
-            if expr.uuid in self.backend.sql_columns:
+            if col.uuid in self.backend.sql_columns:
 
                 def sql_col(cols, **kw):
-                    return cols[expr.uuid]
+                    return cols[col.uuid]
 
-                return TypedValue(sql_col, expr.dtype, OPType.EWISE)
+                return TypedValue(sql_col, col.dtype, OPType.EWISE)
 
-            col = self.backend.cols[expr.uuid]
-            return TypedValue(col.compiled, col.dtype, col.ftype)
+            meta_data = self.backend.cols[col.uuid]
+            return TypedValue(meta_data.compiled, meta_data.dtype, meta_data.ftype)
 
         def _translate_literal_col(self, expr, **kwargs):
             if not self.backend.is_aligned_with(expr):
@@ -587,10 +605,9 @@ class SQLTableImpl(LazyTableImpl):
             return TypedValue(sql_col, expr.typed_value.dtype, expr.typed_value.ftype)
 
         def _translate_function(
-            self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
+            self, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             value = self._translate_function_value(
-                expr,
                 implementation,
                 op_args,
                 context_kwargs,
@@ -623,7 +640,6 @@ class SQLTableImpl(LazyTableImpl):
 
         def _translate_function_value(
             self,
-            expr: FunctionCall,
             implementation: TypedOperatorImpl,
             op_args: list,
             context_kwargs: dict,
@@ -709,9 +725,13 @@ class SQLTableImpl(LazyTableImpl):
             wants_order_by = operator.ftype == OPType.WINDOW
 
             # PARTITION BY
-            compiled_pb = tuple(
-                self.translate(group_by).value for group_by in self.backend.grouped_by
-            )
+            grouping = context_kwargs.get("partition_by")
+            if grouping is not None:
+                grouping = [self.backend.resolve_lambda_cols(col) for col in grouping]
+            else:
+                grouping = self.backend.grouped_by
+
+            compiled_pb = tuple(self.translate(col).value for col in grouping)
 
             # ORDER BY
             def order_by_clause_generator(ordering: OrderingDescriptor):
@@ -770,7 +790,7 @@ class SQLTableImpl(LazyTableImpl):
             return over_value
 
     class AlignedExpressionEvaluator(
-        LazyTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]
+        AbstractTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]
     ):
         def translate(self, expr, check_alignment=True, **kwargs):
             if check_alignment:
@@ -787,21 +807,25 @@ class SQLTableImpl(LazyTableImpl):
 
             return super().translate(expr, check_alignment=check_alignment, **kwargs)
 
-        def _translate_col(self, expr, **kwargs):
-            backend = expr.table
-            if expr.uuid in backend.sql_columns:
-                sql_col = backend.sql_columns[expr.uuid]
-                return TypedValue(sql_col, expr.dtype)
+        def _translate_col(self, col, **kwargs):
+            backend = col.table
+            if col.uuid in backend.sql_columns:
+                sql_col = backend.sql_columns[col.uuid]
+                return TypedValue(sql_col, col.dtype)
 
-            col = backend.cols[expr.uuid]
-            return TypedValue(col.compiled(backend.sql_columns), col.dtype, col.ftype)
+            meta_data = backend.cols[col.uuid]
+            return TypedValue(
+                meta_data.compiled(backend.sql_columns),
+                meta_data.dtype,
+                meta_data.ftype,
+            )
 
         def _translate_literal_col(self, expr, **kwargs):
             assert issubclass(expr.backend, SQLTableImpl)
             return expr.typed_value
 
         def _translate_function(
-            self, expr, implementation, op_args, context_kwargs, **kwargs
+            self, implementation, op_args, context_kwargs, **kwargs
         ):
             # Aggregate function -> window function
             value = implementation(*(arg.value for arg in op_args))
@@ -819,6 +843,15 @@ class SQLTableImpl(LazyTableImpl):
                 raise NotImplementedError("How to handle window functions?")
 
             return TypedValue(value, implementation.rtype, ftype)
+
+
+@dataclass
+class JoinDescriptor(Generic[ImplT]):
+    __slots__ = ("right", "on", "how")
+
+    right: ImplT
+    on: Any
+    how: str
 
 
 def generate_alignment_hash():
@@ -920,125 +953,147 @@ with SQLTableImpl.op(ops.IsIn()) as op:
         return reduce(py_operator.or_, map(lambda v: x == v, values))
 
 
+with SQLTableImpl.op(ops.IsNull()) as op:
+
+    @op.auto
+    def _is_null(x):
+        return x.is_(sa.null())
+
+
+with SQLTableImpl.op(ops.IsNotNull()) as op:
+
+    @op.auto
+    def _is_not_null(x):
+        return x.is_not(sa.null())
+
+
 #### String Functions ####
 
 
-with SQLTableImpl.op(ops.Strip()) as op:
+with SQLTableImpl.op(ops.StrStrip()) as op:
 
     @op.auto
-    def _strip(x):
+    def _str_strip(x):
         return sa.func.TRIM(x, type_=x.type)
 
 
-with SQLTableImpl.op(ops.StringLength()) as op:
+with SQLTableImpl.op(ops.StrLen()) as op:
 
     @op.auto
     def _str_length(x):
         return sa.func.LENGTH(x, type_=sa.Integer())
 
 
-with SQLTableImpl.op(ops.Upper()) as op:
+with SQLTableImpl.op(ops.StrToUpper()) as op:
 
     @op.auto
     def _upper(x):
         return sa.func.UPPER(x, type_=x.type)
 
 
-with SQLTableImpl.op(ops.Lower()) as op:
+with SQLTableImpl.op(ops.StrToLower()) as op:
 
     @op.auto
     def _upper(x):
         return sa.func.LOWER(x, type_=x.type)
 
 
-with SQLTableImpl.op(ops.Replace()) as op:
+with SQLTableImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
     def _replace(x, y, z):
         return sa.func.REPLACE(x, y, z, type_=x.type)
 
 
-with SQLTableImpl.op(ops.StartsWith()) as op:
+with SQLTableImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
         return x.startswith(y, autoescape=True)
 
 
-with SQLTableImpl.op(ops.EndsWith()) as op:
+with SQLTableImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
         return x.endswith(y, autoescape=True)
 
 
-with SQLTableImpl.op(ops.Contains()) as op:
+with SQLTableImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):
         return x.contains(y, autoescape=True)
 
 
+with SQLTableImpl.op(ops.StrSlice()) as op:
+
+    @op.auto
+    def _str_slice(x, offset, length):
+        # SQL has 1-indexed strings but we do it 0-indexed
+        return sa.func.SUBSTR(x, offset + 1, length)
+
+
 #### Datetime Functions ####
 
 
-with SQLTableImpl.op(ops.Year()) as op:
+with SQLTableImpl.op(ops.DtYear()) as op:
 
     @op.auto
     def _year(x):
         return sa.extract("year", x)
 
 
-with SQLTableImpl.op(ops.Month()) as op:
+with SQLTableImpl.op(ops.DtMonth()) as op:
 
     @op.auto
     def _month(x):
         return sa.extract("month", x)
 
 
-with SQLTableImpl.op(ops.Day()) as op:
+with SQLTableImpl.op(ops.DtDay()) as op:
 
     @op.auto
     def _day(x):
         return sa.extract("day", x)
 
 
-with SQLTableImpl.op(ops.Hour()) as op:
+with SQLTableImpl.op(ops.DtHour()) as op:
 
     @op.auto
     def _hour(x):
         return sa.extract("hour", x)
 
 
-with SQLTableImpl.op(ops.Minute()) as op:
+with SQLTableImpl.op(ops.DtMinute()) as op:
 
     @op.auto
     def _minute(x):
         return sa.extract("minute", x)
 
 
-with SQLTableImpl.op(ops.Second()) as op:
+with SQLTableImpl.op(ops.DtSecond()) as op:
 
     @op.auto
     def _second(x):
         return sa.extract("second", x)
 
 
-with SQLTableImpl.op(ops.Millisecond()) as op:
+with SQLTableImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _millisecond(x):
         return sa.extract("milliseconds", x) % 1000
 
 
-with SQLTableImpl.op(ops.DayOfWeek()) as op:
+with SQLTableImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _day_of_week(x):
         return sa.extract("dow", x)
 
 
-with SQLTableImpl.op(ops.DayOfYear()) as op:
+with SQLTableImpl.op(ops.DtDayOfYear()) as op:
 
     @op.auto
     def _day_of_year(x):
@@ -1133,13 +1188,6 @@ with SQLTableImpl.op(ops.All()) as op:
         )
 
 
-with SQLTableImpl.op(ops.StringJoin()) as op:
-
-    @op.auto
-    def _join(x, sep: str):
-        return sa.func.STRING_AGG(x, sep, type_=x.type)
-
-
 with SQLTableImpl.op(ops.Count()) as op:
 
     @op.auto
@@ -1192,19 +1240,18 @@ with SQLTableImpl.op(ops.RowNumber()) as op:
 with SQLTableImpl.op(ops.Rank()) as op:
 
     @op.auto
-    def _rank(_):
+    def _rank():
         return sa.func.rank()
 
 
 with SQLTableImpl.op(ops.DenseRank()) as op:
 
     @op.auto
-    def _dense_rank(_):
+    def _dense_rank():
         return sa.func.dense_rank()
 
 
-####
-
-
-# Load SQLTableImpl dialect specific subclasses
-from . import dialects  # noqa
+from .mssql import MSSqlTableImpl  # noqa
+from .duckdb import DuckDBTableImpl  # noqa
+from .postgres import PostgresTableImpl  # noqa
+from .sqlite import SQLiteTableImpl  # noqa

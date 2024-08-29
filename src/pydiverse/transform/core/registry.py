@@ -195,9 +195,9 @@ class OperatorRegistry:
     def __init__(self, name, super_registry=None):
         self.name = name
         self.super_registry = super_registry
-        self.registered_ops = set()  # type: set[Operator]
-        self.implementations = dict()  # type: dict[str, OperatorImplementationStore]
-        self.check_super = dict()  # type: dict[str, bool]
+        self.registered_ops: set[Operator] = set()
+        self.implementations: dict[str, OperatorImplementationStore] = dict()
+        self.check_super: dict[str, bool] = dict()
 
     def register_op(self, operator: Operator, check_super=True):
         """

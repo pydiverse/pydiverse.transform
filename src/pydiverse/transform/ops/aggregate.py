@@ -9,7 +9,6 @@ __all__ = [
     "Sum",
     "Any",
     "All",
-    "StringJoin",
     "Count",
 ]
 
@@ -21,6 +20,7 @@ class Min(Aggregate, Unary):
         "float -> float",
         "str -> str",
         "datetime -> datetime",
+        "date -> date",
     ]
 
 
@@ -31,6 +31,7 @@ class Max(Aggregate, Unary):
         "float -> float",
         "str -> str",
         "datetime -> datetime",
+        "date -> date",
     ]
 
 
@@ -61,13 +62,6 @@ class All(Aggregate, Unary):
     name = "all"
     signatures = [
         "bool -> bool",
-    ]
-
-
-class StringJoin(Aggregate):
-    name = "join"
-    signatures = [
-        "str, const str -> str",
     ]
 
 

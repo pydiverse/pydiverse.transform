@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
+from pydiverse.transform.sql.sql_table import SQLTableImpl
 
 
 class PostgresTableImpl(SQLTableImpl):
@@ -55,14 +55,14 @@ with PostgresTableImpl.op(ops.Round()) as op:
         return sa.func.ROUND(x, decimals, type_=x.type)
 
 
-with PostgresTableImpl.op(ops.Second()) as op:
+with PostgresTableImpl.op(ops.DtSecond()) as op:
 
     @op.auto
     def _second(x):
         return sa.func.FLOOR(sa.extract("second", x), type_=sa.Integer())
 
 
-with PostgresTableImpl.op(ops.Millisecond()) as op:
+with PostgresTableImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _millisecond(x):

@@ -10,6 +10,7 @@ from pydiverse.transform.core.expressions import (
     LambdaColumn,
     SymbolicExpression,
 )
+from pydiverse.transform.core.verbs import export
 
 
 class Table(Generic[ImplT]):
@@ -84,12 +85,10 @@ class Table(Generic[ImplT]):
         return self.__class__(impl_copy)
 
     def __str__(self):
-        from pydiverse.transform.core.verbs import collect
-
         try:
             return (
                 f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n"
-                f"{self >> collect()}"
+                f"{self >> export()}"
             )
         except Exception as e:
             return (
@@ -99,15 +98,13 @@ class Table(Generic[ImplT]):
             )
 
     def _repr_html_(self) -> str | None:
-        from pydiverse.transform.core.verbs import collect
-
         html = (
             f"Table <code>{self._impl.name}</code> using"
             f" <code>{type(self._impl).__name__}</code> backend:</br>"
         )
         try:
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
-            html += (self >> collect())._repr_html_()
+            html += (self >> export())._repr_html_()
         except Exception as e:
             html += (
                 "</br><pre>Failed to collect table due to an exception:\n"
@@ -117,3 +114,9 @@ class Table(Generic[ImplT]):
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+    def cols(self) -> list[Column]:
+        return [
+            self._impl.cols[uuid].as_column(name, self._impl)
+            for (name, uuid) in self._impl.selected_cols()
+        ]

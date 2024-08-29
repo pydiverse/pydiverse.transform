@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
+from pydiverse.transform.sql.sql_table import SQLTableImpl
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
@@ -21,7 +21,7 @@ with SQLiteTableImpl.op(ops.Round()) as op:
         return sa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
 
 
-with SQLiteTableImpl.op(ops.StartsWith()) as op:
+with SQLiteTableImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
@@ -33,7 +33,7 @@ with SQLiteTableImpl.op(ops.StartsWith()) as op:
         return x.startswith(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.EndsWith()) as op:
+with SQLiteTableImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
@@ -45,7 +45,7 @@ with SQLiteTableImpl.op(ops.EndsWith()) as op:
         return x.endswith(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.Contains()) as op:
+with SQLiteTableImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):
@@ -57,7 +57,7 @@ with SQLiteTableImpl.op(ops.Contains()) as op:
         return x.contains(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.Millisecond()) as op:
+with SQLiteTableImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _millisecond(x):
@@ -101,10 +101,3 @@ with SQLiteTableImpl.op(ops.Least()) as op:
 
         # TODO: Determine return type
         return sa.func.coalesce(sa.func.MIN(left, right), left, right)
-
-
-with SQLiteTableImpl.op(ops.StringJoin()) as op:
-
-    @op.auto
-    def _join(x, sep: str):
-        return sa.func.GROUP_CONCAT(x, sep, type_=x.type)

@@ -6,11 +6,11 @@ from pydiverse.transform import ops
 from pydiverse.transform._typing import CallableT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import TypedValue
+from pydiverse.transform.core.expressions.expressions import Column
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.util import OrderingDescriptor
-from pydiverse.transform.errors import OperatorNotSupportedError
-from pydiverse.transform.lazy.sql_table.sql_table import SQLTableImpl
 from pydiverse.transform.ops import Operator, OPType
+from pydiverse.transform.sql.sql_table import SQLTableImpl
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
@@ -65,33 +65,32 @@ class MSSqlTableImpl(SQLTableImpl):
 
             return super()._translate(expr, **kwargs)
 
-        def _translate_col(self, expr, **kwargs):
+        def _translate_col(self, col: Column, **kwargs):
             # If mssql_bool_as_bit is true, then we can just return the
             # precompiled col. Otherwise, we must recompile it to ensure
             # we return booleans as bools and not as bits.
             if kwargs.get("mssql_bool_as_bit") is True:
-                return super()._translate_col(expr, **kwargs)
+                return super()._translate_col(col, **kwargs)
 
             # Can either be a base SQL column, or a reference to an expression
-            if expr.uuid in self.backend.sql_columns:
-                is_bool = dtypes.Bool().same_kind(self.backend.cols[expr.uuid].dtype)
+            if col.uuid in self.backend.sql_columns:
+                is_bool = dtypes.Bool().same_kind(self.backend.cols[col.uuid].dtype)
 
                 def sql_col(cols, **kw):
-                    col = cols[expr.uuid]
+                    sql_col = cols[col.uuid]
                     if is_bool:
-                        return mssql_convert_bit_to_bool(col)
-                    return col
+                        return mssql_convert_bit_to_bool(sql_col)
+                    return sql_col
 
-                return TypedValue(sql_col, expr.dtype, OPType.EWISE)
+                return TypedValue(sql_col, col.dtype, OPType.EWISE)
 
-            col = self.backend.cols[expr.uuid]
-            return self._translate(col.expr, **kwargs)
+            meta_data = self.backend.cols[col.uuid]
+            return self._translate(meta_data.expr, **kwargs)
 
         def _translate_function_value(
-            self, expr, implementation, op_args, context_kwargs, *, verb=None, **kwargs
+            self, implementation, op_args, context_kwargs, *, verb=None, **kwargs
         ):
             value = super()._translate_function_value(
-                expr,
                 implementation,
                 op_args,
                 context_kwargs,
@@ -258,7 +257,7 @@ with MSSqlTableImpl.op(ops.RPow()) as op:
         return _pow(lhs, rhs)
 
 
-with MSSqlTableImpl.op(ops.StringLength()) as op:
+with MSSqlTableImpl.op(ops.StrLen()) as op:
 
     @op.auto
     def _str_length(x):
@@ -268,7 +267,7 @@ with MSSqlTableImpl.op(ops.StringLength()) as op:
         return sa.func.LENGTH(x, type_=sa.Integer())
 
 
-with MSSqlTableImpl.op(ops.Replace()) as op:
+with MSSqlTableImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
     def _replace(x, y, z):
@@ -276,7 +275,7 @@ with MSSqlTableImpl.op(ops.Replace()) as op:
         return sa.func.REPLACE(x, y, z, type_=x.type)
 
 
-with MSSqlTableImpl.op(ops.StartsWith()) as op:
+with MSSqlTableImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
@@ -284,7 +283,7 @@ with MSSqlTableImpl.op(ops.StartsWith()) as op:
         return x.startswith(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.EndsWith()) as op:
+with MSSqlTableImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
@@ -292,7 +291,7 @@ with MSSqlTableImpl.op(ops.EndsWith()) as op:
         return x.endswith(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.Contains()) as op:
+with MSSqlTableImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):
@@ -300,7 +299,14 @@ with MSSqlTableImpl.op(ops.Contains()) as op:
         return x.contains(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.DayOfWeek()) as op:
+with MSSqlTableImpl.op(ops.StrSlice()) as op:
+
+    @op.auto
+    def _str_slice(x, offset, length):
+        return sa.func.SUBSTRING(x, offset + 1, length)
+
+
+with MSSqlTableImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _day_of_week(x):
@@ -316,15 +322,3 @@ with MSSqlTableImpl.op(ops.Mean()) as op:
     @op.auto
     def _mean(x):
         return sa.func.AVG(sa.cast(x, sa.Double()), type_=sa.Double())
-
-
-with MSSqlTableImpl.op(ops.StringJoin()) as op:
-
-    @op.auto
-    def _join(x, sep: str):
-        # We could do something like this:
-        #     return sa.func.STRING_AGG(x, sep, type_=x.type).within_group(...)
-        # but the problem is, that the StringJoin function is an aggregate function
-        # and not a window function, thus we don't (yet) support the `arrange`
-        # context kwarg
-        raise OperatorNotSupportedError

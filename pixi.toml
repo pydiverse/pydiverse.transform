@@ -9,6 +9,7 @@ numpy = ">=1.23.1"
 pandas = ">=1.4.3"
 SQLAlchemy = ">=1.4.27"
 pyarrow = ">=11.0.0"
+polars = ">=1.6.0"
 
 [feature.dev.dependencies]
 ruff = ">=0.5.6"
@@ -73,5 +74,4 @@ py312 = ["py312", "dev", "duckdb", "postgres", "mssql"]
 py39ibm = ["py39", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
 py312ibm = ["py312", "dev", "duckdb", "postgres", "mssql", "ibm-db"]
 docs = ["docs"]
-release = { features=["release"], no-default-feature=true }
-
+release = { features = ["release"], no-default-feature = true }

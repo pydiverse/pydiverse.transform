@@ -3,25 +3,26 @@ from __future__ import annotations
 import contextlib
 import warnings
 
-import pandas as pd
+import polars as pl
 import pytest
-from pandas._testing import assert_frame_equal
+from polars.testing import assert_frame_equal
 
 from pydiverse.transform import Table
-from pydiverse.transform.core.verbs import collect, show_query
+from pydiverse.transform.core.verbs import export, show_query
 from pydiverse.transform.errors import NonStandardBehaviourWarning
 
 
-def assert_equal(left, right, check_dtype=False):
-    left_df = left >> collect() if isinstance(left, Table) else left
-    right_df = right >> collect() if isinstance(right, Table) else right
+def assert_equal(left, right, check_dtypes=False, check_row_order=True):
+    left_df = left >> export() if isinstance(left, Table) else left
+    right_df = right >> export() if isinstance(right, Table) else right
 
     try:
-        cols = left_df.columns.tolist()
         assert_frame_equal(
-            left_df.sort_values(cols).reset_index(drop=True),
-            right_df.sort_values(cols).reset_index(drop=True),
-            check_dtype=check_dtype,
+            left_df,
+            right_df,
+            check_column_order=False,
+            check_row_order=check_row_order,
+            check_dtypes=check_dtypes,
         )
     except AssertionError as e:
         print("First dataframe:")
@@ -54,10 +55,9 @@ def assert_result_equal(
     pipe_factory,
     *,
     exception=None,
-    check_order=False,
-    may_throw=False,
-    xfail_warnings=True,
-    **kwargs,
+    check_row_order: bool = False,
+    may_throw: bool = False,
+    xfail_warnings: bool = True,
 ):
     if not isinstance(input_tables[0], (tuple, list)):
         input_tables = (input_tables,)
@@ -65,9 +65,9 @@ def assert_result_equal(
 
     if exception and not may_throw:
         with pytest.raises(exception):
-            pipe_factory(*x) >> collect()
+            pipe_factory(*x) >> export()
         with pytest.raises(exception):
-            pipe_factory(*y) >> collect()
+            pipe_factory(*y) >> export()
         return
 
     did_raise_warning = False
@@ -77,17 +77,31 @@ def assert_result_equal(
             query_x = pipe_factory(*x)
             query_y = pipe_factory(*y)
 
-            dfx = (query_x >> collect()).reset_index(drop=True)
-            dfy = (query_y >> collect()).reset_index(drop=True)
+            dfx: pl.DataFrame = (query_x >> export()).with_columns(
+                pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
+            )
+            dfy: pl.DataFrame = (query_y >> export()).with_columns(
+                pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
+            )
+
+            # after a join, cols containing only null values get type Null on SQLite and
+            # Postgres. maybe we can fix this but for now we just ignore such cols
+            assert dfx.columns == dfy.columns
+            null_cols = set(dfx.select(pl.col(pl.Null)).columns) | set(
+                dfy.select(pl.col(pl.Null)).columns
+            )
+            assert all(
+                all(d.get_column(col).is_null().all() for col in null_cols)
+                for d in (dfx, dfy)
+            )
+            dfy = dfy.select(pl.all().exclude(null_cols))
+            dfx = dfx.select(pl.all().exclude(null_cols))
 
         warnings_record = get_transform_warnings(warnings_record)
         if len(warnings_record):
             did_raise_warning = True
             warnings_summary = "\n".join({str(w.message) for w in warnings_record})
 
-        if not check_order:
-            dfx.sort_values(by=dfx.columns.tolist(), inplace=True, ignore_index=True)
-            dfy.sort_values(by=dfy.columns.tolist(), inplace=True, ignore_index=True)
     except Exception as e:
         if may_throw:
             if exception is not None:
@@ -104,13 +118,14 @@ def assert_result_equal(
         else:
             raise e
 
-    def fix_na(df: pd.DataFrame):
-        for col in dfy.dtypes[dfy.dtypes == object].index:  # noqa: E721
-            df[col] = df[col].fillna(pd.NA)
-        return df
-
     try:
-        assert_frame_equal(fix_na(dfx), fix_na(dfy), check_dtype=False, **kwargs)
+        assert_frame_equal(
+            dfx,
+            dfy,
+            check_dtypes=False,
+            check_row_order=check_row_order,
+            check_exact=False,
+        )
     except Exception as e:
         if xfail_warnings and did_raise_warning:
             pytest.xfail(warnings_summary)
