@@ -958,6 +958,13 @@ with SQLTableImpl.op(ops.IsNull()) as op:
         return x.is_(sa.null())
 
 
+with SQLTableImpl.op(ops.IsNotNull()) as op:
+
+    @op.auto
+    def _is_not_null(x):
+        return x.is_not(sa.null())
+
+
 #### String Functions ####
 
 

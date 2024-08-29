@@ -562,6 +562,13 @@ with PolarsEager.op(ops.IsNull()) as op:
         return x.is_null()
 
 
+with PolarsEager.op(ops.IsNotNull()) as op:
+
+    @op.auto
+    def _is_not_null(x):
+        return x.is_not_null()
+
+
 with PolarsEager.op(ops.FillNull()) as op:
 
     @op.auto
