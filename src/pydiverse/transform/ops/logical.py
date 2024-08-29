@@ -95,7 +95,7 @@ class IsIn(ElementWise, Logical):
     name = "isin"
     signatures = [
         # TODO: A signature like "T, const list[const T] -> bool" would be better
-        "T, const T... -> bool",
+        "T, T... -> bool",
     ]
 
 

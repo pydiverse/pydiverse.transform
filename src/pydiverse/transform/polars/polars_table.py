@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import itertools
-import operator
 import uuid
 from typing import Any, Callable, Literal
 
@@ -98,11 +97,10 @@ class PolarsEager(AbstractTableImpl):
         )
 
     def filter(self, *args: SymbolicExpression):
-        if not args:
-            return
-        pl_expr, dtype = self.compiler.translate(functools.reduce(operator.and_, args))
-        assert isinstance(dtype, dtypes.Bool)
-        self.df = self.df.filter(pl_expr())
+        if args:
+            self.df = self.df.filter(
+                self.compiler.translate(arg).value() for arg in args
+            )
 
     def alias(self, new_name: str | None = None):
         new_name = new_name or self.name
@@ -739,7 +737,7 @@ with PolarsEager.op(ops.IsIn()) as op:
 
     @op.auto
     def _isin(x, *values):
-        return x.is_in([pl.select(v).item() for v in values])
+        return pl.any_horizontal(x == v for v in values)
 
 
 with PolarsEager.op(ops.StrContains()) as op:

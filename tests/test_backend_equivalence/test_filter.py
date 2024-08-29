@@ -44,8 +44,16 @@ def test_filter_isin(df4):
         lambda t: t
         >> filter(
             C.col1.isin(0, 2),
+            C.col2.isin(0, t.col1 * t.col2),
         ),
     )
+
+    assert_result_equal(
+        df4,
+        lambda t: t >> filter((-(t.col4 // 2 - 1)).isin(1, 4, t.col1 + t.col2)),
+    )
+
+    assert_result_equal(df4, lambda t: t >> filter(t.col1.isin(None)))
 
     assert_result_equal(
         df4,
