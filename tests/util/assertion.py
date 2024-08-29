@@ -84,6 +84,19 @@ def assert_result_equal(
                 pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
             )
 
+            # after a join, cols containing only null values get type Null on SQLite and
+            # Postgres. maybe we can fix this but for now we just ignore such cols
+            assert dfx.columns == dfy.columns
+            null_cols = set(dfx.select(pl.col(pl.Null)).columns) | set(
+                dfy.select(pl.col(pl.Null)).columns
+            )
+            assert all(
+                all(d.get_column(col).is_null().all() for col in null_cols)
+                for d in (dfx, dfy)
+            )
+            dfy = dfy.select(pl.all().exclude(null_cols))
+            dfx = dfx.select(pl.all().exclude(null_cols))
+
         warnings_record = get_transform_warnings(warnings_record)
         if len(warnings_record):
             did_raise_warning = True

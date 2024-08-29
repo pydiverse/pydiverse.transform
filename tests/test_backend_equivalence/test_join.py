@@ -4,9 +4,13 @@ import sqlite3
 
 import pytest
 
+from pydiverse.transform.core.expressions.lambda_getter import C
 from pydiverse.transform.core.verbs import (
     alias,
     join,
+    left_join,
+    mutate,
+    outer_join,
     select,
 )
 from tests.util import assert_result_equal, full_sort
@@ -29,14 +33,18 @@ from tests.util import assert_result_equal, full_sort
 def test_join(df1, df2, how):
     assert_result_equal(
         (df1, df2),
-        lambda t, u: t >> join(u, t.col1 == u.col1, how=how) >> full_sort(),
+        lambda t, u: t >> join(u, t.col1 == u.col1, how=how),
     )
 
     assert_result_equal(
         (df1, df2),
         lambda t, u: t
         >> join(u, (t.col1 == u.col1) & (t.col1 == u.col2), how=how)
-        >> full_sort(),
+        >> mutate(l=t.col2.str.len())
+        >> left_join(v := u >> alias("v"), C.l == v.col2)
+        >> mutate(k=v.col1 + C.l + u.col2)
+        >> outer_join(w := t >> alias("w"), (t.col1 == w.col1) & (C.k == w.col1)),
+        check_row_order=False,
     )
 
 

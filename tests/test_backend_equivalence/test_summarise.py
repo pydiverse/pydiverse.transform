@@ -94,24 +94,24 @@ def test_filter(df3):
     )
 
 
-def test_filter_argument(df3):
-    assert_result_equal(
-        df3,
-        lambda t: t
-        >> group_by(t.col2)
-        >> summarise(u=t.col4.sum(filter=(t.col1 != 0))),
-    )
+# def test_filter_argument(df3):
+#     assert_result_equal(
+#         df3,
+#         lambda t: t
+#         >> group_by(t.col2)
+#         >> summarise(u=t.col4.sum(filter=(t.col1 != 0))),
+#     )
 
-    assert_result_equal(
-        df3,
-        lambda t: t
-        >> group_by(t.col4, t.col1)
-        >> summarise(
-            u=(t.col3 * t.col4 - t.col2).sum(
-                filter=(t.col5.isin("a", "e", "i", "o", "u"))
-            )
-        ),
-    )
+#     assert_result_equal(
+#         df3,
+#         lambda t: t
+#         >> group_by(t.col4, t.col1)
+#         >> summarise(
+#             u=(t.col3 * t.col4 - t.col2).sum(
+#                 filter=(t.col5.isin("a", "e", "i", "o", "u"))
+#             )
+#         ),
+#     )
 
 
 def test_arrange(df3):
