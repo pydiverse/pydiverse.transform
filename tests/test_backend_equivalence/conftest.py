@@ -104,6 +104,8 @@ reference_backends = ["polars", "duckdb"]
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc):
+    pl.Config.set_tbl_cols(12)
+    pl.Config.set_tbl_rows(40)
     # Parametrize tests based on `backends` and `skip_backends` mark.
 
     backends = dict.fromkeys(BACKEND_TABLES)

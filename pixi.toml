@@ -9,7 +9,7 @@ numpy = ">=1.23.1"
 pandas = ">=1.4.3"
 SQLAlchemy = ">=1.4.27"
 pyarrow = ">=11.0.0"
-polars = ">=1.0.0"
+polars = ">=1.6.0"
 
 [feature.dev.dependencies]
 ruff = ">=0.5.6"

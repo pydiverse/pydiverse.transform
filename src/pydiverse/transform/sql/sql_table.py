@@ -450,9 +450,11 @@ class SQLTableImpl(AbstractTableImpl):
         return result
 
     def export(self):
-        select = self.build_select()
         with self.engine.connect() as conn:
-            result = pl.read_database(select, connection=conn)
+            if isinstance(self, DuckDBTableImpl):
+                result = pl.read_database(self.build_query(), connection=conn)
+            else:
+                result = pl.read_database(self.build_select(), connection=conn)
         return result
 
     def build_query(self) -> str:
