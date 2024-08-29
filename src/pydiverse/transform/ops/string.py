@@ -15,6 +15,7 @@ __all__ = [
     "StrStartsWith",
     "StrEndsWith",
     "StrContains",
+    "StrSlice",
 ]
 
 
@@ -86,3 +87,8 @@ class StrContains(ElementWise, Logical):
     signatures = [
         "str, const str -> bool",
     ]
+
+
+class StrSlice(ElementWise):
+    name = "str.slice"
+    signatures = ["str, int, int -> str"]

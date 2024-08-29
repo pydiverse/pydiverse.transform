@@ -786,6 +786,13 @@ with PolarsEager.op(ops.StrStrip()) as op:
         return x.str.strip_chars()
 
 
+with PolarsEager.op(ops.StrSlice()) as op:
+
+    @op.auto
+    def _str_slice(x, offset, length):
+        return x.str.slice(offset, length)
+
+
 with PolarsEager.op(ops.Count()) as op:
 
     @op.auto

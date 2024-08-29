@@ -1017,6 +1017,14 @@ with SQLTableImpl.op(ops.StrContains()) as op:
         return x.contains(y, autoescape=True)
 
 
+with SQLTableImpl.op(ops.StrSlice()) as op:
+
+    @op.auto
+    def _str_slice(x, offset, length):
+        # SQL has 1-indexed strings but we do it 0-indexed
+        return sa.func.SUBSTR(x, offset + 1, length)
+
+
 #### Datetime Functions ####
 
 

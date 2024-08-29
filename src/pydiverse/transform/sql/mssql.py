@@ -299,6 +299,13 @@ with MSSqlTableImpl.op(ops.StrContains()) as op:
         return x.contains(y, autoescape=True)
 
 
+with MSSqlTableImpl.op(ops.StrSlice()) as op:
+
+    @op.auto
+    def _str_slice(x, offset, length):
+        return sa.func.SUBSTRING(x, offset + 1, length)
+
+
 with MSSqlTableImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto

@@ -132,3 +132,15 @@ def test_contains(df_strings):
             underscore=C.col2.str.contains("_"),
         ),
     )
+
+
+def test_slice(df_strings):
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> mutate(
+            u=t.col1.str.slice(1, 3),
+            v=t.col2.str.slice(t.col1.str.len() % (t.col2.str.len() + 1), 42),
+            w=t.col1.str.slice(2, t.col1.str.len() // 2),
+        ),
+    )
