@@ -261,9 +261,14 @@ class PolarsEager(AbstractTableImpl):
             if op.name in ("rank", "dense_rank"):
                 assert len(args) == 0
                 args = [
-                    lambda: pl.struct(*self.backend._merge_desc_nulls_last(ordering))
+                    functools.partial(
+                        lambda ordering: pl.struct(
+                            *self.backend._merge_desc_nulls_last(ordering)
+                        ),
+                        ordering,
+                    )
                 ]
-                del context_kwargs["arrange"]
+                ordering = None
 
             def value(**kw):
                 return implementation(
@@ -783,7 +788,7 @@ with PolarsEager.op(ops.StrLen()) as op:
 
     @op.auto
     def _string_length(x):
-        return x.str.len_chars()
+        return x.str.len_chars().cast(pl.Int64)
 
 
 with PolarsEager.op(ops.StrStrip()) as op:
