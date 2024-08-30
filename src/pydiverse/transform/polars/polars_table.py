@@ -24,7 +24,7 @@ from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import TableImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.core.util.util import translate_ordering
-from pydiverse.transform.core.verbs import TableExpr
+from pydiverse.transform.core.verbs import Context, TableExpr
 from pydiverse.transform.errors import (
     AlignmentError,
     ExpressionError,
@@ -388,13 +388,64 @@ class JoinTranslator(Translator[tuple]):
         )
 
 
-def compile_table_expr(expr: TableExpr) -> pl.LazyFrame:
+def compile_col_expr(expr: Expr) -> pl.Expr:
+    pass
+
+
+def compile_order_expr(expr: Expr) -> pl.Expr:
+    pass
+
+
+def compile_table_expr(expr: TableExpr) -> tuple[pl.LazyFrame, list[pl.Expr]]:
     if isinstance(expr, verbs.Alias):
-        table = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr(expr.table)
         setattr(table, expr.new_name)
-        return table
-    if isinstance(expr, verbs.Select):
-        return compile_table_expr(expr.table).select(col.name for col in expr.selects)
+        return table, group_by
+    elif isinstance(expr, verbs.Select):
+        table, group_by = compile_table_expr(expr.table)
+        return table.select(col.name for col in expr.selects), group_by
+    elif isinstance(expr, verbs.Mutate):
+        table, group_by = compile_table_expr(expr.table)
+        return table.with_columns(
+            **{
+                name: compile_col_expr(
+                    value,
+                    Context[pl.Expr](group_by, [], []),
+                )
+                for name, value in zip(expr.names, expr.values)
+            }
+        ), group_by
+    elif isinstance(expr, verbs.Rename):
+        table, group_by = compile_table_expr(expr.table)
+        return table.rename(expr.name_map), group_by
+    elif isinstance(expr, verbs.Join):
+        left, _ = compile_table_expr(expr.left)
+        right, _ = compile_table_expr(expr.right)
+        on = compile_col_expr(expr.on)
+        suffix = expr.suffix | right.name
+        # TODO: more sophisticated name collision resolution / fail
+        return left.join(right, on, expr.how, validate=expr.validate, suffix=suffix), []
+    elif isinstance(expr, verbs.Filter):
+        table, group_by = compile_table_expr(expr.table)
+        return table.filter(compile_col_expr(expr.filters)), group_by
+    elif isinstance(expr, verbs.Arrange):
+        table, group_by = compile_table_expr(expr.table)
+        return table.sort(
+            [compile_order_expr(order_expr) for order_expr in expr.order_by]
+        ), group_by
+    elif isinstance(expr, verbs.GroupBy):
+        table, group_by = compile_table_expr(expr.table)
+        new_group_by = compile_col_expr(expr.group_by)
+        return table, (group_by + new_group_by) if expr.add else new_group_by
+    elif isinstance(expr, verbs.Ungroup):
+        table, _ = compile_table_expr(expr.table)
+        return table, []
+    elif isinstance(expr, verbs.SliceHead):
+        table, group_by = compile_table_expr(expr.table)
+        assert len(group_by) == 0
+        return table, []
+
+    raise AssertionError
 
 
 def _pdt_dtype(t: pl.DataType) -> dtypes.DType:

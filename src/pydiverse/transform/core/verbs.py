@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
-from typing import Literal
+from typing import Generic, Literal
 
+from pydiverse.transform._typing import T
 from pydiverse.transform.core.dispatchers import builtin_verb
 from pydiverse.transform.core.expressions import (
     Col,
@@ -40,6 +41,13 @@ __all__ = [
 JoinHow = Literal["inner", "left", "outer"]
 
 JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
+
+
+@dataclass
+class Context(Generic[T]):
+    group_by: list[T]
+    arrange: list[T]
+    filter: list[T]
 
 
 class TableExpr:
@@ -79,7 +87,7 @@ class Join(TableExpr):
     on: Expr
     how: JoinHow
     validate: JoinValidate
-    suffix: str | None = None
+    suffix: str | None = None  # dataframe backend only
 
 
 @dataclass
@@ -112,6 +120,7 @@ class SliceHead(TableExpr):
 class GroupBy(TableExpr):
     table: TableExpr
     group_by: list[Col | ColName]
+    add: bool
 
 
 @dataclass
