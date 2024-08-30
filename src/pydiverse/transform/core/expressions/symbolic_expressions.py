@@ -5,6 +5,7 @@ from typing import Any, Generic
 
 from pydiverse.transform._typing import T
 from pydiverse.transform.core.expressions import CaseExpression, FunctionCall, util
+from pydiverse.transform.core.expressions.expressions import Col
 from pydiverse.transform.core.registry import OperatorRegistry
 from pydiverse.transform.core.util import traverse
 
@@ -151,3 +152,15 @@ def create_operator(op):
 for dunder in OperatorRegistry.SUPPORTED_DUNDER:
     setattr(SymbolicExpression, dunder, create_operator(dunder))
 del create_operator
+
+
+class MC(type):
+    def __getattr__(cls, name: str) -> SymbolicExpression:
+        return SymbolicExpression(Col(name))
+
+    def __getitem__(cls, name: str) -> SymbolicExpression:
+        return SymbolicExpression(Col(name))
+
+
+class C(metaclass=MC):
+    pass

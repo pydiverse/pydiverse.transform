@@ -8,9 +8,9 @@ from pydiverse.transform._typing import T
 from pydiverse.transform.core import registry
 from pydiverse.transform.core.expressions import (
     CaseExpression,
-    Column,
+    Col,
     FunctionCall,
-    LiteralColumn,
+    LiteralCol,
 )
 from pydiverse.transform.ops.core import Operator, OPType
 from pydiverse.transform.util import reraise
@@ -62,10 +62,10 @@ class DelegatingTranslator(Translator[T], Generic[T]):
             reraise(e, suffix=msg)
 
     def _translate(self, expr, **kwargs):
-        if isinstance(expr, Column):
+        if isinstance(expr, Col):
             return self._translate_col(expr, **kwargs)
 
-        if isinstance(expr, LiteralColumn):
+        if isinstance(expr, LiteralCol):
             return self._translate_literal_col(expr, **kwargs)
 
         if isinstance(expr, FunctionCall):
@@ -115,10 +115,10 @@ class DelegatingTranslator(Translator[T], Generic[T]):
             f" {expr}."
         )
 
-    def _translate_col(self, col: Column, **kwargs) -> T:
+    def _translate_col(self, col: Col, **kwargs) -> T:
         raise NotImplementedError
 
-    def _translate_literal_col(self, col: LiteralColumn, **kwargs) -> T:
+    def _translate_literal_col(self, col: LiteralCol, **kwargs) -> T:
         raise NotImplementedError
 
     def _translate_function(

@@ -19,13 +19,13 @@ from pydiverse.transform import ops
 from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import (
-    Column,
-    LiteralColumn,
+    Col,
+    LiteralCol,
     SymbolicExpression,
     iterate_over_expr,
 )
 from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.table_impl import AbstractTableImpl, ColumnMetaData
+from pydiverse.transform.core.table_impl import ColumnMetaData, TableImpl
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.errors import AlignmentError, FunctionTypeError
 from pydiverse.transform.ops import OPType
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from pydiverse.transform.core.registry import TypedOperatorImpl
 
 
-class SQLTableImpl(AbstractTableImpl):
+class SQLTableImpl(TableImpl):
     """SQL backend
 
     Attributes:
@@ -102,7 +102,7 @@ class SQLTableImpl(AbstractTableImpl):
         tbl = self._create_table(table, self.engine)
 
         columns = {
-            col.name: Column(
+            col.name: Col(
                 name=col.name,
                 table=self,
                 dtype=self._get_dtype(col, hints=_dtype_hints),
@@ -113,17 +113,17 @@ class SQLTableImpl(AbstractTableImpl):
         self.replace_tbl(tbl, columns)
         super().__init__(name=self.tbl.name, columns=columns)
 
-    def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
-        if isinstance(col, Column):
+    def is_aligned_with(self, col: Col | LiteralCol) -> bool:
+        if isinstance(col, Col):
             if not isinstance(col.table, type(self)):
                 return False
             return col.table.alignment_hash == self.alignment_hash
 
-        if isinstance(col, LiteralColumn):
+        if isinstance(col, LiteralCol):
             return all(
                 self.is_aligned_with(atom)
                 for atom in iterate_over_expr(col.expr, expand_literal_col=True)
-                if isinstance(atom, Column)
+                if isinstance(atom, Col)
             )
 
         raise ValueError
@@ -192,7 +192,7 @@ class SQLTableImpl(AbstractTableImpl):
 
         raise NotImplementedError(f"Unsupported type: {type_}")
 
-    def replace_tbl(self, new_tbl, columns: dict[str:Column]):
+    def replace_tbl(self, new_tbl, columns: dict[str:Col]):
         if isinstance(new_tbl, sql.Select):
             # noinspection PyNoneFunctionAssignment
             new_tbl = new_tbl.subquery()
@@ -344,7 +344,7 @@ class SQLTableImpl(AbstractTableImpl):
                 self.cols[c.uuid].ftype in ftypes
                 for v in cols
                 for c in iterate_over_expr(self.resolve_lambda_cols(v))
-                if isinstance(c, Column)
+                if isinstance(c, Col)
             )
 
         requires_subquery = False
@@ -531,7 +531,7 @@ class SQLTableImpl(AbstractTableImpl):
                 only_grouping_cols = all(
                     col in self.intrinsic_grouped_by
                     for col in iterate_over_expr(arg, expand_literal_col=True)
-                    if isinstance(col, Column)
+                    if isinstance(col, Col)
                 )
 
                 if only_grouping_cols:
@@ -575,7 +575,7 @@ class SQLTableImpl(AbstractTableImpl):
         return [col]
 
     class ExpressionCompiler(
-        AbstractTableImpl.ExpressionCompiler[
+        TableImpl.ExpressionCompiler[
             "SQLTableImpl",
             TypedValue[Callable[[dict[uuid.UUID, sa.Column]], sql.ColumnElement]],
         ]
@@ -790,14 +790,14 @@ class SQLTableImpl(AbstractTableImpl):
             return over_value
 
     class AlignedExpressionEvaluator(
-        AbstractTableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]
+        TableImpl.AlignedExpressionEvaluator[TypedValue[sql.ColumnElement]]
     ):
         def translate(self, expr, check_alignment=True, **kwargs):
             if check_alignment:
                 alignment_hashes = {
                     col.table.alignment_hash
                     for col in iterate_over_expr(expr, expand_literal_col=True)
-                    if isinstance(col, Column)
+                    if isinstance(col, Col)
                 }
                 if len(alignment_hashes) >= 2:
                     raise AlignmentError(

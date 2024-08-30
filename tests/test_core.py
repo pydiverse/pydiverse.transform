@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.core import AbstractTableImpl, Table, dtypes
+from pydiverse.transform.core import Table, TableImpl, dtypes
 from pydiverse.transform.core.dispatchers import (
     col_to_table,
     inverse_partial,
@@ -11,7 +11,7 @@ from pydiverse.transform.core.dispatchers import (
     verb,
     wrap_tables,
 )
-from pydiverse.transform.core.expressions import Column, SymbolicExpression
+from pydiverse.transform.core.expressions import Col, SymbolicExpression
 from pydiverse.transform.core.expressions.translator import TypedValue
 from pydiverse.transform.core.util import bidict, ordered_set, sign_peeler
 from pydiverse.transform.core.verbs import (
@@ -121,7 +121,7 @@ class TestDispatchers:
         assert col_to_table(tbl1) == tbl1
 
         c1_tbl = col_to_table(tbl1.col1._)
-        assert isinstance(c1_tbl, AbstractTableImpl)
+        assert isinstance(c1_tbl, TableImpl)
         assert c1_tbl.available_cols == {tbl1.col1._.uuid}
         assert list(c1_tbl.named_cols.fwd) == ["col1"]
 
@@ -448,11 +448,9 @@ class TestUtil:
         assert sign_peeler((-++--sx)._) == (x, False)  # noqa: B002
 
 
-class MockTableImpl(AbstractTableImpl):
+class MockTableImpl(TableImpl):
     def __init__(self, name, col_names):
-        super().__init__(
-            name, {name: Column(name, self, dtypes.Int()) for name in col_names}
-        )
+        super().__init__(name, {name: Col(name, self) for name in col_names})
 
     def resolve_lambda_cols(self, expr):
         return expr
@@ -460,6 +458,6 @@ class MockTableImpl(AbstractTableImpl):
     def collect(self):
         return list(self.selects)
 
-    class ExpressionCompiler(AbstractTableImpl.ExpressionCompiler):
+    class ExpressionCompiler(TableImpl.ExpressionCompiler):
         def _translate(self, expr, **kwargs):
             return TypedValue(None, dtypes.Int())

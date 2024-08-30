@@ -5,7 +5,6 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
-from pydiverse.transform.core.dtypes import DType
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions.translator import TypedValue
@@ -17,7 +16,7 @@ def expr_repr(it: Any):
 
     if isinstance(it, SymbolicExpression):
         return expr_repr(it._)
-    if isinstance(it, BaseExpression):
+    if isinstance(it, Expr):
         return it._expr_repr()
     if isinstance(it, (list, tuple)):
         return f"[{ ', '.join([expr_repr(e) for e in it]) }]"
@@ -59,23 +58,22 @@ _dunder_expr_repr = {
 }
 
 
-class BaseExpression:
+class Expr:
     def _expr_repr(self) -> str:
         """String repr that, when executed, returns the same expression"""
         raise NotImplementedError
 
 
-class Column(BaseExpression, Generic[ImplT]):
-    __slots__ = ("name", "table", "dtype", "uuid")
+class Col(Expr, Generic[ImplT]):
+    __slots__ = ("name", "table", "uuid")
 
-    def __init__(self, name: str, table: ImplT, dtype: DType, uuid: uuid.UUID = None):
+    def __init__(self, name: str, table: ImplT | None = None, uuid: uuid.UUID = None):
         self.name = name
         self.table = table
-        self.dtype = dtype
-        self.uuid = uuid or Column.generate_col_uuid()
+        self.uuid = uuid or Col.generate_col_uuid()
 
     def __repr__(self):
-        return f"<{self.table.name}.{self.name}({self.dtype})>"
+        return f"<{self.table.name}.{self.name}>"
 
     def _expr_repr(self) -> str:
         return f"{self.table.name}.{self.name}"
@@ -96,7 +94,7 @@ class Column(BaseExpression, Generic[ImplT]):
         return uuid.uuid1()
 
 
-class LambdaColumn(BaseExpression):
+class LambdaColumn(Expr):
     """Anonymous Column
 
     A lambda column is a column without an associated table or UUID. This means
@@ -132,7 +130,7 @@ class LambdaColumn(BaseExpression):
         return hash(("C", self.name))
 
 
-class LiteralColumn(BaseExpression, Generic[T]):
+class LiteralCol(Expr, Generic[T]):
     __slots__ = ("typed_value", "expr", "backend")
 
     def __init__(
@@ -164,7 +162,7 @@ class LiteralColumn(BaseExpression, Generic[T]):
         return not self.__eq__(other)
 
 
-class FunctionCall(BaseExpression):
+class FunctionCall(Expr):
     """
     AST node to represent a function / operator call.
     """
@@ -219,7 +217,7 @@ class FunctionCall(BaseExpression):
         yield from self.args
 
 
-class CaseExpression(BaseExpression):
+class CaseExpression(Expr):
     def __init__(
         self, switching_on: Any | None, cases: Iterable[tuple[Any, Any]], default: Any
     ):

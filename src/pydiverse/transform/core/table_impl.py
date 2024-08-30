@@ -13,9 +13,9 @@ from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import (
     CaseExpression,
-    Column,
+    Col,
     LambdaColumn,
-    LiteralColumn,
+    LiteralCol,
 )
 from pydiverse.transform.core.expressions.translator import (
     DelegatingTranslator,
@@ -39,7 +39,7 @@ ExprCompT = TypeVar("ExprCompT", bound="TypedValue")
 AlignedT = TypeVar("AlignedT", bound="TypedValue")
 
 
-class AbstractTableImpl:
+class TableImpl:
     """
     Base class from which all table backend implementations are derived from.
     It tracks various metadata that is relevant for all backends.
@@ -71,7 +71,7 @@ class AbstractTableImpl:
     def __init__(
         self,
         name: str,
-        columns: dict[str, Column],
+        columns: dict[str, Col],
     ):
         self.name = name
         self.compiler = self.ExpressionCompiler(self)
@@ -82,8 +82,8 @@ class AbstractTableImpl:
         self.available_cols: set[uuid.UUID] = set()
         self.cols: dict[uuid.UUID, ColumnMetaData] = dict()
 
-        self.grouped_by: ordered_set[Column] = ordered_set()
-        self.intrinsic_grouped_by: ordered_set[Column] = ordered_set()
+        self.grouped_by: ordered_set[Col] = ordered_set()
+        self.intrinsic_grouped_by: ordered_set[Col] = ordered_set()
 
         # Init Values
         for name, col in columns.items():
@@ -117,7 +117,7 @@ class AbstractTableImpl:
         c.lambda_translator = self.LambdaTranslator(c)
         return c
 
-    def get_col(self, key: str | Column | LambdaColumn):
+    def get_col(self, key: str | Col | LambdaColumn):
         """Getter used by `Table.__getattr__`"""
 
         if isinstance(key, LambdaColumn):
@@ -129,7 +129,7 @@ class AbstractTableImpl:
             # Must return AttributeError, else `hasattr` doesn't work on Table instances
             raise AttributeError(f"Table '{self.name}' has not column named '{key}'.")
 
-        if isinstance(key, Column):
+        if isinstance(key, Col):
             uuid = key.uuid
             if uuid in self.available_cols:
                 name = self.named_cols.bwd[uuid]
@@ -143,7 +143,7 @@ class AbstractTableImpl:
     def resolve_lambda_cols(self, expr: Any):
         return self.lambda_translator.translate(expr)
 
-    def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
+    def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         """Determine if a column is aligned with the table.
 
         :param col: The column or literal colum against which alignment
@@ -175,7 +175,7 @@ class AbstractTableImpl:
         """
         ...
 
-    def alias(self, name=None) -> AbstractTableImpl: ...
+    def alias(self, name=None) -> TableImpl: ...
 
     def collect(self): ...
 
@@ -436,7 +436,7 @@ class ColumnMetaData:
     ftype: OPType
 
     @classmethod
-    def from_expr(cls, uuid, expr, table: AbstractTableImpl, **kwargs):
+    def from_expr(cls, uuid, expr, table: TableImpl, **kwargs):
         v: TypedValue = table.compiler.translate(expr, **kwargs)
         return cls(
             uuid=uuid,
@@ -449,21 +449,21 @@ class ColumnMetaData:
     def __hash__(self):
         return hash(self.uuid)
 
-    def as_column(self, name, table: AbstractTableImpl):
-        return Column(name, table, self.dtype, self.uuid)
+    def as_column(self, name, table: TableImpl):
+        return Col(name, table, self.uuid)
 
 
 #### MARKER OPERATIONS #########################################################
 
 
-with AbstractTableImpl.op(ops.NullsFirst()) as op:
+with TableImpl.op(ops.NullsFirst()) as op:
 
     @op.auto
     def _nulls_first(_):
         raise RuntimeError("This is just a marker that never should get called")
 
 
-with AbstractTableImpl.op(ops.NullsLast()) as op:
+with TableImpl.op(ops.NullsLast()) as op:
 
     @op.auto
     def _nulls_last(_):
@@ -473,7 +473,7 @@ with AbstractTableImpl.op(ops.NullsLast()) as op:
 #### ARITHMETIC OPERATORS ######################################################
 
 
-with AbstractTableImpl.op(ops.Add()) as op:
+with TableImpl.op(ops.Add()) as op:
 
     @op.auto
     def _add(lhs, rhs):
@@ -484,7 +484,7 @@ with AbstractTableImpl.op(ops.Add()) as op:
         return lhs + rhs
 
 
-with AbstractTableImpl.op(ops.RAdd()) as op:
+with TableImpl.op(ops.RAdd()) as op:
 
     @op.auto
     def _radd(rhs, lhs):
@@ -495,105 +495,105 @@ with AbstractTableImpl.op(ops.RAdd()) as op:
         return lhs + rhs
 
 
-with AbstractTableImpl.op(ops.Sub()) as op:
+with TableImpl.op(ops.Sub()) as op:
 
     @op.auto
     def _sub(lhs, rhs):
         return lhs - rhs
 
 
-with AbstractTableImpl.op(ops.RSub()) as op:
+with TableImpl.op(ops.RSub()) as op:
 
     @op.auto
     def _rsub(rhs, lhs):
         return lhs - rhs
 
 
-with AbstractTableImpl.op(ops.Mul()) as op:
+with TableImpl.op(ops.Mul()) as op:
 
     @op.auto
     def _mul(lhs, rhs):
         return lhs * rhs
 
 
-with AbstractTableImpl.op(ops.RMul()) as op:
+with TableImpl.op(ops.RMul()) as op:
 
     @op.auto
     def _rmul(rhs, lhs):
         return lhs * rhs
 
 
-with AbstractTableImpl.op(ops.TrueDiv()) as op:
+with TableImpl.op(ops.TrueDiv()) as op:
 
     @op.auto
     def _truediv(lhs, rhs):
         return lhs / rhs
 
 
-with AbstractTableImpl.op(ops.RTrueDiv()) as op:
+with TableImpl.op(ops.RTrueDiv()) as op:
 
     @op.auto
     def _rtruediv(rhs, lhs):
         return lhs / rhs
 
 
-with AbstractTableImpl.op(ops.FloorDiv()) as op:
+with TableImpl.op(ops.FloorDiv()) as op:
 
     @op.auto
     def _floordiv(lhs, rhs):
         return lhs // rhs
 
 
-with AbstractTableImpl.op(ops.RFloorDiv()) as op:
+with TableImpl.op(ops.RFloorDiv()) as op:
 
     @op.auto
     def _rfloordiv(rhs, lhs):
         return lhs // rhs
 
 
-with AbstractTableImpl.op(ops.Pow()) as op:
+with TableImpl.op(ops.Pow()) as op:
 
     @op.auto
     def _pow(lhs, rhs):
         return lhs**rhs
 
 
-with AbstractTableImpl.op(ops.RPow()) as op:
+with TableImpl.op(ops.RPow()) as op:
 
     @op.auto
     def _rpow(rhs, lhs):
         return lhs**rhs
 
 
-with AbstractTableImpl.op(ops.Mod()) as op:
+with TableImpl.op(ops.Mod()) as op:
 
     @op.auto
     def _mod(lhs, rhs):
         return lhs % rhs
 
 
-with AbstractTableImpl.op(ops.RMod()) as op:
+with TableImpl.op(ops.RMod()) as op:
 
     @op.auto
     def _rmod(rhs, lhs):
         return lhs % rhs
 
 
-with AbstractTableImpl.op(ops.Neg()) as op:
+with TableImpl.op(ops.Neg()) as op:
 
     @op.auto
     def _neg(x):
         return -x
 
 
-with AbstractTableImpl.op(ops.Pos()) as op:
+with TableImpl.op(ops.Pos()) as op:
 
     @op.auto
     def _pos(x):
         return +x
 
 
-with AbstractTableImpl.op(ops.Abs()) as op:
+with TableImpl.op(ops.Abs()) as op:
 
     @op.auto
     def _abs(x):
@@ -603,49 +603,49 @@ with AbstractTableImpl.op(ops.Abs()) as op:
 #### BINARY OPERATORS ##########################################################
 
 
-with AbstractTableImpl.op(ops.And()) as op:
+with TableImpl.op(ops.And()) as op:
 
     @op.auto
     def _and(lhs, rhs):
         return lhs & rhs
 
 
-with AbstractTableImpl.op(ops.RAnd()) as op:
+with TableImpl.op(ops.RAnd()) as op:
 
     @op.auto
     def _rand(rhs, lhs):
         return lhs & rhs
 
 
-with AbstractTableImpl.op(ops.Or()) as op:
+with TableImpl.op(ops.Or()) as op:
 
     @op.auto
     def _or(lhs, rhs):
         return lhs | rhs
 
 
-with AbstractTableImpl.op(ops.ROr()) as op:
+with TableImpl.op(ops.ROr()) as op:
 
     @op.auto
     def _ror(rhs, lhs):
         return lhs | rhs
 
 
-with AbstractTableImpl.op(ops.Xor()) as op:
+with TableImpl.op(ops.Xor()) as op:
 
     @op.auto
     def _xor(lhs, rhs):
         return lhs ^ rhs
 
 
-with AbstractTableImpl.op(ops.RXor()) as op:
+with TableImpl.op(ops.RXor()) as op:
 
     @op.auto
     def _rxor(rhs, lhs):
         return lhs ^ rhs
 
 
-with AbstractTableImpl.op(ops.Invert()) as op:
+with TableImpl.op(ops.Invert()) as op:
 
     @op.auto
     def _invert(x):
@@ -655,42 +655,42 @@ with AbstractTableImpl.op(ops.Invert()) as op:
 #### COMPARISON OPERATORS ######################################################
 
 
-with AbstractTableImpl.op(ops.Equal()) as op:
+with TableImpl.op(ops.Equal()) as op:
 
     @op.auto
     def _eq(lhs, rhs):
         return lhs == rhs
 
 
-with AbstractTableImpl.op(ops.NotEqual()) as op:
+with TableImpl.op(ops.NotEqual()) as op:
 
     @op.auto
     def _ne(lhs, rhs):
         return lhs != rhs
 
 
-with AbstractTableImpl.op(ops.Less()) as op:
+with TableImpl.op(ops.Less()) as op:
 
     @op.auto
     def _lt(lhs, rhs):
         return lhs < rhs
 
 
-with AbstractTableImpl.op(ops.LessEqual()) as op:
+with TableImpl.op(ops.LessEqual()) as op:
 
     @op.auto
     def _le(lhs, rhs):
         return lhs <= rhs
 
 
-with AbstractTableImpl.op(ops.Greater()) as op:
+with TableImpl.op(ops.Greater()) as op:
 
     @op.auto
     def _gt(lhs, rhs):
         return lhs > rhs
 
 
-with AbstractTableImpl.op(ops.GreaterEqual()) as op:
+with TableImpl.op(ops.GreaterEqual()) as op:
 
     @op.auto
     def _ge(lhs, rhs):

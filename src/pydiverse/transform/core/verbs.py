@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import functools
-from collections import ChainMap
-from collections.abc import Iterable
 from typing import Literal
 
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.dispatchers import builtin_verb
 from pydiverse.transform.core.expressions import (
-    Column,
+    Col,
     LambdaColumn,
     SymbolicExpression,
 )
-from pydiverse.transform.core.expressions.util import iterate_over_expr
-from pydiverse.transform.core.table_impl import AbstractTableImpl, ColumnMetaData
+from pydiverse.transform.core.table_impl import ColumnMetaData, TableImpl
 from pydiverse.transform.core.util import (
     bidict,
     ordered_set,
@@ -45,92 +42,30 @@ __all__ = [
 ]
 
 
-def check_cols_available(
-    tables: AbstractTableImpl | Iterable[AbstractTableImpl],
-    columns: set[Column],
-    function_name: str,
-):
-    if isinstance(tables, AbstractTableImpl):
-        tables = (tables,)
-    available_columns = ChainMap(*(table.available_cols for table in tables))
-    missing_columns = []
-    for col in columns:
-        if col.uuid not in available_columns:
-            missing_columns.append(col)
-    if missing_columns:
-        missing_columns_str = ", ".join(map(lambda x: str(x), missing_columns))
-        raise ValueError(
-            f"Can't access column(s) {missing_columns_str} in {function_name}() because"
-            " they aren't available in the input."
-        )
-
-
-def check_lambdas_valid(tbl: AbstractTableImpl, *expressions):
-    lambdas = []
-    for expression in expressions:
-        lambdas.extend(
-            lc for lc in iterate_over_expr(expression) if isinstance(lc, LambdaColumn)
-        )
-    missing_lambdas = {lc for lc in lambdas if lc.name not in tbl.named_cols.fwd}
-    if missing_lambdas:
-        missing_lambdas_str = ", ".join(map(lambda x: str(x), missing_lambdas))
-        raise ValueError(f"Invalid lambda column(s) {missing_lambdas_str}.")
-
-
-def cols_in_expression(expression) -> set[Column]:
-    return {c for c in iterate_over_expr(expression) if isinstance(c, Column)}
-
-
-def cols_in_expressions(expressions) -> set[Column]:
-    if len(expressions) == 0:
-        return set()
-    return set.union(*(cols_in_expression(e) for e in expressions))
-
-
-def validate_table_args(*tables):
-    if len(tables) == 0:
-        return
-
-    for table in tables:
-        if not isinstance(table, AbstractTableImpl):
-            raise TypeError(f"Expected a TableImpl but got {type(table)} instead.")
-
-    backend = type(tables[0])
-    for table in tables:
-        if type(table) is not backend:
-            raise ValueError(
-                f"Can't mix tables with different backends. Expected '{backend}' but"
-                f" found '{type(table)}'."
-            )
-
-
 @builtin_verb()
-def alias(tbl: AbstractTableImpl, name: str | None = None):
+def alias(tbl: TableImpl, name: str | None = None):
     """Creates a new table object with a different name and reassigns column UUIDs.
     Must be used before performing a self-join."""
-    validate_table_args(tbl)
     return tbl.alias(name)
 
 
 @builtin_verb()
-def collect(tbl: AbstractTableImpl):
-    validate_table_args(tbl)
+def collect(tbl: TableImpl):
     return tbl.collect()
 
 
 @builtin_verb()
-def export(tbl: AbstractTableImpl):
-    validate_table_args(tbl)
+def export(tbl: TableImpl):
     return tbl.export()
 
 
 @builtin_verb()
-def build_query(tbl: AbstractTableImpl):
+def build_query(tbl: TableImpl):
     return tbl.build_query()
 
 
 @builtin_verb()
-def show_query(tbl: AbstractTableImpl):
+def show_query(tbl: TableImpl):
     if query := tbl.build_query():
         print(query)
     else:
@@ -140,18 +75,13 @@ def show_query(tbl: AbstractTableImpl):
 
 
 @builtin_verb()
-def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
+def select(tbl: TableImpl, *args: Col):
     if len(args) == 1 and args[0] is Ellipsis:
         # >> select(...)  ->  Select all columns
         args = [
             tbl.cols[uuid].as_column(name, tbl)
             for name, uuid in tbl.named_cols.fwd.items()
         ]
-
-    # Validate input
-    validate_table_args(tbl)
-    check_cols_available(tbl, cols_in_expressions(args), "select")
-    check_lambdas_valid(tbl, *args)
 
     cols = []
     positive_selection = None
@@ -166,16 +96,16 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
                     " Can't mix selection with deselection."
                 )
 
-        if not isinstance(col, (Column, LambdaColumn)):
+        if not isinstance(col, (Col, LambdaColumn)):
             raise TypeError(
-                "Arguments to select verb must be of type 'Column' or 'LambdaColumn'"
+                "Arguments to select verb must be of type `Col`'"
                 f" and not {type(col)}."
             )
         cols.append(col)
 
     selects = []
     for col in cols:
-        if isinstance(col, Column):
+        if isinstance(col, Col):
             selects.append(tbl.named_cols.bwd[col.uuid])
         elif isinstance(col, LambdaColumn):
             selects.append(col.name)
@@ -196,7 +126,7 @@ def select(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
 
 
 @builtin_verb()
-def rename(tbl: AbstractTableImpl, name_map: dict[str, str]):
+def rename(tbl: TableImpl, name_map: dict[str, str]):
     # Type check
     for k, v in name_map.items():
         if not isinstance(k, str) or not isinstance(v, str):
@@ -239,16 +169,13 @@ def rename(tbl: AbstractTableImpl, name_map: dict[str, str]):
 
 
 @builtin_verb()
-def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
-    validate_table_args(tbl)
-    check_cols_available(tbl, cols_in_expressions(kwargs.values()), "mutate")
-
+def mutate(tbl: TableImpl, **kwargs: SymbolicExpression):
     new_tbl = tbl.copy()
     new_tbl.preverb_hook("mutate", **kwargs)
     kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
 
     for name, expr in kwargs.items():
-        uid = Column.generate_col_uuid()
+        uid = Col.generate_col_uuid()
         col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="mutate")
 
         if dtypes.NoneDType().same_kind(col.dtype):
@@ -267,21 +194,16 @@ def mutate(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
 
 @builtin_verb()
 def join(
-    left: AbstractTableImpl,
-    right: AbstractTableImpl,
+    left: TableImpl,
+    right: TableImpl,
     on: SymbolicExpression,
     how: Literal["inner", "left", "outer"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
-    validate_table_args(left, right)
-
     if left.grouped_by or right.grouped_by:
         raise ValueError("Can't join grouped tables. You first have to ungroup them.")
-
-    # Check args only contains valid columns
-    check_cols_available((left, right), cols_in_expression(on), "join")
 
     if how not in ("inner", "left", "outer"):
         raise ValueError(
@@ -325,10 +247,6 @@ def join(
     new_left.available_cols.update(right.available_cols)
     new_left.cols.update(right.cols)
 
-    # By resolving lambdas this late, we enable the user to use lambda columns
-    # to reference mutated columns from the right side of the join.
-    # -> `C.columnname_righttablename` is a valid lambda in the on condition.
-    check_lambdas_valid(new_left, on)
     on = new_left.resolve_lambda_cols(on)
 
     new_left.join(right, on, how, validate=validate)
@@ -341,10 +259,9 @@ outer_join = functools.partial(join, how="outer")
 
 
 @builtin_verb()
-def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
+def filter(tbl: TableImpl, *args: SymbolicExpression):
     # TODO: Type check expression
-    validate_table_args(tbl)
-    check_cols_available(tbl, cols_in_expressions(args), "filter")
+
     args = [tbl.resolve_lambda_cols(arg) for arg in args]
 
     new_tbl = tbl.copy()
@@ -354,14 +271,9 @@ def filter(tbl: AbstractTableImpl, *args: SymbolicExpression):
 
 
 @builtin_verb()
-def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
+def arrange(tbl: TableImpl, *args: Col):
     if len(args) == 0:
         return tbl
-
-    # Validate Input
-    validate_table_args(tbl)
-    check_cols_available(tbl, cols_in_expressions(args), "arrange")
-    check_lambdas_valid(tbl, *args)
 
     ordering = translate_ordering(tbl, args)
 
@@ -372,12 +284,7 @@ def arrange(tbl: AbstractTableImpl, *args: Column | LambdaColumn):
 
 
 @builtin_verb()
-def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add=False):
-    # Validate Input
-    validate_table_args(tbl)
-    check_cols_available(tbl, cols_in_expressions(args), "group_by")
-    check_lambdas_valid(tbl, *args)
-
+def group_by(tbl: TableImpl, *args: Col, add=False):
     # WARNING: Depending on the SQL backend, you might
     #          only be allowed to reference columns
     if not args:
@@ -386,9 +293,9 @@ def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add=False):
             " grouping use the ungroup verb instead."
         )
     for col in args:
-        if not isinstance(col, (Column, LambdaColumn)):
+        if not isinstance(col, (Col, LambdaColumn)):
             raise TypeError(
-                "Arguments to group_by verb must be of type 'Column' or 'LambdaColumn'"
+                "Arguments to group_by verb must be of type 'Column'"
                 f" and not '{type(col)}'."
             )
 
@@ -405,9 +312,8 @@ def group_by(tbl: AbstractTableImpl, *args: Column | LambdaColumn, add=False):
 
 
 @builtin_verb()
-def ungroup(tbl: AbstractTableImpl):
+def ungroup(tbl: TableImpl):
     """Remove all groupings from table."""
-    validate_table_args(tbl)
 
     new_tbl = tbl.copy()
     new_tbl.preverb_hook("ungroup")
@@ -417,10 +323,8 @@ def ungroup(tbl: AbstractTableImpl):
 
 
 @builtin_verb()
-def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
+def summarise(tbl: TableImpl, **kwargs: SymbolicExpression):
     # Validate Input
-    validate_table_args(tbl)
-    check_cols_available(tbl, cols_in_expressions(kwargs.values()), "summarise")
 
     new_tbl = tbl.copy()
     new_tbl.preverb_hook("summarise", **kwargs)
@@ -448,7 +352,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
                 f"Column with name '{name}' already in select. The new summarised"
                 " columns must have a different name than the grouping columns."
             )
-        uid = Column.generate_col_uuid()
+        uid = Col.generate_col_uuid()
         col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="summarise")
 
         if dtypes.NoneDType().same_kind(col.dtype):
@@ -486,8 +390,7 @@ def summarise(tbl: AbstractTableImpl, **kwargs: SymbolicExpression):
 
 
 @builtin_verb()
-def slice_head(tbl: AbstractTableImpl, n: int, *, offset: int = 0):
-    validate_table_args(tbl)
+def slice_head(tbl: TableImpl, n: int, *, offset: int = 0):
     if not isinstance(n, int):
         raise TypeError("'n' must be an int")
     if not isinstance(offset, int):

@@ -6,7 +6,7 @@ from pydiverse.transform import ops
 from pydiverse.transform._typing import CallableT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import TypedValue
-from pydiverse.transform.core.expressions.expressions import Column
+from pydiverse.transform.core.expressions.expressions import Col
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.ops import Operator, OPType
@@ -65,7 +65,7 @@ class MSSqlTableImpl(SQLTableImpl):
 
             return super()._translate(expr, **kwargs)
 
-        def _translate_col(self, col: Column, **kwargs):
+        def _translate_col(self, col: Col, **kwargs):
             # If mssql_bool_as_bit is true, then we can just return the
             # precompiled col. Otherwise, we must recompile it to ensure
             # we return booleans as bools and not as bits.

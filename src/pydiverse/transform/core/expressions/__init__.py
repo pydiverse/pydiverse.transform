@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from .expressions import (
     CaseExpression,
-    Column,
+    Col,
     FunctionCall,
     LambdaColumn,
-    LiteralColumn,
+    LiteralCol,
     expr_repr,
 )
 from .symbolic_expressions import SymbolicExpression, unwrap_symbolic_expressions

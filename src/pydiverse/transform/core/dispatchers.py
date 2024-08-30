@@ -5,7 +5,7 @@ from functools import partial, reduce, wraps
 from typing import Any
 
 from pydiverse.transform.core.expressions import (
-    Column,
+    Col,
     LambdaColumn,
     unwrap_symbolic_expressions,
 )
@@ -145,7 +145,7 @@ def col_to_table(arg: Any = None):
     """
     from pydiverse.transform.core.verbs import select
 
-    if isinstance(arg, Column):
+    if isinstance(arg, Col):
         tbl = (arg.table >> select(arg))._impl
         col = tbl.get_col(arg)
 

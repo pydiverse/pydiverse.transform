@@ -4,20 +4,20 @@ import inspect
 from typing import TYPE_CHECKING
 
 from pydiverse.transform.core.expressions import (
-    Column,
-    LiteralColumn,
+    Col,
+    LiteralCol,
     SymbolicExpression,
     util,
 )
 from pydiverse.transform.errors import AlignmentError
 
 if TYPE_CHECKING:
-    from pydiverse.transform.core import AbstractTableImpl, Table
+    from pydiverse.transform.core import Table, TableImpl
 
 
 def aligned(*, with_: str):
     """Decorator for aligned functions."""
-    from pydiverse.transform.core import AbstractTableImpl, Table
+    from pydiverse.transform.core import Table, TableImpl
 
     if callable(with_):
         raise ValueError("Decorator @aligned requires with_ argument.")
@@ -48,9 +48,9 @@ def aligned(*, with_: str):
             if isinstance(alignment_param, SymbolicExpression):
                 alignment_param = alignment_param._
 
-            if isinstance(alignment_param, Column):
+            if isinstance(alignment_param, Col):
                 aligned_with = alignment_param.table
-            elif isinstance(alignment_param, (Table, AbstractTableImpl)):
+            elif isinstance(alignment_param, (Table, TableImpl)):
                 aligned_with = alignment_param
             else:
                 raise NotImplementedError
@@ -64,10 +64,10 @@ def aligned(*, with_: str):
 
 
 def eval_aligned(
-    sexpr: SymbolicExpression, with_: AbstractTableImpl | Table = None, **kwargs
-) -> SymbolicExpression[LiteralColumn]:
+    sexpr: SymbolicExpression, with_: TableImpl | Table = None, **kwargs
+) -> SymbolicExpression[LiteralCol]:
     """Evaluates an expression using the AlignedExpressionEvaluator."""
-    from pydiverse.transform.core import AbstractTableImpl, Table
+    from pydiverse.transform.core import Table, TableImpl
 
     expr = sexpr._ if isinstance(sexpr, SymbolicExpression) else sexpr
 
@@ -81,13 +81,13 @@ def eval_aligned(
     alignedEvaluator = backend.AlignedExpressionEvaluator(backend.operator_registry)
     result = alignedEvaluator.translate(expr, **kwargs)
 
-    literal_column = LiteralColumn(typed_value=result, expr=expr, backend=backend)
+    literal_column = LiteralCol(typed_value=result, expr=expr, backend=backend)
 
     # Check if alignment condition holds
     if with_ is not None:
         if isinstance(with_, Table):
             with_ = with_._impl
-        if not isinstance(with_, AbstractTableImpl):
+        if not isinstance(with_, TableImpl):
             raise TypeError(
                 "'with_' must either be an instance of a Table or TableImpl. Not"
                 f" '{with_}'."

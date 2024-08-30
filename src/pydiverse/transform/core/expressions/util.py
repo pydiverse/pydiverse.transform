@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING
 
 from pydiverse.transform.core.expressions import (
     CaseExpression,
-    Column,
+    Col,
     FunctionCall,
-    LiteralColumn,
+    LiteralCol,
 )
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
-    from pydiverse.transform.core.table_impl import AbstractTableImpl
+    from pydiverse.transform.core.table_impl import TableImpl
 
 
 def iterate_over_expr(expr, expand_literal_col=False):
@@ -31,12 +31,12 @@ def iterate_over_expr(expr, expand_literal_col=False):
             yield from iterate_over_expr(child, expand_literal_col=expand_literal_col)
         return
 
-    if expand_literal_col and isinstance(expr, LiteralColumn):
+    if expand_literal_col and isinstance(expr, LiteralCol):
         yield from iterate_over_expr(expr.expr, expand_literal_col=expand_literal_col)
         return
 
 
-def determine_expr_backend(expr) -> type[AbstractTableImpl] | None:
+def determine_expr_backend(expr) -> type[TableImpl] | None:
     """Returns the backend used in an expression.
 
     Iterates over an expression and extracts the underlying backend type used.
@@ -47,9 +47,9 @@ def determine_expr_backend(expr) -> type[AbstractTableImpl] | None:
 
     backends = set()
     for atom in iterate_over_expr(expr):
-        if isinstance(atom, Column):
+        if isinstance(atom, Col):
             backends.add(type(atom.table))
-        if isinstance(atom, LiteralColumn):
+        if isinstance(atom, LiteralCol):
             backends.add(atom.backend)
 
     if len(backends) == 1:
