@@ -4,7 +4,7 @@ from html import escape
 from typing import Any, Generic
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.core.expressions import CaseExpression, FunctionCall, util
+from pydiverse.transform.core.expressions import CaseExpr, FunctionCall, util
 from pydiverse.transform.core.expressions.expressions import Col
 from pydiverse.transform.core.registry import OperatorRegistry
 from pydiverse.transform.core.util import traverse
@@ -42,7 +42,7 @@ class SymbolicExpression(Generic[T]):
         return SymbolicExpression(FunctionCall("__getitem__", self, item))
 
     def case(self, *cases: tuple[Any, Any], default: Any = None) -> SymbolicExpression:
-        case_expression = CaseExpression(
+        case_expression = CaseExpr(
             switching_on=self,
             cases=cases,
             default=default,

@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
-from typing import Generic, Literal
+from typing import Literal
 
-from pydiverse.transform._typing import T
 from pydiverse.transform.core.dispatchers import builtin_verb
 from pydiverse.transform.core.expressions import (
     Col,
     ColName,
     SymbolicExpression,
 )
-from pydiverse.transform.core.expressions.expressions import Expr
+from pydiverse.transform.core.expressions.expressions import ColExpr
 from pydiverse.transform.core.util import (
     ordered_set,
     sign_peeler,
@@ -43,13 +42,6 @@ JoinHow = Literal["inner", "left", "outer"]
 JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 
 
-@dataclass
-class Context(Generic[T]):
-    group_by: list[T]
-    arrange: list[T]
-    filter: list[T]
-
-
 class TableExpr:
     def _validate_verb_level():
         pass
@@ -77,14 +69,14 @@ class Rename(TableExpr):
 class Mutate(TableExpr):
     table: TableExpr
     names: list[str]
-    values: list[Expr]
+    values: list[ColExpr]
 
 
 @dataclass
 class Join(TableExpr):
     left: TableExpr
     right: TableExpr
-    on: Expr
+    on: ColExpr
     how: JoinHow
     validate: JoinValidate
     suffix: str | None = None  # dataframe backend only
@@ -93,20 +85,20 @@ class Join(TableExpr):
 @dataclass
 class Filter(TableExpr):
     table: TableExpr
-    filters: list[Expr]
+    filters: list[ColExpr]
 
 
 @dataclass
 class Summarise(TableExpr):
     table: TableExpr
     names: list[str]
-    values: list[Expr]
+    values: list[ColExpr]
 
 
 @dataclass
 class Arrange(TableExpr):
     table: TableExpr
-    order_by: list[Expr]
+    order_by: list[ColExpr]
 
 
 @dataclass
@@ -255,7 +247,7 @@ def rename(table: TableExpr, name_map: dict[str, str]):
 
 
 @builtin_verb()
-def mutate(table: TableExpr, **kwargs: Expr):
+def mutate(table: TableExpr, **kwargs: ColExpr):
     return Mutate(table, list(kwargs.keys()), list(kwargs.values()))
 
 
@@ -263,7 +255,7 @@ def mutate(table: TableExpr, **kwargs: Expr):
 def join(
     left: TableExpr,
     right: TableExpr,
-    on: Expr,
+    on: ColExpr,
     how: Literal["inner", "left", "outer"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
@@ -298,7 +290,7 @@ def ungroup(table: TableExpr):
 
 
 @builtin_verb()
-def summarise(table: TableExpr, **kwargs: Expr):
+def summarise(table: TableExpr, **kwargs: ColExpr):
     return Summarise(table, list(kwargs.keys()), list(kwargs.values()))
 
 

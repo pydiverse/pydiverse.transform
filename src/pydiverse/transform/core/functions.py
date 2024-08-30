@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydiverse.transform.core.expressions import (
-    CaseExpression,
+    CaseExpr,
     FunctionCall,
     SymbolicExpression,
 )
@@ -38,7 +38,7 @@ def dense_rank(*, arrange: list, partition_by: list | None = None):
 
 
 def case(*cases: tuple[Any, Any], default: Any = None):
-    case_expression = CaseExpression(
+    case_expression = CaseExpr(
         switching_on=None,
         cases=cases,
         default=default,

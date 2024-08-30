@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Generic
 from pydiverse.transform._typing import T
 from pydiverse.transform.core import registry
 from pydiverse.transform.core.expressions import (
-    CaseExpression,
+    CaseExpr,
     Col,
     FunctionCall,
     LiteralCol,
@@ -88,7 +88,7 @@ class DelegatingTranslator(Translator[T], Generic[T]):
                 implementation, op_args, context_kwargs, **kwargs
             )
 
-        if isinstance(expr, CaseExpression):
+        if isinstance(expr, CaseExpr):
             switching_on = (
                 self._translate(expr.switching_on, **{**kwargs, "context": "case_val"})
                 if expr.switching_on is not None
@@ -132,7 +132,7 @@ class DelegatingTranslator(Translator[T], Generic[T]):
 
     def _translate_case(
         self,
-        expr: CaseExpression,
+        expr: CaseExpr,
         switching_on: T | None,
         cases: list[tuple[T, T]],
         default: T,
@@ -169,8 +169,8 @@ def bottom_up_replace(expr, replace):
             )
             return replace(f)
 
-        if isinstance(expr, CaseExpression):
-            c = CaseExpression(
+        if isinstance(expr, CaseExpr):
+            c = CaseExpr(
                 switching_on=transform(expr.switching_on),
                 cases=[(transform(k), transform(v)) for k, v in expr.cases],
                 default=transform(expr.default),

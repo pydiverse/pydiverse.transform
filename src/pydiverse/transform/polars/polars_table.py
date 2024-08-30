@@ -1,34 +1,33 @@
 from __future__ import annotations
 
+import datetime
 import itertools
 import uuid
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import polars as pl
 
 from pydiverse.transform import ops
 from pydiverse.transform.core import dtypes, verbs
 from pydiverse.transform.core.expressions.expressions import (
-    CaseExpression,
+    CaseExpr,
     Col,
-    Expr,
-    FunctionCall,
+    ColExpr,
+    ColFn,
+    ColName,
     LiteralCol,
 )
 from pydiverse.transform.core.expressions.symbolic_expressions import SymbolicExpression
 from pydiverse.transform.core.expressions.translator import (
     Translator,
-    TypedValue,
 )
 from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import TableImpl
 from pydiverse.transform.core.util import OrderingDescriptor
-from pydiverse.transform.core.util.util import translate_ordering
-from pydiverse.transform.core.verbs import Context, TableExpr
+from pydiverse.transform.core.verbs import TableExpr
 from pydiverse.transform.errors import (
     AlignmentError,
     ExpressionError,
-    FunctionTypeError,
 )
 from pydiverse.transform.ops.core import OPType
 
@@ -48,7 +47,7 @@ class PolarsEager(TableImpl):
         super().__init__(name, cols)
 
     def mutate(self, **kwargs):
-        uuid_to_kwarg: dict[uuid.UUID, (str, Expr)] = {
+        uuid_to_kwarg: dict[uuid.UUID, (str, ColExpr)] = {
             self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
         }
         self.underlying_col_name.update(
@@ -111,7 +110,7 @@ class PolarsEager(TableImpl):
         )
 
     def summarise(self, **kwargs: SymbolicExpression):
-        uuid_to_kwarg: dict[uuid.UUID, (str, Expr)] = {
+        uuid_to_kwarg: dict[uuid.UUID, (str, ColExpr)] = {
             self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
         }
         self.underlying_col_name.update(
@@ -157,170 +156,6 @@ class PolarsEager(TableImpl):
                 not isinstance(col.typed_value.value, pl.Series)
                 or len(col.typed_value.value) == self.df.height
             )  # not a series => scalar
-
-    class ExpressionCompiler(TableImpl.ExpressionCompiler["PolarsEager", pl.Expr]):
-        def _translate_col(
-            self, col: Col, **kwargs
-        ) -> TypedValue[Callable[[], pl.Expr]]:
-            return pl.col(self.backend.underlying_col_name[col.uuid])
-
-        def _translate_literal_col(self, col: LiteralCol, **kwargs) -> pl.Expr:
-            if not self.backend.is_aligned_with(col):
-                raise AlignmentError(
-                    f"literal column {col} not aligned with table {self.backend.name}."
-                )
-
-            return col.typed_value.value()
-
-        def _translate_function(
-            self,
-            implementation: TypedOperatorImpl,
-            op_args: list[TypedValue[Callable[[], pl.Expr]]],
-            context_kwargs: dict[str, Any],
-            *,
-            verb: str | None = None,
-            **kwargs,
-        ) -> pl.Expr:
-            pl_result_type = _pl_dtype(implementation.rtype)
-
-            internal_kwargs = {}
-
-            op = implementation.operator
-            ftype = (
-                OPType.WINDOW
-                if op.ftype == OPType.AGGREGATE and verb != "summarise"
-                else op.ftype
-            )
-
-            grouping = context_kwargs.get("partition_by")
-            # the `partition_by=` grouping overrides the `group_by` grouping
-            if grouping is not None:  # translate possible lambda cols
-                grouping = [self.backend.resolve_lambda_cols(col) for col in grouping]
-            else:  # use the current grouping of the table
-                grouping = self.backend.grouped_by
-
-            ordering = context_kwargs.get("arrange")
-            if ordering:
-                ordering = translate_ordering(self.backend, ordering)
-                by = [self._translate(o.order).value() for o in ordering]
-                descending = [not o.asc for o in ordering]
-                nulls_last = [not o.nulls_first for o in ordering]
-
-            filter_cond = context_kwargs.get("filter")
-            if filter_cond:
-                filter_cond = self.translate(
-                    self.backend.resolve_lambda_cols(filter_cond)
-                )
-
-            args: list[pl.Expr] = [arg.value for arg in op_args]
-            if ftype == OPType.WINDOW and ordering and not grouping:
-                # order the args. if the table is grouped by group_by or
-                # partition_by=, the groups will be sorted via over(order_by=)
-                # anyways so it need not be done here.
-
-                args = [
-                    arg.sort_by(by=by, descending=descending, nulls_last=nulls_last)
-                    for arg in args
-                ]
-
-            if ftype in (OPType.WINDOW, OPType.AGGREGATE) and filter_cond:
-                # filtering needs to be done before applying the operator.
-                args = [
-                    arg.filter(filter_cond) if isinstance(arg, pl.Expr) else arg
-                    for arg in args
-                ]
-
-            if op.name in ("rank", "dense_rank"):
-                assert len(args) == 0
-                args = [pl.struct(*self.backend._merge_desc_nulls_last(ordering))]
-                ordering = None
-
-            value = implementation(
-                *[arg for arg in args],
-                _tbl=self.backend,
-                _result_type=pl_result_type,
-                **internal_kwargs,
-            )
-
-            if ftype == OPType.AGGREGATE:
-                if context_kwargs.get("filter"):
-                    # TODO: allow AGGRRGATE + `filter` context_kwarg
-                    raise NotImplementedError
-
-                if context_kwargs.get("partition_by"):
-                    # technically, it probably wouldn't be too hard to support this in
-                    # polars.
-                    assert verb == "summarise"
-                    raise ValueError(
-                        f"cannot use keyword argument `partition_by` for the "
-                        f"aggregation function `{op.name}` inside `summarise`."
-                    )
-
-            # TODO: in the grouping / filter expressions, we should probably call
-            # validate_table_args. look what it does and use it.
-            # TODO: what happens if I put None or similar in a filter / partition_by?
-            if ftype == OPType.WINDOW:
-                if verb == "summarise":
-                    raise FunctionTypeError(
-                        "window function are not allowed inside summarise"
-                    )
-
-                # if `verb` != "muatate", we should give a warning that this only works
-                # for polars
-
-                if grouping:
-                    # when doing sort_by -> over in polars, for whatever reason the
-                    # `nulls_last` argument is ignored. thus when both a grouping and an
-                    # arrangment are specified, we manually add the descending and
-                    # nulls_last markers to the ordering.
-                    order_by = None
-                    if ordering:
-                        order_by = self.backend._merge_desc_nulls_last(ordering)
-
-                    group_exprs: list[pl.Expr] = [
-                        pl.col(self.backend.underlying_col_name[col.uuid])
-                        for col in grouping
-                    ]
-                    value = value.over(*group_exprs, order_by=order_by)
-
-                elif ordering:
-                    if op.ftype == OPType.AGGREGATE:
-                        # TODO: don't fail, but give a warning that `arrange` is useless
-                        # here
-                        ...
-
-                    # the function was executed on the ordered arguments. here we
-                    # restore the original order of the table.
-                    inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
-                        by=by,
-                        descending=descending,
-                        nulls_last=nulls_last,
-                    )
-                    value = value.sort_by(inv_permutation)
-
-            return value
-
-        def _translate_case(
-            self,
-            expr: CaseExpression,
-            switching_on: pl.Expr | None,
-            cases: list[tuple[pl.Expr, pl.Expr]],
-            default: pl.Expr,
-            **kwargs,
-        ) -> pl.Expr:
-            if switching_on is not None:
-                switching_on_v = switching_on.value()
-                conds = [match_expr == switching_on_v for match_expr, _ in cases]
-            else:
-                conds = [case[0] for case in cases]
-
-            pl_expr = pl.when(conds[0]).then(cases[0][1])
-            for cond, (_, value) in zip(conds[1:], cases[1:]):
-                pl_expr = pl_expr.when(cond).then(value)
-            return pl_expr.otherwise(default)
-
-        def _translate_literal_value(self, expr):
-            return pl.lit(expr)
 
     class AlignedExpressionEvaluator(TableImpl.AlignedExpressionEvaluator[pl.Series]):
         def _translate_col(self, col: Col, **kwargs) -> pl.Series:
@@ -374,7 +209,7 @@ class JoinTranslator(Translator[tuple]):
     def _translate(self, expr, **kwargs):
         if isinstance(expr, Col):
             return expr
-        if isinstance(expr, FunctionCall):
+        if isinstance(expr, ColFn):
             if expr.name == "__eq__":
                 c1 = expr.args[0]
                 c2 = expr.args[1]
@@ -388,67 +223,172 @@ class JoinTranslator(Translator[tuple]):
         )
 
 
-def compile_col_expr(expr: Expr) -> pl.Expr:
+def compile_col_expr(expr: ColExpr, group_by: list[ColExpr]) -> pl.Expr:
+    assert not isinstance(expr, Col)
+    if isinstance(expr, ColName):
+        return pl.col(expr.name)
+    elif isinstance(expr, ColFn):
+        op = PolarsEager.operator_registry.get_operator(expr.name)
+        args = [compile_col_expr(arg) for arg in expr.args]
+        impl = PolarsEager.operator_registry.get_implementation(
+            expr.name, tuple(arg._type for arg in expr.args)
+        )
+
+        # the `partition_by=` grouping overrides the `group_by` grouping
+        partition_by = expr.context_kwargs.get("partition_by")
+        if partition_by is None:
+            partition_by = group_by
+
+        arrange = expr.context_kwargs.get("arrange")
+
+        if arrange:
+            by, descending, nulls_last = zip(
+                compile_order_expr(order_expr) for order_expr in arrange
+            )
+
+        filter_cond = expr.context_kwargs.get("filter")
+
+        if (
+            op.ftype in (OPType.WINDOW, OPType.AGGREGATE)
+            and arrange
+            and not partition_by
+        ):
+            # order the args. if the table is grouped by group_by or
+            # partition_by=, the groups will be sorted via over(order_by=)
+            # anyways so it need not be done here.
+
+            args = [
+                arg.sort_by(by=by, descending=descending, nulls_last=nulls_last)
+                for arg in args
+            ]
+
+        if op.ftype in (OPType.WINDOW, OPType.AGGREGATE) and filter_cond:
+            # filtering needs to be done before applying the operator.
+            args = [
+                arg.filter(filter_cond) if isinstance(arg, pl.Expr) else arg
+                for arg in args
+            ]
+
+        # if op.name in ("rank", "dense_rank"):
+        #     assert len(args) == 0
+        #     args = [pl.struct(merge_desc_nulls_last(ordering))]
+        #     ordering = None
+
+        value: pl.Expr = impl(*[arg for arg in args])
+
+        if op.ftype == OPType.AGGREGATE:
+            if filter_cond:
+                # TODO: allow AGGRRGATE + `filter` context_kwarg
+                raise NotImplementedError
+
+            if partition_by:
+                # technically, it probably wouldn't be too hard to support this in
+                # polars.
+                raise NotImplementedError
+
+        # TODO: in the grouping / filter expressions, we should probably call
+        # validate_table_args. look what it does and use it.
+        # TODO: what happens if I put None or similar in a filter / partition_by?
+        if op.ftype == OPType.WINDOW:
+            # if `verb` != "muatate", we should give a warning that this only works
+            # for polars
+
+            if partition_by:
+                # when doing sort_by -> over in polars, for whatever reason the
+                # `nulls_last` argument is ignored. thus when both a grouping and an
+                # arrangment are specified, we manually add the descending and
+                # nulls_last markers to the ordering.
+                order_by = None
+                # if arrange:
+                #     order_by = merge_desc_nulls_last(by, )
+                value = value.over(partition_by, order_by=order_by)
+
+            elif arrange:
+                if op.ftype == OPType.AGGREGATE:
+                    # TODO: don't fail, but give a warning that `arrange` is useless
+                    # here
+                    ...
+
+                # the function was executed on the ordered arguments. here we
+                # restore the original order of the table.
+                inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
+                    by=by,
+                    descending=descending,
+                    nulls_last=nulls_last,
+                )
+                value = value.sort_by(inv_permutation)
+
+            return value
+    elif isinstance(expr, CaseExpr):
+        raise NotImplementedError
+    else:
+        return pl.lit(expr, dtype=python_type_to_polars(type(expr)))
+
+
+def compile_order_expr(expr: ColExpr) -> pl.Expr:
     pass
 
 
-def compile_order_expr(expr: Expr) -> pl.Expr:
-    pass
+def compile_table_expr(expr: TableExpr) -> pl.LazyFrame:
+    lf, _ = compile_table_expr_with_group_by(expr)
+    return lf
 
 
-def compile_table_expr(expr: TableExpr) -> tuple[pl.LazyFrame, list[pl.Expr]]:
+def compile_table_expr_with_group_by(
+    expr: TableExpr,
+) -> tuple[pl.LazyFrame, list[pl.Expr]]:
     if isinstance(expr, verbs.Alias):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         setattr(table, expr.new_name)
         return table, group_by
     elif isinstance(expr, verbs.Select):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         return table.select(col.name for col in expr.selects), group_by
     elif isinstance(expr, verbs.Mutate):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         return table.with_columns(
             **{
                 name: compile_col_expr(
                     value,
-                    Context[pl.Expr](group_by, [], []),
+                    group_by,
                 )
                 for name, value in zip(expr.names, expr.values)
             }
         ), group_by
     elif isinstance(expr, verbs.Rename):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         return table.rename(expr.name_map), group_by
     elif isinstance(expr, verbs.Join):
-        left, _ = compile_table_expr(expr.left)
-        right, _ = compile_table_expr(expr.right)
+        left, _ = compile_table_expr_with_group_by(expr.left)
+        right, _ = compile_table_expr_with_group_by(expr.right)
         on = compile_col_expr(expr.on)
         suffix = expr.suffix | right.name
         # TODO: more sophisticated name collision resolution / fail
         return left.join(right, on, expr.how, validate=expr.validate, suffix=suffix), []
     elif isinstance(expr, verbs.Filter):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         return table.filter(compile_col_expr(expr.filters)), group_by
     elif isinstance(expr, verbs.Arrange):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         return table.sort(
             [compile_order_expr(order_expr) for order_expr in expr.order_by]
         ), group_by
     elif isinstance(expr, verbs.GroupBy):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         new_group_by = compile_col_expr(expr.group_by)
         return table, (group_by + new_group_by) if expr.add else new_group_by
     elif isinstance(expr, verbs.Ungroup):
-        table, _ = compile_table_expr(expr.table)
+        table, _ = compile_table_expr_with_group_by(expr.table)
         return table, []
     elif isinstance(expr, verbs.SliceHead):
-        table, group_by = compile_table_expr(expr.table)
+        table, group_by = compile_table_expr_with_group_by(expr.table)
         assert len(group_by) == 0
         return table, []
 
     raise AssertionError
 
 
-def _pdt_dtype(t: pl.DataType) -> dtypes.DType:
+def pdt_type_to_polars(t: pl.DataType) -> dtypes.DType:
     if t.is_float():
         return dtypes.Float()
     elif t.is_integer():
@@ -467,7 +407,7 @@ def _pdt_dtype(t: pl.DataType) -> dtypes.DType:
     raise TypeError(f"polars type {t} is not supported")
 
 
-def _pl_dtype(t: dtypes.DType) -> pl.DataType:
+def polars_type_to_pdt(t: dtypes.DType) -> pl.DataType:
     if isinstance(t, dtypes.Float):
         return pl.Float64()
     elif isinstance(t, dtypes.Int):
@@ -484,6 +424,25 @@ def _pl_dtype(t: dtypes.DType) -> pl.DataType:
         return pl.Duration()
 
     raise TypeError(f"pydiverse.transform type {t} not supported for polars")
+
+
+def python_type_to_polars(t: type) -> pl.DataType:
+    if t is int:
+        return pl.Int64()
+    elif t is float:
+        return pl.Float64()
+    elif t is bool:
+        return pl.Boolean()
+    elif t is str:
+        return pl.String()
+    elif t is datetime.datetime:
+        return pl.Datetime()
+    elif t is datetime.date:
+        return pl.Date()
+    elif t is datetime.timedelta:
+        return pl.Duration()
+
+    raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
 
 
 with PolarsEager.op(ops.Mean()) as op:

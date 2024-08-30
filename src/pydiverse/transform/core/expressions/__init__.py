@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .expressions import (
-    CaseExpression,
+    CaseExpr,
     Col,
     ColName,
     expr_repr,

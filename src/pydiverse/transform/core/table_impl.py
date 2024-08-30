@@ -11,7 +11,7 @@ from pydiverse.transform import ops
 from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import (
-    CaseExpression,
+    CaseExpr,
     Col,
     ColName,
     LiteralCol,
@@ -256,7 +256,7 @@ class TableImpl:
 
         def _translate_case_common(
             self,
-            expr: CaseExpression,
+            expr: CaseExpr,
             switching_on: ExprCompT | None,
             cases: list[tuple[ExprCompT, ExprCompT]],
             default: ExprCompT,

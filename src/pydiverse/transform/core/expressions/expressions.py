@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
+from pydiverse.transform.core.dtypes import DType
+from pydiverse.transform.core.table import Table
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions.translator import TypedValue
@@ -16,7 +17,7 @@ def expr_repr(it: Any):
 
     if isinstance(it, SymbolicExpression):
         return expr_repr(it._)
-    if isinstance(it, Expr):
+    if isinstance(it, ColExpr):
         return it._expr_repr()
     if isinstance(it, (list, tuple)):
         return f"[{ ', '.join([expr_repr(e) for e in it]) }]"
@@ -58,22 +59,21 @@ _dunder_expr_repr = {
 }
 
 
-class Expr:
+class ColExpr:
+    _type: DType
+
     def _expr_repr(self) -> str:
         """String repr that, when executed, returns the same expression"""
         raise NotImplementedError
 
 
-class Col(Expr, Generic[ImplT]):
-    __slots__ = ("name", "table", "uuid")
-
-    def __init__(self, name: str, table: ImplT | None = None, uuid: uuid.UUID = None):
+class Col(ColExpr, Generic[ImplT]):
+    def __init__(self, name: str, table: Table):
         self.name = name
         self.table = table
-        self.uuid = uuid or Col.generate_col_uuid()
 
     def __repr__(self):
-        return f"<{self.table.name}.{self.name}>"
+        return f"<{self.table._impl.name}.{self.name}>"
 
     def _expr_repr(self) -> str:
         return f"{self.table.name}.{self.name}"
@@ -89,26 +89,8 @@ class Col(Expr, Generic[ImplT]):
     def __hash__(self):
         return hash(self.uuid)
 
-    @classmethod
-    def generate_col_uuid(cls) -> uuid.UUID:
-        return uuid.uuid1()
 
-
-class ColName(Expr):
-    """Anonymous Column
-
-    A lambda column is a column without an associated table or UUID. This means
-    that it can be used to reference columns in the same pipe as it was created.
-
-    Example:
-      The following fails because `table.a` gets referenced before it gets created.
-        table >> mutate(a = table.x) >> mutate(b = table.a)
-      Instead you can use a lambda column to achieve this:
-        table >> mutate(a = table.x) >> mutate(b = C.a)
-    """
-
-    __slots__ = "name"
-
+class ColName(ColExpr):
     def __init__(self, name: str):
         self.name = name
 
@@ -130,7 +112,7 @@ class ColName(Expr):
         return hash(("C", self.name))
 
 
-class LiteralCol(Expr, Generic[T]):
+class LiteralCol(ColExpr, Generic[T]):
     __slots__ = ("typed_value", "expr", "backend")
 
     def __init__(
@@ -162,33 +144,21 @@ class LiteralCol(Expr, Generic[T]):
         return not self.__eq__(other)
 
 
-class FunctionCall(Expr):
-    """
-    AST node to represent a function / operator call.
-    """
-
-    def __init__(self, name: str, *args, **kwargs):
-        from pydiverse.transform.core.expressions.symbolic_expressions import (
-            unwrap_symbolic_expressions,
-        )
-
-        # Unwrap all symbolic expressions in the input
-        args = unwrap_symbolic_expressions(args)
-        kwargs = unwrap_symbolic_expressions(kwargs)
-
+class ColFn(ColExpr):
+    def __init__(self, name: str, *args: ColExpr, **kwargs: ColExpr):
         self.name = name
         self.args = args
-        self.kwargs = kwargs
+        self.context_kwargs = kwargs
 
     def __repr__(self):
         args = [repr(e) for e in self.args] + [
-            f"{k}={repr(v)}" for k, v in self.kwargs.items()
+            f"{k}={repr(v)}" for k, v in self.context_kwargs.items()
         ]
         return f'{self.name}({", ".join(args)})'
 
     def _expr_repr(self) -> str:
         args = [expr_repr(e) for e in self.args] + [
-            f"{k}={expr_repr(v)}" for k, v in self.kwargs.items()
+            f"{k}={expr_repr(v)}" for k, v in self.context_kwargs.items()
         ]
 
         if self.name in _dunder_expr_repr:
@@ -211,13 +181,13 @@ class FunctionCall(Expr):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash((self.name, self.args, tuple(self.kwargs.items())))
+        return hash((self.name, self.args, tuple(self.context_kwargs.items())))
 
     def iter_children(self):
         yield from self.args
 
 
-class CaseExpression(Expr):
+class CaseExpr(ColExpr):
     def __init__(
         self, switching_on: Any | None, cases: Iterable[tuple[Any, Any]], default: Any
     ):

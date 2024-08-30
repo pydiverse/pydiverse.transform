@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pydiverse.transform.core.expressions import (
-    CaseExpression,
+    CaseExpr,
     Col,
     FunctionCall,
     LiteralCol,
@@ -26,7 +26,7 @@ def iterate_over_expr(expr, expand_literal_col=False):
             yield from iterate_over_expr(child, expand_literal_col=expand_literal_col)
         return
 
-    if isinstance(expr, CaseExpression):
+    if isinstance(expr, CaseExpr):
         for child in expr.iter_children():
             yield from iterate_over_expr(child, expand_literal_col=expand_literal_col)
         return
