@@ -80,11 +80,11 @@ class OrderingDescriptor:
     nulls_first: bool
 
 
-def translate_ordering(tbl, order_list) -> list[OrderingDescriptor]:
+def translate_ordering(table, order_list) -> list[OrderingDescriptor]:
     ordering = []
     for arg in order_list:
         col, ascending, nulls_first = ordering_peeler(arg)
-        col = tbl.resolve_lambda_cols(col)
+        col = table.resolve_lambda_cols(col)
         ordering.append(OrderingDescriptor(col, ascending, nulls_first))
 
     return ordering

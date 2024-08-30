@@ -94,7 +94,7 @@ class Col(Expr, Generic[ImplT]):
         return uuid.uuid1()
 
 
-class LambdaColumn(Expr):
+class ColName(Expr):
     """Anonymous Column
 
     A lambda column is a column without an associated table or UUID. This means

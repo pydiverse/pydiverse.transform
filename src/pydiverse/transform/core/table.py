@@ -7,13 +7,13 @@ from typing import Generic
 from pydiverse.transform._typing import ImplT
 from pydiverse.transform.core.expressions import (
     Col,
-    LambdaColumn,
+    ColName,
     SymbolicExpression,
 )
-from pydiverse.transform.core.verbs import export
+from pydiverse.transform.core.verbs import TableExpr, export
 
 
-class Table(Generic[ImplT]):
+class Table(TableExpr, Generic[ImplT]):
     """
     All attributes of a table are columns except for the `_impl` attribute
     which is a reference to the underlying table implementation.
@@ -37,7 +37,7 @@ class Table(Generic[ImplT]):
 
         if isinstance(col, SymbolicExpression):
             underlying = col._
-            if isinstance(underlying, (Col, LambdaColumn)):
+            if isinstance(underlying, (Col, ColName)):
                 col_name = underlying.name
         elif isinstance(col, str):
             col_name = col
@@ -72,7 +72,7 @@ class Table(Generic[ImplT]):
     def __contains__(self, item):
         if isinstance(item, SymbolicExpression):
             item = item._
-        if isinstance(item, LambdaColumn):
+        if isinstance(item, ColName):
             return item.name in self._impl.named_cols.fwd
         if isinstance(item, Col):
             return item.uuid in self._impl.available_cols

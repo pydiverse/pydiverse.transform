@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import copy
-import dataclasses
 import datetime
 import uuid
 import warnings
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydiverse.transform import ops
 from pydiverse.transform._typing import ImplT
@@ -14,7 +13,7 @@ from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.expressions import (
     CaseExpression,
     Col,
-    LambdaColumn,
+    ColName,
     LiteralCol,
 )
 from pydiverse.transform.core.expressions.translator import (
@@ -80,7 +79,10 @@ class TableImpl:
         self.selects: ordered_set[str] = ordered_set()  # subset of named_cols
         self.named_cols: bidict[str, uuid.UUID] = bidict()
         self.available_cols: set[uuid.UUID] = set()
-        self.cols: dict[uuid.UUID, ColumnMetaData] = dict()
+
+        self.verb_table_args: list[TableImpl]
+        self.verb_args: list[Any]
+        self.verb_kwargs: dict[str, Any]
 
         self.grouped_by: ordered_set[Col] = ordered_set()
         self.intrinsic_grouped_by: ordered_set[Col] = ordered_set()
@@ -90,7 +92,6 @@ class TableImpl:
             self.selects.add(name)
             self.named_cols.fwd[name] = col.uuid
             self.available_cols.add(col.uuid)
-            self.cols[col.uuid] = ColumnMetaData.from_expr(col.uuid, col, self)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -117,10 +118,10 @@ class TableImpl:
         c.lambda_translator = self.LambdaTranslator(c)
         return c
 
-    def get_col(self, key: str | Col | LambdaColumn):
+    def get_col(self, key: str | Col | ColName):
         """Getter used by `Table.__getattr__`"""
 
-        if isinstance(key, LambdaColumn):
+        if isinstance(key, ColName):
             key = key.name
 
         if isinstance(key, str):
@@ -345,7 +346,7 @@ class TableImpl:
 
     class LambdaTranslator(Translator):
         """
-        Translator that takes an expression and replaces all LambdaColumns
+        Translator that takes an expression and replaces all ColNames
         inside it with the corresponding Column instance.
         """
 
@@ -355,7 +356,7 @@ class TableImpl:
 
         def _translate(self, expr, **kwargs):
             # Resolve lambda and return Column object
-            if isinstance(expr, LambdaColumn):
+            if isinstance(expr, ColName):
                 if expr.name not in self.backend.named_cols.fwd:
                     raise ValueError(
                         f"Invalid lambda column '{expr.name}'. No column with this name"
@@ -425,32 +426,6 @@ class TableImpl:
                         " supported by SQL backend."
                     )
             return op_ftype
-
-
-@dataclasses.dataclass
-class ColumnMetaData:
-    uuid: uuid.UUID
-    expr: Any
-    compiled: Callable[[Any], TypedValue]
-    dtype: dtypes.DType
-    ftype: OPType
-
-    @classmethod
-    def from_expr(cls, uuid, expr, table: TableImpl, **kwargs):
-        v: TypedValue = table.compiler.translate(expr, **kwargs)
-        return cls(
-            uuid=uuid,
-            expr=expr,
-            compiled=v.value,
-            dtype=v.dtype.without_modifiers(),
-            ftype=v.ftype,
-        )
-
-    def __hash__(self):
-        return hash(self.uuid)
-
-    def as_column(self, name, table: TableImpl):
-        return Col(name, table, self.uuid)
 
 
 #### MARKER OPERATIONS #########################################################

@@ -3,9 +3,7 @@ from __future__ import annotations
 from .expressions import (
     CaseExpression,
     Col,
-    FunctionCall,
-    LambdaColumn,
-    LiteralCol,
+    ColName,
     expr_repr,
 )
 from .symbolic_expressions import SymbolicExpression, unwrap_symbolic_expressions

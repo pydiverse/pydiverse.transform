@@ -38,10 +38,10 @@ class SQLTableImpl(TableImpl):
     """SQL backend
 
     Attributes:
-        tbl: The underlying SQLAlchemy table object.
+        table: The underlying SQLAlchemy table object.
         engine: The SQLAlchemy engine.
         sql_columns: A dict mapping from uuids to SQLAlchemy column objects
-            (only those contained in `tbl`).
+            (only those contained in `table`).
 
         alignment_hash: A hash value that allows checking if two tables are
             'aligned'. In the case of SQL this means that two tables NUST NOT
@@ -99,7 +99,7 @@ class SQLTableImpl(TableImpl):
         _dtype_hints: dict[str, dtypes.DType] = None,
     ):
         self.engine = sa.create_engine(engine) if isinstance(engine, str) else engine
-        tbl = self._create_table(table, self.engine)
+        table = self._create_table(table, self.engine)
 
         columns = {
             col.name: Col(
@@ -107,11 +107,11 @@ class SQLTableImpl(TableImpl):
                 table=self,
                 dtype=self._get_dtype(col, hints=_dtype_hints),
             )
-            for col in tbl.columns
+            for col in table.columns
         }
 
-        self.replace_tbl(tbl, columns)
-        super().__init__(name=self.tbl.name, columns=columns)
+        self.replace_tbl(table, columns)
+        super().__init__(name=self.table.name, columns=columns)
 
     def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         if isinstance(col, Col):
@@ -135,19 +135,21 @@ class SQLTableImpl(TableImpl):
         return super()._html_repr_expr(expr)
 
     @staticmethod
-    def _create_table(tbl, engine=None):
+    def _create_table(table, engine=None):
         """Return a sa.Table
 
-        :param tbl: a sa.Table or string of form 'table_name'
+        :param table: a sa.Table or string of form 'table_name'
             or 'schema_name.table_name'.
         """
-        if isinstance(tbl, sa.sql.FromClause):
-            return tbl
+        if isinstance(table, sa.sql.FromClause):
+            return table
 
-        if not isinstance(tbl, str):
-            raise ValueError(f"tbl must be a sqlalchemy Table or string, but was {tbl}")
+        if not isinstance(table, str):
+            raise ValueError(
+                f"table must be a sqlalchemy Table or string, but was {table}"
+            )
 
-        schema, table_name = tbl.split(".") if "." in tbl else [None, tbl]
+        schema, table_name = table.split(".") if "." in table else [None, table]
         return sa.Table(
             table_name,
             sa.MetaData(),
@@ -197,11 +199,11 @@ class SQLTableImpl(TableImpl):
             # noinspection PyNoneFunctionAssignment
             new_tbl = new_tbl.subquery()
 
-        self.tbl = new_tbl
+        self.table = new_tbl
         self.alignment_hash = generate_alignment_hash()
 
         self.sql_columns = {
-            col.uuid: self.tbl.columns[col.name] for col in columns.values()
+            col.uuid: self.table.columns[col.name] for col in columns.values()
         }  # from uuid to sqlalchemy column
 
         if hasattr(self, "cols"):
@@ -223,11 +225,11 @@ class SQLTableImpl(TableImpl):
             raise ValueError("Can't execute a SQL query without any SELECT statements.")
 
         # Start building query
-        select = self.tbl.select()
+        select = self.table.select()
 
         # `select_from` is required if no table is explicitly referenced
         # inside the SELECT. e.g. `SELECT COUNT(*) AS count`
-        select = select.select_from(self.tbl)
+        select = select.select_from(self.table)
 
         # FROM
         select = self._build_select_from(select)
@@ -258,7 +260,7 @@ class SQLTableImpl(TableImpl):
             on = compiled(self.sql_columns)
 
             select = select.join(
-                join.right.tbl,
+                join.right.table,
                 onclause=on,
                 isouter=join.how != "inner",
                 full=join.how == "outer",
@@ -377,7 +379,7 @@ class SQLTableImpl(TableImpl):
             clear_order = True
 
             # If the grouping level is different from the grouping level of the
-            # tbl object, or if on of the input columns is a window or aggregate
+            # table object, or if on of the input columns is a window or aggregate
             # function, we must make a subquery.
             requires_subquery |= (
                 bool(self.intrinsic_grouped_by)

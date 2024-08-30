@@ -1,24 +1,20 @@
 from __future__ import annotations
 
 import functools
+from dataclasses import dataclass
 from typing import Literal
 
-from pydiverse.transform.core import dtypes
 from pydiverse.transform.core.dispatchers import builtin_verb
 from pydiverse.transform.core.expressions import (
     Col,
-    LambdaColumn,
+    ColName,
     SymbolicExpression,
 )
-from pydiverse.transform.core.table_impl import ColumnMetaData, TableImpl
+from pydiverse.transform.core.expressions.expressions import Expr
 from pydiverse.transform.core.util import (
-    bidict,
     ordered_set,
     sign_peeler,
-    translate_ordering,
 )
-from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
-from pydiverse.transform.ops import OPType
 
 __all__ = [
     "alias",
@@ -41,46 +37,126 @@ __all__ = [
     "export",
 ]
 
+JoinHow = Literal["inner", "left", "outer"]
+
+JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
+
+
+class TableExpr:
+    def _validate_verb_level():
+        pass
+
+
+@dataclass
+class Alias(TableExpr):
+    table: TableExpr
+    new_name: str | None
+
+
+@dataclass
+class Select(TableExpr):
+    table: TableExpr
+    selects: list[Col | ColName]
+
+
+@dataclass
+class Rename(TableExpr):
+    table: TableExpr
+    name_map: dict[str, str]
+
+
+@dataclass
+class Mutate(TableExpr):
+    table: TableExpr
+    names: list[str]
+    values: list[Expr]
+
+
+@dataclass
+class Join(TableExpr):
+    left: TableExpr
+    right: TableExpr
+    on: Expr
+    how: JoinHow
+    validate: JoinValidate
+    suffix: str | None = None
+
+
+@dataclass
+class Filter(TableExpr):
+    table: TableExpr
+    filters: list[Expr]
+
+
+@dataclass
+class Summarise(TableExpr):
+    table: TableExpr
+    names: list[str]
+    values: list[Expr]
+
+
+@dataclass
+class Arrange(TableExpr):
+    table: TableExpr
+    order_by: list[Expr]
+
+
+@dataclass
+class SliceHead(TableExpr):
+    table: TableExpr
+    n: int
+    offset: int
+
+
+@dataclass
+class GroupBy(TableExpr):
+    table: TableExpr
+    group_by: list[Col | ColName]
+
+
+@dataclass
+class Ungroup(TableExpr):
+    table: TableExpr
+
 
 @builtin_verb()
-def alias(tbl: TableImpl, name: str | None = None):
-    """Creates a new table object with a different name and reassigns column UUIDs.
-    Must be used before performing a self-join."""
-    return tbl.alias(name)
+def alias(table: TableExpr, new_name: str | None = None):
+    return Alias(table, new_name)
 
 
 @builtin_verb()
-def collect(tbl: TableImpl):
-    return tbl.collect()
+def collect(table: TableExpr):
+    return table.collect()
 
 
 @builtin_verb()
-def export(tbl: TableImpl):
-    return tbl.export()
+def export(table: TableExpr):
+    table._validate_verb_level()
 
 
 @builtin_verb()
-def build_query(tbl: TableImpl):
-    return tbl.build_query()
+def build_query(table: TableExpr):
+    return table.build_query()
 
 
 @builtin_verb()
-def show_query(tbl: TableImpl):
-    if query := tbl.build_query():
+def show_query(table: TableExpr):
+    if query := table.build_query():
         print(query)
     else:
-        print(f"No query to show for {type(tbl).__name__}")
+        print(f"No query to show for {type(table).__name__}")
 
-    return tbl
+    return table
 
 
 @builtin_verb()
-def select(tbl: TableImpl, *args: Col):
+def select(table: TableExpr, *args: Col | ColName):
+    return Select(table, list(args))
     if len(args) == 1 and args[0] is Ellipsis:
         # >> select(...)  ->  Select all columns
         args = [
-            tbl.cols[uuid].as_column(name, tbl)
-            for name, uuid in tbl.named_cols.fwd.items()
+            table.cols[uuid].as_column(name, table)
+            for name, uuid in table.named_cols.fwd.items()
         ]
 
     cols = []
@@ -96,7 +172,7 @@ def select(tbl: TableImpl, *args: Col):
                     " Can't mix selection with deselection."
                 )
 
-        if not isinstance(col, (Col, LambdaColumn)):
+        if not isinstance(col, (Col, ColName)):
             raise TypeError(
                 "Arguments to select verb must be of type `Col`'"
                 f" and not {type(col)}."
@@ -106,19 +182,19 @@ def select(tbl: TableImpl, *args: Col):
     selects = []
     for col in cols:
         if isinstance(col, Col):
-            selects.append(tbl.named_cols.bwd[col.uuid])
-        elif isinstance(col, LambdaColumn):
+            selects.append(table.named_cols.bwd[col.uuid])
+        elif isinstance(col, ColName):
             selects.append(col.name)
 
     # Invert selection
     if positive_selection is False:
         exclude = set(selects)
         selects.clear()
-        for name in tbl.selects:
+        for name in table.selects:
             if name not in exclude:
                 selects.append(name)
 
-    new_tbl = tbl.copy()
+    new_tbl = table.copy()
     new_tbl.preverb_hook("select", *args)
     new_tbl.selects = ordered_set(selects)
     new_tbl.select(*args)
@@ -126,7 +202,8 @@ def select(tbl: TableImpl, *args: Col):
 
 
 @builtin_verb()
-def rename(tbl: TableImpl, name_map: dict[str, str]):
+def rename(table: TableExpr, name_map: dict[str, str]):
+    return Rename(table, name_map)
     # Type check
     for k, v in name_map.items():
         if not isinstance(k, str) or not isinstance(v, str):
@@ -135,7 +212,7 @@ def rename(tbl: TableImpl, name_map: dict[str, str]):
             )
 
     # Reference col that doesn't exist
-    if missing_cols := name_map.keys() - tbl.named_cols.fwd.keys():
+    if missing_cols := name_map.keys() - table.named_cols.fwd.keys():
         raise KeyError("Table has no columns named: " + ", ".join(missing_cols))
 
     # Can't rename two cols to the same name
@@ -149,14 +226,14 @@ def rename(tbl: TableImpl, name_map: dict[str, str]):
         )
 
     # Can't rename a column to one that already exists
-    unmodified_cols = tbl.named_cols.fwd.keys() - name_map.keys()
+    unmodified_cols = table.named_cols.fwd.keys() - name_map.keys()
     if duplicate_names := unmodified_cols & set(name_map.values()):
         raise ValueError(
             "Table already contains columns named: " + ", ".join(duplicate_names)
         )
 
     # Rename
-    new_tbl = tbl.copy()
+    new_tbl = table.copy()
     new_tbl.selects = ordered_set(name_map.get(name, name) for name in new_tbl.selects)
 
     uuid_name_map = {new_tbl.named_cols.fwd[old]: new for old, new in name_map.items()}
@@ -169,88 +246,21 @@ def rename(tbl: TableImpl, name_map: dict[str, str]):
 
 
 @builtin_verb()
-def mutate(tbl: TableImpl, **kwargs: SymbolicExpression):
-    new_tbl = tbl.copy()
-    new_tbl.preverb_hook("mutate", **kwargs)
-    kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
-
-    for name, expr in kwargs.items():
-        uid = Col.generate_col_uuid()
-        col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="mutate")
-
-        if dtypes.NoneDType().same_kind(col.dtype):
-            raise ExpressionTypeError(
-                f"Column '{name}' has an invalid type: {col.dtype}"
-            )
-
-        new_tbl.selects.add(name)
-        new_tbl.named_cols.fwd[name] = uid
-        new_tbl.available_cols.add(uid)
-        new_tbl.cols[uid] = col
-
-    new_tbl.mutate(**kwargs)
-    return new_tbl
+def mutate(table: TableExpr, **kwargs: Expr):
+    return Mutate(table, list(kwargs.keys()), list(kwargs.values()))
 
 
 @builtin_verb()
 def join(
-    left: TableImpl,
-    right: TableImpl,
-    on: SymbolicExpression,
+    left: TableExpr,
+    right: TableExpr,
+    on: Expr,
     how: Literal["inner", "left", "outer"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
-    if left.grouped_by or right.grouped_by:
-        raise ValueError("Can't join grouped tables. You first have to ungroup them.")
-
-    if how not in ("inner", "left", "outer"):
-        raise ValueError(
-            "join type must be one of 'inner', 'left' or 'outer' (value provided:"
-            f" {how})"
-        )
-
-    new_left = left.copy()
-    new_left.preverb_hook("join", right, on, how, validate=validate)
-
-    if set(new_left.named_cols.fwd.values()) & set(right.named_cols.fwd.values()):
-        raise ValueError(
-            f"{how} join of `{left.name}` and `{right.name}` failed: "
-            f"duplicate columns detected. If you want to do a self-join or join a "
-            f"table twice, use `alias` on one table before the join."
-        )
-
-    if suffix is not None:
-        # check that the user-provided suffix does not lead to collisions
-        if collisions := set(new_left.named_cols.fwd.keys()) & set(
-            name + suffix for name in right.named_cols.fwd.keys()
-        ):
-            raise ValueError(
-                f"{how} join of `{left.name}` and `{right.name}` failed: "
-                f"using the suffix `{suffix}` for right columns, the following column "
-                f"names appear both in the left and right table: {collisions}"
-            )
-    else:
-        # try `_{right.name}`, then `_{right.name}1`, `_{right.name}2` and so on
-        cnt = 0
-        suffix = "_" + right.name
-        for rname in right.named_cols.fwd.keys():
-            while rname + suffix in new_left.named_cols.fwd.keys():
-                cnt += 1
-                suffix = "_" + right.name + str(cnt)
-
-    new_left.selects |= {name + suffix for name in right.selects}
-    new_left.named_cols.fwd.update(
-        {name + suffix: uuid for name, uuid in right.named_cols.fwd.items()}
-    )
-    new_left.available_cols.update(right.available_cols)
-    new_left.cols.update(right.cols)
-
-    on = new_left.resolve_lambda_cols(on)
-
-    new_left.join(right, on, how, validate=validate)
-    return new_left
+    return Join(left, right, on, how, validate, suffix)
 
 
 inner_join = functools.partial(join, how="inner")
@@ -259,151 +269,30 @@ outer_join = functools.partial(join, how="outer")
 
 
 @builtin_verb()
-def filter(tbl: TableImpl, *args: SymbolicExpression):
-    # TODO: Type check expression
-
-    args = [tbl.resolve_lambda_cols(arg) for arg in args]
-
-    new_tbl = tbl.copy()
-    new_tbl.preverb_hook("filter", *args)
-    new_tbl.filter(*args)
-    return new_tbl
+def filter(table: TableExpr, *args: SymbolicExpression):
+    return Filter(table, list(args))
 
 
 @builtin_verb()
-def arrange(tbl: TableImpl, *args: Col):
-    if len(args) == 0:
-        return tbl
-
-    ordering = translate_ordering(tbl, args)
-
-    new_tbl = tbl.copy()
-    new_tbl.preverb_hook("arrange", *args)
-    new_tbl.arrange(ordering)
-    return new_tbl
+def arrange(table: TableExpr, *args: Col):
+    return Arrange(table, list(args))
 
 
 @builtin_verb()
-def group_by(tbl: TableImpl, *args: Col, add=False):
-    # WARNING: Depending on the SQL backend, you might
-    #          only be allowed to reference columns
-    if not args:
-        raise ValueError(
-            "Expected columns to group by, but none were specified. To remove the"
-            " grouping use the ungroup verb instead."
-        )
-    for col in args:
-        if not isinstance(col, (Col, LambdaColumn)):
-            raise TypeError(
-                "Arguments to group_by verb must be of type 'Column'"
-                f" and not '{type(col)}'."
-            )
-
-    args = [tbl.resolve_lambda_cols(arg) for arg in args]
-
-    new_tbl = tbl.copy()
-    new_tbl.preverb_hook("group_by", *args, add=add)
-    if add:
-        new_tbl.grouped_by |= ordered_set(args)
-    else:
-        new_tbl.grouped_by = ordered_set(args)
-    new_tbl.group_by(*args)
-    return new_tbl
+def group_by(table: TableExpr, *args: Col | ColName, add=False):
+    return GroupBy(table, list(args), add)
 
 
 @builtin_verb()
-def ungroup(tbl: TableImpl):
-    """Remove all groupings from table."""
-
-    new_tbl = tbl.copy()
-    new_tbl.preverb_hook("ungroup")
-    new_tbl.grouped_by.clear()
-    new_tbl.ungroup()
-    return new_tbl
+def ungroup(table: TableExpr):
+    return Ungroup(table)
 
 
 @builtin_verb()
-def summarise(tbl: TableImpl, **kwargs: SymbolicExpression):
-    # Validate Input
-
-    new_tbl = tbl.copy()
-    new_tbl.preverb_hook("summarise", **kwargs)
-    kwargs = {k: new_tbl.resolve_lambda_cols(v) for k, v in kwargs.items()}
-
-    # TODO: Validate that the functions are actually aggregating functions.
-    ...
-
-    # Calculate state for new table
-    selects = ordered_set()
-    named_cols = bidict()
-    available_cols = set()
-    cols = {}
-
-    # Add grouping cols to beginning of select.
-    for col in tbl.grouped_by:
-        selects.add(tbl.named_cols.bwd[col.uuid])
-        available_cols.add(col.uuid)
-        named_cols.fwd[col.name] = col.uuid
-
-    # Add summarizing cols to the end of the select.
-    for name, expr in kwargs.items():
-        if name in selects:
-            raise ValueError(
-                f"Column with name '{name}' already in select. The new summarised"
-                " columns must have a different name than the grouping columns."
-            )
-        uid = Col.generate_col_uuid()
-        col = ColumnMetaData.from_expr(uid, expr, new_tbl, verb="summarise")
-
-        if dtypes.NoneDType().same_kind(col.dtype):
-            raise ExpressionTypeError(
-                f"Column '{name}' has an invalid type: {col.dtype}"
-            )
-        if col.ftype != OPType.AGGREGATE:
-            raise FunctionTypeError(
-                f"Expression for column '{name}' doesn't summarise any values."
-            )
-
-        selects.add(name)
-        named_cols.fwd[name] = uid
-        available_cols.add(uid)
-        cols[uid] = col
-
-    # Update new_tbl
-    new_tbl.selects = ordered_set(selects)
-    new_tbl.named_cols = named_cols
-    new_tbl.available_cols = available_cols
-    new_tbl.cols.update(cols)
-    new_tbl.intrinsic_grouped_by = new_tbl.grouped_by.copy()
-    new_tbl.summarise(**kwargs)
-
-    # Reduce the grouping level by one -> drop last
-    if len(new_tbl.grouped_by):
-        new_tbl.grouped_by.pop_back()
-
-    if len(new_tbl.grouped_by):
-        new_tbl.group_by(*new_tbl.grouped_by)
-    else:
-        new_tbl.ungroup()
-
-    return new_tbl
+def summarise(table: TableExpr, **kwargs: Expr):
+    return Summarise(table, list(kwargs.keys()), list(kwargs.values()))
 
 
 @builtin_verb()
-def slice_head(tbl: TableImpl, n: int, *, offset: int = 0):
-    if not isinstance(n, int):
-        raise TypeError("'n' must be an int")
-    if not isinstance(offset, int):
-        raise TypeError("'offset' must be an int")
-    if n <= 0:
-        raise ValueError(f"'n' must be a positive integer (value: {n})")
-    if offset < 0:
-        raise ValueError(f"'offset' can't be negative (value: {offset})")
-
-    if tbl.grouped_by:
-        raise ValueError("Can't slice table that is grouped. Must ungroup first.")
-
-    new_tbl = tbl.copy()
-    new_tbl.preverb_hook("slice_head")
-    new_tbl.slice_head(n, offset)
-    return new_tbl
+def slice_head(table: TableExpr, n: int, *, offset: int = 0):
+    return SliceHead(table, n, offset)

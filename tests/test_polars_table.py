@@ -117,13 +117,13 @@ def tbl_dt():
     return Table(PolarsEager("df_dt", df_dt))
 
 
-def assert_not_inplace(tbl: Table[PolarsEager], operation: Pipeable):
+def assert_not_inplace(table: Table[PolarsEager], operation: Pipeable):
     """
     Operations should not happen in-place. They should always return a new dataframe.
     """
-    initial = tbl._impl.df.clone()
-    tbl >> operation
-    after = tbl._impl.df
+    initial = table._impl.df.clone()
+    table >> operation
+    after = table._impl.df
 
     assert initial.equals(after)
 
@@ -424,9 +424,9 @@ class TestPolarsEager:
 
     def test_slice_head(self, tbl3):
         @verb
-        def slice_head_custom(tbl: Table, n: int, *, offset: int = 0):
+        def slice_head_custom(table: Table, n: int, *, offset: int = 0):
             t = (
-                tbl
+                table
                 >> mutate(_n=f.row_number(arrange=[]))
                 >> alias()
                 >> filter((offset < C._n) & (C._n <= (n + offset)))
@@ -577,9 +577,9 @@ class TestPolarsEager:
 
     def test_custom_verb(self, tbl1):
         @verb
-        def double_col1(tbl):
-            tbl[C.col1] = C.col1 * 2
-            return tbl
+        def double_col1(table):
+            table[C.col1] = C.col1 * 2
+            return table
 
         # Custom verb should not mutate input object
         assert_not_inplace(tbl1, double_col1())

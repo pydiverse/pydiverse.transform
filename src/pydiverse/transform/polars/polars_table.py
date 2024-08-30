@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import itertools
 import uuid
 from typing import Any, Callable, Literal
@@ -8,13 +7,13 @@ from typing import Any, Callable, Literal
 import polars as pl
 
 from pydiverse.transform import ops
-from pydiverse.transform.core import dtypes
+from pydiverse.transform.core import dtypes, verbs
 from pydiverse.transform.core.expressions.expressions import (
-    BaseExpression,
     CaseExpression,
-    Column,
+    Col,
+    Expr,
     FunctionCall,
-    LiteralColumn,
+    LiteralCol,
 )
 from pydiverse.transform.core.expressions.symbolic_expressions import SymbolicExpression
 from pydiverse.transform.core.expressions.translator import (
@@ -22,9 +21,10 @@ from pydiverse.transform.core.expressions.translator import (
     TypedValue,
 )
 from pydiverse.transform.core.registry import TypedOperatorImpl
-from pydiverse.transform.core.table_impl import AbstractTableImpl
+from pydiverse.transform.core.table_impl import TableImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.core.util.util import translate_ordering
+from pydiverse.transform.core.verbs import TableExpr
 from pydiverse.transform.errors import (
     AlignmentError,
     ExpressionError,
@@ -33,15 +33,12 @@ from pydiverse.transform.errors import (
 from pydiverse.transform.ops.core import OPType
 
 
-class PolarsEager(AbstractTableImpl):
+class PolarsEager(TableImpl):
     def __init__(self, name: str, df: pl.DataFrame):
         self.df = df
         self.join_translator = JoinTranslator()
 
-        cols = {
-            col.name: Column(col.name, self, _pdt_dtype(col.dtype))
-            for col in df.iter_columns()
-        }
+        cols = {col.name: Col(col.name, self) for col in df.iter_columns()}
         self.underlying_col_name: dict[uuid.UUID, str] = {
             col.uuid: f"{name}_{col.name}_{col.uuid.int}" for col in cols.values()
         }
@@ -51,7 +48,7 @@ class PolarsEager(AbstractTableImpl):
         super().__init__(name, cols)
 
     def mutate(self, **kwargs):
-        uuid_to_kwarg: dict[uuid.UUID, (str, BaseExpression)] = {
+        uuid_to_kwarg: dict[uuid.UUID, (str, Expr)] = {
             self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
         }
         self.underlying_col_name.update(
@@ -114,7 +111,7 @@ class PolarsEager(AbstractTableImpl):
         )
 
     def summarise(self, **kwargs: SymbolicExpression):
-        uuid_to_kwarg: dict[uuid.UUID, (str, BaseExpression)] = {
+        uuid_to_kwarg: dict[uuid.UUID, (str, Expr)] = {
             self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
         }
         self.underlying_col_name.update(
@@ -149,43 +146,31 @@ class PolarsEager(AbstractTableImpl):
     def slice_head(self, n: int, offset: int):
         self.df = self.df.slice(offset, n)
 
-    def is_aligned_with(self, col: Column | LiteralColumn) -> bool:
-        if isinstance(col, Column):
+    def is_aligned_with(self, col: Col | LiteralCol) -> bool:
+        if isinstance(col, Col):
             return (
                 isinstance(col.table, type(self))
                 and col.table.df.height == self.df.height
             )
-        if isinstance(col, LiteralColumn):
+        if isinstance(col, LiteralCol):
             return issubclass(col.backend, type(self)) and (
                 not isinstance(col.typed_value.value, pl.Series)
                 or len(col.typed_value.value) == self.df.height
             )  # not a series => scalar
 
-    class ExpressionCompiler(
-        AbstractTableImpl.ExpressionCompiler[
-            "PolarsEager", TypedValue[Callable[[], pl.Expr]]
-        ]
-    ):
+    class ExpressionCompiler(TableImpl.ExpressionCompiler["PolarsEager", pl.Expr]):
         def _translate_col(
-            self, col: Column, **kwargs
+            self, col: Col, **kwargs
         ) -> TypedValue[Callable[[], pl.Expr]]:
-            def value():
-                return pl.col(self.backend.underlying_col_name[col.uuid])
+            return pl.col(self.backend.underlying_col_name[col.uuid])
 
-            return TypedValue(value, col.dtype)
-
-        def _translate_literal_col(
-            self, col: LiteralColumn, **kwargs
-        ) -> TypedValue[Callable[[], pl.Expr]]:
+        def _translate_literal_col(self, col: LiteralCol, **kwargs) -> pl.Expr:
             if not self.backend.is_aligned_with(col):
                 raise AlignmentError(
                     f"literal column {col} not aligned with table {self.backend.name}."
                 )
 
-            def value(**kw):
-                return col.typed_value.value
-
-            return TypedValue(value, col.typed_value.dtype, col.typed_value.ftype)
+            return col.typed_value.value()
 
         def _translate_function(
             self,
@@ -195,7 +180,7 @@ class PolarsEager(AbstractTableImpl):
             *,
             verb: str | None = None,
             **kwargs,
-        ) -> TypedValue[Callable[[], pl.Expr]]:
+        ) -> pl.Expr:
             pl_result_type = _pl_dtype(implementation.rtype)
 
             internal_kwargs = {}
@@ -227,54 +212,35 @@ class PolarsEager(AbstractTableImpl):
                     self.backend.resolve_lambda_cols(filter_cond)
                 )
 
-            args: list[Callable[[], pl.Expr]] = [arg.value for arg in op_args]
-            dtypes: list[dtypes.DType] = [arg.dtype for arg in op_args]
+            args: list[pl.Expr] = [arg.value for arg in op_args]
             if ftype == OPType.WINDOW and ordering and not grouping:
                 # order the args. if the table is grouped by group_by or
                 # partition_by=, the groups will be sorted via over(order_by=)
                 # anyways so it need not be done here.
-                def ordered_arg(arg):
-                    return arg().sort_by(
-                        by=by, descending=descending, nulls_last=nulls_last
-                    )
 
                 args = [
-                    arg if dtype.const else functools.partial(ordered_arg, arg)
-                    for arg, dtype in zip(args, dtypes)
+                    arg.sort_by(by=by, descending=descending, nulls_last=nulls_last)
+                    for arg in args
                 ]
 
             if ftype in (OPType.WINDOW, OPType.AGGREGATE) and filter_cond:
-                # filtering needs to be done before applying the operator. We filter
-                # all non-constant arguments, although there should always be only
-                # one of these.
-                def filtered_value(value):
-                    return value().filter(filter_cond.value())
-
-                assert len(list(filter(lambda arg: not arg.dtype.const, op_args))) == 1
+                # filtering needs to be done before applying the operator.
                 args = [
-                    arg if dtype.const else functools.partial(filtered_value, arg)
-                    for arg, dtype in zip(args, dtypes)
+                    arg.filter(filter_cond) if isinstance(arg, pl.Expr) else arg
+                    for arg in args
                 ]
 
             if op.name in ("rank", "dense_rank"):
                 assert len(args) == 0
-                args = [
-                    functools.partial(
-                        lambda ordering: pl.struct(
-                            *self.backend._merge_desc_nulls_last(ordering)
-                        ),
-                        ordering,
-                    )
-                ]
+                args = [pl.struct(*self.backend._merge_desc_nulls_last(ordering))]
                 ordering = None
 
-            def value(**kw):
-                return implementation(
-                    *[arg(**kw) for arg in args],
-                    _tbl=self.backend,
-                    _result_type=pl_result_type,
-                    **internal_kwargs,
-                )
+            value = implementation(
+                *[arg for arg in args],
+                _tbl=self.backend,
+                _result_type=pl_result_type,
+                **internal_kwargs,
+            )
 
             if ftype == OPType.AGGREGATE:
                 if context_kwargs.get("filter"):
@@ -311,14 +277,11 @@ class PolarsEager(AbstractTableImpl):
                     if ordering:
                         order_by = self.backend._merge_desc_nulls_last(ordering)
 
-                    def partitioned_value(value):
-                        group_exprs: list[pl.Expr] = [
-                            pl.col(self.backend.underlying_col_name[col.uuid])
-                            for col in grouping
-                        ]
-                        return value().over(*group_exprs, order_by=order_by)
-
-                    value = functools.partial(partitioned_value, value)
+                    group_exprs: list[pl.Expr] = [
+                        pl.col(self.backend.underlying_col_name[col.uuid])
+                        for col in grouping
+                    ]
+                    value = value.over(*group_exprs, order_by=order_by)
 
                 elif ordering:
                     if op.ftype == OPType.AGGREGATE:
@@ -328,95 +291,52 @@ class PolarsEager(AbstractTableImpl):
 
                     # the function was executed on the ordered arguments. here we
                     # restore the original order of the table.
-                    def sorted_value(value):
-                        inv_permutation = pl.int_range(
-                            0, pl.len(), dtype=pl.Int64
-                        ).sort_by(
-                            by=by,
-                            descending=descending,
-                            nulls_last=nulls_last,
-                        )
-                        return value().sort_by(inv_permutation)
+                    inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
+                        by=by,
+                        descending=descending,
+                        nulls_last=nulls_last,
+                    )
+                    value = value.sort_by(inv_permutation)
 
-                    # need to bind `value` inside `filtered_value` so that it refers to
-                    # the original `value`.
-                    value = functools.partial(sorted_value, value)
-
-            return TypedValue(
-                value,
-                implementation.rtype,
-                PolarsEager._get_op_ftype(
-                    op_args,
-                    op,
-                    OPType.WINDOW
-                    if op.ftype == OPType.AGGREGATE and verb != "summarise"
-                    else None,
-                ),
-            )
+            return value
 
         def _translate_case(
             self,
             expr: CaseExpression,
-            switching_on: TypedValue[Callable[[], pl.Expr]] | None,
-            cases: list[
-                tuple[
-                    TypedValue[Callable[[], pl.Expr]], TypedValue[Callable[[], pl.Expr]]
-                ]
-            ],
-            default: TypedValue[Callable[[], pl.Expr]],
+            switching_on: pl.Expr | None,
+            cases: list[tuple[pl.Expr, pl.Expr]],
+            default: pl.Expr,
             **kwargs,
-        ) -> TypedValue[Callable[[], pl.Expr]]:
-            def value():
-                if switching_on is not None:
-                    switching_on_v = switching_on.value()
-                    conds = [
-                        match_expr.value() == switching_on_v for match_expr, _ in cases
-                    ]
-                else:
-                    conds = [case[0].value() for case in cases]
+        ) -> pl.Expr:
+            if switching_on is not None:
+                switching_on_v = switching_on.value()
+                conds = [match_expr == switching_on_v for match_expr, _ in cases]
+            else:
+                conds = [case[0] for case in cases]
 
-                pl_expr = pl.when(conds[0]).then(cases[0][1].value())
-                for cond, (_, value) in zip(conds[1:], cases[1:]):
-                    pl_expr = pl_expr.when(cond).then(value.value())
-                return pl_expr.otherwise(default.value())
-
-            result_dtype, result_ftype = self._translate_case_common(
-                expr, switching_on, cases, default, **kwargs
-            )
-
-            return TypedValue(value, result_dtype, result_ftype)
+            pl_expr = pl.when(conds[0]).then(cases[0][1])
+            for cond, (_, value) in zip(conds[1:], cases[1:]):
+                pl_expr = pl_expr.when(cond).then(value)
+            return pl_expr.otherwise(default)
 
         def _translate_literal_value(self, expr):
-            def value():
-                return pl.lit(expr)
+            return pl.lit(expr)
 
-            return value
+    class AlignedExpressionEvaluator(TableImpl.AlignedExpressionEvaluator[pl.Series]):
+        def _translate_col(self, col: Col, **kwargs) -> pl.Series:
+            return col.table.df.get_column(col.table.underlying_col_name[col.uuid])
 
-    class AlignedExpressionEvaluator(
-        AbstractTableImpl.AlignedExpressionEvaluator[TypedValue[pl.Series]]
-    ):
-        def _translate_col(self, col: Column, **kwargs) -> TypedValue[pl.Series]:
-            return TypedValue(
-                col.table.df.get_column(col.table.underlying_col_name[col.uuid]),
-                col.table.cols[col.uuid].dtype,
-            )
-
-        def _translate_literal_col(
-            self, expr: LiteralColumn, **kwargs
-        ) -> TypedValue[pl.Series]:
-            return expr.typed_value
+        def _translate_literal_col(self, expr: LiteralCol, **kwargs) -> pl.Series:
+            return expr.typed_value.value()
 
         def _translate_function(
             self,
             implementation: TypedOperatorImpl,
-            op_args: list[TypedValue[pl.Series]],
+            op_args: list[pl.Series],
             context_kwargs: dict[str, Any],
             **kwargs,
-        ) -> TypedValue[pl.Series]:
-            args = [arg.value for arg in op_args]
-            op = implementation.operator
-
-            arg_lens = {arg.len() for arg in args if isinstance(arg, pl.Series)}
+        ) -> pl.Series:
+            arg_lens = {arg.len() for arg in op_args if isinstance(arg, pl.Series)}
             if len(arg_lens) >= 2:
                 raise AlignmentError(
                     f"arguments for function {implementation.operator.name} are not "
@@ -424,15 +344,7 @@ class PolarsEager(AbstractTableImpl):
                     f"be equal."
                 )
 
-            value = implementation(*args)
-
-            return TypedValue(
-                value,
-                implementation.rtype,
-                PolarsEager._get_op_ftype(
-                    op_args, op, OPType.WINDOW if op.ftype == OPType.AGGREGATE else None
-                ),
-            )
+            return implementation(*op_args)
 
     # merges descending and null_last markers into the ordering expression
     def _merge_desc_nulls_last(
@@ -440,9 +352,7 @@ class PolarsEager(AbstractTableImpl):
     ) -> list[pl.Expr]:
         with_signs = []
         for o in ordering:
-            numeric = (
-                self.compiler.translate(o.order).value().rank("dense").cast(pl.Int64)
-            )
+            numeric = self.compiler.translate(o.order).rank("dense").cast(pl.Int64)
             with_signs.append(numeric if o.asc else -numeric)
         return [
             x.fill_null(
@@ -462,13 +372,13 @@ class JoinTranslator(Translator[tuple]):
     """
 
     def _translate(self, expr, **kwargs):
-        if isinstance(expr, Column):
+        if isinstance(expr, Col):
             return expr
         if isinstance(expr, FunctionCall):
             if expr.name == "__eq__":
                 c1 = expr.args[0]
                 c2 = expr.args[1]
-                assert isinstance(c1, Column) and isinstance(c2, Column)
+                assert isinstance(c1, Col) and isinstance(c2, Col)
                 return ((c1, c2),)
             if expr.name == "__and__":
                 return tuple(itertools.chain(*expr.args))
@@ -476,6 +386,15 @@ class JoinTranslator(Translator[tuple]):
             f"invalid ON clause element: {expr}. only a conjunction of equalities"
             " is supported"
         )
+
+
+def compile_table_expr(expr: TableExpr) -> pl.LazyFrame:
+    if isinstance(expr, verbs.Alias):
+        table = compile_table_expr(expr.table)
+        setattr(table, expr.new_name)
+        return table
+    if isinstance(expr, verbs.Select):
+        return compile_table_expr(expr.table).select(col.name for col in expr.selects)
 
 
 def _pdt_dtype(t: pl.DataType) -> dtypes.DType:

@@ -6,8 +6,7 @@ from typing import Any
 
 from pydiverse.transform.core.expressions import (
     Col,
-    LambdaColumn,
-    unwrap_symbolic_expressions,
+    ColName,
 )
 from pydiverse.transform.core.util import bidict, traverse
 
@@ -82,42 +81,10 @@ def verb(func):
 
 
 def builtin_verb(backends=None):
-    def wrap_and_unwrap(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            args = list(args)
-            args = unwrap_symbolic_expressions(args)
-            if len(args):
-                args[0] = col_to_table(args[0])
-            args = unwrap_tables(args)
-
-            kwargs = unwrap_symbolic_expressions(kwargs)
-            kwargs = unwrap_tables(kwargs)
-
-            return wrap_tables(func(*args, **kwargs))
-
-        return wrapper
-
-    def check_backend(func):
-        if backends is None:
-            return func
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            assert len(args) > 0
-            impl = args[0]._impl
-            if isinstance(impl, backends):
-                return func(*args, **kwargs)
-            raise TypeError(f"Backend {impl} not supported for verb '{func.__name__}'.")
-
-        return wrapper
-
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             f = func
-            f = wrap_and_unwrap(f)  # Convert from Table to Impl and back
-            f = check_backend(f)  # Check type of backend
             f = inverse_partial(f, *args, **kwargs)  # Bind arguments
             return Pipeable(f)  # Make pipeable
 
@@ -146,13 +113,13 @@ def col_to_table(arg: Any = None):
     from pydiverse.transform.core.verbs import select
 
     if isinstance(arg, Col):
-        tbl = (arg.table >> select(arg))._impl
-        col = tbl.get_col(arg)
+        table = (arg.table >> select(arg))._impl
+        col = table.get_col(arg)
 
-        tbl.available_cols = {col.uuid}
-        tbl.named_cols = bidict({col.name: col.uuid})
-        return tbl
-    elif isinstance(arg, LambdaColumn):
+        table.available_cols = {col.uuid}
+        table.named_cols = bidict({col.name: col.uuid})
+        return table
+    elif isinstance(arg, ColName):
         raise ValueError("Can't start a pipe with a lambda column.")
 
     return arg
