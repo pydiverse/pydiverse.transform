@@ -146,7 +146,9 @@ class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: ColExpr):
         self.name = name
         self.args = args
-        self.context_kwargs = kwargs
+        self.arrange = kwargs.get("arrange")
+        self.partition_by = kwargs.get("partition_by")
+        self.filter = kwargs.get("filter")
 
     def __repr__(self):
         args = [repr(e) for e in self.args] + [
@@ -189,17 +191,8 @@ class CaseExpr(ColExpr):
     def __init__(
         self, switching_on: Any | None, cases: Iterable[tuple[Any, Any]], default: Any
     ):
-        from pydiverse.transform.core.expressions.symbolic_expressions import (
-            unwrap_symbolic_expressions,
-        )
-
-        # Unwrap all symbolic expressions in the input
-        switching_on = unwrap_symbolic_expressions(switching_on)
-        cases = unwrap_symbolic_expressions(list(cases))
-        default = unwrap_symbolic_expressions(default)
-
         self.switching_on = switching_on
-        self.cases = cases
+        self.cases = list(cases)
         self.default = default
 
     def __repr__(self):
@@ -228,7 +221,37 @@ class CaseExpr(ColExpr):
         yield self.default
 
 
-def get_needed_tables(expr: ColExpr) -> set[TableExpr]: ...
+def get_needed_tables(expr: ColExpr) -> set[TableExpr]:
+    if isinstance(expr, Col):
+        return set(expr.table)
+    elif isinstance(expr, ColFn):
+        needed_tables = set()
+        for v in expr.args:
+            needed_tables |= get_needed_tables(v)
+        for v in expr.context_kwargs.values():
+            needed_tables |= get_needed_tables(v)
+        return needed_tables
+    elif isinstance(expr, CaseExpr):
+        raise NotImplementedError
+    elif isinstance(expr, LiteralCol):
+        raise NotImplementedError
+    return set()
 
 
-def propagate_col_names(expr: ColExpr, col_to_name: dict[Col, ColName]): ...
+def propagate_col_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColExpr:
+    if isinstance(expr, Col):
+        col_name = col_to_name.get(expr)
+        return col_name if col_name is not None else expr
+    elif isinstance(expr, ColFn):
+        return ColFn(
+            expr.name,
+            *[propagate_col_names(arg, col_to_name) for arg in expr.args],
+            **{
+                key: [propagate_col_names(v) for v in arr]
+                for key, arr in expr.context_kwargs
+            },
+        )
+    elif isinstance(expr, CaseExpr):
+        raise NotImplementedError
+
+    return expr

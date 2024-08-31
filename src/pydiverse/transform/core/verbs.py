@@ -145,8 +145,9 @@ def propagate_col_names(
         for v in expr.values:
             needed_tables |= expressions.get_needed_tables(v)
         col_to_name, cols = propagate_col_names(expr.table, needed_tables)
-        for v in expr.values:
-            expressions.propagate_col_names(v, col_to_name)
+        expr.values = [
+            expressions.propagate_col_names(v, col_to_name) for v in expr.values
+        ]
         cols.extend(Col(name, expr) for name in expr.names)
 
     elif isinstance(expr, Join):
@@ -156,36 +157,31 @@ def propagate_col_names(
         col_to_name_right, cols_right = propagate_col_names(expr.right, needed_tables)
         col_to_name = col_to_name_left | col_to_name_right
         cols = cols_left + [ColName(col.name + expr.suffix) for col in cols_right]
-        for v in expr.on:
-            expressions.propagate_col_names(v, col_to_name)
+        expr.on = [expressions.propagate_col_names(v, col_to_name) for v in expr.on]
 
     elif isinstance(expr, Filter):
         for v in expr.filters:
             needed_tables |= expressions.get_needed_tables(v)
         col_to_name, cols = propagate_col_names(expr.table, needed_tables)
-        for v in expr.filters:
-            expressions.propagate_col_names(v, col_to_name)
-
-    elif isinstance(expr, Filter):
-        for v in expr.filters:
-            needed_tables |= expressions.get_needed_tables(v)
-        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
-        for v in expr.filters:
-            expressions.propagate_col_names(v, col_to_name)
+        expr.filters = [
+            expressions.propagate_col_names(v, col_to_name) for v in expr.filters
+        ]
 
     elif isinstance(expr, Arrange):
         for v in expr.order_by:
             needed_tables |= expressions.get_needed_tables(v)
         col_to_name, cols = propagate_col_names(expr.table, needed_tables)
-        for v in expr.order_by:
-            expressions.propagate_col_names(v, col_to_name)
+        expr.order_by = [
+            expressions.propagate_col_names(v, col_to_name) for v in expr.order_by
+        ]
 
     elif isinstance(expr, GroupBy):
         for v in expr.group_by:
             needed_tables |= expressions.get_needed_tables(v)
         col_to_name, cols = propagate_col_names(expr.table, needed_tables)
-        for v in expr.group_by:
-            expressions.propagate_col_names(v, col_to_name)
+        expr.group_by = [
+            expressions.propagate_col_names(v, col_to_name) for v in expr.group_by
+        ]
 
     if expr in needed_tables:
         col_to_name |= {Col(col.name, expr): ColName(col.name) for col in cols}
