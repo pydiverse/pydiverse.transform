@@ -57,15 +57,6 @@ class Table(TableExpr, Generic[ImplT]):
         ]
         return iter(cols)
 
-    def __eq__(self, other):
-        return isinstance(other, type(self)) and self._impl == other._impl
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return hash(self._impl)
-
     def __dir__(self):
         return sorted(self._impl.named_cols.fwd.keys())
 

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
 from pydiverse.transform.core.dtypes import DType
-from pydiverse.transform.core.table import Table
+from pydiverse.transform.core.verbs import TableExpr
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions.translator import TypedValue
@@ -68,7 +68,7 @@ class ColExpr:
 
 
 class Col(ColExpr, Generic[ImplT]):
-    def __init__(self, name: str, table: Table):
+    def __init__(self, name: str, table: TableExpr):
         self.name = name
         self.table = table
 
@@ -79,15 +79,13 @@ class Col(ColExpr, Generic[ImplT]):
         return f"{self.table.name}.{self.name}"
 
     def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        return self.name == other.name and self.uuid == other.uuid
+        return self.table == other.table & self.name == other.name
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self.uuid)
+        return hash((hash(self.name), hash(self.table)))
 
 
 class ColName(ColExpr):
@@ -228,3 +226,9 @@ class CaseExpr(ColExpr):
             yield v
 
         yield self.default
+
+
+def get_needed_tables(expr: ColExpr) -> set[TableExpr]: ...
+
+
+def propagate_col_names(expr: ColExpr, col_to_name: dict[Col, ColName]): ...

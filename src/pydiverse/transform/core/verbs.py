@@ -4,6 +4,7 @@ import functools
 from dataclasses import dataclass
 from typing import Literal
 
+import pydiverse.transform.core.expressions.expressions as expressions
 from pydiverse.transform.core.dispatchers import builtin_verb
 from pydiverse.transform.core.expressions import (
     Col,
@@ -42,9 +43,7 @@ JoinHow = Literal["inner", "left", "outer"]
 JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 
 
-class TableExpr:
-    def _validate_verb_level():
-        pass
+class TableExpr: ...
 
 
 @dataclass
@@ -79,7 +78,7 @@ class Join(TableExpr):
     on: ColExpr
     how: JoinHow
     validate: JoinValidate
-    suffix: str | None = None  # dataframe backend only
+    suffix: str
 
 
 @dataclass
@@ -118,6 +117,79 @@ class GroupBy(TableExpr):
 @dataclass
 class Ungroup(TableExpr):
     table: TableExpr
+
+
+def propagate_col_names(
+    expr: TableExpr, needed_tables: set[TableExpr]
+) -> tuple[dict[Col, ColName], list[ColName]]:
+    if isinstance(expr, (Alias, SliceHead, Ungroup)):
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+
+    elif isinstance(expr, Select):
+        needed_tables |= set(col.table for col in expr.selects if isinstance(col, Col))
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+        expr.selects = [
+            col_to_name[col] if col in col_to_name else col for col in expr.selects
+        ]
+
+    elif isinstance(expr, Rename):
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+        col_to_name = {
+            col: ColName(expr.name_map[col_name.name])
+            if col_name.name in expr.name_map
+            else col_name
+            for col, col_name in col_to_name
+        }
+
+    elif isinstance(expr, (Mutate, Summarise)):
+        for v in expr.values:
+            needed_tables |= expressions.get_needed_tables(v)
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+        for v in expr.values:
+            expressions.propagate_col_names(v, col_to_name)
+        cols.extend(Col(name, expr) for name in expr.names)
+
+    elif isinstance(expr, Join):
+        for v in expr.on:
+            needed_tables |= expressions.get_needed_tables(v)
+        col_to_name_left, cols_left = propagate_col_names(expr.left, needed_tables)
+        col_to_name_right, cols_right = propagate_col_names(expr.right, needed_tables)
+        col_to_name = col_to_name_left | col_to_name_right
+        cols = cols_left + [ColName(col.name + expr.suffix) for col in cols_right]
+        for v in expr.on:
+            expressions.propagate_col_names(v, col_to_name)
+
+    elif isinstance(expr, Filter):
+        for v in expr.filters:
+            needed_tables |= expressions.get_needed_tables(v)
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+        for v in expr.filters:
+            expressions.propagate_col_names(v, col_to_name)
+
+    elif isinstance(expr, Filter):
+        for v in expr.filters:
+            needed_tables |= expressions.get_needed_tables(v)
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+        for v in expr.filters:
+            expressions.propagate_col_names(v, col_to_name)
+
+    elif isinstance(expr, Arrange):
+        for v in expr.order_by:
+            needed_tables |= expressions.get_needed_tables(v)
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+        for v in expr.order_by:
+            expressions.propagate_col_names(v, col_to_name)
+
+    elif isinstance(expr, GroupBy):
+        for v in expr.group_by:
+            needed_tables |= expressions.get_needed_tables(v)
+        col_to_name, cols = propagate_col_names(expr.table, needed_tables)
+        for v in expr.group_by:
+            expressions.propagate_col_names(v, col_to_name)
+
+    if expr in needed_tables:
+        col_to_name |= {Col(col.name, expr): ColName(col.name) for col in cols}
+    return col_to_name, cols
 
 
 @builtin_verb()
