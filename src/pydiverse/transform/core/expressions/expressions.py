@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Generic
 
@@ -218,6 +219,36 @@ class CaseExpr(ColExpr):
             yield v
 
         yield self.default
+
+
+@dataclasses.dataclass
+class Order:
+    order_by: ColExpr
+    descending: bool
+    nulls_last: bool
+
+    # the given `expr` may contain nulls_last markers or `-` (descending markers). the
+    # order_by of the Order does not contain these special functions and can thus be
+    # translated normally.
+    @classmethod
+    def from_col_expr(expr: ColExpr) -> Order:
+        descending = False
+        nulls_last = None
+        while isinstance(expr, ColFn):
+            if expr.name == "__neg__":
+                descending = not descending
+            elif nulls_last is None:
+                if expr.name == "nulls_last":
+                    nulls_last = True
+                elif expr.name == "nulls_first":
+                    nulls_last = False
+            if expr.name in ("__neg__", "__pos__", "nulls_last", "nulls_first"):
+                assert len(expr.args) == 1
+                assert len(expr.context_kwargs) == 0
+                expr = expr.args[0]
+            else:
+                break
+        return Order(expr, descending, nulls_last)
 
 
 def get_needed_tables(expr: ColExpr) -> set[TableExpr]:

@@ -10,9 +10,8 @@ from pydiverse.transform.core.dtypes import DType
 from pydiverse.transform.core.expressions import (
     Col,
     ColName,
-    SymbolicExpression,
 )
-from pydiverse.transform.core.expressions.expressions import ColExpr
+from pydiverse.transform.core.expressions.expressions import ColExpr, Order
 from pydiverse.transform.core.util import (
     ordered_set,
     sign_peeler,
@@ -98,7 +97,7 @@ class Summarise(TableExpr):
 @dataclass
 class Arrange(TableExpr):
     table: TableExpr
-    order_by: list[ColExpr]
+    order_by: list[Order]
 
 
 @dataclass
@@ -173,7 +172,12 @@ def propagate_col_names(
             needed_tables |= expressions.get_needed_tables(v)
         col_to_name, cols = propagate_col_names(expr.table, needed_tables)
         expr.order_by = [
-            expressions.propagate_col_names(v, col_to_name) for v in expr.order_by
+            Order(
+                expressions.propagate_col_names(order.order_by, col_to_name),
+                order.descending,
+                order.nulls_last,
+            )
+            for order in expr.order_by
         ]
 
     elif isinstance(expr, GroupBy):
@@ -380,13 +384,13 @@ outer_join = functools.partial(join, how="outer")
 
 
 @builtin_verb()
-def filter(table: TableExpr, *args: SymbolicExpression):
+def filter(table: TableExpr, *args: ColExpr):
     return Filter(table, list(args))
 
 
 @builtin_verb()
-def arrange(table: TableExpr, *args: Col):
-    return Arrange(table, list(args))
+def arrange(table: TableExpr, *args: ColExpr):
+    return Arrange(table, list(Order.from_col_expr(arg) for arg in args))
 
 
 @builtin_verb()
