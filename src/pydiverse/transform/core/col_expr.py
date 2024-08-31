@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
 from pydiverse.transform.core.dtypes import DType
+from pydiverse.transform.core.registry import OperatorRegistry
 from pydiverse.transform.core.verbs import TableExpr
 from pydiverse.transform.polars.polars_table import PolarsEager
 
@@ -67,6 +68,20 @@ class ColExpr:
     def _expr_repr(self) -> str:
         """String repr that, when executed, returns the same expression"""
         raise NotImplementedError
+
+    def __getattr__(self, item) -> ColExpr:
+        if item in ("str", "dt"):
+            return FnNamespace(item, self)
+        return ColFn(item, self)
+
+    __contains__ = None
+    __iter__ = None
+
+    def __bool__(self):
+        raise TypeError(
+            "cannot call __bool__() on a ColExpr. hint: A ColExpr cannot be "
+            "converted to a boolean or used with the and, or, not keywords"
+        )
 
 
 class Col(ColExpr, Generic[ImplT]):
@@ -222,33 +237,12 @@ class CaseExpr(ColExpr):
 
 
 @dataclasses.dataclass
-class Order:
-    order_by: ColExpr
-    descending: bool
-    nulls_last: bool
+class FnNamespace:
+    name: str
+    arg: ColExpr
 
-    # the given `expr` may contain nulls_last markers or `-` (descending markers). the
-    # order_by of the Order does not contain these special functions and can thus be
-    # translated normally.
-    @classmethod
-    def from_col_expr(expr: ColExpr) -> Order:
-        descending = False
-        nulls_last = None
-        while isinstance(expr, ColFn):
-            if expr.name == "__neg__":
-                descending = not descending
-            elif nulls_last is None:
-                if expr.name == "nulls_last":
-                    nulls_last = True
-                elif expr.name == "nulls_first":
-                    nulls_last = False
-            if expr.name in ("__neg__", "__pos__", "nulls_last", "nulls_first"):
-                assert len(expr.args) == 1
-                assert len(expr.context_kwargs) == 0
-                expr = expr.args[0]
-            else:
-                break
-        return Order(expr, descending, nulls_last)
+    def __getattr__(self, name) -> ColExpr:
+        return ColFn(self.name + name, self.arg)
 
 
 def get_needed_tables(expr: ColExpr) -> set[TableExpr]:
@@ -300,3 +294,59 @@ def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
         return expr
 
     raise NotImplementedError
+
+
+# Add all supported dunder methods to `ColExpr`. This has to be done, because Python
+# doesn't call __getattr__ for dunder methods.
+def create_operator(op):
+    def impl(*args, **kwargs):
+        return ColFn(op, *args, **kwargs)
+
+    return impl
+
+
+for dunder in OperatorRegistry.SUPPORTED_DUNDER:
+    setattr(ColExpr, dunder, create_operator(dunder))
+del create_operator
+
+
+@dataclasses.dataclass
+class Order:
+    order_by: ColExpr
+    descending: bool
+    nulls_last: bool
+
+    # the given `expr` may contain nulls_last markers or `-` (descending markers). the
+    # order_by of the Order does not contain these special functions and can thus be
+    # translated normally.
+    @classmethod
+    def from_col_expr(expr: ColExpr) -> Order:
+        descending = False
+        nulls_last = None
+        while isinstance(expr, ColFn):
+            if expr.name == "__neg__":
+                descending = not descending
+            elif nulls_last is None:
+                if expr.name == "nulls_last":
+                    nulls_last = True
+                elif expr.name == "nulls_first":
+                    nulls_last = False
+            if expr.name in ("__neg__", "__pos__", "nulls_last", "nulls_first"):
+                assert len(expr.args) == 1
+                assert len(expr.context_kwargs) == 0
+                expr = expr.args[0]
+            else:
+                break
+        return Order(expr, descending, nulls_last)
+
+
+class MC(type):
+    def __getattr__(cls, name: str) -> ColName:
+        return ColName(name)
+
+    def __getitem__(cls, name: str) -> ColName:
+        return ColName(name)
+
+
+class C(metaclass=MC):
+    pass

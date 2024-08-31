@@ -5,7 +5,6 @@ from typing import Any, Generic
 
 from pydiverse.transform._typing import T
 from pydiverse.transform.core.expressions import CaseExpr, FunctionCall, util
-from pydiverse.transform.core.expressions.expressions import Col
 from pydiverse.transform.core.registry import OperatorRegistry
 from pydiverse.transform.core.util import traverse
 
@@ -137,30 +136,3 @@ def unwrap_symbolic_expressions(arg: Any = None):
     Replaces all symbolic expressions in the input with their underlying value.
     """
     return traverse(arg, lambda x: x._ if isinstance(x, SymbolicExpression) else x)
-
-
-# Add all supported dunder methods to `SymbolicExpression`.
-# This has to be done, because Python doesn't call __getattr__ for
-# dunder methods.
-def create_operator(op):
-    def impl(*args, **kwargs):
-        return SymbolicExpression(FunctionCall(op, *args, **kwargs))
-
-    return impl
-
-
-for dunder in OperatorRegistry.SUPPORTED_DUNDER:
-    setattr(SymbolicExpression, dunder, create_operator(dunder))
-del create_operator
-
-
-class MC(type):
-    def __getattr__(cls, name: str) -> SymbolicExpression:
-        return SymbolicExpression(Col(name))
-
-    def __getitem__(cls, name: str) -> SymbolicExpression:
-        return SymbolicExpression(Col(name))
-
-
-class C(metaclass=MC):
-    pass
