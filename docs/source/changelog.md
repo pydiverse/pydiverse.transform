@@ -1,7 +1,11 @@
 # Changelog
 
-## unreleased
+## 0.2.0 (2024-08-31)
 
+- add polars backend
+- add Date and Duration type
+- string / datetime operations now have their separate namespace (.str / .dt)
+- add partition_by=, arrange= and filter= arguments for window / aggregation functions (filter does not work on SQL yet)
 - migrate project to pixi
 
 ## 0.1.5 (2024-04-20)
