@@ -4,17 +4,12 @@ import functools
 from dataclasses import dataclass
 from typing import Literal
 
-import pydiverse.transform.core.expressions.expressions as expressions
+import pydiverse.transform.core.col_expr as expressions
+from pydiverse.transform.core.col_expr import Col, ColExpr, ColName, Order
 from pydiverse.transform.core.dispatchers import builtin_verb
 from pydiverse.transform.core.dtypes import DType
-from pydiverse.transform.core.expressions import (
-    Col,
-    ColName,
-)
-from pydiverse.transform.core.expressions.expressions import ColExpr, Order
 from pydiverse.transform.core.util import (
     ordered_set,
-    sign_peeler,
 )
 
 __all__ = [
@@ -267,53 +262,6 @@ def show_query(table: TableExpr):
 @builtin_verb()
 def select(table: TableExpr, *args: Col | ColName):
     return Select(table, list(args))
-    if len(args) == 1 and args[0] is Ellipsis:
-        # >> select(...)  ->  Select all columns
-        args = [
-            table.cols[uuid].as_column(name, table)
-            for name, uuid in table.named_cols.fwd.items()
-        ]
-
-    cols = []
-    positive_selection = None
-    for col in args:
-        col, is_pos = sign_peeler(col)
-        if positive_selection is None:
-            positive_selection = is_pos
-        else:
-            if is_pos is not positive_selection:
-                raise ValueError(
-                    "All columns in input must have the same sign."
-                    " Can't mix selection with deselection."
-                )
-
-        if not isinstance(col, (Col, ColName)):
-            raise TypeError(
-                "Arguments to select verb must be of type `Col`'"
-                f" and not {type(col)}."
-            )
-        cols.append(col)
-
-    selects = []
-    for col in cols:
-        if isinstance(col, Col):
-            selects.append(table.named_cols.bwd[col.uuid])
-        elif isinstance(col, ColName):
-            selects.append(col.name)
-
-    # Invert selection
-    if positive_selection is False:
-        exclude = set(selects)
-        selects.clear()
-        for name in table.selects:
-            if name not in exclude:
-                selects.append(name)
-
-    new_tbl = table.copy()
-    new_tbl.preverb_hook("select", *args)
-    new_tbl.selects = ordered_set(selects)
-    new_tbl.select(*args)
-    return new_tbl
 
 
 @builtin_verb()

@@ -5,10 +5,9 @@ from html import escape
 from typing import Generic
 
 from pydiverse.transform._typing import ImplT
-from pydiverse.transform.core.expressions import (
+from pydiverse.transform.core.col_expr import (
     Col,
     ColName,
-    SymbolicExpression,
 )
 from pydiverse.transform.core.verbs import TableExpr, export
 
@@ -22,52 +21,24 @@ class Table(TableExpr, Generic[ImplT]):
     def __init__(self, implementation: ImplT):
         self._impl = implementation
 
-    def __getitem__(self, key) -> SymbolicExpression[Col]:
-        if isinstance(key, SymbolicExpression):
-            key = key._
-        return SymbolicExpression(self._impl.get_col(key))
+    def __getitem__(self, key: str) -> Col:
+        if not isinstance(key, str):
+            raise TypeError(
+                f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
+                f"str, got {type(key)} instead."
+            )
+        return Col(self, key)
 
-    def __setitem__(self, col, expr):
-        """Mutate a column
-        :param col: Either a str or SymbolicColumn
-        """
-        from pydiverse.transform.core.verbs import mutate
+    def __getattr__(self, name: str) -> Col:
+        return Col(self, name)
 
-        col_name = None
+    def __iter__(self) -> Iterable[Col]:
+        return iter(self.cols())
 
-        if isinstance(col, SymbolicExpression):
-            underlying = col._
-            if isinstance(underlying, (Col, ColName)):
-                col_name = underlying.name
-        elif isinstance(col, str):
-            col_name = col
-
-        if not col_name:
-            raise KeyError(f"Invalid key {col}. Must be either a string or Col.")
-        self._impl = (self >> mutate(**{col_name: expr}))._impl
-
-    def __getattr__(self, name) -> SymbolicExpression[Col]:
-        return SymbolicExpression(self._impl.get_col(name))
-
-    def __iter__(self) -> Iterable[SymbolicExpression[Col]]:
-        # Capture current state (this allows modifying the table inside a loop)
-        cols = [
-            SymbolicExpression(self._impl.get_col(name))
-            for name, _ in self._impl.selected_cols()
-        ]
-        return iter(cols)
-
-    def __dir__(self):
-        return sorted(self._impl.named_cols.fwd.keys())
-
-    def __contains__(self, item):
-        if isinstance(item, SymbolicExpression):
-            item = item._
-        if isinstance(item, ColName):
-            return item.name in self._impl.named_cols.fwd
-        if isinstance(item, Col):
-            return item.uuid in self._impl.available_cols
-        return False
+    def __contains__(self, item: str | Col | ColName):
+        if isinstance(item, (Col, ColName)):
+            item = item.name
+        return item in self.col_names()
 
     def __copy__(self):
         impl_copy = self._impl.copy()
@@ -105,7 +76,7 @@ class Table(TableExpr, Generic[ImplT]):
         p.text(str(self) if not cycle else "...")
 
     def cols(self) -> list[Col]:
-        return [
-            self._impl.cols[uuid].as_column(name, self._impl)
-            for (name, uuid) in self._impl.selected_cols()
-        ]
+        return [Col(name, self) for name in self._impl.cols()]
+
+    def col_names(self) -> list[str]:
+        return self._impl.cols()
