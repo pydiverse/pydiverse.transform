@@ -6,6 +6,7 @@ from typing import Literal
 
 import pydiverse.transform.core.expressions.expressions as expressions
 from pydiverse.transform.core.dispatchers import builtin_verb
+from pydiverse.transform.core.dtypes import DType
 from pydiverse.transform.core.expressions import (
     Col,
     ColName,
@@ -183,9 +184,50 @@ def propagate_col_names(
             expressions.propagate_col_names(v, col_to_name) for v in expr.group_by
         ]
 
+    else:
+        raise TypeError
+
     if expr in needed_tables:
         col_to_name |= {Col(col.name, expr): ColName(col.name) for col in cols}
     return col_to_name, cols
+
+
+def propagate_types(expr: TableExpr) -> dict[ColName, DType]:
+    if isinstance(
+        expr, (Alias, SliceHead, Ungroup, Select, Rename, SliceHead, GroupBy)
+    ):
+        return propagate_types(expr.table)
+
+    elif isinstance(expr, (Mutate, Summarise)):
+        col_types = propagate_types(expr.table)
+        expr.values = [expressions.propagate_types(v, col_types) for v in expr.values]
+        col_types.update(
+            {ColName(name): value._type for name, value in zip(expr.names, expr.values)}
+        )
+        return col_types
+
+    elif isinstance(expr, Join):
+        col_types_left = propagate_types(expr.left)
+        col_types_right = {
+            ColName(name + expr.suffix): col_type
+            for name, col_type in propagate_types(expr.right)
+        }
+        return col_types_left | col_types_right
+
+    elif isinstance(expr, Filter):
+        col_types = propagate_types(expr.table)
+        expr.filters = [expressions.propagate_types(v, col_types) for v in expr.filters]
+        return col_types
+
+    elif isinstance(expr, Arrange):
+        col_types = propagate_types(expr.table)
+        expr.order_by = [
+            expressions.propagate_types(v, col_types) for v in expr.order_by
+        ]
+        return col_types
+
+    else:
+        raise TypeError
 
 
 @builtin_verb()

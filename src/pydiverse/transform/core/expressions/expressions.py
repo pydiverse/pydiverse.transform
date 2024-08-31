@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Generic
 from pydiverse.transform._typing import ImplT, T
 from pydiverse.transform.core.dtypes import DType
 from pydiverse.transform.core.verbs import TableExpr
+from pydiverse.transform.polars.polars_table import PolarsEager
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions.translator import TypedValue
@@ -146,9 +147,7 @@ class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: ColExpr):
         self.name = name
         self.args = args
-        self.arrange = kwargs.get("arrange")
-        self.partition_by = kwargs.get("partition_by")
-        self.filter = kwargs.get("filter")
+        self.context_kwargs = kwargs
 
     def __repr__(self):
         args = [repr(e) for e in self.args] + [
@@ -243,15 +242,30 @@ def propagate_col_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColEx
         col_name = col_to_name.get(expr)
         return col_name if col_name is not None else expr
     elif isinstance(expr, ColFn):
-        return ColFn(
-            expr.name,
-            *[propagate_col_names(arg, col_to_name) for arg in expr.args],
-            **{
-                key: [propagate_col_names(v) for v in arr]
-                for key, arr in expr.context_kwargs
-            },
-        )
+        expr.args = [propagate_col_names(arg, col_to_name) for arg in expr.args]
+        expr.context_kwargs = {
+            key: [propagate_col_names(v) for v in arr]
+            for key, arr in expr.context_kwargs
+        }
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
 
     return expr
+
+
+def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
+    if isinstance(expr, ColName):
+        expr._type = col_types[expr]
+        return expr
+    elif isinstance(expr, ColFn):
+        expr.args = [propagate_types(arg, col_types) for arg in expr.args]
+        expr.context_kwargs = {
+            key: [propagate_types(v) for v in arr] for key, arr in expr.context_kwargs
+        }
+        # TODO: create a backend agnostic registry
+        expr._type = PolarsEager.operator_registry.get_implementation(
+            expr.name, [arg._type for arg in expr.args]
+        ).return_type
+        return expr
+
+    raise NotImplementedError

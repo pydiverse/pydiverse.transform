@@ -112,7 +112,7 @@ class TypedOperatorImpl:
 
     operator: Operator
     impl: OperatorImpl
-    rtype: dtypes.DType
+    return_type: dtypes.DType
 
     @classmethod
     def from_operator_impl(cls, impl: OperatorImpl, rtype: dtypes.DType):

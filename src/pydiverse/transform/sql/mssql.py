@@ -131,7 +131,7 @@ def mssql_op_wants_bool_as_bit(operator: Operator) -> bool:
 
 
 def mssql_op_returns_bool_as_bit(implementation: TypedOperatorImpl) -> bool | None:
-    if not dtypes.Bool().same_kind(implementation.rtype):
+    if not dtypes.Bool().same_kind(implementation.return_type):
         return None
 
     # These operations return boolean types (not BIT)

@@ -111,7 +111,7 @@ class TestOperatorRegistry:
 
         assert reg.get_implementation("op1", parse_dtypes("int", "int"))() == 1
         assert isinstance(
-            reg.get_implementation("op1", parse_dtypes("int", "int")).rtype,
+            reg.get_implementation("op1", parse_dtypes("int", "int")).return_type,
             dtypes.Int,
         )
         assert reg.get_implementation("op2", parse_dtypes("int", "int"))() == 10
@@ -182,19 +182,23 @@ class TestOperatorRegistry:
             reg.add_implementation(op3, lambda: 4, "int, T, U -> U")
 
         assert isinstance(
-            reg.get_implementation("op3", parse_dtypes("str")).rtype,
+            reg.get_implementation("op3", parse_dtypes("str")).return_type,
             dtypes.String,
         )
         assert isinstance(
-            reg.get_implementation("op3", parse_dtypes("int")).rtype,
+            reg.get_implementation("op3", parse_dtypes("int")).return_type,
             dtypes.Int,
         )
         assert isinstance(
-            reg.get_implementation("op3", parse_dtypes("int", "int", "float")).rtype,
+            reg.get_implementation(
+                "op3", parse_dtypes("int", "int", "float")
+            ).return_type,
             dtypes.Int,
         )
         assert isinstance(
-            reg.get_implementation("op3", parse_dtypes("str", "int", "float")).rtype,
+            reg.get_implementation(
+                "op3", parse_dtypes("str", "int", "float")
+            ).return_type,
             dtypes.Float,
         )
 
@@ -222,7 +226,9 @@ class TestOperatorRegistry:
         assert reg.get_implementation("op1", parse_dtypes("int", "str", "str"))() == 3
 
         assert isinstance(
-            reg.get_implementation("op1", parse_dtypes("int", "str", "str")).rtype,
+            reg.get_implementation(
+                "op1", parse_dtypes("int", "str", "str")
+            ).return_type,
             dtypes.String,
         )
 

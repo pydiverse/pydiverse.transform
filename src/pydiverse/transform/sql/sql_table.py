@@ -844,7 +844,7 @@ class SQLTableImpl(TableImpl):
             if operator.ftype == OPType.WINDOW:
                 raise NotImplementedError("How to handle window functions?")
 
-            return TypedValue(value, implementation.rtype, ftype)
+            return TypedValue(value, implementation.return_type, ftype)
 
 
 @dataclass
