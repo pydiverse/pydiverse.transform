@@ -1,41 +1,28 @@
 from __future__ import annotations
 
 import copy
-import datetime
 import uuid
 import warnings
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from pydiverse.transform import ops
-from pydiverse.transform._typing import ImplT
-from pydiverse.transform.core import dtypes
-from pydiverse.transform.core.expressions import (
-    CaseExpr,
+from pydiverse.transform.core.col_expr import (
     Col,
     ColName,
     LiteralCol,
-)
-from pydiverse.transform.core.expressions.translator import (
-    DelegatingTranslator,
-    Translator,
-    TypedValue,
 )
 from pydiverse.transform.core.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
 )
 from pydiverse.transform.core.util import bidict, ordered_set
-from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
+from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.util import OrderingDescriptor
     from pydiverse.transform.ops import Operator
-
-
-ExprCompT = TypeVar("ExprCompT", bound="TypedValue")
-AlignedT = TypeVar("AlignedT", bound="TypedValue")
 
 
 class TableImpl:
@@ -209,162 +196,6 @@ class TableImpl:
         return OperatorRegistrationContextManager(
             cls.operator_registry, operator, **kwargs
         )
-
-    #### Expressions ####
-
-    class ExpressionCompiler(
-        DelegatingTranslator[ExprCompT], Generic[ImplT, ExprCompT]
-    ):
-        """
-        Class convert an expression into a function that, when provided with
-        the appropriate arguments, evaluates the expression.
-
-        The reason we can't just eagerly evaluate the expression is because for
-        grouped data we often have to use the split-apply-combine strategy.
-        """
-
-        def __init__(self, backend: ImplT):
-            self.backend = backend
-            super().__init__(backend.operator_registry)
-
-        def _translate_literal(self, expr, **kwargs):
-            literal = self._translate_literal_value(expr)
-
-            if isinstance(expr, bool):
-                return TypedValue(literal, dtypes.Bool(const=True))
-            if isinstance(expr, int):
-                return TypedValue(literal, dtypes.Int(const=True))
-            if isinstance(expr, float):
-                return TypedValue(literal, dtypes.Float(const=True))
-            if isinstance(expr, str):
-                return TypedValue(literal, dtypes.String(const=True))
-            if isinstance(expr, datetime.datetime):
-                return TypedValue(literal, dtypes.DateTime(const=True))
-            if isinstance(expr, datetime.date):
-                return TypedValue(literal, dtypes.Date(const=True))
-            if isinstance(expr, datetime.timedelta):
-                return TypedValue(literal, dtypes.Duration(const=True))
-
-            if expr is None:
-                return TypedValue(literal, dtypes.NoneDType(const=True))
-
-        def _translate_literal_value(self, expr):
-            def literal_func(*args, **kwargs):
-                return expr
-
-            return literal_func
-
-        def _translate_case_common(
-            self,
-            expr: CaseExpr,
-            switching_on: ExprCompT | None,
-            cases: list[tuple[ExprCompT, ExprCompT]],
-            default: ExprCompT,
-            **kwargs,
-        ) -> tuple[dtypes.DType, OPType]:
-            # Determine dtype of result
-            val_dtypes = [default.dtype.without_modifiers()]
-            for _, val in cases:
-                val_dtypes.append(val.dtype.without_modifiers())
-
-            result_dtype = dtypes.promote_dtypes(val_dtypes)
-
-            # Determine ftype of result
-            val_ftypes = set()
-            if not default.dtype.const:
-                val_ftypes.add(default.ftype)
-
-            for _, val in cases:
-                if not val.dtype.const:
-                    val_ftypes.add(val.ftype)
-
-            if len(val_ftypes) == 0:
-                result_ftype = OPType.EWISE
-            elif len(val_ftypes) == 1:
-                (result_ftype,) = val_ftypes
-            elif OPType.WINDOW in val_ftypes:
-                result_ftype = OPType.WINDOW
-            else:
-                # AGGREGATE and EWISE are incompatible
-                raise FunctionTypeError(
-                    "Incompatible function types found in case statement: " ", ".join(
-                        val_ftypes
-                    )
-                )
-
-            if result_ftype is OPType.EWISE and switching_on is not None:
-                result_ftype = switching_on.ftype
-
-            # Type check conditions
-            if switching_on is None:
-                # All conditions must be boolean
-                for cond, _ in cases:
-                    if not dtypes.Bool().same_kind(cond.dtype):
-                        raise ExpressionTypeError(
-                            "All conditions in a case statement return booleans. "
-                            f"{cond} is of type {cond.dtype}."
-                        )
-            else:
-                # All conditions must be of the same type as switching_on
-                for cond, _ in cases:
-                    if not cond.dtype.can_promote_to(
-                        switching_on.dtype.without_modifiers()
-                    ):
-                        # Can't compare
-                        raise ExpressionTypeError(
-                            f"Condition value {cond} (dtype: {cond.dtype}) "
-                            f"is incompatible with switch dtype {switching_on.dtype}."
-                        )
-
-            return result_dtype, result_ftype
-
-    class AlignedExpressionEvaluator(DelegatingTranslator[AlignedT], Generic[AlignedT]):
-        """
-        Used for evaluating an expression in a typical eager style where, as
-        long as two columns have the same alignment / length, we can perform
-        operations on them without first having to join them.
-        """
-
-        def _translate_literal(self, expr, **kwargs):
-            if isinstance(expr, bool):
-                return TypedValue(expr, dtypes.Bool(const=True))
-            if isinstance(expr, int):
-                return TypedValue(expr, dtypes.Int(const=True))
-            if isinstance(expr, float):
-                return TypedValue(expr, dtypes.Float(const=True))
-            if isinstance(expr, str):
-                return TypedValue(expr, dtypes.String(const=True))
-            if isinstance(expr, datetime.datetime):
-                return TypedValue(expr, dtypes.DateTime(const=True))
-            if isinstance(expr, datetime.date):
-                return TypedValue(expr, dtypes.Date(const=True))
-            if isinstance(expr, datetime.timedelta):
-                return TypedValue(expr, dtypes.Duration(const=True))
-
-            if expr is None:
-                return TypedValue(expr, dtypes.NoneDType(const=True))
-
-    class LambdaTranslator(Translator):
-        """
-        Translator that takes an expression and replaces all ColNames
-        inside it with the corresponding Column instance.
-        """
-
-        def __init__(self, backend: ImplT):
-            self.backend = backend
-            super().__init__()
-
-        def _translate(self, expr, **kwargs):
-            # Resolve lambda and return Column object
-            if isinstance(expr, ColName):
-                if expr.name not in self.backend.named_cols.fwd:
-                    raise ValueError(
-                        f"Invalid lambda column '{expr.name}'. No column with this name"
-                        f" found for table '{self.backend.name}'."
-                    )
-                uuid = self.backend.named_cols.fwd[expr.name]
-                return self.backend.cols[uuid].as_column(expr.name, self.backend)
-            return expr
 
     #### Helpers ####
 

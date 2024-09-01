@@ -7,19 +7,15 @@ from typing import TYPE_CHECKING, Any, Generic
 from pydiverse.transform._typing import ImplT, T
 from pydiverse.transform.core.dtypes import DType
 from pydiverse.transform.core.registry import OperatorRegistry
+from pydiverse.transform.core.table_impl import TableImpl
 from pydiverse.transform.core.verbs import TableExpr
 from pydiverse.transform.polars.polars_table import PolarsEager
 
 if TYPE_CHECKING:
     from pydiverse.transform.core.expressions.translator import TypedValue
-    from pydiverse.transform.core.table_impl import AbstractTableImpl
 
 
 def expr_repr(it: Any):
-    from pydiverse.transform.core.expressions import SymbolicExpression
-
-    if isinstance(it, SymbolicExpression):
-        return expr_repr(it._)
     if isinstance(it, ColExpr):
         return it._expr_repr()
     if isinstance(it, (list, tuple)):
@@ -134,7 +130,7 @@ class LiteralCol(ColExpr, Generic[T]):
         self,
         typed_value: TypedValue[T],
         expr: Any,
-        backend: type[AbstractTableImpl],
+        backend: type[TableImpl],
     ):
         self.typed_value = typed_value
         self.expr = expr
@@ -269,7 +265,7 @@ def propagate_col_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColEx
     elif isinstance(expr, ColFn):
         expr.args = [propagate_col_names(arg, col_to_name) for arg in expr.args]
         expr.context_kwargs = {
-            key: [propagate_col_names(v) for v in arr]
+            key: [propagate_col_names(v, col_to_name) for v in arr]
             for key, arr in expr.context_kwargs
         }
     elif isinstance(expr, CaseExpr):
@@ -285,7 +281,8 @@ def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
     elif isinstance(expr, ColFn):
         expr.args = [propagate_types(arg, col_types) for arg in expr.args]
         expr.context_kwargs = {
-            key: [propagate_types(v) for v in arr] for key, arr in expr.context_kwargs
+            key: [propagate_types(v, col_types) for v in arr]
+            for key, arr in expr.context_kwargs
         }
         # TODO: create a backend agnostic registry
         expr._type = PolarsEager.operator_registry.get_implementation(
