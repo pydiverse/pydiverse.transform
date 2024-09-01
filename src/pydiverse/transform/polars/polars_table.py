@@ -1,185 +1,29 @@
 from __future__ import annotations
 
 import datetime
-import itertools
-import uuid
-from typing import Any, Literal
 
 import polars as pl
 
 from pydiverse.transform import ops
 from pydiverse.transform.core import dtypes, verbs
-from pydiverse.transform.core.expressions.expressions import (
+from pydiverse.transform.core.col_expr import (
     CaseExpr,
     Col,
     ColExpr,
     ColFn,
     ColName,
-    LiteralCol,
+    Order,
 )
-from pydiverse.transform.core.expressions.symbolic_expressions import SymbolicExpression
-from pydiverse.transform.core.expressions.translator import (
-    Translator,
-)
-from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.table_impl import TableImpl
 from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.core.verbs import TableExpr
-from pydiverse.transform.errors import (
-    AlignmentError,
-    ExpressionError,
-)
 from pydiverse.transform.ops.core import OPType
 
 
 class PolarsEager(TableImpl):
     def __init__(self, name: str, df: pl.DataFrame):
         self.df = df
-        self.join_translator = JoinTranslator()
-
-        cols = {col.name: Col(col.name, self) for col in df.iter_columns()}
-        self.underlying_col_name: dict[uuid.UUID, str] = {
-            col.uuid: f"{name}_{col.name}_{col.uuid.int}" for col in cols.values()
-        }
-        self.df = self.df.rename(
-            {col.name: self.underlying_col_name[col.uuid] for col in cols.values()}
-        )
-        super().__init__(name, cols)
-
-    def mutate(self, **kwargs):
-        uuid_to_kwarg: dict[uuid.UUID, (str, ColExpr)] = {
-            self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
-        }
-        self.underlying_col_name.update(
-            {
-                uuid: f"{self.name}_{col_name}_mut_{uuid.int}"
-                for uuid, (col_name, _) in uuid_to_kwarg.items()
-            }
-        )
-
-        polars_exprs = [
-            self.cols[uuid].compiled().alias(self.underlying_col_name[uuid])
-            for uuid in uuid_to_kwarg.keys()
-        ]
-        self.df = self.df.with_columns(*polars_exprs)
-
-    def join(
-        self,
-        right: PolarsEager,
-        on: SymbolicExpression,
-        how: Literal["inner", "left", "outer"],
-        *,
-        validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
-    ):
-        # get the columns on which the data frames are joined
-        left_on: list[str] = []
-        right_on: list[str] = []
-        for col1, col2 in self.join_translator.translate(on):
-            if col2.uuid in self.cols and col1.uuid in right.cols:
-                col1, col2 = col2, col1
-            assert col1.uuid in self.cols and col2.uuid in right.cols
-            left_on.append(self.underlying_col_name[col1.uuid])
-            right_on.append(right.underlying_col_name[col2.uuid])
-
-        self.underlying_col_name.update(right.underlying_col_name)
-
-        self.df = self.df.join(
-            right.df,
-            how=how,
-            left_on=left_on,
-            right_on=right_on,
-            validate=validate,
-            coalesce=False,
-        )
-
-    def filter(self, *args: SymbolicExpression):
-        if args:
-            self.df = self.df.filter(
-                self.compiler.translate(arg).value() for arg in args
-            )
-
-    def alias(self, new_name: str | None = None):
-        new_name = new_name or self.name
-        return self.__class__(new_name, self.export())
-
-    def arrange(self, ordering: list[OrderingDescriptor]):
-        self.df = self.df.sort(
-            by=[self.compiler.translate(o.order).value() for o in ordering],
-            nulls_last=[not o.nulls_first for o in ordering],
-            descending=[not o.asc for o in ordering],
-        )
-
-    def summarise(self, **kwargs: SymbolicExpression):
-        uuid_to_kwarg: dict[uuid.UUID, (str, ColExpr)] = {
-            self.named_cols.fwd[k]: (k, v) for (k, v) in kwargs.items()
-        }
-        self.underlying_col_name.update(
-            {
-                uuid: f"{self.name}_{col_name}_summarise_{uuid.int}"
-                for uuid, (col_name, _) in uuid_to_kwarg.items()
-            }
-        )
-
-        agg_exprs: list[pl.Expr] = [
-            self.cols[uuid].compiled().alias(self.underlying_col_name[uuid])
-            for uuid in uuid_to_kwarg.keys()
-        ]
-        group_exprs: list[pl.Expr] = [
-            pl.col(self.underlying_col_name[col.uuid]) for col in self.grouped_by
-        ]
-
-        if self.grouped_by:
-            # retain the cols the table was grouped by and add the aggregation cols
-            self.df = self.df.group_by(*group_exprs).agg(*agg_exprs)
-        else:
-            self.df = self.df.select(*agg_exprs)
-
-    def export(self) -> pl.DataFrame:
-        return self.df.select(
-            **{
-                name: self.underlying_col_name[uuid]
-                for (name, uuid) in self.selected_cols()
-            }
-        )
-
-    def slice_head(self, n: int, offset: int):
-        self.df = self.df.slice(offset, n)
-
-    def is_aligned_with(self, col: Col | LiteralCol) -> bool:
-        if isinstance(col, Col):
-            return (
-                isinstance(col.table, type(self))
-                and col.table.df.height == self.df.height
-            )
-        if isinstance(col, LiteralCol):
-            return issubclass(col.backend, type(self)) and (
-                not isinstance(col.typed_value.value, pl.Series)
-                or len(col.typed_value.value) == self.df.height
-            )  # not a series => scalar
-
-    class AlignedExpressionEvaluator(TableImpl.AlignedExpressionEvaluator[pl.Series]):
-        def _translate_col(self, col: Col, **kwargs) -> pl.Series:
-            return col.table.df.get_column(col.table.underlying_col_name[col.uuid])
-
-        def _translate_literal_col(self, expr: LiteralCol, **kwargs) -> pl.Series:
-            return expr.typed_value.value()
-
-        def _translate_function(
-            self,
-            implementation: TypedOperatorImpl,
-            op_args: list[pl.Series],
-            context_kwargs: dict[str, Any],
-            **kwargs,
-        ) -> pl.Series:
-            arg_lens = {arg.len() for arg in op_args if isinstance(arg, pl.Series)}
-            if len(arg_lens) >= 2:
-                raise AlignmentError(
-                    f"arguments for function {implementation.operator.name} are not "
-                    f"aligned. they have lengths {list(arg_lens)} but all lengths must "
-                    f"be equal."
-                )
-
-            return implementation(*op_args)
+        super().__init__(name)
 
     # merges descending and null_last markers into the ordering expression
     def _merge_desc_nulls_last(
@@ -199,37 +43,14 @@ class PolarsEager(TableImpl):
         ]
 
 
-class JoinTranslator(Translator[tuple]):
-    """
-    This translator takes a conjunction (AND) of equality checks and returns
-    a tuple of tuple where the inner tuple contains the left and right column
-    of the equality checks.
-    """
-
-    def _translate(self, expr, **kwargs):
-        if isinstance(expr, Col):
-            return expr
-        if isinstance(expr, ColFn):
-            if expr.name == "__eq__":
-                c1 = expr.args[0]
-                c2 = expr.args[1]
-                assert isinstance(c1, Col) and isinstance(c2, Col)
-                return ((c1, c2),)
-            if expr.name == "__and__":
-                return tuple(itertools.chain(*expr.args))
-        raise ExpressionError(
-            f"invalid ON clause element: {expr}. only a conjunction of equalities"
-            " is supported"
-        )
-
-
-def compile_col_expr(expr: ColExpr, group_by: list[ColExpr]) -> pl.Expr:
+def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
         return pl.col(expr.name)
+
     elif isinstance(expr, ColFn):
         op = PolarsEager.operator_registry.get_operator(expr.name)
-        args = [compile_col_expr(arg) for arg in expr.args]
+        args: list[pl.Expr] = [compile_col_expr(arg, group_by) for arg in expr.args]
         impl = PolarsEager.operator_registry.get_implementation(
             expr.name, tuple(arg._type for arg in expr.args)
         )
@@ -242,8 +63,8 @@ def compile_col_expr(expr: ColExpr, group_by: list[ColExpr]) -> pl.Expr:
         arrange = expr.context_kwargs.get("arrange")
 
         if arrange:
-            by, descending, nulls_last = zip(
-                compile_order_expr(order_expr) for order_expr in arrange
+            order_by, descending, nulls_last = zip(
+                compile_order(order, group_by) for order in arrange
             )
 
         filter_cond = expr.context_kwargs.get("filter")
@@ -258,7 +79,7 @@ def compile_col_expr(expr: ColExpr, group_by: list[ColExpr]) -> pl.Expr:
             # anyways so it need not be done here.
 
             args = [
-                arg.sort_by(by=by, descending=descending, nulls_last=nulls_last)
+                arg.sort_by(by=order_by, descending=descending, nulls_last=nulls_last)
                 for arg in args
             ]
 
@@ -312,26 +133,45 @@ def compile_col_expr(expr: ColExpr, group_by: list[ColExpr]) -> pl.Expr:
                 # the function was executed on the ordered arguments. here we
                 # restore the original order of the table.
                 inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
-                    by=by,
+                    by=order_by,
                     descending=descending,
                     nulls_last=nulls_last,
                 )
                 value = value.sort_by(inv_permutation)
 
             return value
+
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
+
     else:
         return pl.lit(expr, dtype=python_type_to_polars(type(expr)))
 
 
-def compile_order_expr(expr: ColExpr) -> pl.Expr:
-    pass
+def compile_order(order: Order, group_by: list[pl.Expr]) -> tuple[pl.Expr, bool, bool]:
+    return (
+        compile_col_expr(order.order_by, group_by),
+        order.descending,
+        order.nulls_last,
+    )
 
 
 def compile_table_expr(expr: TableExpr) -> pl.LazyFrame:
     lf, _ = compile_table_expr_with_group_by(expr)
     return lf
+
+
+def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
+    if isinstance(expr, ColFn):
+        if expr.name == "__and__":
+            return compile_join_cond(expr.args[0]) + compile_join_cond(expr.args[1])
+        if expr.name == "__eq__":
+            return (
+                compile_col_expr(expr.args[0], []),
+                compile_col_expr(expr.args[1], []),
+            )
+
+    raise AssertionError()
 
 
 def compile_table_expr_with_group_by(
@@ -365,24 +205,29 @@ def compile_table_expr_with_group_by(
     elif isinstance(expr, verbs.Join):
         left, _ = compile_table_expr_with_group_by(expr.left)
         right, _ = compile_table_expr_with_group_by(expr.right)
-        on = compile_col_expr(expr.on)
-        suffix = expr.suffix | right.name
-        # TODO: more sophisticated name collision resolution / fail
-        return left.join(right, on, expr.how, validate=expr.validate, suffix=suffix), []
+        left_on, right_on = zip(*compile_join_cond(expr.on))
+        return left.join(
+            right,
+            left_on=left_on,
+            right_on=right_on,
+            how=expr.how,
+            validate=expr.validate,
+            suffix=expr.suffix,
+        ), []
 
     elif isinstance(expr, verbs.Filter):
         table, group_by = compile_table_expr_with_group_by(expr.table)
-        return table.filter(compile_col_expr(expr.filters)), group_by
+        return table.filter(compile_col_expr(expr.filters, group_by)), group_by
 
     elif isinstance(expr, verbs.Arrange):
         table, group_by = compile_table_expr_with_group_by(expr.table)
         return table.sort(
-            [compile_order_expr(order_expr) for order_expr in expr.order_by]
+            [compile_order(order, group_by) for order in expr.order_by]
         ), group_by
 
     elif isinstance(expr, verbs.GroupBy):
         table, group_by = compile_table_expr_with_group_by(expr.table)
-        new_group_by = compile_col_expr(expr.group_by)
+        new_group_by = compile_col_expr(expr.group_by, group_by)
         return table, (group_by + new_group_by) if expr.add else new_group_by
 
     elif isinstance(expr, verbs.Ungroup):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Generic
+from typing import Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
 from pydiverse.transform.core.dtypes import DType
@@ -10,9 +10,6 @@ from pydiverse.transform.core.registry import OperatorRegistry
 from pydiverse.transform.core.table_impl import TableImpl
 from pydiverse.transform.core.verbs import TableExpr
 from pydiverse.transform.polars.polars_table import PolarsEager
-
-if TYPE_CHECKING:
-    from pydiverse.transform.core.expressions.translator import TypedValue
 
 
 def expr_repr(it: Any):
@@ -128,11 +125,9 @@ class LiteralCol(ColExpr, Generic[T]):
 
     def __init__(
         self,
-        typed_value: TypedValue[T],
         expr: Any,
         backend: type[TableImpl],
     ):
-        self.typed_value = typed_value
         self.expr = expr
         self.backend = backend
 
