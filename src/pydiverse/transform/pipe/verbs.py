@@ -7,6 +7,7 @@ from pydiverse.transform.core.util import (
     ordered_set,
 )
 from pydiverse.transform.pipe.pipeable import builtin_verb
+from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
 from pydiverse.transform.tree.verbs import (
     Alias,
@@ -51,23 +52,21 @@ def alias(table: TableExpr, new_name: str | None = None):
 
 
 @builtin_verb()
-def collect(table: TableExpr):
-    return table.collect()
+def collect(table: TableExpr): ...
 
 
 @builtin_verb()
-def export(table: TableExpr):
-    table._validate_verb_level()
+def export(table: TableExpr): ...
 
 
 @builtin_verb()
 def build_query(table: TableExpr):
-    return table.build_query()
+    return get_backend(table).build_query()
 
 
 @builtin_verb()
 def show_query(table: TableExpr):
-    if query := table.build_query():
+    if query := build_query(table):
         print(query)
     else:
         print(f"No query to show for {type(table).__name__}")
@@ -139,6 +138,7 @@ def join(
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
+    # TODO: col name collision resolution
     return Join(left, right, on, how, validate, suffix)
 
 
@@ -175,3 +175,12 @@ def summarise(table: TableExpr, **kwargs: ColExpr):
 @builtin_verb()
 def slice_head(table: TableExpr, n: int, *, offset: int = 0):
     return SliceHead(table, n, offset)
+
+
+def get_backend(expr: TableExpr) -> type:
+    if isinstance(expr, Table):
+        return expr._impl.__class__
+    elif isinstance(expr, Join):
+        return get_backend(expr.left)
+    else:
+        return get_backend(expr.table)

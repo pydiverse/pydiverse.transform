@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 from pydiverse.transform import ops
 from pydiverse.transform.core.util import bidict, ordered_set
@@ -17,6 +17,7 @@ from pydiverse.transform.tree.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
 )
+from pydiverse.transform.tree.table_expr import TableExpr
 
 if TYPE_CHECKING:
     from pydiverse.transform.ops import Operator
@@ -51,12 +52,6 @@ class TableImpl:
 
     operator_registry = OperatorRegistry("AbstractTableImpl")
 
-    def __init__(
-        self,
-        name: str,
-    ):
-        self.name = name
-
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
@@ -80,6 +75,12 @@ class TableImpl:
         return c
 
     def col_type(self, col_name: str) -> DType: ...
+
+    @staticmethod
+    def compile_table_expr(expr: TableExpr) -> Self: ...
+
+    @staticmethod
+    def build_query(expr: TableExpr) -> str | None: ...
 
     def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         """Determine if a column is aligned with the table.

@@ -5,11 +5,11 @@ from html import escape
 from typing import Generic
 
 from pydiverse.transform._typing import ImplT
-from pydiverse.transform.pipe.verbs import TableExpr, export
 from pydiverse.transform.tree.col_expr import (
     Col,
     ColName,
 )
+from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class Table(TableExpr, Generic[ImplT]):
@@ -27,7 +27,7 @@ class Table(TableExpr, Generic[ImplT]):
                 f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
                 f"str, got {type(key)} instead."
             )
-        return Col(key, self)
+        return Col(key, self, self._impl.col_type(key))
 
     def __getattr__(self, name: str) -> Col:
         return Col(name, self, self._impl.col_type(name))
@@ -48,7 +48,7 @@ class Table(TableExpr, Generic[ImplT]):
         try:
             return (
                 f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n"
-                f"{self >> export()}"
+                f"{self._impl.to_polars().df}"
             )
         except Exception as e:
             return (
@@ -64,7 +64,7 @@ class Table(TableExpr, Generic[ImplT]):
         )
         try:
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
-            html += (self >> export())._repr_html_()
+            html += (self._impl.to_polars().df)._repr_html_()
         except Exception as e:
             html += (
                 "</br><pre>Failed to collect table due to an exception:\n"

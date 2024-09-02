@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import Self
 
 import polars as pl
 
@@ -21,12 +22,20 @@ from pydiverse.transform.tree.col_expr import (
 
 
 class PolarsEager(TableImpl):
-    def __init__(self, name: str, df: pl.DataFrame):
+    def __init__(self, df: pl.DataFrame):
         self.df = df
-        super().__init__(name)
 
     def col_type(self, col_name: str) -> dtypes.DType:
         return polars_type_to_pdt(self.df.schema[col_name])
+
+    @staticmethod
+    def compile_table_expr(expr: TableExpr) -> Self:
+        lf, _ = compile_table_expr_with_group_by(expr)
+        return PolarsEager(lf)
+
+    @staticmethod
+    def build_query(expr: TableExpr) -> str | None:
+        return None
 
 
 def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
@@ -156,11 +165,6 @@ def compile_order(order: Order, group_by: list[pl.Expr]) -> tuple[pl.Expr, bool,
         order.descending,
         order.nulls_last,
     )
-
-
-def compile_table_expr(expr: TableExpr) -> pl.LazyFrame:
-    lf, _ = compile_table_expr_with_group_by(expr)
-    return lf
 
 
 def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
