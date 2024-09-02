@@ -10,7 +10,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Callable
 
 from pydiverse.transform.errors import ExpressionTypeError
-from pydiverse.transform.expr import dtypes
+from pydiverse.transform.tree import dtypes
 
 if TYPE_CHECKING:
     from pydiverse.transform.ops import Operator, OperatorExtension

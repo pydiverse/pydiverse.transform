@@ -5,7 +5,7 @@ from functools import partial, reduce, wraps
 from typing import Any
 
 from pydiverse.transform.core.util import bidict, traverse
-from pydiverse.transform.expr.col_expr import (
+from pydiverse.transform.tree.col_expr import (
     Col,
     ColName,
 )
@@ -110,7 +110,7 @@ def col_to_table(arg: Any = None):
         feature_col = get_c(tblA.b, tblB)
 
     """
-    from pydiverse.transform.core.verbs import select
+    from pydiverse.transform.pipe.verbs import select
 
     if isinstance(arg, Col):
         table = (arg.table >> select(arg))._impl
@@ -140,7 +140,7 @@ def wrap_tables(arg: Any = None):
     Takes an instance or collection of `AbstractTableImpl` objects and wraps
     them in a `Table` object. This is an inverse to the `unwrap_tables` function.
     """
-    from pydiverse.transform.core.table_impl import AbstractTableImpl
+    from pydiverse.transform.backend.table_impl import AbstractTableImpl
     from pydiverse.transform.pipe.table import Table
 
     return traverse(arg, lambda x: Table(x) if isinstance(x, AbstractTableImpl) else x)

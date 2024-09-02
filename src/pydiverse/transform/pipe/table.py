@@ -5,11 +5,11 @@ from html import escape
 from typing import Generic
 
 from pydiverse.transform._typing import ImplT
-from pydiverse.transform.expr.col_expr import (
+from pydiverse.transform.pipe.verbs import TableExpr, export
+from pydiverse.transform.tree.col_expr import (
     Col,
     ColName,
 )
-from pydiverse.transform.pipe.verbs import TableExpr, export
 
 
 class Table(TableExpr, Generic[ImplT]):

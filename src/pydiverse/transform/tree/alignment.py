@@ -3,13 +3,12 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING
 
-from pydiverse.transform.core.expressions import (
-    Col,
-    LiteralCol,
-    SymbolicExpression,
-    util,
-)
 from pydiverse.transform.errors import AlignmentError
+from pydiverse.transform.tree.col_expr import (
+    Col,
+    ColExpr,
+    LiteralCol,
+)
 
 if TYPE_CHECKING:
     from pydiverse.transform.core import Table, TableImpl
@@ -34,19 +33,17 @@ def aligned(*, with_: str):
         def wrapper(*args, **kwargs):
             # Execute func
             result = func(*args, **kwargs)
-            if not isinstance(result, SymbolicExpression):
-                raise TypeError(
-                    "Aligned function must return a symbolic expression not"
-                    f" '{result}'."
-                )
+            # if not isinstance(result, SymbolicExpression):
+            #     raise TypeError(
+            #         "Aligned function must return a symbolic expression not"
+            #         f" '{result}'."
+            #     )
 
             # Extract the correct `with_` argument for eval_aligned
             bound_sig = signature.bind(*args, **kwargs)
             bound_sig.apply_defaults()
 
             alignment_param = bound_sig.arguments[with_]
-            if isinstance(alignment_param, SymbolicExpression):
-                alignment_param = alignment_param._
 
             if isinstance(alignment_param, Col):
                 aligned_with = alignment_param.table
@@ -64,15 +61,13 @@ def aligned(*, with_: str):
 
 
 def eval_aligned(
-    sexpr: SymbolicExpression, with_: TableImpl | Table = None, **kwargs
-) -> SymbolicExpression[LiteralCol]:
+    expr: ColExpr, with_: TableImpl | Table = None, **kwargs
+) -> ColExpr[LiteralCol]:
     """Evaluates an expression using the AlignedExpressionEvaluator."""
     from pydiverse.transform.core import Table, TableImpl
 
-    expr = sexpr._ if isinstance(sexpr, SymbolicExpression) else sexpr
-
     # Determine Backend
-    backend = util.determine_expr_backend(expr)
+    backend = None
     if backend is None:
         # TODO: Handle this case. Should return some value...
         raise NotImplementedError
@@ -98,4 +93,4 @@ def eval_aligned(
 
     # Convert to sexpr so that the user can easily continue transforming
     # it symbolically.
-    return SymbolicExpression(literal_column)
+    return literal_column

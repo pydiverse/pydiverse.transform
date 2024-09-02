@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-
-from pydiverse.transform.core.expressions import (
-    CaseExpr,
-    FunctionCall,
-    SymbolicExpression,
+from pydiverse.transform.tree.col_expr import (
+    ColExpr,
+    ColFn,
 )
 
 __all__ = [
@@ -14,42 +11,28 @@ __all__ = [
 ]
 
 
-def _sym_f_call(name, *args, **kwargs) -> SymbolicExpression[FunctionCall]:
-    return SymbolicExpression(FunctionCall(name, *args, **kwargs))
-
-
-def count(expr: SymbolicExpression | None = None):
+def count(expr: ColExpr | None = None):
     if expr is None:
-        return _sym_f_call("count")
+        return ColFn("count")
     else:
-        return _sym_f_call("count", expr)
+        return ColFn("count", expr)
 
 
-def row_number(*, arrange: list, partition_by: list | None = None):
-    return _sym_f_call("row_number", arrange=arrange, partition_by=partition_by)
+def row_number(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
+    return ColFn("row_number", arrange=arrange, partition_by=partition_by)
 
 
-def rank(*, arrange: list, partition_by: list | None = None):
-    return _sym_f_call("rank", arrange=arrange, partition_by=partition_by)
+def rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
+    return ColFn("rank", arrange=arrange, partition_by=partition_by)
 
 
-def dense_rank(*, arrange: list, partition_by: list | None = None):
-    return _sym_f_call("dense_rank", arrange=arrange, partition_by=partition_by)
+def dense_rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
+    return ColFn("dense_rank", arrange=arrange, partition_by=partition_by)
 
 
-def case(*cases: tuple[Any, Any], default: Any = None):
-    case_expression = CaseExpr(
-        switching_on=None,
-        cases=cases,
-        default=default,
-    )
-
-    return SymbolicExpression(case_expression)
+def min(first: ColExpr, *expr: ColExpr):
+    return ColFn("__least", first, *expr)
 
 
-def min(first: Any, *expr: Any):
-    return _sym_f_call("__least", first, *expr)
-
-
-def max(first: Any, *expr: Any):
-    return _sym_f_call("__greatest", first, *expr)
+def max(first: ColExpr, *expr: ColExpr):
+    return ColFn("__greatest", first, *expr)

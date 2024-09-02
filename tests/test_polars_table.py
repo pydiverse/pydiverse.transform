@@ -8,12 +8,12 @@ import pytest
 from pydiverse.transform import C
 from pydiverse.transform.backend.polars_table import PolarsEager
 from pydiverse.transform.errors import AlignmentError
-from pydiverse.transform.expr import dtypes
-from pydiverse.transform.expr.alignment import aligned, eval_aligned
 from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.pipeable import Pipeable, verb
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.pipe.verbs import *
+from pydiverse.transform.tree import dtypes
+from pydiverse.transform.tree.alignment import aligned, eval_aligned
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(

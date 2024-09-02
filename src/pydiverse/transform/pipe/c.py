@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.expr.col_expr import ColName
+from pydiverse.transform.tree.col_expr import ColName
 
 
 class MC(type):

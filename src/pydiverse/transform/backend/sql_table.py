@@ -27,11 +27,11 @@ from pydiverse.transform.core.expressions import (
 from pydiverse.transform.core.expressions.translator import TypedValue
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.errors import AlignmentError, FunctionTypeError
-from pydiverse.transform.expr import dtypes
 from pydiverse.transform.ops import OPType
+from pydiverse.transform.tree import dtypes
 
 if TYPE_CHECKING:
-    from pydiverse.transform.expr.registry import TypedOperatorImpl
+    from pydiverse.transform.tree.registry import TypedOperatorImpl
 
 
 class SQLTableImpl(TableImpl):

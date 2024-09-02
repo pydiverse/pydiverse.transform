@@ -5,9 +5,9 @@ from collections.abc import Iterable
 from typing import Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
-from pydiverse.transform.expr.dtypes import DType
-from pydiverse.transform.expr.registry import OperatorRegistry
-from pydiverse.transform.expr.table_expr import TableExpr
+from pydiverse.transform.tree.dtypes import DType
+from pydiverse.transform.tree.registry import OperatorRegistry
+from pydiverse.transform.tree.table_expr import TableExpr
 
 
 def expr_repr(it: Any):
@@ -276,7 +276,7 @@ def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
             for key, arr in expr.context_kwargs
         }
         # TODO: create a backend agnostic registry
-        from pydiverse.transform.polars.polars_table import PolarsEager
+        from pydiverse.transform.backend.polars_table import PolarsEager
 
         expr._type = PolarsEager.operator_registry.get_implementation(
             expr.name, [arg._type for arg in expr.args]
