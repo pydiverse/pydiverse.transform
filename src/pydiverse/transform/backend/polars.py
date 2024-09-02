@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import datetime
 from typing import Any, Self
 
@@ -32,8 +33,8 @@ class PolarsImpl(TableImpl):
 
     @staticmethod
     def compile_table_expr(expr: TableExpr) -> Self:
-        lf, _ = compile_table_expr_with_group_by(expr)
-        return PolarsImpl(lf)
+        lf, context = compile_table_expr_with_context(expr)
+        return PolarsImpl(lf.select(context.selects))
 
     @staticmethod
     def build_query(expr: TableExpr) -> str | None:
@@ -153,7 +154,7 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
                 )
                 value = value.sort_by(inv_permutation)
 
-            return value
+        return value
 
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
@@ -202,74 +203,99 @@ def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
     raise AssertionError()
 
 
-def compile_table_expr_with_group_by(
+@dataclasses.dataclass
+class CompilationContext:
+    group_by: list[str]
+    selects: list[str]
+
+    def group_by_expr(self) -> list[pl.Expr]:
+        return [pl.col(name) for name in self.group_by]
+
+
+def compile_table_expr_with_context(
     expr: TableExpr,
-) -> tuple[pl.LazyFrame, list[pl.Expr]]:
+) -> tuple[pl.LazyFrame, CompilationContext]:
     if isinstance(expr, verbs.Alias):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        setattr(table, expr.new_name)
-        return table, group_by
+        df, context = compile_table_expr_with_context(expr.table)
+        setattr(df, expr.new_name)
+        return df, context
 
     elif isinstance(expr, verbs.Select):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        return table.select(col.name for col in expr.selects), group_by
+        df, context = compile_table_expr_with_context(expr.table)
+        context.selects = [col for col in context.selects if col in set(expr.selects)]
+        return df, context
 
     elif isinstance(expr, verbs.Mutate):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        return table.with_columns(
+        df, context = compile_table_expr_with_context(expr.table)
+        context.selects.extend(expr.names)
+        return df.with_columns(
             **{
                 name: compile_col_expr(
                     value,
-                    group_by,
+                    context.group_by_expr(),
                 )
                 for name, value in zip(expr.names, expr.values)
             }
-        ), group_by
+        ), context
 
     elif isinstance(expr, verbs.Rename):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        return table.rename(expr.name_map), group_by
+        df, context = compile_table_expr_with_context(expr.table)
+        return df.rename(expr.name_map), context
 
     elif isinstance(expr, verbs.Join):
-        left, _ = compile_table_expr_with_group_by(expr.left)
-        right, _ = compile_table_expr_with_group_by(expr.right)
+        left_df, left_context = compile_table_expr_with_context(expr.left)
+        right_df, right_context = compile_table_expr_with_context(expr.right)
+        assert not left_context.compiled_group_by
+        assert not right_context.compiled_group_by
         left_on, right_on = zip(*compile_join_cond(expr.on))
-        return left.join(
-            right,
+        return left_df.join(
+            right_df,
             left_on=left_on,
             right_on=right_on,
             how=expr.how,
             validate=expr.validate,
             suffix=expr.suffix,
-        ), []
+        ), CompilationContext(
+            [],
+            left_context.selects
+            + [col_name + expr.suffix for col_name in right_context.selects],
+        )
 
     elif isinstance(expr, verbs.Filter):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        return table.filter(compile_col_expr(expr.filters, group_by)), group_by
+        df, context = compile_table_expr_with_context(expr.table)
+        return df.filter(
+            compile_col_expr(expr.filters, context.group_by_expr())
+        ), context
 
     elif isinstance(expr, verbs.Arrange):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        return table.sort(
-            [compile_order(order, group_by) for order in expr.order_by]
-        ), group_by
+        df, context = compile_table_expr_with_context(expr.table)
+        return df.sort(
+            [compile_order(order, context.group_by_expr()) for order in expr.order_by]
+        ), context
 
     elif isinstance(expr, verbs.GroupBy):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        new_group_by = compile_col_expr(expr.group_by, group_by)
-        return table, (group_by + new_group_by) if expr.add else new_group_by
+        df, context = compile_table_expr_with_context(expr.table)
+        return df, CompilationContext(
+            (
+                context.group_by + [col.name for col in expr.group_by]
+                if expr.add
+                else expr.group_by
+            ),
+            context.selects,
+        )
 
     elif isinstance(expr, verbs.Ungroup):
-        table, _ = compile_table_expr_with_group_by(expr.table)
-        return table, []
+        df, context = compile_table_expr_with_context(expr.table)
+        return df, context
 
     elif isinstance(expr, verbs.SliceHead):
-        table, group_by = compile_table_expr_with_group_by(expr.table)
-        assert len(group_by) == 0
-        return table, []
+        df, context = compile_table_expr_with_context(expr.table)
+        assert len(context.group_by) == 0
+        return df, context
 
     elif isinstance(expr, Table):
         assert isinstance(expr._impl, PolarsImpl)
-        return expr._impl.df, []
+        return expr._impl.df, CompilationContext([], expr.col_names())
 
     raise AssertionError
 
