@@ -5,10 +5,10 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 from pydiverse.transform import ops
+from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.core.util import bidict, ordered_set
 from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops import OPType
-from pydiverse.transform.pipe.backends import Backend
 from pydiverse.transform.tree.col_expr import (
     Col,
     LiteralCol,
@@ -84,9 +84,9 @@ class TableImpl:
     def build_query(expr: TableExpr) -> str | None: ...
 
     @staticmethod
-    def backend_marker() -> Backend: ...
+    def backend_marker() -> Target: ...
 
-    def export(self, target: Backend) -> Any: ...
+    def export(self, target: Target) -> Any: ...
 
     def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         """Determine if a column is aligned with the table.

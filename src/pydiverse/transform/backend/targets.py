@@ -6,15 +6,15 @@
 from __future__ import annotations
 
 
-class Backend: ...
+class Target: ...
 
 
-class Polars(Backend):
+class Polars(Target):
     def __init__(self, *, lazy: bool = True) -> None:
         self.lazy = lazy
 
 
-class DuckDB(Backend): ...
+class DuckDB(Target): ...
 
 
-class SqlAlchemy(Backend): ...
+class SqlAlchemy(Target): ...
