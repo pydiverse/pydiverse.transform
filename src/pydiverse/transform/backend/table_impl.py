@@ -88,6 +88,10 @@ class TableImpl:
 
     def export(self, target: Target) -> Any: ...
 
+    def cols(self) -> list[str]: ...
+
+    def schema(self) -> dict[str, DType]: ...
+
     def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         """Determine if a column is aligned with the table.
 

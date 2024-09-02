@@ -7,8 +7,8 @@ import polars as pl
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
+from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.ops.core import OPType
-from pydiverse.transform.pipe.backends import Backend, Polars
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
@@ -17,6 +17,7 @@ from pydiverse.transform.tree.col_expr import (
     ColExpr,
     ColFn,
     ColName,
+    LiteralCol,
     Order,
 )
 from pydiverse.transform.tree.table_expr import TableExpr
@@ -39,12 +40,20 @@ class PolarsImpl(TableImpl):
         return None
 
     @staticmethod
-    def backend_marker() -> Backend:
+    def backend_marker() -> Target:
         return Polars(lazy=True)
 
-    def export(self, target: Backend) -> Any:
+    def export(self, target: Target) -> Any:
         if isinstance(target, Polars):
             return self.df if target.lazy else self.df.collect()
+
+    def cols(self) -> list[str]:
+        return self.df.columns
+
+    def schema(self) -> dict[str, dtypes.DType]:
+        return {
+            name: polars_type_to_pdt(dtype) for name, dtype in self.df.schema.items()
+        }
 
 
 def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
@@ -56,7 +65,8 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
         op = PolarsImpl.operator_registry.get_operator(expr.name)
         args: list[pl.Expr] = [compile_col_expr(arg, group_by) for arg in expr.args]
         impl = PolarsImpl.operator_registry.get_implementation(
-            expr.name, tuple(arg._type for arg in expr.args)
+            expr.name,
+            tuple(arg.dtype for arg in expr.args),
         )
 
         # the `partition_by=` grouping overrides the `group_by` grouping
@@ -148,8 +158,11 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
 
+    elif isinstance(expr, LiteralCol):
+        return pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype))
+
     else:
-        return pl.lit(expr, dtype=python_type_to_polars(type(expr)))
+        raise AssertionError
 
 
 # merges descending and null_last markers into the ordering expression

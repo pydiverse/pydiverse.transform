@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from abc import ABC, abstractmethod
 
 from pydiverse.transform._typing import T
@@ -136,6 +137,25 @@ class NoneDType(DType):
     """DType used to represent the `None` value."""
 
     name = "none"
+
+
+def python_type_to_pdt(t: type) -> DType:
+    if t is int:
+        return Int()
+    elif t is float:
+        return Float()
+    elif t is bool:
+        return Bool()
+    elif t is str:
+        return String()
+    elif t is datetime.datetime:
+        return DateTime()
+    elif t is datetime.date:
+        return Date()
+    elif t is datetime.timedelta:
+        return Duration()
+
+    raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
 
 
 def dtype_from_string(t: str) -> DType:

@@ -11,6 +11,7 @@ from pydiverse.transform.tree.col_expr import (
     Col,
     ColName,
 )
+from pydiverse.transform.tree.dtypes import DType
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -90,3 +91,6 @@ class Table(TableExpr, Generic[ImplT]):
 
     def col_names(self) -> list[str]:
         return self._impl.cols()
+
+    def schema(self) -> dict[str, DType]:
+        return self._impl.schema()
