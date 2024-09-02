@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.backend.polars_table import PolarsEager
+from pydiverse.transform.backend.polars import PolarsImpl
 from pydiverse.transform.errors import AlignmentError
 from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.pipeable import Pipeable, verb
@@ -84,40 +84,40 @@ def dtype_backend(request):
 
 @pytest.fixture
 def tbl1():
-    return Table(PolarsEager("df1", df1))
+    return Table(df1)
 
 
 @pytest.fixture
 def tbl2():
-    return Table(PolarsEager("df2", df2))
+    return Table(df2)
 
 
 @pytest.fixture
 def tbl3():
-    return Table(PolarsEager("df3", df3))
+    return Table(df3)
 
 
 @pytest.fixture
 def tbl4():
-    return Table(PolarsEager("df4", df4.clone()))
+    return Table(df4)
 
 
 @pytest.fixture
 def tbl_left():
-    return Table(PolarsEager("df_left", df_left.clone()))
+    return Table(df_left)
 
 
 @pytest.fixture
 def tbl_right():
-    return Table(PolarsEager("df_right", df_right.clone()))
+    return Table(df_right)
 
 
 @pytest.fixture
 def tbl_dt():
-    return Table(PolarsEager("df_dt", df_dt))
+    return Table(df_dt)
 
 
-def assert_not_inplace(table: Table[PolarsEager], operation: Pipeable):
+def assert_not_inplace(table: Table[PolarsImpl], operation: Pipeable):
     """
     Operations should not happen in-place. They should always return a new dataframe.
     """
@@ -128,14 +128,14 @@ def assert_not_inplace(table: Table[PolarsEager], operation: Pipeable):
     assert initial.equals(after)
 
 
-class TestPolarsEager:
+class TestPolarsLazyImpl:
     def test_dtype(self, tbl1, tbl2):
-        assert isinstance(tbl1.col1._.dtype, dtypes.Int)
-        assert isinstance(tbl1.col2._.dtype, dtypes.String)
+        assert isinstance(tbl1.col1.dtype, dtypes.Int)
+        assert isinstance(tbl1.col2.dtype, dtypes.String)
 
-        assert isinstance(tbl2.col1._.dtype, dtypes.Int)
-        assert isinstance(tbl2.col2._.dtype, dtypes.Int)
-        assert isinstance(tbl2.col3._.dtype, dtypes.Float)
+        assert isinstance(tbl2.col1.dtype, dtypes.Int)
+        assert isinstance(tbl2.col2.dtype, dtypes.Int)
+        assert isinstance(tbl2.col3.dtype, dtypes.Float)
 
     def test_build_query(self, tbl1):
         assert (tbl1 >> build_query()) is None
@@ -695,7 +695,7 @@ class TestPolarsAligned:
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
-        # Table: df1, backend: PolarsEager
+        # Table: df1, backend: PolarsImpl
         #    col1 col2
         # 0     1    a
         # 1     2    b
@@ -705,7 +705,7 @@ class TestPrintAndRepr:
         tbl_str = str(tbl1)
 
         assert "df1" in tbl_str
-        assert "PolarsEager" in tbl_str
+        assert "PolarsImpl" in tbl_str
         assert str(df1) in tbl_str
 
     def test_table_repr_html(self, tbl1):

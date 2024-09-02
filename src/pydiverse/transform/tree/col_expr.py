@@ -277,9 +277,9 @@ def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
             for key, arr in expr.context_kwargs
         }
         # TODO: create a backend agnostic registry
-        from pydiverse.transform.backend.polars_table import PolarsEager
+        from pydiverse.transform.backend.polars import PolarsImpl
 
-        expr._type = PolarsEager.operator_registry.get_implementation(
+        expr._type = PolarsImpl.operator_registry.get_implementation(
             expr.name, [arg._type for arg in expr.args]
         ).return_type
         return expr

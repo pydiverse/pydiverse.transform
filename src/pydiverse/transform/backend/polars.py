@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import datetime
-from typing import Self
+from typing import Any, Self
 
 import polars as pl
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.ops.core import OPType
-from pydiverse.transform.pipe import verbs
-from pydiverse.transform.pipe.verbs import TableExpr
-from pydiverse.transform.tree import dtypes
+from pydiverse.transform.pipe.backends import Backend, Polars
+from pydiverse.transform.pipe.table import Table
+from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
     Col,
@@ -19,11 +19,12 @@ from pydiverse.transform.tree.col_expr import (
     ColName,
     Order,
 )
+from pydiverse.transform.tree.table_expr import TableExpr
 
 
-class PolarsEager(TableImpl):
-    def __init__(self, df: pl.DataFrame):
-        self.df = df
+class PolarsImpl(TableImpl):
+    def __init__(self, df: pl.DataFrame | pl.LazyFrame):
+        self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
 
     def col_type(self, col_name: str) -> dtypes.DType:
         return polars_type_to_pdt(self.df.schema[col_name])
@@ -31,11 +32,19 @@ class PolarsEager(TableImpl):
     @staticmethod
     def compile_table_expr(expr: TableExpr) -> Self:
         lf, _ = compile_table_expr_with_group_by(expr)
-        return PolarsEager(lf)
+        return PolarsImpl(lf)
 
     @staticmethod
     def build_query(expr: TableExpr) -> str | None:
         return None
+
+    @staticmethod
+    def backend_marker() -> Backend:
+        return Polars(lazy=True)
+
+    def export(self, target: Backend) -> Any:
+        if isinstance(target, Polars):
+            return self.df if target.lazy else self.df.collect()
 
 
 def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
@@ -44,9 +53,9 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
         return pl.col(expr.name)
 
     elif isinstance(expr, ColFn):
-        op = PolarsEager.operator_registry.get_operator(expr.name)
+        op = PolarsImpl.operator_registry.get_operator(expr.name)
         args: list[pl.Expr] = [compile_col_expr(arg, group_by) for arg in expr.args]
-        impl = PolarsEager.operator_registry.get_implementation(
+        impl = PolarsImpl.operator_registry.get_implementation(
             expr.name, tuple(arg._type for arg in expr.args)
         )
 
@@ -245,6 +254,10 @@ def compile_table_expr_with_group_by(
         assert len(group_by) == 0
         return table, []
 
+    elif isinstance(expr, Table):
+        assert isinstance(expr._impl, PolarsImpl)
+        return expr._impl.df, []
+
     raise AssertionError
 
 
@@ -305,308 +318,308 @@ def python_type_to_polars(t: type) -> pl.DataType:
     raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
 
 
-with PolarsEager.op(ops.Mean()) as op:
+with PolarsImpl.op(ops.Mean()) as op:
 
     @op.auto
     def _mean(x):
         return x.mean()
 
 
-with PolarsEager.op(ops.Min()) as op:
+with PolarsImpl.op(ops.Min()) as op:
 
     @op.auto
     def _min(x):
         return x.min()
 
 
-with PolarsEager.op(ops.Max()) as op:
+with PolarsImpl.op(ops.Max()) as op:
 
     @op.auto
     def _max(x):
         return x.max()
 
 
-with PolarsEager.op(ops.Sum()) as op:
+with PolarsImpl.op(ops.Sum()) as op:
 
     @op.auto
     def _sum(x):
         return x.sum()
 
 
-with PolarsEager.op(ops.All()) as op:
+with PolarsImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
         return x.all()
 
 
-with PolarsEager.op(ops.Any()) as op:
+with PolarsImpl.op(ops.Any()) as op:
 
     @op.auto
     def _any(x):
         return x.any()
 
 
-with PolarsEager.op(ops.IsNull()) as op:
+with PolarsImpl.op(ops.IsNull()) as op:
 
     @op.auto
     def _is_null(x):
         return x.is_null()
 
 
-with PolarsEager.op(ops.IsNotNull()) as op:
+with PolarsImpl.op(ops.IsNotNull()) as op:
 
     @op.auto
     def _is_not_null(x):
         return x.is_not_null()
 
 
-with PolarsEager.op(ops.FillNull()) as op:
+with PolarsImpl.op(ops.FillNull()) as op:
 
     @op.auto
     def _fill_null(x, y):
         return x.fill_null(y)
 
 
-with PolarsEager.op(ops.DtYear()) as op:
+with PolarsImpl.op(ops.DtYear()) as op:
 
     @op.auto
     def _dt_year(x):
         return x.dt.year()
 
 
-with PolarsEager.op(ops.DtMonth()) as op:
+with PolarsImpl.op(ops.DtMonth()) as op:
 
     @op.auto
     def _dt_month(x):
         return x.dt.month()
 
 
-with PolarsEager.op(ops.DtDay()) as op:
+with PolarsImpl.op(ops.DtDay()) as op:
 
     @op.auto
     def _dt_day(x):
         return x.dt.day()
 
 
-with PolarsEager.op(ops.DtHour()) as op:
+with PolarsImpl.op(ops.DtHour()) as op:
 
     @op.auto
     def _dt_hour(x):
         return x.dt.hour()
 
 
-with PolarsEager.op(ops.DtMinute()) as op:
+with PolarsImpl.op(ops.DtMinute()) as op:
 
     @op.auto
     def _dt_minute(x):
         return x.dt.minute()
 
 
-with PolarsEager.op(ops.DtSecond()) as op:
+with PolarsImpl.op(ops.DtSecond()) as op:
 
     @op.auto
     def _dt_second(x):
         return x.dt.second()
 
 
-with PolarsEager.op(ops.DtMillisecond()) as op:
+with PolarsImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _dt_millisecond(x):
         return x.dt.millisecond()
 
 
-with PolarsEager.op(ops.DtDayOfWeek()) as op:
+with PolarsImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _dt_day_of_week(x):
         return x.dt.weekday()
 
 
-with PolarsEager.op(ops.DtDayOfYear()) as op:
+with PolarsImpl.op(ops.DtDayOfYear()) as op:
 
     @op.auto
     def _dt_day_of_year(x):
         return x.dt.ordinal_day()
 
 
-with PolarsEager.op(ops.DtDays()) as op:
+with PolarsImpl.op(ops.DtDays()) as op:
 
     @op.auto
     def _days(x):
         return x.dt.total_days()
 
 
-with PolarsEager.op(ops.DtHours()) as op:
+with PolarsImpl.op(ops.DtHours()) as op:
 
     @op.auto
     def _hours(x):
         return x.dt.total_hours()
 
 
-with PolarsEager.op(ops.DtMinutes()) as op:
+with PolarsImpl.op(ops.DtMinutes()) as op:
 
     @op.auto
     def _minutes(x):
         return x.dt.total_minutes()
 
 
-with PolarsEager.op(ops.DtSeconds()) as op:
+with PolarsImpl.op(ops.DtSeconds()) as op:
 
     @op.auto
     def _seconds(x):
         return x.dt.total_seconds()
 
 
-with PolarsEager.op(ops.DtMilliseconds()) as op:
+with PolarsImpl.op(ops.DtMilliseconds()) as op:
 
     @op.auto
     def _milliseconds(x):
         return x.dt.total_milliseconds()
 
 
-with PolarsEager.op(ops.Sub()) as op:
+with PolarsImpl.op(ops.Sub()) as op:
 
     @op.extension(ops.DtSub)
     def _dt_sub(lhs, rhs):
         return lhs - rhs
 
 
-with PolarsEager.op(ops.RSub()) as op:
+with PolarsImpl.op(ops.RSub()) as op:
 
     @op.extension(ops.DtRSub)
     def _dt_rsub(rhs, lhs):
         return lhs - rhs
 
 
-with PolarsEager.op(ops.Add()) as op:
+with PolarsImpl.op(ops.Add()) as op:
 
     @op.extension(ops.DtDurAdd)
     def _dt_dur_add(lhs, rhs):
         return lhs + rhs
 
 
-with PolarsEager.op(ops.RAdd()) as op:
+with PolarsImpl.op(ops.RAdd()) as op:
 
     @op.extension(ops.DtDurRAdd)
     def _dt_dur_radd(rhs, lhs):
         return lhs + rhs
 
 
-with PolarsEager.op(ops.RowNumber()) as op:
+with PolarsImpl.op(ops.RowNumber()) as op:
 
     @op.auto
     def _row_number():
         return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)
 
 
-with PolarsEager.op(ops.Rank()) as op:
+with PolarsImpl.op(ops.Rank()) as op:
 
     @op.auto
     def _rank(x):
         return x.rank("min").cast(pl.Int64)
 
 
-with PolarsEager.op(ops.DenseRank()) as op:
+with PolarsImpl.op(ops.DenseRank()) as op:
 
     @op.auto
     def _dense_rank(x):
         return x.rank("dense").cast(pl.Int64)
 
 
-with PolarsEager.op(ops.Shift()) as op:
+with PolarsImpl.op(ops.Shift()) as op:
 
     @op.auto
     def _shift(x, n, fill_value=None):
         return x.shift(n, fill_value=fill_value)
 
 
-with PolarsEager.op(ops.IsIn()) as op:
+with PolarsImpl.op(ops.IsIn()) as op:
 
     @op.auto
     def _isin(x, *values):
         return pl.any_horizontal(x == v for v in values)
 
 
-with PolarsEager.op(ops.StrContains()) as op:
+with PolarsImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):
         return x.str.contains(y)
 
 
-with PolarsEager.op(ops.StrStartsWith()) as op:
+with PolarsImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _starts_with(x, y):
         return x.str.starts_with(y)
 
 
-with PolarsEager.op(ops.StrEndsWith()) as op:
+with PolarsImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _ends_with(x, y):
         return x.str.ends_with(y)
 
 
-with PolarsEager.op(ops.StrToLower()) as op:
+with PolarsImpl.op(ops.StrToLower()) as op:
 
     @op.auto
     def _lower(x):
         return x.str.to_lowercase()
 
 
-with PolarsEager.op(ops.StrToUpper()) as op:
+with PolarsImpl.op(ops.StrToUpper()) as op:
 
     @op.auto
     def _upper(x):
         return x.str.to_uppercase()
 
 
-with PolarsEager.op(ops.StrReplaceAll()) as op:
+with PolarsImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
     def _replace_all(x, to_replace, replacement):
         return x.str.replace_all(to_replace, replacement)
 
 
-with PolarsEager.op(ops.StrLen()) as op:
+with PolarsImpl.op(ops.StrLen()) as op:
 
     @op.auto
     def _string_length(x):
         return x.str.len_chars().cast(pl.Int64)
 
 
-with PolarsEager.op(ops.StrStrip()) as op:
+with PolarsImpl.op(ops.StrStrip()) as op:
 
     @op.auto
     def _str_strip(x):
         return x.str.strip_chars()
 
 
-with PolarsEager.op(ops.StrSlice()) as op:
+with PolarsImpl.op(ops.StrSlice()) as op:
 
     @op.auto
     def _str_slice(x, offset, length):
         return x.str.slice(offset, length)
 
 
-with PolarsEager.op(ops.Count()) as op:
+with PolarsImpl.op(ops.Count()) as op:
 
     @op.auto
     def _count(x=None):
         return pl.len() if x is None else x.count()
 
 
-with PolarsEager.op(ops.Greatest()) as op:
+with PolarsImpl.op(ops.Greatest()) as op:
 
     @op.auto
     def _greatest(*x):
         return pl.max_horizontal(*x)
 
 
-with PolarsEager.op(ops.Least()) as op:
+with PolarsImpl.op(ops.Least()) as op:
 
     @op.auto
     def _least(*x):

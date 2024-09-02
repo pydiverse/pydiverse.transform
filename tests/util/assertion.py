@@ -9,12 +9,18 @@ from polars.testing import assert_frame_equal
 
 from pydiverse.transform import Table
 from pydiverse.transform.errors import NonStandardBehaviourWarning
+from pydiverse.transform.pipe.backends import Polars
 from pydiverse.transform.pipe.verbs import export, show_query
+from pydiverse.transform.tree.table_expr import TableExpr
 
 
 def assert_equal(left, right, check_dtypes=False, check_row_order=True):
-    left_df = left >> export() if isinstance(left, Table) else left
-    right_df = right >> export() if isinstance(right, Table) else right
+    left_df = (
+        left >> export(Polars(lazy=False)) if isinstance(left, TableExpr) else left
+    )
+    right_df = (
+        right >> export(Polars(lazy=False)) if isinstance(right, TableExpr) else right
+    )
 
     try:
         assert_frame_equal(

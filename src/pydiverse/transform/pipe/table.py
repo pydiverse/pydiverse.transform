@@ -4,6 +4,8 @@ from collections.abc import Iterable
 from html import escape
 from typing import Generic
 
+import polars as pl
+
 from pydiverse.transform._typing import ImplT
 from pydiverse.transform.tree.col_expr import (
     Col,
@@ -18,8 +20,16 @@ class Table(TableExpr, Generic[ImplT]):
     which is a reference to the underlying table implementation.
     """
 
-    def __init__(self, implementation: ImplT):
-        self._impl = implementation
+    # TODO: define exactly what can be given for the two
+    def __init__(self, resource, backend=None, *, name: str | None = None):
+        from pydiverse.transform.backend.polars import PolarsImpl
+
+        if isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
+            self._impl = PolarsImpl(resource)
+        elif isinstance(resource, str):
+            ...  # could be a SQL table name
+
+        self.name = name
 
     def __getitem__(self, key: str) -> Col:
         if not isinstance(key, str):
