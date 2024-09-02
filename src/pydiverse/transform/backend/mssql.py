@@ -4,13 +4,13 @@ import sqlalchemy as sa
 
 from pydiverse.transform import ops
 from pydiverse.transform._typing import CallableT
-from pydiverse.transform.core import dtypes
+from pydiverse.transform.backend.sql_table import SQLTableImpl
 from pydiverse.transform.core.expressions import TypedValue
 from pydiverse.transform.core.expressions.expressions import Col
-from pydiverse.transform.core.registry import TypedOperatorImpl
 from pydiverse.transform.core.util import OrderingDescriptor
+from pydiverse.transform.expr import dtypes
+from pydiverse.transform.expr.registry import TypedOperatorImpl
 from pydiverse.transform.ops import Operator, OPType
-from pydiverse.transform.sql.sql_table import SQLTableImpl
 from pydiverse.transform.util.warnings import warn_non_standard
 
 

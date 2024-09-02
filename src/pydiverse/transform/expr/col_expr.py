@@ -5,11 +5,9 @@ from collections.abc import Iterable
 from typing import Any, Generic
 
 from pydiverse.transform._typing import ImplT, T
-from pydiverse.transform.core.dtypes import DType
-from pydiverse.transform.core.registry import OperatorRegistry
-from pydiverse.transform.core.table_impl import TableImpl
-from pydiverse.transform.core.verbs import TableExpr
-from pydiverse.transform.polars.polars_table import PolarsEager
+from pydiverse.transform.expr.dtypes import DType
+from pydiverse.transform.expr.registry import OperatorRegistry
+from pydiverse.transform.expr.table_expr import TableExpr
 
 
 def expr_repr(it: Any):
@@ -126,10 +124,8 @@ class LiteralCol(ColExpr, Generic[T]):
     def __init__(
         self,
         expr: Any,
-        backend: type[TableImpl],
     ):
         self.expr = expr
-        self.backend = backend
 
     def __repr__(self):
         return f"<Lit: {self.expr} ({self.typed_value.dtype})>"
@@ -280,6 +276,8 @@ def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
             for key, arr in expr.context_kwargs
         }
         # TODO: create a backend agnostic registry
+        from pydiverse.transform.polars.polars_table import PolarsEager
+
         expr._type = PolarsEager.operator_registry.get_implementation(
             expr.name, [arg._type for arg in expr.args]
         ).return_type
@@ -330,15 +328,3 @@ class Order:
             else:
                 break
         return Order(expr, descending, nulls_last)
-
-
-class MC(type):
-    def __getattr__(cls, name: str) -> ColName:
-        return ColName(name)
-
-    def __getitem__(cls, name: str) -> ColName:
-        return ColName(name)
-
-
-class C(metaclass=MC):
-    pass

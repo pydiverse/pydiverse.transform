@@ -7,17 +7,17 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from pydiverse.transform import ops
-from pydiverse.transform.core.col_expr import (
+from pydiverse.transform.core.util import bidict, ordered_set
+from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform.expr.col_expr import (
     Col,
     ColName,
     LiteralCol,
 )
-from pydiverse.transform.core.registry import (
+from pydiverse.transform.expr.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
 )
-from pydiverse.transform.core.util import bidict, ordered_set
-from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:

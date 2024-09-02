@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.core import dtypes
+from pydiverse.transform.expr import dtypes
 from pydiverse.transform.ops.core import Binary, ElementWise, Operator, Unary
 
 __all__ = [

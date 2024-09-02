@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.core import functions as f
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform.pipe import functions as f
+from pydiverse.transform.pipe.verbs import (
     arrange,
     filter,
     group_by,
@@ -11,7 +12,6 @@ from pydiverse.transform.core.verbs import (
     summarise,
     ungroup,
 )
-from pydiverse.transform.errors import FunctionTypeError
 from tests.util import assert_result_equal, full_sort
 
 

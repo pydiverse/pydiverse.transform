@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from pydiverse.transform.core import functions
-from pydiverse.transform.core.alignment import aligned, eval_aligned
-from pydiverse.transform.core.dispatchers import verb
-from pydiverse.transform.core.expressions.symbolic_expressions import C
-from pydiverse.transform.core.table import Table
+from pydiverse.transform.expr.alignment import aligned, eval_aligned
+from pydiverse.transform.pipe import functions
+from pydiverse.transform.pipe.c import C
+from pydiverse.transform.pipe.pipeable import verb
+from pydiverse.transform.pipe.table import Table
 
 __all__ = [
     "Table",

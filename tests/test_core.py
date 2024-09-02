@@ -3,18 +3,19 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.core import Table, TableImpl, dtypes
-from pydiverse.transform.core.dispatchers import (
+from pydiverse.transform.core import Table, TableImpl
+from pydiverse.transform.core.expressions import Col, SymbolicExpression
+from pydiverse.transform.core.expressions.translator import TypedValue
+from pydiverse.transform.core.util import bidict, ordered_set, sign_peeler
+from pydiverse.transform.expr import dtypes
+from pydiverse.transform.pipe.pipeable import (
     col_to_table,
     inverse_partial,
     unwrap_tables,
     verb,
     wrap_tables,
 )
-from pydiverse.transform.core.expressions import Col, SymbolicExpression
-from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.util import bidict, ordered_set, sign_peeler
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe.verbs import (
     arrange,
     collect,
     filter,

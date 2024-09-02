@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform.core import dtypes
-from pydiverse.transform.core.registry import (
+from pydiverse.transform.expr import dtypes
+from pydiverse.transform.expr.registry import (
     OperatorRegistry,
     OperatorSignature,
 )

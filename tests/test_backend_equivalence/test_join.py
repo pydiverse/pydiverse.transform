@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from pydiverse.transform.core.expressions.lambda_getter import C
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe.verbs import (
     alias,
     join,
     left_join,

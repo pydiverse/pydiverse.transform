@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from pydiverse.transform import C
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe.verbs import (
     filter,
     mutate,
 )

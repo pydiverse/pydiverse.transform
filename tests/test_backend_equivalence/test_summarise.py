@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
+from pydiverse.transform.pipe.verbs import (
     arrange,
     filter,
     group_by,
@@ -9,7 +10,6 @@ from pydiverse.transform.core.verbs import (
     select,
     summarise,
 )
-from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 from tests.util import assert_result_equal
 
 

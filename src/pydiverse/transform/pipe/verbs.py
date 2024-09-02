@@ -4,13 +4,14 @@ import functools
 from dataclasses import dataclass
 from typing import Literal
 
-import pydiverse.transform.core.col_expr as expressions
-from pydiverse.transform.core.col_expr import Col, ColExpr, ColName, Order
-from pydiverse.transform.core.dispatchers import builtin_verb
-from pydiverse.transform.core.dtypes import DType
+import pydiverse.transform.expr.col_expr as expressions
 from pydiverse.transform.core.util import (
     ordered_set,
 )
+from pydiverse.transform.expr.col_expr import Col, ColExpr, ColName, Order
+from pydiverse.transform.expr.dtypes import DType
+from pydiverse.transform.expr.table_expr import TableExpr
+from pydiverse.transform.pipe.pipeable import builtin_verb
 
 __all__ = [
     "alias",
@@ -36,9 +37,6 @@ __all__ = [
 JoinHow = Literal["inner", "left", "outer"]
 
 JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
-
-
-class TableExpr: ...
 
 
 @dataclass

@@ -4,9 +4,9 @@ import functools
 
 import polars as pl
 
+from pydiverse.transform.backend.polars_table import PolarsEager
+from pydiverse.transform.backend.sql_table import SQLTableImpl
 from pydiverse.transform.core import Table
-from pydiverse.transform.polars.polars_table import PolarsEager
-from pydiverse.transform.sql.sql_table import SQLTableImpl
 
 
 def _cached_impl(fn):

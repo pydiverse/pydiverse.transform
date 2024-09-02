@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pydiverse.transform import C
 from pydiverse.transform import functions as f
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
+from pydiverse.transform.pipe.verbs import (
     group_by,
     mutate,
     summarise,
 )
-from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 from tests.util import assert_result_equal
 
 

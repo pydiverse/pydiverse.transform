@@ -4,11 +4,11 @@ import copy
 from functools import partial, reduce, wraps
 from typing import Any
 
-from pydiverse.transform.core.expressions import (
+from pydiverse.transform.core.util import bidict, traverse
+from pydiverse.transform.expr.col_expr import (
     Col,
     ColName,
 )
-from pydiverse.transform.core.util import bidict, traverse
 
 
 class Pipeable:
@@ -60,7 +60,7 @@ class inverse_partial(partial):
 
 
 def verb(func):
-    from pydiverse.transform.core.table import Table
+    from pydiverse.transform.pipe.table import Table
 
     def copy_tables(arg: Any = None):
         return traverse(arg, lambda x: copy.copy(x) if isinstance(x, Table) else x)
@@ -130,7 +130,7 @@ def unwrap_tables(arg: Any = None):
     Takes an instance or collection of `Table` objects and replaces them with
     their implementation.
     """
-    from pydiverse.transform.core.table import Table
+    from pydiverse.transform.pipe.table import Table
 
     return traverse(arg, lambda x: x._impl if isinstance(x, Table) else x)
 
@@ -140,7 +140,7 @@ def wrap_tables(arg: Any = None):
     Takes an instance or collection of `AbstractTableImpl` objects and wraps
     them in a `Table` object. This is an inverse to the `unwrap_tables` function.
     """
-    from pydiverse.transform.core.table import Table
     from pydiverse.transform.core.table_impl import AbstractTableImpl
+    from pydiverse.transform.pipe.table import Table
 
     return traverse(arg, lambda x: Table(x) if isinstance(x, AbstractTableImpl) else x)

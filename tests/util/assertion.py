@@ -8,8 +8,8 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from pydiverse.transform import Table
-from pydiverse.transform.core.verbs import export, show_query
 from pydiverse.transform.errors import NonStandardBehaviourWarning
+from pydiverse.transform.pipe.verbs import export, show_query
 
 
 def assert_equal(left, right, check_dtypes=False, check_row_order=True):

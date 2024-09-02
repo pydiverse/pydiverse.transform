@@ -17,7 +17,7 @@ from sqlalchemy import sql
 
 from pydiverse.transform import ops
 from pydiverse.transform._typing import ImplT
-from pydiverse.transform.core import dtypes
+from pydiverse.transform.backend.table_impl import ColumnMetaData, TableImpl
 from pydiverse.transform.core.expressions import (
     Col,
     LiteralCol,
@@ -25,13 +25,13 @@ from pydiverse.transform.core.expressions import (
     iterate_over_expr,
 )
 from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.table_impl import ColumnMetaData, TableImpl
 from pydiverse.transform.core.util import OrderingDescriptor, translate_ordering
 from pydiverse.transform.errors import AlignmentError, FunctionTypeError
+from pydiverse.transform.expr import dtypes
 from pydiverse.transform.ops import OPType
 
 if TYPE_CHECKING:
-    from pydiverse.transform.core.registry import TypedOperatorImpl
+    from pydiverse.transform.expr.registry import TypedOperatorImpl
 
 
 class SQLTableImpl(TableImpl):

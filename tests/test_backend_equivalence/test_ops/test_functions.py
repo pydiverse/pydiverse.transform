@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydiverse.transform import C
 from pydiverse.transform import functions as f
-from pydiverse.transform.core.verbs import mutate
+from pydiverse.transform.pipe.verbs import mutate
 from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.errors import ExpressionTypeError
+from pydiverse.transform.pipe.verbs import (
     mutate,
     select,
 )
-from pydiverse.transform.errors import ExpressionTypeError
 from tests.util import assert_result_equal
 
 

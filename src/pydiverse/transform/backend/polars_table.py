@@ -5,8 +5,10 @@ import datetime
 import polars as pl
 
 from pydiverse.transform import ops
-from pydiverse.transform.core import dtypes, verbs
-from pydiverse.transform.core.col_expr import (
+from pydiverse.transform.backend.table_impl import TableImpl
+from pydiverse.transform.core.util import OrderingDescriptor
+from pydiverse.transform.expr import dtypes
+from pydiverse.transform.expr.col_expr import (
     CaseExpr,
     Col,
     ColExpr,
@@ -14,10 +16,9 @@ from pydiverse.transform.core.col_expr import (
     ColName,
     Order,
 )
-from pydiverse.transform.core.table_impl import TableImpl
-from pydiverse.transform.core.util import OrderingDescriptor
-from pydiverse.transform.core.verbs import TableExpr
 from pydiverse.transform.ops.core import OPType
+from pydiverse.transform.pipe import verbs
+from pydiverse.transform.pipe.verbs import TableExpr
 
 
 class PolarsEager(TableImpl):

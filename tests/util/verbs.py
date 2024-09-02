@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform import Table, verb
-from pydiverse.transform.core.verbs import arrange
+from pydiverse.transform.pipe.verbs import arrange
 
 
 @verb
