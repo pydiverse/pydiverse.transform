@@ -21,7 +21,6 @@ from pydiverse.transform.tree.registry import (
 )
 
 if TYPE_CHECKING:
-    from pydiverse.transform.core.util import OrderingDescriptor
     from pydiverse.transform.ops import Operator
 
 
@@ -57,28 +56,8 @@ class TableImpl:
     def __init__(
         self,
         name: str,
-        columns: dict[str, Col],
     ):
         self.name = name
-        self.compiler = self.ExpressionCompiler(self)
-        self.lambda_translator = self.LambdaTranslator(self)
-
-        self.selects: ordered_set[str] = ordered_set()  # subset of named_cols
-        self.named_cols: bidict[str, uuid.UUID] = bidict()
-        self.available_cols: set[uuid.UUID] = set()
-
-        self.verb_table_args: list[TableImpl]
-        self.verb_args: list[Any]
-        self.verb_kwargs: dict[str, Any]
-
-        self.grouped_by: ordered_set[Col] = ordered_set()
-        self.intrinsic_grouped_by: ordered_set[Col] = ordered_set()
-
-        # Init Values
-        for name, col in columns.items():
-            self.selects.add(name)
-            self.named_cols.fwd[name] = col.uuid
-            self.available_cols.add(col.uuid)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -100,9 +79,6 @@ class TableImpl:
             if isinstance(v, (list, dict, set, bidict, ordered_set)):
                 c.__dict__[k] = copy.copy(v)
 
-        # Must create a new translator, so that it can access the current df.
-        c.compiler = self.ExpressionCompiler(c)
-        c.lambda_translator = self.LambdaTranslator(c)
         return c
 
     def get_col(self, key: str | Col | ColName):
@@ -162,32 +138,6 @@ class TableImpl:
         :param kwargs: The keyword arguments passed to the verb
         """
         ...
-
-    def alias(self, name=None) -> TableImpl: ...
-
-    def collect(self): ...
-
-    def build_query(self): ...
-
-    def select(self, *args): ...
-
-    def mutate(self, **kwargs): ...
-
-    def join(self, right, on, how, *, validate="m:m"): ...
-
-    def filter(self, *args): ...
-
-    def arrange(self, ordering: list[OrderingDescriptor]): ...
-
-    def group_by(self, *args): ...
-
-    def ungroup(self, *args): ...
-
-    def summarise(self, **kwargs): ...
-
-    def slice_head(self, n: int, offset: int): ...
-
-    def export(self): ...
 
     #### Symbolic Operators ####
 

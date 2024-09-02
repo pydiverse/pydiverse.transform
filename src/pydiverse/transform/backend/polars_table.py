@@ -6,7 +6,6 @@ import polars as pl
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.core.util import OrderingDescriptor
 from pydiverse.transform.ops.core import OPType
 from pydiverse.transform.pipe import verbs
 from pydiverse.transform.pipe.verbs import TableExpr
@@ -26,22 +25,8 @@ class PolarsEager(TableImpl):
         self.df = df
         super().__init__(name)
 
-    # merges descending and null_last markers into the ordering expression
-    def _merge_desc_nulls_last(
-        self, ordering: list[OrderingDescriptor]
-    ) -> list[pl.Expr]:
-        with_signs = []
-        for o in ordering:
-            numeric = self.compiler.translate(o.order).rank("dense").cast(pl.Int64)
-            with_signs.append(numeric if o.asc else -numeric)
-        return [
-            x.fill_null(
-                -(pl.len().cast(pl.Int64) + 1)
-                if o.nulls_first
-                else pl.len().cast(pl.Int64) + 1
-            )
-            for x, o in zip(with_signs, ordering)
-        ]
+    def col_type(self, col_name: str) -> dtypes.DType:
+        return polars_type_to_pdt(self.df.schema[col_name])
 
 
 def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
@@ -149,6 +134,22 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
         return pl.lit(expr, dtype=python_type_to_polars(type(expr)))
 
 
+# merges descending and null_last markers into the ordering expression
+def merge_desc_nulls_last(self, order_exprs: list[Order]) -> list[pl.Expr]:
+    with_signs: list[pl.Expr] = []
+    for expr in order_exprs:
+        numeric = compile_col_expr(expr.order_by, []).rank("dense").cast(pl.Int64)
+        with_signs.append(-numeric if expr.descending else numeric)
+    return [
+        x.fill_null(
+            pl.len().cast(pl.Int64) + 1
+            if o.nulls_last
+            else -(pl.len().cast(pl.Int64) + 1)
+        )
+        for x, o in zip(with_signs, order_exprs)
+    ]
+
+
 def compile_order(order: Order, group_by: list[pl.Expr]) -> tuple[pl.Expr, bool, bool]:
     return (
         compile_col_expr(order.order_by, group_by),
@@ -243,7 +244,7 @@ def compile_table_expr_with_group_by(
     raise AssertionError
 
 
-def pdt_type_to_polars(t: pl.DataType) -> dtypes.DType:
+def polars_type_to_pdt(t: pl.DataType) -> dtypes.DType:
     if t.is_float():
         return dtypes.Float()
     elif t.is_integer():
@@ -262,7 +263,7 @@ def pdt_type_to_polars(t: pl.DataType) -> dtypes.DType:
     raise TypeError(f"polars type {t} is not supported")
 
 
-def polars_type_to_pdt(t: dtypes.DType) -> pl.DataType:
+def pdt_type_to_polars(t: dtypes.DType) -> pl.DataType:
     if isinstance(t, dtypes.Float):
         return pl.Float64()
     elif isinstance(t, dtypes.Int):
