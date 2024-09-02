@@ -54,7 +54,7 @@ _dunder_expr_repr = {
 
 
 class ColExpr:
-    _type: DType
+    dtype: DType | None = None
 
     def _expr_repr(self) -> str:
         """String repr that, when executed, returns the same expression"""
@@ -76,9 +76,10 @@ class ColExpr:
 
 
 class Col(ColExpr, Generic[ImplT]):
-    def __init__(self, name: str, table: TableExpr):
+    def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
         self.name = name
         self.table = table
+        self.dtype = dtype
 
     def __repr__(self):
         return f"<{self.table._impl.name}.{self.name}>"

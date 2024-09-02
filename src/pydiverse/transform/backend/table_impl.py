@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import copy
-import uuid
 import warnings
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pydiverse.transform import ops
 from pydiverse.transform.core.util import bidict, ordered_set
@@ -12,9 +10,9 @@ from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops import OPType
 from pydiverse.transform.tree.col_expr import (
     Col,
-    ColName,
     LiteralCol,
 )
+from pydiverse.transform.tree.dtypes import DType
 from pydiverse.transform.tree.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
@@ -81,31 +79,7 @@ class TableImpl:
 
         return c
 
-    def get_col(self, key: str | Col | ColName):
-        """Getter used by `Table.__getattr__`"""
-
-        if isinstance(key, ColName):
-            key = key.name
-
-        if isinstance(key, str):
-            if uuid := self.named_cols.fwd.get(key, None):
-                return self.cols[uuid].as_column(key, self)
-            # Must return AttributeError, else `hasattr` doesn't work on Table instances
-            raise AttributeError(f"Table '{self.name}' has not column named '{key}'.")
-
-        if isinstance(key, Col):
-            uuid = key.uuid
-            if uuid in self.available_cols:
-                name = self.named_cols.bwd[uuid]
-                return self.cols[uuid].as_column(name, self)
-            raise KeyError(f"Table '{self.name}' has no column that matches '{key}'.")
-
-    def selected_cols(self) -> Iterable[tuple[str, uuid.UUID]]:
-        for name in self.selects:
-            yield (name, self.named_cols.fwd[name])
-
-    def resolve_lambda_cols(self, expr: Any):
-        return self.lambda_translator.translate(expr)
+    def col_type(self, col_name: str) -> DType: ...
 
     def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         """Determine if a column is aligned with the table.

@@ -27,10 +27,10 @@ class Table(TableExpr, Generic[ImplT]):
                 f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
                 f"str, got {type(key)} instead."
             )
-        return Col(self, key)
+        return Col(key, self)
 
     def __getattr__(self, name: str) -> Col:
-        return Col(self, name)
+        return Col(name, self, self._impl.col_type(name))
 
     def __iter__(self) -> Iterable[Col]:
         return iter(self.cols())
