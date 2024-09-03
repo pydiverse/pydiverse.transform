@@ -24,9 +24,12 @@ class Table(TableExpr, Generic[ImplT]):
     # TODO: define exactly what can be given for the two
     def __init__(self, resource, backend=None, *, name: str | None = None):
         from pydiverse.transform.backend.polars import PolarsImpl
+        from pydiverse.transform.backend.table_impl import TableImpl
 
         if isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
             self._impl = PolarsImpl(resource)
+        elif isinstance(resource, TableImpl):
+            self._impl = resource
         elif isinstance(resource, str):
             ...  # could be a SQL table name
 
@@ -53,7 +56,7 @@ class Table(TableExpr, Generic[ImplT]):
 
     def __copy__(self):
         impl_copy = self._impl.copy()
-        return self.__class__(impl_copy)
+        return Table(impl_copy)
 
     def __str__(self):
         try:

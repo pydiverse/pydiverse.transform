@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import functools
 from typing import Literal
 
@@ -52,7 +53,7 @@ __all__ = [
 def alias(expr: TableExpr, new_name: str | None = None):
     if new_name is None:
         new_name = expr.name
-    new_expr = tree.recursive_copy(expr)
+    new_expr = copy.copy(expr)
     new_expr.name = new_name
     return new_expr
 

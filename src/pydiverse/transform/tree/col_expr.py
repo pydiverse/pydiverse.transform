@@ -236,7 +236,7 @@ def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
         ).return_type
         return expr
     elif isinstance(expr, LiteralCol):
-        expr.dtype = python_type_to_pdt(type(expr))
+        expr.dtype = python_type_to_pdt(type(expr.val))
         return expr
     else:
         return LiteralCol(expr)
