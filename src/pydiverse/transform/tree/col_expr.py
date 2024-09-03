@@ -208,9 +208,26 @@ def get_needed_cols(expr: ColExpr) -> set[TableExpr]:
     return set()
 
 
-def propagate_types(expr: ColExpr, col_types: dict[Col | ColName, DType]) -> ColExpr:
-    if isinstance(expr, (Col, ColName)):
-        expr.dtype = col_types[expr]
+def propagate_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColExpr:
+    if isinstance(expr, Col):
+        col_name = col_to_name.get(expr)
+        return col_name if col_name is not None else expr
+    elif isinstance(expr, ColFn):
+        expr.args = [propagate_names(arg, col_to_name) for arg in expr.args]
+        expr.context_kwargs = {
+            key: [propagate_names(v, col_to_name) for v in arr]
+            for key, arr in expr.context_kwargs
+        }
+    elif isinstance(expr, CaseExpr):
+        raise NotImplementedError
+
+    return expr
+
+
+def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
+    assert not isinstance(expr, Col)
+    if isinstance(expr, ColName):
+        expr.dtype = col_types[expr.name]
         return expr
     elif isinstance(expr, ColFn):
         expr.args = [propagate_types(arg, col_types) for arg in expr.args]
@@ -230,20 +247,6 @@ def propagate_types(expr: ColExpr, col_types: dict[Col | ColName, DType]) -> Col
         return expr
     else:
         return LiteralCol(expr)
-
-
-# Add all supported dunder methods to `ColExpr`. This has to be done, because Python
-# doesn't call __getattr__ for dunder methods.
-def create_operator(op):
-    def impl(*args, **kwargs):
-        return ColFn(op, *args, **kwargs)
-
-    return impl
-
-
-for dunder in OperatorRegistry.SUPPORTED_DUNDER:
-    setattr(ColExpr, dunder, create_operator(dunder))
-del create_operator
 
 
 @dataclasses.dataclass
@@ -274,3 +277,17 @@ class Order:
             else:
                 break
         return Order(expr, descending, nulls_last)
+
+
+# Add all supported dunder methods to `ColExpr`. This has to be done, because Python
+# doesn't call __getattr__ for dunder methods.
+def create_operator(op):
+    def impl(*args, **kwargs):
+        return ColFn(op, *args, **kwargs)
+
+    return impl
+
+
+for dunder in OperatorRegistry.SUPPORTED_DUNDER:
+    setattr(ColExpr, dunder, create_operator(dunder))
+del create_operator

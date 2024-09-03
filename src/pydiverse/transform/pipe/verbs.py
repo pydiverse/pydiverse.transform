@@ -3,11 +3,12 @@ from __future__ import annotations
 import functools
 from typing import Literal
 
+from pydiverse.transform import tree
 from pydiverse.transform.backend.table_impl import TableImpl
+from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.core.util import (
     ordered_set,
 )
-from pydiverse.transform.pipe.backends import Backend
 from pydiverse.transform.pipe.pipeable import builtin_verb
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
@@ -58,10 +59,12 @@ def collect(expr: TableExpr): ...
 
 
 @builtin_verb()
-def export(expr: TableExpr, target: Backend | None = None):
+def export(expr: TableExpr, target: Target | None = None):
     SourceBackend: type[TableImpl] = get_backend(expr)
     if target is None:
         target = SourceBackend.backend_marker()
+    tree.propagate_names(expr)
+    tree.propagate_types(expr)
     return SourceBackend.compile_table_expr(expr).export(target)
 
 

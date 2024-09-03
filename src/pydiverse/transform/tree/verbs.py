@@ -87,9 +87,98 @@ class Ungroup(TableExpr):
     table: TableExpr
 
 
-def propagate_types(
-    expr: TableExpr, needed_cols: set[Col]
-) -> dict[Col | ColName, DType]:
+# returns Col -> ColName mapping and the list of available columns
+def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName]:
+    if isinstance(expr, (Alias, SliceHead, Ungroup)):
+        col_to_name = propagate_names(expr.table, needed_cols)
+
+    elif isinstance(expr, Select):
+        needed_cols |= set(col.table for col in expr.selects if isinstance(col, Col))
+        col_to_name = propagate_names(expr.table, needed_cols)
+        expr.selects = [
+            col_to_name[col] if col in col_to_name else col for col in expr.selects
+        ]
+
+    elif isinstance(expr, Rename):
+        col_to_name = propagate_names(expr.table, needed_cols)
+        col_to_name = {
+            col: ColName(expr.name_map[col_name.name])
+            if col_name.name in expr.name_map
+            else col_name
+            for col, col_name in col_to_name
+        }
+
+    elif isinstance(expr, Mutate):
+        for v in expr.values:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = propagate_names(expr.table, needed_cols)
+        # overwritten columns still need to be stored since the user may access them
+        # later. They're not in the C-space anymore, however, so we give them
+        # {name}_{hash of the previous table} as a dummy name.
+        overwritten = set(
+            name for name in expr.names if Col(expr, name) in set(needed_cols)
+        )
+        col_to_name = {
+            col: ColName(col_name.name + str(hash(expr.table)))
+            if col_name.name in overwritten
+            else col_name
+            for col, col_name in col_to_name.items()
+        }
+        expr.values = [col_expr.propagate_names(v, col_to_name) for v in expr.values]
+
+    elif isinstance(expr, Join):
+        for v in expr.on:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name_left, cols_left = propagate_names(expr.left, needed_cols)
+        col_to_name_right, cols_right = propagate_names(expr.right, needed_cols)
+        col_to_name = col_to_name_left | col_to_name_right
+        expr.on = [propagate_names(v, col_to_name) for v in expr.on]
+
+    elif isinstance(expr, Filter):
+        for v in expr.filters:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = propagate_names(expr.table, needed_cols)
+        expr.filters = [propagate_names(v, col_to_name) for v in expr.filters]
+
+    elif isinstance(expr, Arrange):
+        for v in expr.order_by:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = propagate_names(expr.table, needed_cols)
+        expr.order_by = [
+            Order(
+                propagate_names(order.order_by, col_to_name),
+                order.descending,
+                order.nulls_last,
+            )
+            for order in expr.order_by
+        ]
+
+    elif isinstance(expr, GroupBy):
+        for v in expr.group_by:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = propagate_names(expr.table, needed_cols)
+        expr.group_by = [propagate_names(v, col_to_name) for v in expr.group_by]
+
+    elif isinstance(expr, Summarise):
+        for v in expr.values:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = propagate_names(expr.table, needed_cols)
+        expr.values = [propagate_names(v, col_to_name) for v in expr.values]
+
+    elif isinstance(expr, Table):
+        col_to_name = dict()
+
+    else:
+        raise TypeError
+
+    for col in needed_cols:
+        if col.table == expr:
+            col_to_name[col] = ColName(col.name)
+
+    return col_to_name
+
+
+def propagate_types(expr: TableExpr) -> dict[Col | ColName, DType]:
     if isinstance(
         expr, (Alias, SliceHead, Ungroup, Select, Rename, SliceHead, GroupBy)
     ):

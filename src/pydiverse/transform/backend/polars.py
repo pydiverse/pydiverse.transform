@@ -11,7 +11,7 @@ from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.ops.core import OPType
 from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree import col_expr, dtypes, verbs
+from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
     Col,
@@ -33,7 +33,6 @@ class PolarsImpl(TableImpl):
 
     @staticmethod
     def compile_table_expr(expr: TableExpr) -> PolarsImpl:
-        table_expr_propagate_names(expr, set())
         lf, context = table_expr_compile_with_context(expr)
         return PolarsImpl(lf.select(context.selects))
 
@@ -56,123 +55,6 @@ class PolarsImpl(TableImpl):
         return {
             name: polars_type_to_pdt(dtype) for name, dtype in self.df.schema.items()
         }
-
-
-def col_expr_propagate_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColExpr:
-    if isinstance(expr, Col):
-        col_name = col_to_name.get(expr)
-        return col_name if col_name is not None else expr
-    elif isinstance(expr, ColFn):
-        expr.args = [col_expr_propagate_names(arg, col_to_name) for arg in expr.args]
-        expr.context_kwargs = {
-            key: [col_expr_propagate_names(v, col_to_name) for v in arr]
-            for key, arr in expr.context_kwargs
-        }
-    elif isinstance(expr, CaseExpr):
-        raise NotImplementedError
-
-    return expr
-
-
-# returns Col -> ColName mapping and the list of available columns
-def table_expr_propagate_names(
-    expr: TableExpr, needed_cols: set[Col]
-) -> tuple[dict[Col, ColName]]:
-    if isinstance(expr, (verbs.Alias, verbs.SliceHead, verbs.Ungroup)):
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-
-    elif isinstance(expr, verbs.Select):
-        needed_cols |= set(col.table for col in expr.selects if isinstance(col, Col))
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-        expr.selects = [
-            col_to_name[col] if col in col_to_name else col for col in expr.selects
-        ]
-
-    elif isinstance(expr, verbs.Rename):
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-        col_to_name = {
-            col: ColName(expr.name_map[col_name.name])
-            if col_name.name in expr.name_map
-            else col_name
-            for col, col_name in col_to_name
-        }
-
-    elif isinstance(expr, verbs.Mutate):
-        for v in expr.values:
-            needed_cols |= col_expr.get_needed_cols(v)
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-        # overwritten columns still need to be stored since the user may access them
-        # later. They're not in the C-space anymore, however, so we give them
-        # {name}_{hash of the previous table} as a dummy name.
-        overwritten = set(
-            name for name in expr.names if Col(expr, name) in set(needed_cols)
-        )
-        col_to_name = {
-            col: ColName(col_name.name + str(hash(expr.table)))
-            if col_name.name in overwritten
-            else col_name
-            for col, col_name in col_to_name
-        }
-        expr.values = [table_expr_propagate_names(v, col_to_name) for v in expr.values]
-
-    elif isinstance(expr, verbs.Join):
-        for v in expr.on:
-            needed_cols |= col_expr.get_needed_cols(v)
-        col_to_name_left, cols_left = table_expr_propagate_names(expr.left, needed_cols)
-        col_to_name_right, cols_right = table_expr_propagate_names(
-            expr.right, needed_cols
-        )
-        col_to_name = col_to_name_left | col_to_name_right
-        cols = cols_left + [ColName(col.name + expr.suffix) for col in cols_right]
-        expr.on = [table_expr_propagate_names(v, col_to_name) for v in expr.on]
-
-    elif isinstance(expr, verbs.Filter):
-        for v in expr.filters:
-            needed_cols |= col_expr.get_needed_cols(v)
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-        expr.filters = [
-            table_expr_propagate_names(v, col_to_name) for v in expr.filters
-        ]
-
-    elif isinstance(expr, verbs.Arrange):
-        for v in expr.order_by:
-            needed_cols |= col_expr.get_needed_cols(v)
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-        expr.order_by = [
-            Order(
-                table_expr_propagate_names(order.order_by, col_to_name),
-                order.descending,
-                order.nulls_last,
-            )
-            for order in expr.order_by
-        ]
-
-    elif isinstance(expr, verbs.GroupBy):
-        for v in expr.group_by:
-            needed_cols |= col_expr.get_needed_cols(v)
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-        expr.group_by = [
-            table_expr_propagate_names(v, col_to_name) for v in expr.group_by
-        ]
-
-    elif isinstance(expr, verbs.Summarise):
-        for v in expr.values:
-            needed_cols |= col_expr.get_needed_cols(v)
-        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
-        expr.values = [table_expr_propagate_names(v, col_to_name) for v in expr.values]
-        cols.extend(Col(name, expr) for name in expr.names)
-
-    elif isinstance(expr, Table):
-        col_to_name = dict()
-
-    else:
-        raise TypeError
-
-    for col in needed_cols:
-        if col.table == expr:
-            col_to_name[col] = ColName(col.name)
-
-    return col_to_name
 
 
 def col_expr_compile(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
