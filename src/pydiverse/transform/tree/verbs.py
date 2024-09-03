@@ -148,12 +148,12 @@ def propagate_names(
         expr.filters = [col_expr.propagate_names(v, col_to_name) for v in expr.filters]
 
     elif isinstance(expr, Arrange):
-        for v in expr.order_by:
-            needed_cols.inner_update(col_expr.get_needed_cols(v))
+        for order in expr.order_by:
+            needed_cols.inner_update(col_expr.get_needed_cols(order.order_by))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.order_by = [
             Order(
-                propagate_names(order.order_by, col_to_name),
+                col_expr.propagate_names(order.order_by, col_to_name),
                 order.descending,
                 order.nulls_last,
             )
@@ -170,7 +170,7 @@ def propagate_names(
         for v in expr.values:
             needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
-        expr.values = [propagate_names(v, col_to_name) for v in expr.values]
+        expr.values = [col_expr.propagate_names(v, col_to_name) for v in expr.values]
 
     elif isinstance(expr, Table):
         col_to_name = Map2d()
@@ -221,7 +221,14 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
 
     elif isinstance(expr, Arrange):
         col_types = propagate_types(expr.table)
-        expr.order_by = [col_expr.propagate_types(v, col_types) for v in expr.order_by]
+        expr.order_by = [
+            Order(
+                col_expr.propagate_types(ord.order_by, col_types),
+                ord.descending,
+                ord.nulls_last,
+            )
+            for ord in expr.order_by
+        ]
         return col_types
 
     elif isinstance(expr, Table):

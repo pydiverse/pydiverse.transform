@@ -62,10 +62,8 @@ class ColExpr:
         """String repr that, when executed, returns the same expression"""
         raise NotImplementedError
 
-    def __getattr__(self, item) -> ColExpr:
-        if item in ("str", "dt"):
-            return FnNamespace(item, self)
-        return ColFn(item, self)
+    def __getattr__(self, item) -> FnAttr:
+        return FnAttr(item, self)
 
     __contains__ = None
     __iter__ = None
@@ -176,12 +174,15 @@ class CaseExpr(ColExpr):
 
 
 @dataclasses.dataclass
-class FnNamespace:
+class FnAttr:
     name: str
     arg: ColExpr
 
-    def __getattr__(self, name) -> ColExpr:
-        return ColFn(self.name + name, self.arg)
+    def __getattr__(self, name) -> FnAttr:
+        return FnAttr(f"{self.name}.{name}", self.arg)
+
+    def __call__(self) -> ColExpr:
+        return ColFn(self.name, self.arg)
 
 
 def get_needed_cols(expr: ColExpr) -> Map2d[TableExpr, set[str]]:
@@ -250,7 +251,7 @@ class Order:
     # the given `expr` may contain nulls_last markers or `-` (descending markers). the
     # order_by of the Order does not contain these special functions and can thus be
     # translated normally.
-    @classmethod
+    @staticmethod
     def from_col_expr(expr: ColExpr) -> Order:
         descending = False
         nulls_last = None
@@ -268,6 +269,8 @@ class Order:
                 expr = expr.args[0]
             else:
                 break
+        if nulls_last is None:
+            nulls_last = False
         return Order(expr, descending, nulls_last)
 
 

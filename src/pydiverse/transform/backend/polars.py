@@ -278,11 +278,14 @@ def table_expr_compile_with_context(
 
     elif isinstance(expr, verbs.Arrange):
         df, context = table_expr_compile_with_context(expr.table)
-        return df.sort(
-            [
+        order_by, descending, nulls_last = zip(
+            *[
                 compile_order(order, context.compiled_group_by())
                 for order in expr.order_by
             ]
+        )
+        return df.sort(
+            order_by, descending=descending, nulls_last=nulls_last, maintain_order=True
         ), context
 
     elif isinstance(expr, verbs.GroupBy):
