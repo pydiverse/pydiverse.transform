@@ -53,7 +53,7 @@ __all__ = [
 def alias(expr: TableExpr, new_name: str | None = None):
     if new_name is None:
         new_name = expr.name
-    new_expr = copy.copy(expr)
+    new_expr = copy.deepcopy(expr)
     new_expr.name = new_name
     return new_expr
 

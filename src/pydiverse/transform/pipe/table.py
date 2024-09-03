@@ -41,10 +41,14 @@ class Table(TableExpr, Generic[ImplT]):
                 f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
                 f"str, got {type(key)} instead."
             )
-        return Col(key, self, self._impl.col_type(key))
+        col = super().__getitem__(key)
+        col.dtype = self._impl.col_type(key)
+        return col
 
     def __getattr__(self, name: str) -> Col:
-        return Col(name, self, self._impl.col_type(name))
+        col = super().__getattr__(name)
+        col.dtype = self._impl.col_type(name)
+        return col
 
     def __iter__(self) -> Iterable[Col]:
         return iter(self.cols())
@@ -53,10 +57,6 @@ class Table(TableExpr, Generic[ImplT]):
         if isinstance(item, (Col, ColName)):
             item = item.name
         return item in self.col_names()
-
-    def __copy__(self):
-        impl_copy = self._impl.copy()
-        return Table(impl_copy)
 
     def __str__(self):
         try:

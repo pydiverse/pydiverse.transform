@@ -28,8 +28,11 @@ class PolarsImpl(TableImpl):
     def __init__(self, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
 
+    def __deepcopy__(self, memo) -> PolarsImpl:
+        return PolarsImpl(self.df.clone())
+
     def col_type(self, col_name: str) -> dtypes.DType:
-        return polars_type_to_pdt(self.df.schema[col_name])
+        return polars_type_to_pdt(self.df.collect_schema()[col_name])
 
     @staticmethod
     def compile_table_expr(expr: TableExpr) -> PolarsImpl:

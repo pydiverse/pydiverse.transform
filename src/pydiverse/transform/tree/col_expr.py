@@ -56,17 +56,21 @@ _dunder_expr_repr = {
 
 
 class ColExpr:
-    dtype: DType | None = None
+    dtype: DType | None
+
+    __slots__ = ["dtype"]
+
+    __contains__ = None
+    __iter__ = None
 
     def _expr_repr(self) -> str:
         """String repr that, when executed, returns the same expression"""
         raise NotImplementedError
 
-    def __getattr__(self, item) -> FnAttr:
-        return FnAttr(item, self)
-
-    __contains__ = None
-    __iter__ = None
+    def __getattr__(self, name: str) -> FnAttr:
+        if name.startswith("_") and name.endswith("_"):
+            raise AttributeError(f"`ColExpr` has no attribute `{name}`")
+        return FnAttr(name, self)
 
     def __bool__(self):
         raise TypeError(

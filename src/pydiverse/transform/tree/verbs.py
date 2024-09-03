@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import dataclasses
 import itertools
 from typing import Literal
@@ -17,35 +16,26 @@ JoinHow = Literal["inner", "left", "outer"]
 JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 
 
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Select(TableExpr):
     table: TableExpr
     selects: list[Col | ColName]
 
-    def __copy__(self):
-        return Select(copy.copy(self.table), self.selects)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Rename(TableExpr):
     table: TableExpr
     name_map: dict[str, str]
 
-    def __copy__(self):
-        return Rename(copy.copy(self.table), self.name_map)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Mutate(TableExpr):
     table: TableExpr
     names: list[str]
     values: list[ColExpr]
 
-    def __copy__(self):
-        return Mutate(copy.copy(self.table), self.names, self.values)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Join(TableExpr):
     left: TableExpr
     right: TableExpr
@@ -54,71 +44,43 @@ class Join(TableExpr):
     validate: JoinValidate
     suffix: str
 
-    def __copy__(self):
-        return Join(
-            copy.copy(self.left),
-            copy.copy(self.right),
-            self.on,
-            self.how,
-            self.validate,
-            self.suffix,
-        )
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Filter(TableExpr):
     table: TableExpr
     filters: list[ColExpr]
 
-    def __copy__(self):
-        return Filter(copy.copy(self.table), self.filters)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Summarise(TableExpr):
     table: TableExpr
     names: list[str]
     values: list[ColExpr]
 
-    def __copy__(self):
-        return Summarise(copy.copy(self.table), self.names, self.values)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Arrange(TableExpr):
     table: TableExpr
     order_by: list[Order]
 
-    def __copy__(self):
-        return Arrange(copy.copy(self.table), self.order_by)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class SliceHead(TableExpr):
     table: TableExpr
     n: int
     offset: int
 
-    def __copy__(self):
-        return SliceHead(copy.copy(self.table), self.n, self.offset)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class GroupBy(TableExpr):
     table: TableExpr
     group_by: list[Col | ColName]
     add: bool
 
-    def __copy__(self):
-        return GroupBy(copy.copy(self.table), self.group_by, self.add)
 
-
-@dataclasses.dataclass(eq=False)
+@dataclasses.dataclass(eq=False, slots=True)
 class Ungroup(TableExpr):
     table: TableExpr
-
-    def __copy__(self):
-        return Ungroup(copy.copy(self.table))
 
 
 # returns Col -> ColName mapping and the list of available columns
