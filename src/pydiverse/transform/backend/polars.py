@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-from typing import Any, Self
+from typing import Any
 
 import polars as pl
 
@@ -11,7 +11,7 @@ from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.ops.core import OPType
 from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree import dtypes, verbs
+from pydiverse.transform.tree import col_expr, dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
     Col,
@@ -32,8 +32,9 @@ class PolarsImpl(TableImpl):
         return polars_type_to_pdt(self.df.schema[col_name])
 
     @staticmethod
-    def compile_table_expr(expr: TableExpr) -> Self:
-        lf, context = compile_table_expr_with_context(expr)
+    def compile_table_expr(expr: TableExpr) -> PolarsImpl:
+        table_expr_propagate_names(expr, set())
+        lf, context = table_expr_compile_with_context(expr)
         return PolarsImpl(lf.select(context.selects))
 
     @staticmethod
@@ -57,14 +58,131 @@ class PolarsImpl(TableImpl):
         }
 
 
-def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
+def col_expr_propagate_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColExpr:
+    if isinstance(expr, Col):
+        col_name = col_to_name.get(expr)
+        return col_name if col_name is not None else expr
+    elif isinstance(expr, ColFn):
+        expr.args = [col_expr_propagate_names(arg, col_to_name) for arg in expr.args]
+        expr.context_kwargs = {
+            key: [col_expr_propagate_names(v, col_to_name) for v in arr]
+            for key, arr in expr.context_kwargs
+        }
+    elif isinstance(expr, CaseExpr):
+        raise NotImplementedError
+
+    return expr
+
+
+# returns Col -> ColName mapping and the list of available columns
+def table_expr_propagate_names(
+    expr: TableExpr, needed_cols: set[Col]
+) -> tuple[dict[Col, ColName]]:
+    if isinstance(expr, (verbs.Alias, verbs.SliceHead, verbs.Ungroup)):
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+
+    elif isinstance(expr, verbs.Select):
+        needed_cols |= set(col.table for col in expr.selects if isinstance(col, Col))
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+        expr.selects = [
+            col_to_name[col] if col in col_to_name else col for col in expr.selects
+        ]
+
+    elif isinstance(expr, verbs.Rename):
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+        col_to_name = {
+            col: ColName(expr.name_map[col_name.name])
+            if col_name.name in expr.name_map
+            else col_name
+            for col, col_name in col_to_name
+        }
+
+    elif isinstance(expr, verbs.Mutate):
+        for v in expr.values:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+        # overwritten columns still need to be stored since the user may access them
+        # later. They're not in the C-space anymore, however, so we give them
+        # {name}_{hash of the previous table} as a dummy name.
+        overwritten = set(
+            name for name in expr.names if Col(expr, name) in set(needed_cols)
+        )
+        col_to_name = {
+            col: ColName(col_name.name + str(hash(expr.table)))
+            if col_name.name in overwritten
+            else col_name
+            for col, col_name in col_to_name
+        }
+        expr.values = [table_expr_propagate_names(v, col_to_name) for v in expr.values]
+
+    elif isinstance(expr, verbs.Join):
+        for v in expr.on:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name_left, cols_left = table_expr_propagate_names(expr.left, needed_cols)
+        col_to_name_right, cols_right = table_expr_propagate_names(
+            expr.right, needed_cols
+        )
+        col_to_name = col_to_name_left | col_to_name_right
+        cols = cols_left + [ColName(col.name + expr.suffix) for col in cols_right]
+        expr.on = [table_expr_propagate_names(v, col_to_name) for v in expr.on]
+
+    elif isinstance(expr, verbs.Filter):
+        for v in expr.filters:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+        expr.filters = [
+            table_expr_propagate_names(v, col_to_name) for v in expr.filters
+        ]
+
+    elif isinstance(expr, verbs.Arrange):
+        for v in expr.order_by:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+        expr.order_by = [
+            Order(
+                table_expr_propagate_names(order.order_by, col_to_name),
+                order.descending,
+                order.nulls_last,
+            )
+            for order in expr.order_by
+        ]
+
+    elif isinstance(expr, verbs.GroupBy):
+        for v in expr.group_by:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+        expr.group_by = [
+            table_expr_propagate_names(v, col_to_name) for v in expr.group_by
+        ]
+
+    elif isinstance(expr, verbs.Summarise):
+        for v in expr.values:
+            needed_cols |= col_expr.get_needed_cols(v)
+        col_to_name = table_expr_propagate_names(expr.table, needed_cols)
+        expr.values = [table_expr_propagate_names(v, col_to_name) for v in expr.values]
+        cols.extend(Col(name, expr) for name in expr.names)
+
+    elif isinstance(expr, Table):
+        col_to_name = dict()
+
+    else:
+        raise TypeError
+
+    for col in needed_cols:
+        if col.table == expr:
+            col_to_name[col] = ColName(col.name)
+
+    return col_to_name
+
+
+def col_expr_compile(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
         return pl.col(expr.name)
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.operator_registry.get_operator(expr.name)
-        args: list[pl.Expr] = [compile_col_expr(arg, group_by) for arg in expr.args]
+        args: list[pl.Expr] = [col_expr_compile(arg, group_by) for arg in expr.args]
         impl = PolarsImpl.operator_registry.get_implementation(
             expr.name,
             tuple(arg.dtype for arg in expr.args),
@@ -170,7 +288,7 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
 def merge_desc_nulls_last(self, order_exprs: list[Order]) -> list[pl.Expr]:
     with_signs: list[pl.Expr] = []
     for expr in order_exprs:
-        numeric = compile_col_expr(expr.order_by, []).rank("dense").cast(pl.Int64)
+        numeric = col_expr_compile(expr.order_by, []).rank("dense").cast(pl.Int64)
         with_signs.append(-numeric if expr.descending else numeric)
     return [
         x.fill_null(
@@ -184,7 +302,7 @@ def merge_desc_nulls_last(self, order_exprs: list[Order]) -> list[pl.Expr]:
 
 def compile_order(order: Order, group_by: list[pl.Expr]) -> tuple[pl.Expr, bool, bool]:
     return (
-        compile_col_expr(order.order_by, group_by),
+        col_expr_compile(order.order_by, group_by),
         order.descending,
         order.nulls_last,
     )
@@ -196,8 +314,8 @@ def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
             return compile_join_cond(expr.args[0]) + compile_join_cond(expr.args[1])
         if expr.name == "__eq__":
             return (
-                compile_col_expr(expr.args[0], []),
-                compile_col_expr(expr.args[1], []),
+                col_expr_compile(expr.args[0], []),
+                col_expr_compile(expr.args[1], []),
             )
 
     raise AssertionError()
@@ -208,43 +326,49 @@ class CompilationContext:
     group_by: list[str]
     selects: list[str]
 
-    def group_by_expr(self) -> list[pl.Expr]:
+    def compiled_group_by(self) -> list[pl.Expr]:
         return [pl.col(name) for name in self.group_by]
 
 
-def compile_table_expr_with_context(
+def table_expr_compile_with_context(
     expr: TableExpr,
 ) -> tuple[pl.LazyFrame, CompilationContext]:
     if isinstance(expr, verbs.Alias):
-        df, context = compile_table_expr_with_context(expr.table)
+        df, context = table_expr_compile_with_context(expr.table)
         setattr(df, expr.new_name)
         return df, context
 
     elif isinstance(expr, verbs.Select):
-        df, context = compile_table_expr_with_context(expr.table)
-        context.selects = [col for col in context.selects if col in set(expr.selects)]
+        df, context = table_expr_compile_with_context(expr.table)
+        context.selects = [
+            col
+            for col in context.selects
+            if col in set(col.name for col in expr.selects)
+        ]
         return df, context
 
     elif isinstance(expr, verbs.Mutate):
-        df, context = compile_table_expr_with_context(expr.table)
-        context.selects.extend(expr.names)
+        df, context = table_expr_compile_with_context(expr.table)
+        context.selects.extend(
+            name for name in expr.names if name not in set(context.selects)
+        )
         return df.with_columns(
             **{
-                name: compile_col_expr(
+                name: col_expr_compile(
                     value,
-                    context.group_by_expr(),
+                    context.compiled_group_by(),
                 )
                 for name, value in zip(expr.names, expr.values)
             }
         ), context
 
     elif isinstance(expr, verbs.Rename):
-        df, context = compile_table_expr_with_context(expr.table)
+        df, context = table_expr_compile_with_context(expr.table)
         return df.rename(expr.name_map), context
 
     elif isinstance(expr, verbs.Join):
-        left_df, left_context = compile_table_expr_with_context(expr.left)
-        right_df, right_context = compile_table_expr_with_context(expr.right)
+        left_df, left_context = table_expr_compile_with_context(expr.left)
+        right_df, right_context = table_expr_compile_with_context(expr.right)
         assert not left_context.compiled_group_by
         assert not right_context.compiled_group_by
         left_on, right_on = zip(*compile_join_cond(expr.on))
@@ -262,19 +386,22 @@ def compile_table_expr_with_context(
         )
 
     elif isinstance(expr, verbs.Filter):
-        df, context = compile_table_expr_with_context(expr.table)
+        df, context = table_expr_compile_with_context(expr.table)
         return df.filter(
-            compile_col_expr(expr.filters, context.group_by_expr())
+            col_expr_compile(expr.filters, context.compiled_group_by())
         ), context
 
     elif isinstance(expr, verbs.Arrange):
-        df, context = compile_table_expr_with_context(expr.table)
+        df, context = table_expr_compile_with_context(expr.table)
         return df.sort(
-            [compile_order(order, context.group_by_expr()) for order in expr.order_by]
+            [
+                compile_order(order, context.compiled_group_by())
+                for order in expr.order_by
+            ]
         ), context
 
     elif isinstance(expr, verbs.GroupBy):
-        df, context = compile_table_expr_with_context(expr.table)
+        df, context = table_expr_compile_with_context(expr.table)
         return df, CompilationContext(
             (
                 context.group_by + [col.name for col in expr.group_by]
@@ -285,11 +412,24 @@ def compile_table_expr_with_context(
         )
 
     elif isinstance(expr, verbs.Ungroup):
-        df, context = compile_table_expr_with_context(expr.table)
+        df, context = table_expr_compile_with_context(expr.table)
         return df, context
 
+    elif isinstance(expr, verbs.Summarise):
+        df, context = table_expr_compile_with_context(expr.table)
+        compiled_group_by = context.compiled_group_by()
+        return df.group_by(compiled_group_by).agg(
+            **{
+                name: col_expr_compile(
+                    value,
+                    compiled_group_by,
+                )
+                for name, value in zip(expr.names, expr.values)
+            }
+        ), CompilationContext([], context.group_by + expr.names)
+
     elif isinstance(expr, verbs.SliceHead):
-        df, context = compile_table_expr_with_context(expr.table)
+        df, context = table_expr_compile_with_context(expr.table)
         assert len(context.group_by) == 0
         return df, context
 

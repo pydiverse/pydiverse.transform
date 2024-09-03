@@ -4,8 +4,8 @@ import dataclasses
 from collections.abc import Iterable
 from typing import Any, Generic
 
-from pydiverse.transform._typing import ImplT, T
-from pydiverse.transform.tree.dtypes import DType
+from pydiverse.transform._typing import ImplT
+from pydiverse.transform.tree.dtypes import DType, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 from pydiverse.transform.tree.table_expr import TableExpr
 
@@ -88,7 +88,7 @@ class Col(ColExpr, Generic[ImplT]):
         return f"{self.table.name}.{self.name}"
 
     def __eq__(self, other):
-        return self.table == other.table & self.name == other.name
+        return self.table == other.table and self.name == other.name
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -107,44 +107,17 @@ class ColName(ColExpr):
     def _expr_repr(self) -> str:
         return f"C.{self.name}"
 
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return self.name == other.name
-        return False
 
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return hash(("C", self.name))
-
-
-class LiteralCol(ColExpr, Generic[T]):
-    __slots__ = ("typed_value", "expr", "backend")
-
-    def __init__(
-        self,
-        expr: Any,
-    ):
-        self.expr = expr
+class LiteralCol(ColExpr):
+    def __init__(self, val: Any):
+        self.val = val
+        self.dtype = python_type_to_pdt(type(val))
 
     def __repr__(self):
         return f"<Lit: {self.expr} ({self.typed_value.dtype})>"
 
     def _expr_repr(self) -> str:
         return repr(self)
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        return (
-            self.typed_value == other.typed_value
-            and self.expr == other.expr
-            and self.backend == other.backend
-        )
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
 
 class ColFn(ColExpr):
@@ -173,21 +146,6 @@ class ColFn(ColExpr):
         else:
             args_str = ", ".join(args[1:])
             return f"{args[0]}.{self.name}({args_str})"
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return self.__dict__ == other.__dict__
-        else:
-            return False
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return hash((self.name, self.args, tuple(self.context_kwargs.items())))
-
-    def iter_children(self):
-        yield from self.args
 
 
 class CaseExpr(ColExpr):
@@ -233,42 +191,26 @@ class FnNamespace:
         return ColFn(self.name + name, self.arg)
 
 
-def get_needed_tables(expr: ColExpr) -> set[TableExpr]:
+def get_needed_cols(expr: ColExpr) -> set[TableExpr]:
     if isinstance(expr, Col):
-        return set(expr.table)
+        return set({expr})
     elif isinstance(expr, ColFn):
         needed_tables = set()
         for v in expr.args:
-            needed_tables |= get_needed_tables(v)
+            needed_tables |= get_needed_cols(v)
         for v in expr.context_kwargs.values():
-            needed_tables |= get_needed_tables(v)
+            needed_tables |= get_needed_cols(v)
         return needed_tables
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
     elif isinstance(expr, LiteralCol):
-        raise NotImplementedError
+        return set()
     return set()
 
 
-def propagate_col_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColExpr:
-    if isinstance(expr, Col):
-        col_name = col_to_name.get(expr)
-        return col_name if col_name is not None else expr
-    elif isinstance(expr, ColFn):
-        expr.args = [propagate_col_names(arg, col_to_name) for arg in expr.args]
-        expr.context_kwargs = {
-            key: [propagate_col_names(v, col_to_name) for v in arr]
-            for key, arr in expr.context_kwargs
-        }
-    elif isinstance(expr, CaseExpr):
-        raise NotImplementedError
-
-    return expr
-
-
-def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
-    if isinstance(expr, ColName):
-        expr._type = col_types[expr]
+def propagate_types(expr: ColExpr, col_types: dict[Col | ColName, DType]) -> ColExpr:
+    if isinstance(expr, (Col, ColName)):
+        expr.dtype = col_types[expr]
         return expr
     elif isinstance(expr, ColFn):
         expr.args = [propagate_types(arg, col_types) for arg in expr.args]
@@ -279,12 +221,15 @@ def propagate_types(expr: ColExpr, col_types: dict[ColName, DType]) -> ColExpr:
         # TODO: create a backend agnostic registry
         from pydiverse.transform.backend.polars import PolarsImpl
 
-        expr._type = PolarsImpl.operator_registry.get_implementation(
-            expr.name, [arg._type for arg in expr.args]
+        expr.dtype = PolarsImpl.operator_registry.get_implementation(
+            expr.name, [arg.dtype for arg in expr.args]
         ).return_type
         return expr
-
-    raise NotImplementedError
+    elif isinstance(expr, LiteralCol):
+        expr.dtype = python_type_to_pdt(type(expr))
+        return expr
+    else:
+        return LiteralCol(expr)
 
 
 # Add all supported dunder methods to `ColExpr`. This has to be done, because Python
