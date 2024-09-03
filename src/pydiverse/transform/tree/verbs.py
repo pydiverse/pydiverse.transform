@@ -1,23 +1,19 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
+import itertools
 from typing import Literal
 
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import col_expr
-from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order, TableColSet
+from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Map2d, Order
 from pydiverse.transform.tree.dtypes import DType
 from pydiverse.transform.tree.table_expr import TableExpr
 
 JoinHow = Literal["inner", "left", "outer"]
 
 JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
-
-
-@dataclasses.dataclass(eq=False)
-class Alias(TableExpr):
-    table: TableExpr
-    new_name: str | None
 
 
 @dataclasses.dataclass(eq=False)
@@ -88,11 +84,10 @@ class Ungroup(TableExpr):
 
 
 # returns Col -> ColName mapping and the list of available columns
-def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColName]:
-    if isinstance(expr, (Alias, SliceHead, Ungroup)):
-        col_to_name = propagate_names(expr.table, needed_cols)
-
-    elif isinstance(expr, Select):
+def propagate_names(
+    expr: TableExpr, needed_cols: Map2d[TableExpr, set[str]]
+) -> Map2d[TableExpr, dict[str, str]]:
+    if isinstance(expr, Select):
         for col in expr.selects:
             if isinstance(col, Col):
                 if col.table in needed_cols:
@@ -107,15 +102,16 @@ def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColN
     elif isinstance(expr, Rename):
         col_to_name = propagate_names(expr.table, needed_cols)
         col_to_name = {
-            col: ColName(expr.name_map[col_name.name])
-            if col_name.name in expr.name_map
-            else col_name
-            for col, col_name in col_to_name.items()
+            table: {
+                name: (expr.name_map[name] if name in expr.name_map else name)
+                for name in mapping
+            }
+            for table, mapping in col_to_name.items()
         }
 
     elif isinstance(expr, Mutate):
         for v in expr.values:
-            needed_cols.update(col_expr.get_needed_cols(v))
+            needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         # overwritten columns still need to be stored since the user may access them
         # later. They're not in the C-space anymore, however, so we give them
@@ -123,7 +119,7 @@ def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColN
         overwritten = set(
             name
             for name in expr.names
-            if name in set(col_name.name for col_name in col_to_name.values())
+            if name in set(itertools.chain(v.values() for v in col_to_name.values()))
         )
         # for the backends, we insert a Rename here that gives the overwritten cols
         # their dummy names. The backends may thus assume that the user never overwrites
@@ -143,7 +139,7 @@ def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColN
 
     elif isinstance(expr, Join):
         for v in expr.on:
-            needed_cols.update(col_expr.get_needed_cols(v))
+            needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name_left = propagate_names(expr.left, needed_cols)
         col_to_name_right = propagate_names(expr.right, needed_cols)
         col_to_name = col_to_name_left | col_to_name_right
@@ -151,13 +147,13 @@ def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColN
 
     elif isinstance(expr, Filter):
         for v in expr.filters:
-            needed_cols.update(col_expr.get_needed_cols(v))
+            needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.filters = [propagate_names(v, col_to_name) for v in expr.filters]
 
     elif isinstance(expr, Arrange):
         for v in expr.order_by:
-            needed_cols.update(col_expr.get_needed_cols(v))
+            needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.order_by = [
             Order(
@@ -170,13 +166,13 @@ def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColN
 
     elif isinstance(expr, GroupBy):
         for v in expr.group_by:
-            needed_cols.update(col_expr.get_needed_cols(v))
+            needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.group_by = [propagate_names(v, col_to_name) for v in expr.group_by]
 
     elif isinstance(expr, Summarise):
         for v in expr.values:
-            needed_cols.update(col_expr.get_needed_cols(v))
+            needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.values = [propagate_names(v, col_to_name) for v in expr.values]
 
@@ -195,10 +191,7 @@ def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColN
 
 
 def propagate_types(expr: TableExpr) -> dict[str, DType]:
-    if isinstance(expr, (Alias, SliceHead, Ungroup, Select, SliceHead, GroupBy)):
-        return propagate_types(expr.table)
-
-    elif isinstance(expr, Rename):
+    if isinstance(expr, Rename):
         col_types = propagate_types(expr.table)
         return {
             (expr.name_map[name] if name in expr.name_map else name): dtype
@@ -236,3 +229,13 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
 
     else:
         raise TypeError
+
+
+def recursive_copy(expr: TableExpr) -> TableExpr:
+    new_expr = copy(expr)
+    if isinstance(expr, Join):
+        new_expr.left = recursive_copy(expr.left)
+        new_expr.right = recursive_copy(expr.right)
+    else:
+        new_expr.table = recursive_copy(expr.table)
+    return new_expr

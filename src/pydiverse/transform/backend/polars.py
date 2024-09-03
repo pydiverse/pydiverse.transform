@@ -215,12 +215,7 @@ class CompilationContext:
 def table_expr_compile_with_context(
     expr: TableExpr,
 ) -> tuple[pl.LazyFrame, CompilationContext]:
-    if isinstance(expr, verbs.Alias):
-        df, context = table_expr_compile_with_context(expr.table)
-        setattr(df, expr.new_name)
-        return df, context
-
-    elif isinstance(expr, verbs.Select):
+    if isinstance(expr, verbs.Select):
         df, context = table_expr_compile_with_context(expr.table)
         context.selects = [
             col

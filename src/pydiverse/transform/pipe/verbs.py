@@ -13,7 +13,6 @@ from pydiverse.transform.pipe.pipeable import builtin_verb
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
 from pydiverse.transform.tree.verbs import (
-    Alias,
     Arrange,
     Filter,
     GroupBy,
@@ -51,7 +50,7 @@ __all__ = [
 
 @builtin_verb()
 def alias(expr: TableExpr, new_name: str | None = None):
-    return Alias(expr, new_name)
+    return tree.recursive_copy(expr)
 
 
 @builtin_verb()
