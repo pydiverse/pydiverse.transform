@@ -145,7 +145,7 @@ def propagate_names(
         for v in expr.filters:
             needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
-        expr.filters = [propagate_names(v, col_to_name) for v in expr.filters]
+        expr.filters = [col_expr.propagate_names(v, col_to_name) for v in expr.filters]
 
     elif isinstance(expr, Arrange):
         for v in expr.order_by:

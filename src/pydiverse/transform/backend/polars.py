@@ -270,9 +270,11 @@ def table_expr_compile_with_context(
 
     elif isinstance(expr, verbs.Filter):
         df, context = table_expr_compile_with_context(expr.table)
-        return df.filter(
-            col_expr_compile(expr.filters, context.compiled_group_by())
-        ), context
+        if expr.filters:
+            df = df.filter(
+                [col_expr_compile(f, context.compiled_group_by()) for f in expr.filters]
+            )
+        return df, context
 
     elif isinstance(expr, verbs.Arrange):
         df, context = table_expr_compile_with_context(expr.table)
