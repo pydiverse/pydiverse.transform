@@ -134,9 +134,8 @@ def propagate_names(
                     needed_cols[col.table] = set({col.name})
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.selects = [
-            ColName(col_to_name[col.table][col.name])
+            (ColName(col_to_name[col.table][col.name]) if isinstance(col, Col) else col)
             for col in expr.selects
-            if isinstance(col, Col)
         ]
 
     elif isinstance(expr, Rename):
@@ -190,12 +189,7 @@ def propagate_names(
             needed_cols.inner_update(col_expr.get_needed_cols(order.order_by))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.order_by = [
-            Order(
-                col_expr.propagate_names(ord.order_by, col_to_name),
-                ord.descending,
-                ord.nulls_last,
-            )
-            for ord in expr.order_by
+            col_expr.propagate_names(ord, col_to_name) for ord in expr.order_by
         ]
 
     elif isinstance(expr, GroupBy):
@@ -265,12 +259,7 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
     elif isinstance(expr, Arrange):
         col_types = propagate_types(expr.table)
         expr.order_by = [
-            Order(
-                col_expr.propagate_types(ord.order_by, col_types),
-                ord.descending,
-                ord.nulls_last,
-            )
-            for ord in expr.order_by
+            col_expr.propagate_types(ord, col_types) for ord in expr.order_by
         ]
         return col_types
 

@@ -20,8 +20,6 @@ def count(expr: ColExpr | None = None):
 
 
 def row_number(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
-    if partition_by is None:
-        partition_by = []
     return ColFn(
         "row_number",
         arrange=[Order.from_col_expr(ord) for ord in arrange],
@@ -30,8 +28,6 @@ def row_number(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = N
 
 
 def rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
-    if partition_by is None:
-        partition_by = []
     return ColFn(
         "rank",
         arrange=[Order.from_col_expr(ord) for ord in arrange],
@@ -40,8 +36,6 @@ def rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
 
 
 def dense_rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
-    if partition_by is None:
-        partition_by = []
     return ColFn(
         "dense_rank",
         arrange=[Order.from_col_expr(ord) for ord in arrange],

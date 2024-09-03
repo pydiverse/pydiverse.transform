@@ -57,7 +57,9 @@ class PolarsImpl(TableImpl):
         }
 
 
-def col_expr_compile(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
+def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
+    if isinstance(expr, Order):
+        return Order(col_expr_compile(expr.order_by), expr.descending, expr.nulls_last)
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
         return pl.col(expr.name)
@@ -74,15 +76,19 @@ def col_expr_compile(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
         partition_by = expr.context_kwargs.get("partition_by")
         if partition_by is None:
             partition_by = group_by
+        else:
+            partition_by = [col_expr_compile(z, []) for z in partition_by]
 
         arrange = expr.context_kwargs.get("arrange")
 
         if arrange:
             order_by, descending, nulls_last = zip(
-                compile_order(order, group_by) for order in arrange
+                *[compile_order(order, group_by) for order in arrange]
             )
 
         filter_cond = expr.context_kwargs.get("filter")
+        if filter_cond:
+            filter_cond = [col_expr_compile(z, []) for z in filter_cond]
 
         if (
             op.ftype in (OPType.WINDOW, OPType.AGGREGATE)
@@ -105,10 +111,10 @@ def col_expr_compile(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
                 for arg in args
             ]
 
-        # if op.name in ("rank", "dense_rank"):
-        #     assert len(args) == 0
-        #     args = [pl.struct(merge_desc_nulls_last(ordering))]
-        #     ordering = None
+        if op.name in ("rank", "dense_rank"):
+            assert len(args) == 0
+            args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
+            arrange = None
 
         value: pl.Expr = impl(*[arg for arg in args])
 
@@ -134,9 +140,8 @@ def col_expr_compile(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
                 # `nulls_last` argument is ignored. thus when both a grouping and an
                 # arrangment are specified, we manually add the descending and
                 # nulls_last markers to the ordering.
-                order_by = None
-                # if arrange:
-                #     order_by = merge_desc_nulls_last(by, )
+                if arrange:
+                    order_by = merge_desc_nulls_last(order_by, descending, nulls_last)
                 value = value.over(partition_by, order_by=order_by)
 
             elif arrange:
@@ -167,18 +172,18 @@ def col_expr_compile(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
 
 
 # merges descending and null_last markers into the ordering expression
-def merge_desc_nulls_last(self, order_exprs: list[Order]) -> list[pl.Expr]:
+def merge_desc_nulls_last(
+    order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool]
+) -> list[pl.Expr]:
     with_signs: list[pl.Expr] = []
-    for expr in order_exprs:
-        numeric = col_expr_compile(expr.order_by, []).rank("dense").cast(pl.Int64)
-        with_signs.append(-numeric if expr.descending else numeric)
+    for ord, desc in zip(order_by, descending):
+        numeric = ord.rank("dense").cast(pl.Int64)
+        with_signs.append(-numeric if desc else numeric)
     return [
-        x.fill_null(
-            pl.len().cast(pl.Int64) + 1
-            if o.nulls_last
-            else -(pl.len().cast(pl.Int64) + 1)
+        expr.fill_null(
+            pl.len().cast(pl.Int64) + 1 if nl else -(pl.len().cast(pl.Int64) + 1)
         )
-        for x, o in zip(with_signs, order_exprs)
+        for expr, nl in zip(with_signs, nulls_last)
     ]
 
 

@@ -115,7 +115,9 @@ class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: ColExpr):
         self.name = name
         self.args = args
-        self.context_kwargs = kwargs
+        self.context_kwargs = {
+            key: val for key, val in kwargs.items() if val is not None
+        }
 
     def __repr__(self):
         args = [repr(e) for e in self.args] + [
@@ -185,7 +187,9 @@ class FnAttr:
         return ColFn(self.name, self.arg, *args, **kwargs)
 
 
-def get_needed_cols(expr: ColExpr) -> Map2d[TableExpr, set[str]]:
+def get_needed_cols(expr: ColExpr | Order) -> Map2d[TableExpr, set[str]]:
+    if isinstance(expr, Order):
+        return get_needed_cols(expr.order_by)
     if isinstance(expr, Col):
         return Map2d({expr.table: {expr.name}})
     elif isinstance(expr, ColFn):
@@ -201,8 +205,10 @@ def get_needed_cols(expr: ColExpr) -> Map2d[TableExpr, set[str]]:
 
 
 def propagate_names(
-    expr: ColExpr, col_to_name: Map2d[TableExpr, dict[str, str]]
-) -> ColExpr:
+    expr: ColExpr | Order, col_to_name: Map2d[TableExpr, dict[str, str]]
+) -> ColExpr | Order:
+    if isinstance(expr, Order):
+        expr.order_by = propagate_names(expr.order_by, col_to_name)
     if isinstance(expr, Col):
         return ColName(col_to_name[expr.table][expr.name])
     elif isinstance(expr, ColFn):
@@ -217,7 +223,13 @@ def propagate_names(
     return expr
 
 
-def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
+def propagate_types(
+    expr: ColExpr | Order, col_types: dict[str, DType]
+) -> ColExpr | Order:
+    if isinstance(expr, Order):
+        return Order(
+            propagate_types(expr.order_by, col_types), expr.descending, expr.nulls_last
+        )
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
         expr.dtype = col_types[expr.name]
