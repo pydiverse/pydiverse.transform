@@ -8,8 +8,8 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from pydiverse.transform import Table
+from pydiverse.transform.backend.targets import Polars
 from pydiverse.transform.errors import NonStandardBehaviourWarning
-from pydiverse.transform.pipe.backends import Polars
 from pydiverse.transform.pipe.verbs import export, show_query
 from pydiverse.transform.tree.table_expr import TableExpr
 

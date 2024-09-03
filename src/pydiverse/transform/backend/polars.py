@@ -294,7 +294,7 @@ def table_expr_compile_with_context(
             (
                 context.group_by + [col.name for col in expr.group_by]
                 if expr.add
-                else expr.group_by
+                else [col.name for col in expr.group_by]
             ),
             context.selects,
         )
@@ -306,15 +306,17 @@ def table_expr_compile_with_context(
     elif isinstance(expr, verbs.Summarise):
         df, context = table_expr_compile_with_context(expr.table)
         compiled_group_by = context.compiled_group_by()
-        return df.group_by(compiled_group_by).agg(
-            **{
-                name: col_expr_compile(
-                    value,
-                    compiled_group_by,
-                )
-                for name, value in zip(expr.names, expr.values)
-            }
-        ), CompilationContext([], context.group_by + expr.names)
+        aggregations = [
+            col_expr_compile(value, []).alias(name)
+            for name, value in zip(expr.names, expr.values)
+        ]
+
+        if compiled_group_by:
+            df = df.group_by(*compiled_group_by).agg(*aggregations)
+        else:
+            df = df.select(*aggregations)
+
+        return df, CompilationContext([], context.group_by + expr.names)
 
     elif isinstance(expr, verbs.SliceHead):
         df, context = table_expr_compile_with_context(expr.table)

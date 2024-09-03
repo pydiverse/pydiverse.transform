@@ -164,7 +164,12 @@ def propagate_names(
         for v in expr.group_by:
             needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
-        expr.group_by = [propagate_names(v, col_to_name) for v in expr.group_by]
+        expr.group_by = [
+            col_expr.propagate_names(v, col_to_name) for v in expr.group_by
+        ]
+
+    elif isinstance(expr, (Ungroup, SliceHead)):
+        return propagate_names(expr.table, needed_cols)
 
     elif isinstance(expr, Summarise):
         for v in expr.values:
@@ -188,7 +193,7 @@ def propagate_names(
 
 
 def propagate_types(expr: TableExpr) -> dict[str, DType]:
-    if isinstance(expr, (SliceHead, Ungroup, Select, SliceHead, GroupBy)):
+    if isinstance(expr, (SliceHead, Ungroup, Select, GroupBy)):
         return propagate_types(expr.table)
 
     if isinstance(expr, Rename):
