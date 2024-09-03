@@ -410,7 +410,9 @@ class TestPolarsLazyImpl:
                 >> alias()
                 >> filter((offset < C._n) & (C._n <= (n + offset)))
             )
-            return t >> select(*[c for c in t if c._.name != "_n"])
+            return t >> select(
+                *[C[col.name] for col in table.cols() if col.name != "_n"]
+            )
 
         assert_equal(
             tbl3 >> slice_head(6),

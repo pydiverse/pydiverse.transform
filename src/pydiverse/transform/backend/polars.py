@@ -329,7 +329,7 @@ def table_expr_compile_with_context(
     elif isinstance(expr, verbs.SliceHead):
         df, context = table_expr_compile_with_context(expr.table)
         assert len(context.group_by) == 0
-        return df, context
+        return df.slice(expr.offset, expr.n), context
 
     elif isinstance(expr, Table):
         assert isinstance(expr._impl, PolarsImpl)
