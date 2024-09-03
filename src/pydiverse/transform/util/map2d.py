@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Hashable
+from collections.abc import Callable, Hashable
 from typing import Generic, TypeVar
 
 T = TypeVar("T", bound=Hashable)
@@ -13,13 +13,20 @@ class Map2d(Generic[T, U]):
             mapping = dict()
         self.mapping = mapping
 
-    def inner_update(self, other: Map2d):
-        for key, val in other.mapping:
+    def inner_update(self, other: Map2d | dict):
+        mapping = other if isinstance(other, dict) else other.mapping
+        for key, val in mapping.items():
             self_val = self.mapping.get(key)
             if self_val:
                 self_val.update(val)
             else:
                 self[key] = val
+
+    def inner_map(self, fn: Callable[[U], U]):
+        self.mapping = {
+            outer_key: {inner_key: fn(val) for inner_key, val in inner_map.items()}
+            for outer_key, inner_map in self.mapping.items()
+        }
 
     def keys(self):
         return self.mapping.keys()
@@ -29,6 +36,9 @@ class Map2d(Generic[T, U]):
 
     def items(self):
         return self.mapping.items()
+
+    def __contains__(self, key):
+        return self.mapping.__contains__(key)
 
     def __iter__(self):
         return self.mapping.__iter__()

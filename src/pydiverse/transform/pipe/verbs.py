@@ -146,7 +146,10 @@ def join(
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
-    # TODO: col name collision resolution
+    if suffix is None:
+        suffix = f"_{right.name}"
+    if suffix is None:
+        suffix = "_right"
     return Join(left, right, on, how, validate, suffix)
 
 

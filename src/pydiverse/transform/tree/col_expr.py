@@ -189,7 +189,7 @@ def get_needed_cols(expr: ColExpr) -> Map2d[TableExpr, set[str]]:
         return Map2d({expr.table: {expr.name}})
     elif isinstance(expr, ColFn):
         needed_cols = Map2d()
-        for v in itertools.chain(expr.args, expr.kwargs.values()):
+        for v in itertools.chain(expr.args, expr.context_kwargs.values()):
             needed_cols.inner_update(get_needed_cols(v))
         return needed_cols
     elif isinstance(expr, CaseExpr):

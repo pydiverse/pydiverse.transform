@@ -96,21 +96,14 @@ def propagate_names(
                     needed_cols[col.table] = set({col.name})
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.selects = [
-            col_to_name[col] if col in col_to_name else col for col in expr.selects
+            ColName(col_to_name[col.table][col.name])
+            for col in expr.selects
+            if isinstance(col, Col)
         ]
 
     elif isinstance(expr, Rename):
         col_to_name = propagate_names(expr.table, needed_cols)
-        col_to_name.inner_update(
-            {
-                table: {
-                    name: expr.name_map[name]
-                    for name in name_map
-                    if name in expr.name_map
-                }
-                for table, name_map in col_to_name.items()
-            }
-        )
+        col_to_name.inner_map(lambda s: expr.name_map[s] if s in expr.name_map else s)
 
     elif isinstance(expr, Mutate):
         for v in expr.values:
@@ -134,25 +127,19 @@ def propagate_names(
             rn = Rename(
                 expr.table, {name: name + str(hash(expr.table)) for name in overwritten}
             )
-            col_to_name.inner_update(
-                {
-                    table: {
-                        name: name + str(hash(expr.table))
-                        for name in name_map
-                        if name in overwritten
-                    }
-                    for table, name_map in col_to_name.items()
-                }
+            col_to_name.inner_map(
+                lambda s: s + str(hash(expr.table)) if s in overwritten else s
             )
             expr.table = rn
         expr.values = [col_expr.propagate_names(v, col_to_name) for v in expr.values]
 
     elif isinstance(expr, Join):
         needed_cols.inner_update(col_expr.get_needed_cols(expr.on))
-        col_to_name_left = propagate_names(expr.left, needed_cols)
+        col_to_name = propagate_names(expr.left, needed_cols)
         col_to_name_right = propagate_names(expr.right, needed_cols)
-        col_to_name = col_to_name_left | col_to_name_right
-        expr.on = propagate_names(expr.on, col_to_name)
+        col_to_name_right.inner_map(lambda s: s + expr.suffix)
+        col_to_name.inner_update(col_to_name_right)
+        expr.on = col_expr.propagate_names(expr.on, col_to_name)
 
     elif isinstance(expr, Filter):
         for v in expr.filters:
@@ -222,8 +209,8 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
     elif isinstance(expr, Join):
         col_types_left = propagate_types(expr.left)
         col_types_right = {
-            ColName(name + expr.suffix): col_type
-            for name, col_type in propagate_types(expr.right)
+            name + expr.suffix: dtype
+            for name, dtype in propagate_types(expr.right).items()
         }
         return col_types_left | col_types_right
 
@@ -245,7 +232,7 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
 
 
 def recursive_copy(expr: TableExpr) -> TableExpr:
-    new_expr = copy(expr)
+    new_expr = copy.copy(expr)
     if isinstance(expr, Join):
         new_expr.left = recursive_copy(expr.left)
         new_expr.right = recursive_copy(expr.right)

@@ -195,10 +195,12 @@ def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
         if expr.name == "__and__":
             return compile_join_cond(expr.args[0]) + compile_join_cond(expr.args[1])
         if expr.name == "__eq__":
-            return (
-                col_expr_compile(expr.args[0], []),
-                col_expr_compile(expr.args[1], []),
-            )
+            return [
+                (
+                    col_expr_compile(expr.args[0], []),
+                    col_expr_compile(expr.args[1], []),
+                )
+            ]
 
     raise AssertionError()
 
@@ -246,16 +248,20 @@ def table_expr_compile_with_context(
     elif isinstance(expr, verbs.Join):
         left_df, left_context = table_expr_compile_with_context(expr.left)
         right_df, right_context = table_expr_compile_with_context(expr.right)
-        assert not left_context.compiled_group_by
-        assert not right_context.compiled_group_by
+        assert not left_context.compiled_group_by()
+        assert not right_context.compiled_group_by()
         left_on, right_on = zip(*compile_join_cond(expr.on))
+        # we want a suffix everywhere but polars only appends it to duplicate columns
+        right_df = right_df.rename(
+            {name: name + expr.suffix for name in right_df.columns}
+        )
         return left_df.join(
             right_df,
             left_on=left_on,
             right_on=right_on,
             how=expr.how,
             validate=expr.validate,
-            suffix=expr.suffix,
+            coalesce=False,
         ), CompilationContext(
             [],
             left_context.selects
