@@ -181,8 +181,8 @@ class FnAttr:
     def __getattr__(self, name) -> FnAttr:
         return FnAttr(f"{self.name}.{name}", self.arg)
 
-    def __call__(self) -> ColExpr:
-        return ColFn(self.name, self.arg)
+    def __call__(self, *args, **kwargs) -> ColExpr:
+        return ColFn(self.name, self.arg, *args, **kwargs)
 
 
 def get_needed_cols(expr: ColExpr) -> Map2d[TableExpr, set[str]]:
@@ -209,7 +209,7 @@ def propagate_names(
         expr.args = [propagate_names(arg, col_to_name) for arg in expr.args]
         expr.context_kwargs = {
             key: [propagate_names(v, col_to_name) for v in arr]
-            for key, arr in expr.context_kwargs
+            for key, arr in expr.context_kwargs.items()
         }
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
@@ -226,7 +226,7 @@ def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
         expr.args = [propagate_types(arg, col_types) for arg in expr.args]
         expr.context_kwargs = {
             key: [propagate_types(v, col_types) for v in arr]
-            for key, arr in expr.context_kwargs
+            for key, arr in expr.context_kwargs.items()
         }
         # TODO: create a backend agnostic registry
         from pydiverse.transform.backend.polars import PolarsImpl

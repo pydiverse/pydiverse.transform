@@ -170,7 +170,7 @@ def filter(expr: TableExpr, *args: ColExpr):
 
 @builtin_verb()
 def arrange(expr: TableExpr, *args: ColExpr):
-    return Arrange(expr, list(Order.from_col_expr(arg) for arg in args))
+    return Arrange(expr, list(Order.from_col_expr(ord) for ord in args))
 
 
 @builtin_verb()

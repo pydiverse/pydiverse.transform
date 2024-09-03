@@ -3,7 +3,6 @@ from __future__ import annotations
 from . import verbs
 from .col_expr import Map2d
 from .table_expr import TableExpr
-from .verbs import recursive_copy
 
 __all__ = ["propagate_names", "propagate_types", "TableExpr"]
 

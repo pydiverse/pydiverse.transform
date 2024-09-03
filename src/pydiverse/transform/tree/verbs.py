@@ -7,9 +7,10 @@ from typing import Literal
 
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import col_expr
-from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Map2d, Order
+from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
 from pydiverse.transform.tree.dtypes import DType
 from pydiverse.transform.tree.table_expr import TableExpr
+from pydiverse.transform.util.map2d import Map2d
 
 JoinHow = Literal["inner", "left", "outer"]
 
@@ -190,11 +191,11 @@ def propagate_names(
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.order_by = [
             Order(
-                col_expr.propagate_names(order.order_by, col_to_name),
-                order.descending,
-                order.nulls_last,
+                col_expr.propagate_names(ord.order_by, col_to_name),
+                ord.descending,
+                ord.nulls_last,
             )
-            for order in expr.order_by
+            for ord in expr.order_by
         ]
 
     elif isinstance(expr, GroupBy):
