@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import itertools
 from collections.abc import Iterable
 from typing import Any, Generic
 
@@ -191,21 +192,47 @@ class FnNamespace:
         return ColFn(self.name + name, self.arg)
 
 
-def get_needed_cols(expr: ColExpr) -> set[TableExpr]:
+class TableColSet:
+    def __init__(self, cols: dict[TableExpr, set[str]] | None = None) -> TableColSet:
+        if cols is None:
+            cols = dict()
+        self.cols = cols
+
+    def update(self, other: TableColSet):
+        self.cols = {
+            table: (
+                (self.cols[table] if table in self else set())
+                | (other.cols[table] if table in other else set())
+            )
+            for table in itertools.chain(self.cols.keys(), other.cols.keys())
+        }
+
+    def __iter__(self):
+        return self.cols.__iter__()
+
+    def __setitem__(self, item, value):
+        return self.cols.__setitem__(item, value)
+
+    def __getitem__(self, item):
+        return self.cols.__getitem__(item)
+
+    def __delitem__(self, item):
+        return self.cols.__delitem__(item)
+
+
+def get_needed_cols(expr: ColExpr) -> TableColSet:
     if isinstance(expr, Col):
-        return set({expr})
+        return TableColSet({expr.table: {expr.name}})
     elif isinstance(expr, ColFn):
-        needed_tables = set()
-        for v in expr.args:
-            needed_tables |= get_needed_cols(v)
-        for v in expr.context_kwargs.values():
-            needed_tables |= get_needed_cols(v)
-        return needed_tables
+        needed_cols = dict()
+        for v in itertools.chain(expr.args, expr.kwargs.values()):
+            needed_cols.update(get_needed_cols(v))
+        return needed_cols
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
     elif isinstance(expr, LiteralCol):
-        return set()
-    return set()
+        return TableColSet()
+    return TableColSet()
 
 
 def propagate_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColExpr:

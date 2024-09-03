@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import col_expr
-from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
+from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order, TableColSet
 from pydiverse.transform.tree.dtypes import DType
 from pydiverse.transform.tree.table_expr import TableExpr
 
@@ -88,12 +88,17 @@ class Ungroup(TableExpr):
 
 
 # returns Col -> ColName mapping and the list of available columns
-def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName]:
+def propagate_names(expr: TableExpr, needed_cols: TableColSet) -> dict[Col, ColName]:
     if isinstance(expr, (Alias, SliceHead, Ungroup)):
         col_to_name = propagate_names(expr.table, needed_cols)
 
     elif isinstance(expr, Select):
-        needed_cols |= set(col.table for col in expr.selects if isinstance(col, Col))
+        for col in expr.selects:
+            if isinstance(col, Col):
+                if col.table in needed_cols:
+                    needed_cols[col.table].add(col.name)
+                else:
+                    needed_cols[col.table] = set({col.name})
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.selects = [
             col_to_name[col] if col in col_to_name else col for col in expr.selects
@@ -110,7 +115,7 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
 
     elif isinstance(expr, Mutate):
         for v in expr.values:
-            needed_cols |= col_expr.get_needed_cols(v)
+            needed_cols.update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         # overwritten columns still need to be stored since the user may access them
         # later. They're not in the C-space anymore, however, so we give them
@@ -138,21 +143,21 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
 
     elif isinstance(expr, Join):
         for v in expr.on:
-            needed_cols |= col_expr.get_needed_cols(v)
-        col_to_name_left, cols_left = propagate_names(expr.left, needed_cols)
-        col_to_name_right, cols_right = propagate_names(expr.right, needed_cols)
+            needed_cols.update(col_expr.get_needed_cols(v))
+        col_to_name_left = propagate_names(expr.left, needed_cols)
+        col_to_name_right = propagate_names(expr.right, needed_cols)
         col_to_name = col_to_name_left | col_to_name_right
         expr.on = [propagate_names(v, col_to_name) for v in expr.on]
 
     elif isinstance(expr, Filter):
         for v in expr.filters:
-            needed_cols |= col_expr.get_needed_cols(v)
+            needed_cols.update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.filters = [propagate_names(v, col_to_name) for v in expr.filters]
 
     elif isinstance(expr, Arrange):
         for v in expr.order_by:
-            needed_cols |= col_expr.get_needed_cols(v)
+            needed_cols.update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.order_by = [
             Order(
@@ -165,13 +170,13 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
 
     elif isinstance(expr, GroupBy):
         for v in expr.group_by:
-            needed_cols |= col_expr.get_needed_cols(v)
+            needed_cols.update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.group_by = [propagate_names(v, col_to_name) for v in expr.group_by]
 
     elif isinstance(expr, Summarise):
         for v in expr.values:
-            needed_cols |= col_expr.get_needed_cols(v)
+            needed_cols.update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.values = [propagate_names(v, col_to_name) for v in expr.values]
 
@@ -181,9 +186,10 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
     else:
         raise TypeError
 
-    for col in needed_cols:
-        if col.table == expr:
-            col_to_name[col] = ColName(col.name)
+    if expr in needed_cols:
+        for col_name in needed_cols[expr]:
+            col_to_name[Col(col_name, expr)] = ColName(col_name)
+        del needed_cols[expr]
 
     return col_to_name
 
