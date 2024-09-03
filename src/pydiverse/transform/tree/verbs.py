@@ -105,7 +105,7 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
             col: ColName(expr.name_map[col_name.name])
             if col_name.name in expr.name_map
             else col_name
-            for col, col_name in col_to_name
+            for col, col_name in col_to_name.items()
         }
 
     elif isinstance(expr, Mutate):
@@ -116,14 +116,24 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
         # later. They're not in the C-space anymore, however, so we give them
         # {name}_{hash of the previous table} as a dummy name.
         overwritten = set(
-            name for name in expr.names if Col(expr, name) in set(needed_cols)
+            name
+            for name in expr.names
+            if name in set(col_name.name for col_name in col_to_name.values())
         )
-        col_to_name = {
-            col: ColName(col_name.name + str(hash(expr.table)))
-            if col_name.name in overwritten
-            else col_name
-            for col, col_name in col_to_name.items()
-        }
+        # for the backends, we insert a Rename here that gives the overwritten cols
+        # their dummy names. The backends may thus assume that the user never overwrites
+        # column names
+        if overwritten:
+            rn = Rename(
+                expr.table, {name: name + str(hash(expr.table)) for name in overwritten}
+            )
+            col_to_name = {
+                col: ColName(col_name.name + str(hash(expr.table)))
+                if col_name.name in overwritten
+                else col_name
+                for col, col_name in col_to_name.items()
+            }
+            expr.table = rn
         expr.values = [col_expr.propagate_names(v, col_to_name) for v in expr.values]
 
     elif isinstance(expr, Join):
@@ -178,11 +188,16 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
     return col_to_name
 
 
-def propagate_types(expr: TableExpr) -> dict[Col | ColName, DType]:
-    if isinstance(
-        expr, (Alias, SliceHead, Ungroup, Select, Rename, SliceHead, GroupBy)
-    ):
+def propagate_types(expr: TableExpr) -> dict[str, DType]:
+    if isinstance(expr, (Alias, SliceHead, Ungroup, Select, SliceHead, GroupBy)):
         return propagate_types(expr.table)
+
+    elif isinstance(expr, Rename):
+        col_types = propagate_types(expr.table)
+        return {
+            (expr.name_map[name] if name in expr.name_map else name): dtype
+            for name, dtype in col_types.items()
+        }
 
     elif isinstance(expr, (Mutate, Summarise)):
         col_types = propagate_types(expr.table)

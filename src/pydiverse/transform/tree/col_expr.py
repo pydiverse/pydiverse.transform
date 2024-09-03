@@ -82,7 +82,7 @@ class Col(ColExpr, Generic[ImplT]):
         self.dtype = dtype
 
     def __repr__(self):
-        return f"<{self.table._impl.name}.{self.name}>"
+        return f"<{self.table.name}.{self.name}>"
 
     def _expr_repr(self) -> str:
         return f"{self.table.name}.{self.name}"
