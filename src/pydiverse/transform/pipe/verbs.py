@@ -50,7 +50,11 @@ __all__ = [
 
 @builtin_verb()
 def alias(expr: TableExpr, new_name: str | None = None):
-    return tree.recursive_copy(expr)
+    if new_name is None:
+        new_name = expr.name
+    new_expr = tree.recursive_copy(expr)
+    new_expr.name = new_name
+    return new_expr
 
 
 @builtin_verb()
@@ -146,7 +150,7 @@ def join(
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
-    if suffix is None:
+    if suffix is None and right.name:
         suffix = f"_{right.name}"
     if suffix is None:
         suffix = "_right"

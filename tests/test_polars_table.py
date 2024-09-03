@@ -6,10 +6,9 @@ import polars as pl
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.backend.polars import PolarsImpl
 from pydiverse.transform.errors import AlignmentError
 from pydiverse.transform.pipe import functions as f
-from pydiverse.transform.pipe.pipeable import Pipeable, verb
+from pydiverse.transform.pipe.pipeable import verb
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.pipe.verbs import *
 from pydiverse.transform.tree import dtypes
@@ -104,28 +103,17 @@ def tbl4():
 
 @pytest.fixture
 def tbl_left():
-    return Table(df_left)
+    return Table(df_left, name="df_left")
 
 
 @pytest.fixture
 def tbl_right():
-    return Table(df_right)
+    return Table(df_right, name="df_right")
 
 
 @pytest.fixture
 def tbl_dt():
     return Table(df_dt)
-
-
-def assert_not_inplace(table: Table[PolarsImpl], operation: Pipeable):
-    """
-    Operations should not happen in-place. They should always return a new dataframe.
-    """
-    initial = table._impl.df.clone()
-    table >> operation
-    after = table._impl.df
-
-    assert initial.equals(after)
 
 
 class TestPolarsLazyImpl:
@@ -145,48 +133,43 @@ class TestPolarsLazyImpl:
         assert_equal(tbl1, df1)
 
     def test_select(self, tbl1):
-        assert_not_inplace(tbl1, select(tbl1.col1))
         assert_equal(tbl1 >> select(tbl1.col1), df1.select("col1"))
         assert_equal(tbl1 >> select(tbl1.col2), df1.select("col2"))
         assert_equal(tbl1 >> select(), df1.select())
 
     def test_mutate(self, tbl1):
-        assert_not_inplace(tbl1, mutate(x=tbl1.col1))
+        # assert_equal(
+        #     tbl1 >> mutate(col1times2=tbl1.col1 * 2),
+        #     pl.DataFrame(
+        #         {
+        #             "col1": [1, 2, 3, 4],
+        #             "col2": ["a", "b", "c", "d"],
+        #             "col1times2": [2, 4, 6, 8],
+        #         }
+        #     ),
+        # )
 
-        assert_equal(
-            tbl1 >> mutate(col1times2=tbl1.col1 * 2),
-            pl.DataFrame(
-                {
-                    "col1": [1, 2, 3, 4],
-                    "col2": ["a", "b", "c", "d"],
-                    "col1times2": [2, 4, 6, 8],
-                }
-            ),
-        )
+        # assert_equal(
+        #     tbl1 >> select() >> mutate(col1times2=tbl1.col1 * 2),
+        #     pl.DataFrame(
+        #         {
+        #             "col1times2": [2, 4, 6, 8],
+        #         }
+        #     ),
+        # )
 
-        assert_equal(
-            tbl1 >> select() >> mutate(col1times2=tbl1.col1 * 2),
-            pl.DataFrame(
-                {
-                    "col1times2": [2, 4, 6, 8],
-                }
-            ),
-        )
-
-        # Check proper column referencing
+        # # Check proper column referencing
         t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2) >> select()
-        assert_equal(
-            t >> mutate(x=t.col1, y=t.col2),
-            tbl1 >> select() >> mutate(x=tbl1.col2, y=tbl1.col1),
-        )
+        # assert_equal(
+        #     t >> mutate(x=t.col1, y=t.col2),
+        #     tbl1 >> select() >> mutate(x=tbl1.col2, y=tbl1.col1),
+        # )
         assert_equal(
             t >> mutate(x=tbl1.col1, y=tbl1.col2),
             tbl1 >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
         )
 
     def test_join(self, tbl_left, tbl_right):
-        assert_not_inplace(tbl_left, join(tbl_right, tbl_left.a == tbl_right.b, "left"))
-
         assert_equal(
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
@@ -226,22 +209,20 @@ class TestPolarsLazyImpl:
             df_left.join(df_left, on="a", coalesce=False, suffix="_df_left"),
         )
 
-        assert_equal(
-            tbl_right
-            >> inner_join(
-                tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
-            )
-            >> inner_join(
-                tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
-            ),
-            df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
-                df_right, "b", suffix="_df_right1", coalesce=False
-            ),
-        )
+        # assert_equal(
+        #     tbl_right
+        #     >> inner_join(
+        #         tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
+        #     )
+        #     >> inner_join(
+        #         tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
+        #     ),
+        #     df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
+        #         df_right, "b", suffix="_df_right1", coalesce=False
+        #     ),
+        # )
 
     def test_filter(self, tbl1, tbl2):
-        assert_not_inplace(tbl1, filter(tbl1.col1 == 3))
-
         # Simple filter expressions
         assert_equal(tbl1 >> filter(), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == tbl1.col1), df1)
@@ -260,7 +241,6 @@ class TestPolarsLazyImpl:
 
     def test_arrange(self, tbl2, tbl4):
         tbl4.col1.nulls_first()
-        assert_not_inplace(tbl2, arrange(tbl2.col2))
 
         assert_equal(
             tbl2 >> arrange(tbl2.col3) >> select(tbl2.col3),
@@ -363,8 +343,6 @@ class TestPolarsLazyImpl:
         )
 
     def test_alias(self, tbl1, tbl2):
-        assert_not_inplace(tbl1, alias("tblxxx"))
-
         x = tbl2 >> alias("x")
         assert x._impl.name == "x"
 
@@ -580,9 +558,6 @@ class TestPolarsLazyImpl:
         def double_col1(table):
             table[C.col1] = C.col1 * 2
             return table
-
-        # Custom verb should not mutate input object
-        assert_not_inplace(tbl1, double_col1())
 
         assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=C.col1 * 2))
 

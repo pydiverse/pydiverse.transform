@@ -236,6 +236,8 @@ def recursive_copy(expr: TableExpr) -> TableExpr:
     if isinstance(expr, Join):
         new_expr.left = recursive_copy(expr.left)
         new_expr.right = recursive_copy(expr.right)
-    elif not isinstance(expr, Table):
+    elif isinstance(expr, Table):
+        new_expr._impl = copy.copy(expr._impl)
+    else:
         new_expr.table = recursive_copy(expr.table)
     return new_expr
