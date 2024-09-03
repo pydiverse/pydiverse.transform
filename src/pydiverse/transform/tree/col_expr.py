@@ -9,6 +9,7 @@ from pydiverse.transform._typing import ImplT
 from pydiverse.transform.tree.dtypes import DType, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 from pydiverse.transform.tree.table_expr import TableExpr
+from pydiverse.transform.util import Map2d
 
 
 def expr_repr(it: Any):
@@ -87,15 +88,6 @@ class Col(ColExpr, Generic[ImplT]):
 
     def _expr_repr(self) -> str:
         return f"{self.table.name}.{self.name}"
-
-    def __eq__(self, other):
-        return self.table == other.table and self.name == other.name
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return hash((hash(self.name), hash(self.table)))
 
 
 class ColName(ColExpr):
@@ -192,53 +184,26 @@ class FnNamespace:
         return ColFn(self.name + name, self.arg)
 
 
-class TableColSet:
-    def __init__(self, cols: dict[TableExpr, set[str]] | None = None) -> TableColSet:
-        if cols is None:
-            cols = dict()
-        self.cols = cols
-
-    def update(self, other: TableColSet):
-        self.cols = {
-            table: (
-                (self.cols[table] if table in self else set())
-                | (other.cols[table] if table in other else set())
-            )
-            for table in itertools.chain(self.cols.keys(), other.cols.keys())
-        }
-
-    def __iter__(self):
-        return self.cols.__iter__()
-
-    def __setitem__(self, item, value):
-        return self.cols.__setitem__(item, value)
-
-    def __getitem__(self, item):
-        return self.cols.__getitem__(item)
-
-    def __delitem__(self, item):
-        return self.cols.__delitem__(item)
-
-
-def get_needed_cols(expr: ColExpr) -> TableColSet:
+def get_needed_cols(expr: ColExpr) -> Map2d[TableExpr, set[str]]:
     if isinstance(expr, Col):
-        return TableColSet({expr.table: {expr.name}})
+        return Map2d({expr.table: {expr.name}})
     elif isinstance(expr, ColFn):
-        needed_cols = dict()
+        needed_cols = Map2d()
         for v in itertools.chain(expr.args, expr.kwargs.values()):
-            needed_cols.update(get_needed_cols(v))
+            needed_cols.inner_update(get_needed_cols(v))
         return needed_cols
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
     elif isinstance(expr, LiteralCol):
-        return TableColSet()
-    return TableColSet()
+        return Map2d()
+    return Map2d()
 
 
-def propagate_names(expr: ColExpr, col_to_name: dict[Col, ColName]) -> ColExpr:
+def propagate_names(
+    expr: ColExpr, col_to_name: Map2d[TableExpr, dict[str, str]]
+) -> ColExpr:
     if isinstance(expr, Col):
-        col_name = col_to_name.get(expr)
-        return col_name if col_name is not None else expr
+        return ColName(col_to_name[expr.table][expr.name])
     elif isinstance(expr, ColFn):
         expr.args = [propagate_names(arg, col_to_name) for arg in expr.args]
         expr.context_kwargs = {

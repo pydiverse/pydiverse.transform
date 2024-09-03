@@ -101,13 +101,16 @@ def propagate_names(
 
     elif isinstance(expr, Rename):
         col_to_name = propagate_names(expr.table, needed_cols)
-        col_to_name = {
-            table: {
-                name: (expr.name_map[name] if name in expr.name_map else name)
-                for name in mapping
+        col_to_name.inner_update(
+            {
+                table: {
+                    name: expr.name_map[name]
+                    for name in name_map
+                    if name in expr.name_map
+                }
+                for table, name_map in col_to_name.items()
             }
-            for table, mapping in col_to_name.items()
-        }
+        )
 
     elif isinstance(expr, Mutate):
         for v in expr.values:
@@ -119,7 +122,10 @@ def propagate_names(
         overwritten = set(
             name
             for name in expr.names
-            if name in set(itertools.chain(v.values() for v in col_to_name.values()))
+            if name
+            in set(
+                itertools.chain.from_iterable(v.values() for v in col_to_name.values())
+            )
         )
         # for the backends, we insert a Rename here that gives the overwritten cols
         # their dummy names. The backends may thus assume that the user never overwrites
@@ -128,22 +134,25 @@ def propagate_names(
             rn = Rename(
                 expr.table, {name: name + str(hash(expr.table)) for name in overwritten}
             )
-            col_to_name = {
-                col: ColName(col_name.name + str(hash(expr.table)))
-                if col_name.name in overwritten
-                else col_name
-                for col, col_name in col_to_name.items()
-            }
+            col_to_name.inner_update(
+                {
+                    table: {
+                        name: name + str(hash(expr.table))
+                        for name in name_map
+                        if name in overwritten
+                    }
+                    for table, name_map in col_to_name.items()
+                }
+            )
             expr.table = rn
         expr.values = [col_expr.propagate_names(v, col_to_name) for v in expr.values]
 
     elif isinstance(expr, Join):
-        for v in expr.on:
-            needed_cols.inner_update(col_expr.get_needed_cols(v))
+        needed_cols.inner_update(col_expr.get_needed_cols(expr.on))
         col_to_name_left = propagate_names(expr.left, needed_cols)
         col_to_name_right = propagate_names(expr.right, needed_cols)
         col_to_name = col_to_name_left | col_to_name_right
-        expr.on = [propagate_names(v, col_to_name) for v in expr.on]
+        expr.on = propagate_names(expr.on, col_to_name)
 
     elif isinstance(expr, Filter):
         for v in expr.filters:
@@ -177,20 +186,24 @@ def propagate_names(
         expr.values = [propagate_names(v, col_to_name) for v in expr.values]
 
     elif isinstance(expr, Table):
-        col_to_name = dict()
+        col_to_name = Map2d()
 
     else:
         raise TypeError
 
     if expr in needed_cols:
-        for col_name in needed_cols[expr]:
-            col_to_name[Col(col_name, expr)] = ColName(col_name)
+        col_to_name.inner_update(
+            Map2d({expr: {name: name for name in needed_cols[expr]}})
+        )
         del needed_cols[expr]
 
     return col_to_name
 
 
 def propagate_types(expr: TableExpr) -> dict[str, DType]:
+    if isinstance(expr, (SliceHead, Ungroup, Select, SliceHead, GroupBy)):
+        return propagate_types(expr.table)
+
     if isinstance(expr, Rename):
         col_types = propagate_types(expr.table)
         return {
@@ -236,6 +249,6 @@ def recursive_copy(expr: TableExpr) -> TableExpr:
     if isinstance(expr, Join):
         new_expr.left = recursive_copy(expr.left)
         new_expr.right = recursive_copy(expr.right)
-    else:
+    elif not isinstance(expr, Table):
         new_expr.table = recursive_copy(expr.table)
     return new_expr
