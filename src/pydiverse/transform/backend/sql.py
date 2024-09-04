@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+import dataclasses
 import functools
 import operator
 from typing import Any
 
 import sqlalchemy as sqa
+from sqlalchemy import ColumnElement, Subquery
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.tree import verbs
-from pydiverse.transform.tree.col_expr import ColExpr
-from pydiverse.transform.tree.table_expr import TableExpr  #
+from pydiverse.transform.tree.col_expr import ColExpr, Order
+from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class SqlImpl(TableImpl):
@@ -25,29 +27,88 @@ class SqlImpl(TableImpl):
 # `AS` in the `SELECT` clause.
 
 
+@dataclasses.dataclass(slots=True)
 class CompilationContext:
     select: list[tuple[ColExpr, str]]
-    group_by: list[ColExpr]
-    where: list[ColExpr]
-    having: list[ColExpr]
-    order_by: list[ColExpr]
-    limit: int
-    offset: int
+    join: list[Join] = []
+    group_by: list[ColExpr] = []
+    partition_by: list[ColExpr] = []
+    where: list[ColExpr] = []
+    having: list[ColExpr] = []
+    order_by: list[Order] = []
+    limit: int | None = None
+    offset: int | None = None
 
 
-def compile_subquery(expr: TableExpr) -> CompilationContext:
+@dataclasses.dataclass(slots=True)
+class Join:
+    right: Subquery
+    on: ColExpr
+    how: str
+
+
+def compile_col_expr(expr: ColExpr) -> ColumnElement: ...
+
+
+def compile_table_expr(expr: TableExpr) -> tuple[Subquery, CompilationContext]:
     if isinstance(expr, verbs.Select):
-        ct = compile_subquery(expr.table)
+        query, ct = compile_table_expr(expr.table)
         ct.select = [(col, col.name) for col in expr.selects]
 
     elif isinstance(expr, verbs.Rename):
+        # drop verb?
         ...
 
     elif isinstance(expr, verbs.Mutate):
-        ct = compile_subquery(expr.table)
+        query, ct = compile_table_expr(expr.table)
         ct.select.extend([(val, name) for val, name in zip(expr.values, expr.names)])
 
-    return ct
+    elif isinstance(expr, verbs.Join):
+        query, ct = compile_table_expr(expr.left)
+        right_query, right_ct = compile_table_expr(expr.right)
+
+        j = Join(right_query, expr.on, expr.how)
+
+        if expr.how == "inner":
+            ct.where.extend(right_ct.where)
+        elif expr.how == "left":
+            j.on = functools.reduce(operator.and_, (j.on, *right_ct.where))
+        elif expr.how == "outer":
+            if ct.where or right_ct.where:
+                raise ValueError("invalid filter before outer join")
+
+        ct.join.append(j)
+
+    elif isinstance(expr, verbs.Filter):
+        query, ct = compile_table_expr(expr.table)
+
+        if ct.group_by:
+            # check whether we can move conditions from `having` clause to `where`. This
+            # is possible if a condition only involves columns in `group_by`. Split up
+            # the filter at __and__`s until no longer possible. TODO
+            ct.having.extend(expr.filters)
+        else:
+            ct.where.extend(expr.filters)
+
+    elif isinstance(expr, verbs.Arrange):
+        query, ct = compile_table_expr(expr.table)
+        # TODO: we could remove duplicates here if we want. but if we do so, this should
+        # not be done in the sql backend but on the abstract tree.
+        ct.order_by = expr.order_by + ct.order_by
+
+    elif isinstance(expr, verbs.Summarise):
+        query, ct = compile_table_expr(expr.table)
+
+    elif isinstance(expr, verbs.SliceHead):
+        query, ct = compile_table_expr(expr.table)
+        if ct.limit is None:
+            ct.limit = expr.n
+            ct.offset = expr.offset
+        else:
+            ct.limit = min(abs(ct.limit - expr.offset), expr.n)
+            ct.offset += expr.offset
+
+    return query, ct
 
 
 with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
