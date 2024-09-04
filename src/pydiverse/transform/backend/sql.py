@@ -9,7 +9,7 @@ import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.backend.targets import Target
+from pydiverse.transform.backend.targets import SqlAlchemy, Target
 from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import verbs
@@ -29,14 +29,17 @@ class SqlImpl(TableImpl):
 
     def __init__(
         self,
-        table_name: str,
-        engine: sqa.Engine | str,
+        table: str,
+        schema: str,
+        engine: sqa.Engine,
     ):
         assert not isinstance(
             self, SqlImpl
         ), "cannot instantiate abstract class `SqlImpl`"
 
-        self.table_name = table_name
+        self.table = sqa.Table(
+            table, sqa.MetaData(), schema=schema, autoload_with=engine
+        )
         self.engine = engine
 
     def __init_subclass__(cls, **kwargs):
@@ -44,39 +47,28 @@ class SqlImpl(TableImpl):
 
     # can also take a connection string for `engine`
     @staticmethod
-    def from_engine(table_name: str, engine: sqa.Engine | str) -> SqlImpl:
-        if isinstance(engine, str):
-            engine = sqa.create_engine(engine)
-        return SqlImpl.Dialects[engine.dialect.name](table_name, engine)
+    def from_engine(table: str | sqa.Table, conf: SqlAlchemy) -> SqlImpl:
+        if isinstance(conf.engine, str):
+            engine = sqa.create_engine(conf.engine)
+        return SqlImpl.Dialects[engine.dialect.name](table, conf.schema, engine)
 
     @staticmethod
-    def export(expr: TableExpr, target: Target) -> Any: ...
+    def export(expr: TableExpr, target: Target) -> Any:
+        query, ct = compile_table_expr(expr)
+        # build select and stuff
 
 
-# the compilation function only deals with one subquery. It assumes that any col
-# it uses that is created by a subquery has the string name given to it in the
-# name propagation stage. A subquery is thus responsible for inserting the right
-# `AS` in the `SELECT` clause.
-
-
-@dataclasses.dataclass(slots=True)
-class CompilationContext:
-    select: list[tuple[ColExpr, str]]
-    join: list[Join] = []
-    group_by: list[ColExpr] = []
-    partition_by: list[ColExpr] = []
-    where: list[ColExpr] = []
-    having: list[ColExpr] = []
-    order_by: list[Order] = []
-    limit: int | None = None
-    offset: int | None = None
-
-
-@dataclasses.dataclass(slots=True)
-class Join:
-    right: sqa.Subquery
-    on: ColExpr
-    how: str
+def compile_order(
+    order: Order,
+    name_to_sqa_col: dict[str, sqa.ColumnElement],
+    group_by: list[sqa.ColumnElement],
+):
+    raise NotImplementedError
+    return (
+        compile_col_expr(order.order_by, group_by),
+        order.descending,
+        order.nulls_last,
+    )
 
 
 def compile_col_expr(
@@ -131,17 +123,30 @@ def compile_col_expr(
     raise AssertionError
 
 
-def compile_order(
-    order: Order,
-    name_to_sqa_col: dict[str, sqa.ColumnElement],
-    group_by: list[sqa.ColumnElement],
-):
-    raise NotImplementedError
-    return (
-        compile_col_expr(order.order_by, group_by),
-        order.descending,
-        order.nulls_last,
-    )
+# the compilation function only deals with one subquery. It assumes that any col
+# it uses that is created by a subquery has the string name given to it in the
+# name propagation stage. A subquery is thus responsible for inserting the right
+# `AS` in the `SELECT` clause.
+
+
+@dataclasses.dataclass(slots=True)
+class CompilationContext:
+    select: list[tuple[ColExpr, str]]
+    join: list[Join] = []
+    group_by: list[ColExpr] = []
+    partition_by: list[ColExpr] = []
+    where: list[ColExpr] = []
+    having: list[ColExpr] = []
+    order_by: list[Order] = []
+    limit: int | None = None
+    offset: int | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class Join:
+    right: sqa.Subquery
+    on: ColExpr
+    how: str
 
 
 def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContext]:
@@ -203,7 +208,9 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContex
             ct.offset += expr.offset
 
     elif isinstance(expr, Table):
-        sqa.select()
+        return expr._impl.table, CompilationContext(
+            [(ColName(col.name), col.name) for col in expr._impl.table.columns]
+        )
 
     return query, ct
 

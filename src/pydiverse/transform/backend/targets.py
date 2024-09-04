@@ -20,5 +20,6 @@ class DuckDb(Target): ...
 
 
 class SqlAlchemy(Target):
-    def __init__(self, engine: sqa.Engine, *, schema):
+    def __init__(self, engine: sqa.Engine, *, schema: str):
         self.engine = engine
+        self.schema = schema
