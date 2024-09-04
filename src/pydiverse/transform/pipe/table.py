@@ -5,8 +5,6 @@ from collections.abc import Iterable
 from html import escape
 from typing import Generic
 
-import polars as pl
-
 from pydiverse.transform._typing import ImplT
 from pydiverse.transform.tree.col_expr import (
     Col,
@@ -24,15 +22,25 @@ class Table(TableExpr, Generic[ImplT]):
 
     # TODO: define exactly what can be given for the two
     def __init__(self, resource, backend=None, *, name: str | None = None):
-        from pydiverse.transform.backend.polars import PolarsImpl
-        from pydiverse.transform.backend.table_impl import TableImpl
+        import polars as pl
+
+        from pydiverse.transform.backend import (
+            PolarsImpl,
+            SqlAlchemy,
+            SqlImpl,
+            TableImpl,
+        )
 
         if isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
             self._impl = PolarsImpl(resource)
         elif isinstance(resource, TableImpl):
             self._impl = resource
         elif isinstance(resource, str):
-            ...  # could be a SQL table name
+            if isinstance(backend, SqlAlchemy):
+                self._impl = SqlImpl.from_engine(resource, backend)
+
+        if self._impl is None:
+            raise AssertionError
 
         self.name = name
 

@@ -11,6 +11,7 @@ from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.ops.core import OpType
+from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import verbs
 from pydiverse.transform.tree.col_expr import (
     Col,
@@ -24,6 +25,30 @@ from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class SqlImpl(TableImpl):
+    Dialects: dict[str, type[TableImpl]]
+
+    def __init__(
+        self,
+        table_name: str,
+        engine: sqa.Engine | str,
+    ):
+        assert not isinstance(
+            self, SqlImpl
+        ), "cannot instantiate abstract class `SqlImpl`"
+
+        self.table_name = table_name
+        self.engine = engine
+
+    def __init_subclass__(cls, **kwargs):
+        SqlImpl.Dialects[cls.dialect_name] = cls
+
+    # can also take a connection string for `engine`
+    @staticmethod
+    def from_engine(table_name: str, engine: sqa.Engine | str) -> SqlImpl:
+        if isinstance(engine, str):
+            engine = sqa.create_engine(engine)
+        return SqlImpl.Dialects[engine.dialect.name](table_name, engine)
+
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any: ...
 
@@ -176,6 +201,9 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContex
         else:
             ct.limit = min(abs(ct.limit - expr.offset), expr.n)
             ct.offset += expr.offset
+
+    elif isinstance(expr, Table):
+        sqa.select()
 
     return query, ct
 

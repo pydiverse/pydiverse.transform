@@ -2,10 +2,12 @@
 # the backend on import / export.
 
 
-# TODO: better name for this? (the user sees this)
 from __future__ import annotations
 
+import sqlalchemy as sqa
 
+
+# TODO: better name for this? (the user sees this)
 class Target: ...
 
 
@@ -17,4 +19,6 @@ class Polars(Target):
 class DuckDb(Target): ...
 
 
-class SqlAlchemy(Target): ...
+class SqlAlchemy(Target):
+    def __init__(self, engine: sqa.Engine, *, schema):
+        self.engine = engine

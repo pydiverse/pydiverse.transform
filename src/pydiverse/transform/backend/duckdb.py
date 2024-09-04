@@ -5,6 +5,8 @@ from pydiverse.transform.backend.targets import DuckDb, Target
 
 
 class DuckDbImpl(SqlImpl):
+    dialect_name = "duckdb"
+
     @staticmethod
     def backend_marker() -> Target:
         return DuckDb()
