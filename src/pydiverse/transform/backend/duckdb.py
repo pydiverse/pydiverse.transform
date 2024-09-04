@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from pydiverse.transform.backend.sql_table import SQLTableImpl
+from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.backend.targets import DuckDb, Target
 
 
-class DuckDBTableImpl(SQLTableImpl):
-    _dialect_name = "duckdb"
+class DuckDbImpl(SqlImpl):
+    @staticmethod
+    def backend_marker() -> Target:
+        return DuckDb()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.backend.targets import DuckDB, Polars, SqlAlchemy
+from pydiverse.transform.backend.targets import DuckDb, Polars, SqlAlchemy
 from pydiverse.transform.pipe import functions
 from pydiverse.transform.pipe.c import C
 from pydiverse.transform.pipe.pipeable import verb
@@ -10,7 +10,7 @@ from pydiverse.transform.tree.alignment import aligned, eval_aligned
 __all__ = [
     "Polars",
     "SqlAlchemy",
-    "DuckDB",
+    "DuckDb",
     "Table",
     "aligned",
     "eval_aligned",
