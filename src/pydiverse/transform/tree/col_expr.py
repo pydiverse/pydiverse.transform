@@ -79,6 +79,8 @@ class ColExpr:
             "converted to a boolean or used with the and, or, not keywords"
         )
 
+    def clone(self, table_map: dict[TableExpr, TableExpr]): ...
+
 
 class Col(ColExpr, Generic[ImplT]):
     def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
@@ -92,6 +94,9 @@ class Col(ColExpr, Generic[ImplT]):
     def _expr_repr(self) -> str:
         return f"{self.table.name}.{self.name}"
 
+    def clone(self, table_map: dict[TableExpr, TableExpr]):
+        return Col(self.name, table_map[self.table], self.dtype)
+
 
 class ColName(ColExpr):
     def __init__(self, name: str):
@@ -102,6 +107,9 @@ class ColName(ColExpr):
 
     def _expr_repr(self) -> str:
         return f"C.{self.name}"
+
+    def clone(self, table_map: dict[TableExpr, TableExpr]):
+        return self
 
 
 class LiteralCol(ColExpr):
@@ -114,6 +122,9 @@ class LiteralCol(ColExpr):
 
     def _expr_repr(self) -> str:
         return repr(self)
+
+    def clone(self, table_map: dict[TableExpr, TableExpr]):
+        return self
 
 
 class ColFn(ColExpr):
@@ -144,6 +155,19 @@ class ColFn(ColExpr):
         else:
             args_str = ", ".join(args[1:])
             return f"{args[0]}.{self.name}({args_str})"
+
+    def clone(self, table_map: dict[TableExpr, TableExpr]):
+        return ColFn(
+            self.name,
+            *[
+                arg.clone(table_map) if isinstance(arg, ColExpr) else arg
+                for arg in self.args
+            ],
+            **{
+                key: [val.clone(table_map) for val in arr]
+                for key, arr in self.context_kwargs.items()
+            },
+        )
 
 
 class CaseExpr(ColExpr):
@@ -289,6 +313,13 @@ class Order:
         if nulls_last is None:
             nulls_last = False
         return Order(expr, descending, nulls_last)
+
+    def clone(self, table_map: dict[TableExpr, TableExpr]) -> Order:
+        return Order(
+            [ord.clone(table_map) for ord in self.order_by],
+            self.descending,
+            self.nulls_last,
+        )
 
 
 # Add all supported dunder methods to `ColExpr`. This has to be done, because Python

@@ -21,11 +21,26 @@ class Select(TableExpr):
     table: TableExpr
     selects: list[Col | ColName]
 
+    def clone(self) -> tuple[Select, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Select(
+            table,
+            [col.clone(table_map) for col in self.selects],
+        )
+        table_map[self] = new_self
+        return new_self, table_map
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Rename(TableExpr):
     table: TableExpr
     name_map: dict[str, str]
+
+    def clone(self) -> tuple[Rename, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Rename(table, self.name_map)
+        table_map[self] = new_self
+        return new_self, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -33,6 +48,12 @@ class Mutate(TableExpr):
     table: TableExpr
     names: list[str]
     values: list[ColExpr]
+
+    def clone(self) -> tuple[Mutate, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Mutate(table, self.names, [z.clone(table_map) for z in self.values])
+        table_map[self] = new_self
+        return new_self, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -44,11 +65,27 @@ class Join(TableExpr):
     validate: JoinValidate
     suffix: str
 
+    def clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
+        left, left_map = self.left.clone()
+        right, right_map = self.right.clone()
+        left_map.update(right_map)
+        new_self = Join(
+            left, right, self.on.clone(left_map), self.how, self.validate, self.suffix
+        )
+        left_map[self] = new_self
+        return new_self, left_map
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Filter(TableExpr):
     table: TableExpr
     filters: list[ColExpr]
+
+    def clone(self) -> tuple[Filter, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Filter(table, [z.clone(table_map) for z in self.filters])
+        table_map[self] = new_self
+        return new_self, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -57,11 +94,31 @@ class Summarise(TableExpr):
     names: list[str]
     values: list[ColExpr]
 
+    def clone(self) -> tuple[Summarise, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Summarise(
+            table, self.names, [z.clone(table_map) for z in self.values]
+        )
+        table_map[self] = new_self
+        return new_self, table_map
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Arrange(TableExpr):
     table: TableExpr
     order_by: list[Order]
+
+    def clone(self) -> tuple[Arrange, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Arrange(
+            table,
+            [
+                Order(z.order_by.clone(table_map), z.descending, z.nulls_last)
+                for z in self.order_by
+            ],
+        )
+        table_map[self] = new_self
+        return new_self, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -70,6 +127,12 @@ class SliceHead(TableExpr):
     n: int
     offset: int
 
+    def clone(self) -> tuple[SliceHead, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = SliceHead(table, self.n, self.offset)
+        table_map[self] = new_self
+        return new_self, table_map
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class GroupBy(TableExpr):
@@ -77,10 +140,22 @@ class GroupBy(TableExpr):
     group_by: list[Col | ColName]
     add: bool
 
+    def clone(self) -> tuple[GroupBy, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Mutate(table, [z.clone(table_map) for z in self.group_by], self.add)
+        table_map[self] = new_self
+        return new_self, table_map
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Ungroup(TableExpr):
     table: TableExpr
+
+    def clone(self) -> tuple[Ungroup, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Ungroup(table)
+        table_map[self] = new_self
+        return new_self, table_map
 
 
 # returns Col -> ColName mapping and the list of available columns

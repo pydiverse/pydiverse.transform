@@ -29,3 +29,5 @@ class TableExpr:
 
     def __hash__(self):
         return id(self)
+
+    def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]: ...

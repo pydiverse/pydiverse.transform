@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Iterable
 from html import escape
 from typing import Generic
@@ -90,10 +91,14 @@ class Table(TableExpr, Generic[ImplT]):
         p.text(str(self) if not cycle else "...")
 
     def cols(self) -> list[Col]:
-        return [Col(name, self) for name in self._impl.cols()]
+        return [Col(name, self) for name in self._impl.col_names()]
 
     def col_names(self) -> list[str]:
-        return self._impl.cols()
+        return self._impl.col_names()
 
     def schema(self) -> dict[str, DType]:
         return self._impl.schema()
+
+    def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
+        new_self = copy.copy(self)
+        return new_self, {self: new_self}
