@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from pydiverse.transform import ops
 from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.ops import OPType
+from pydiverse.transform.ops import OpType
 from pydiverse.transform.tree.col_expr import (
     Col,
     LiteralCol,
@@ -75,7 +75,7 @@ class TableImpl:
 
     def col_type(self, col_name: str) -> DType: ...
 
-    def cols(self) -> list[str]: ...
+    def col_names(self) -> list[str]: ...
 
     def schema(self) -> dict[str, DType]: ...
 
@@ -123,8 +123,8 @@ class TableImpl:
 
     @classmethod
     def _get_op_ftype(
-        cls, args, operator: Operator, override_ftype: OPType = None, strict=False
-    ) -> OPType:
+        cls, args, operator: Operator, override_ftype: OpType = None, strict=False
+    ) -> OpType:
         """
         Get the ftype based on a function implementation and the arguments.
 
@@ -139,15 +139,15 @@ class TableImpl:
         ftypes = [arg.ftype for arg in args]
         op_ftype = override_ftype or operator.ftype
 
-        if op_ftype == OPType.EWISE:
-            if OPType.WINDOW in ftypes:
-                return OPType.WINDOW
-            if OPType.AGGREGATE in ftypes:
-                return OPType.AGGREGATE
+        if op_ftype == OpType.EWISE:
+            if OpType.WINDOW in ftypes:
+                return OpType.WINDOW
+            if OpType.AGGREGATE in ftypes:
+                return OpType.AGGREGATE
             return op_ftype
 
-        if op_ftype == OPType.AGGREGATE:
-            if OPType.WINDOW in ftypes:
+        if op_ftype == OpType.AGGREGATE:
+            if OpType.WINDOW in ftypes:
                 if strict:
                     raise FunctionTypeError(
                         "Can't nest a window function inside an aggregate function"
@@ -159,15 +159,15 @@ class TableImpl:
                         "Nesting a window function inside an aggregate function is not"
                         " supported by SQL backend."
                     )
-            if OPType.AGGREGATE in ftypes:
+            if OpType.AGGREGATE in ftypes:
                 raise FunctionTypeError(
                     "Can't nest an aggregate function inside an aggregate function"
                     f" ({operator.name})."
                 )
             return op_ftype
 
-        if op_ftype == OPType.WINDOW:
-            if OPType.WINDOW in ftypes:
+        if op_ftype == OpType.WINDOW:
+            if OpType.WINDOW in ftypes:
                 if strict:
                     raise FunctionTypeError(
                         "Can't nest a window function inside a window function"

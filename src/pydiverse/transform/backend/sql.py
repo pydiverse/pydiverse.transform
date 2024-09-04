@@ -6,13 +6,20 @@ import operator
 from typing import Any
 
 import sqlalchemy as sqa
-from sqlalchemy import ColumnElement, Subquery
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Target
+from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.tree import verbs
-from pydiverse.transform.tree.col_expr import ColExpr, Order
+from pydiverse.transform.tree.col_expr import (
+    Col,
+    ColExpr,
+    ColFn,
+    ColName,
+    LiteralCol,
+    Order,
+)
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -42,15 +49,77 @@ class CompilationContext:
 
 @dataclasses.dataclass(slots=True)
 class Join:
-    right: Subquery
+    right: sqa.Subquery
     on: ColExpr
     how: str
 
 
-def compile_col_expr(expr: ColExpr) -> ColumnElement: ...
+def compile_col_expr(
+    expr: ColExpr,
+    name_to_sqa_col: dict[str, sqa.ColumnElement],
+    group_by: list[sqa.ColumnElement],
+) -> sqa.ColumnElement:
+    assert not isinstance(expr, Col)
+    if isinstance(expr, ColName):
+        # here, inserted columns referenced via C are implicitly expanded
+        return name_to_sqa_col[expr.name]
+    elif isinstance(expr, ColFn):
+        op = SqlImpl.operator_registry.get_operator(expr.name)
+        args: list[sqa.ColumnElement] = [
+            compile_col_expr(arg, name_to_sqa_col, group_by) for arg in expr.args
+        ]
+        impl = SqlImpl.operator_registry.get_implementation(
+            expr.name, tuple(arg.dtype for arg in expr.args)
+        )
+
+        partition_by = expr.context_kwargs.get("partition_by")
+        if partition_by is None:
+            partition_by = group_by
+        else:
+            partition_by = sqa.sql.expression.ClauseList(
+                *(compile_col_expr(col, name_to_sqa_col, []) for col in partition_by)
+            )
+
+        arrange = expr.context_kwargs.get("arrange")
+
+        if arrange:
+            order_by = sqa.sql.expression.ClauseList(
+                *(compile_order(order, name_to_sqa_col, group_by) for order in arrange)
+            )
+
+        filter_cond = expr.context_kwargs.get("filter")
+        if filter_cond:
+            filter_cond = [compile_col_expr(z, []) for z in filter_cond]
+
+        # if something fails here, you may need to wrap literals in sqa.literal based
+        # on whether the argument in the signature is const or not.
+        value: sqa.ColumnElement = impl(*args)
+
+        if op.ftype in (OpType.WINDOW, OpType.AGGREGATE):
+            value = value.over(partition_by=partition_by, order_by=order_by)
+
+        return value
+
+    elif isinstance(expr, LiteralCol):
+        return expr.val
+
+    raise AssertionError
 
 
-def compile_table_expr(expr: TableExpr) -> tuple[Subquery, CompilationContext]:
+def compile_order(
+    order: Order,
+    name_to_sqa_col: dict[str, sqa.ColumnElement],
+    group_by: list[sqa.ColumnElement],
+):
+    raise NotImplementedError
+    return (
+        compile_col_expr(order.order_by, group_by),
+        order.descending,
+        order.nulls_last,
+    )
+
+
+def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContext]:
     if isinstance(expr, verbs.Select):
         query, ct = compile_table_expr(expr.table)
         ct.select = [(col, col.name) for col in expr.selects]

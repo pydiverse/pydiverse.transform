@@ -3,11 +3,11 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.backend.sql_table import SQLTableImpl
+from pydiverse.transform.backend.sql_table import SqlImpl
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
-class SQLiteTableImpl(SQLTableImpl):
+class SQLiteTableImpl(SqlImpl):
     _dialect_name = "sqlite"
 
 

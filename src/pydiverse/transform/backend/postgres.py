@@ -3,10 +3,10 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.backend.sql_table import SQLTableImpl
+from pydiverse.transform.backend.sql_table import SqlImpl
 
 
-class PostgresTableImpl(SQLTableImpl):
+class PostgresTableImpl(SqlImpl):
     _dialect_name = "postgresql"
 
 
