@@ -130,7 +130,8 @@ def compile_col_expr(
 
 
 @dataclasses.dataclass(slots=True)
-class CompilationContext:
+class Query:
+    name_to_sqa_col: dict[str, sqa.ColumnElement]
     select: list[tuple[ColExpr, str]]
     join: list[Join] = []
     group_by: list[ColExpr] = []
@@ -149,9 +150,63 @@ class Join:
     how: str
 
 
-def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContext]:
+def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
+    sel = table.select().select_from(table)
+
+    for j in query.join:
+        compiled_on = compile_col_expr(j.on, query.name_to_sqa_col, query.partition_by)
+        sel = sel.join(
+            j.right,
+            onclause=compiled_on,
+            isouter=j.how != "inner",
+            full=j.how == "outer",
+        )
+
+    where_cond = functools.reduce(operator.and_, query.where)
+    sel = sel.where(
+        compile_col_expr(where_cond, query.name_to_sqa_col, query.partition_by)
+    )
+
+    sel = sel.group_by(
+        *(
+            compile_col_expr(col, query.name_to_sqa_col, query.partition_by)
+            for col in query.group_by
+        )
+    )
+
+    # for the filter arg in aggregation functions, we somehow need to get the filtering
+    # condition in the having. Currently, this is difficult since we don't look at the
+    # expressions in the verbs before this stage here.
+    having_cond = functools.reduce(operator.and_, query.having)
+    sel = sel.having(
+        compile_col_expr(having_cond, query.name_to_sqa_col, query.partition_by)
+    )
+
+    if query.limit is not None:
+        sel = sel.limit(query.limit).offset(query.offset)
+
+    sel = sel.with_only_columns(
+        *(
+            compile_col_expr(col_expr, query.name_to_sqa_col, query.partition_by).label(
+                col_name
+            )
+            for col_expr, col_name in query.select
+        )
+    )
+
+    sel = sel.order_by(
+        *(
+            compile_order(ord, query.name_to_sqa_col, query.partition_by)
+            for ord in query.order_by
+        )
+    )
+
+    return sel
+
+
+def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
     if isinstance(expr, verbs.Select):
-        query, ct = compile_table_expr(expr.table)
+        table, ct = compile_table_expr(expr.table)
         ct.select = [(col, col.name) for col in expr.selects]
 
     elif isinstance(expr, verbs.Rename):
@@ -159,11 +214,11 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContex
         ...
 
     elif isinstance(expr, verbs.Mutate):
-        query, ct = compile_table_expr(expr.table)
+        table, ct = compile_table_expr(expr.table)
         ct.select.extend([(val, name) for val, name in zip(expr.values, expr.names)])
 
     elif isinstance(expr, verbs.Join):
-        query, ct = compile_table_expr(expr.left)
+        table, ct = compile_table_expr(expr.left)
         right_query, right_ct = compile_table_expr(expr.right)
 
         j = Join(right_query, expr.on, expr.how)
@@ -179,7 +234,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContex
         ct.join.append(j)
 
     elif isinstance(expr, verbs.Filter):
-        query, ct = compile_table_expr(expr.table)
+        table, ct = compile_table_expr(expr.table)
 
         if ct.group_by:
             # check whether we can move conditions from `having` clause to `where`. This
@@ -190,16 +245,16 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContex
             ct.where.extend(expr.filters)
 
     elif isinstance(expr, verbs.Arrange):
-        query, ct = compile_table_expr(expr.table)
+        table, ct = compile_table_expr(expr.table)
         # TODO: we could remove duplicates here if we want. but if we do so, this should
         # not be done in the sql backend but on the abstract tree.
         ct.order_by = expr.order_by + ct.order_by
 
     elif isinstance(expr, verbs.Summarise):
-        query, ct = compile_table_expr(expr.table)
+        table, ct = compile_table_expr(expr.table)
 
     elif isinstance(expr, verbs.SliceHead):
-        query, ct = compile_table_expr(expr.table)
+        table, ct = compile_table_expr(expr.table)
         if ct.limit is None:
             ct.limit = expr.n
             ct.offset = expr.offset
@@ -208,11 +263,11 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Subquery, CompilationContex
             ct.offset += expr.offset
 
     elif isinstance(expr, Table):
-        return expr._impl.table, CompilationContext(
+        return expr._impl.table, Query(
             [(ColName(col.name), col.name) for col in expr._impl.table.columns]
         )
 
-    return query, ct
+    return table, ct
 
 
 with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
