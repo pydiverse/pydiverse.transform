@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import copy
 import warnings
 from typing import TYPE_CHECKING, Any
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.targets import Target
-from pydiverse.transform.core.util import bidict, ordered_set
 from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops import OPType
 from pydiverse.transform.tree.col_expr import (
@@ -66,27 +64,16 @@ class TableImpl:
                 break
         cls.operator_registry = OperatorRegistry(cls.__name__, super_reg)
 
-    def copy(self):
-        c = copy.copy(self)
-        # Copy containers
-        for k, v in self.__dict__.items():
-            if isinstance(v, (list, dict, set, bidict, ordered_set)):
-                c.__dict__[k] = copy.copy(v)
-
-        return c
-
-    def col_type(self, col_name: str) -> DType: ...
-
-    @staticmethod
-    def compile_table_expr(expr: TableExpr) -> TableImpl: ...
-
     @staticmethod
     def build_query(expr: TableExpr) -> str | None: ...
 
     @staticmethod
     def backend_marker() -> Target: ...
 
-    def export(self, target: Target) -> Any: ...
+    @staticmethod
+    def export(expr: TableExpr, target: Target) -> Any: ...
+
+    def col_type(self, col_name: str) -> DType: ...
 
     def cols(self) -> list[str]: ...
 

@@ -69,6 +69,7 @@ class ColExpr:
 
     def __getattr__(self, name: str) -> FnAttr:
         if name.startswith("_") and name.endswith("_"):
+            # that hasattr works correctly
             raise AttributeError(f"`ColExpr` has no attribute `{name}`")
         return FnAttr(name, self)
 

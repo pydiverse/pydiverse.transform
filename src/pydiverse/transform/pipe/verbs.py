@@ -69,7 +69,7 @@ def export(expr: TableExpr, target: Target | None = None):
         target = SourceBackend.backend_marker()
     tree.propagate_names(expr)
     tree.propagate_types(expr)
-    return SourceBackend.compile_table_expr(expr).export(target)
+    return SourceBackend.export(expr, target)
 
 
 @builtin_verb()

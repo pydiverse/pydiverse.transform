@@ -31,14 +31,6 @@ class PolarsImpl(TableImpl):
     def __deepcopy__(self, memo) -> PolarsImpl:
         return PolarsImpl(self.df.clone())
 
-    def col_type(self, col_name: str) -> dtypes.DType:
-        return polars_type_to_pdt(self.df.collect_schema()[col_name])
-
-    @staticmethod
-    def compile_table_expr(expr: TableExpr) -> PolarsImpl:
-        lf, context = table_expr_compile_with_context(expr)
-        return PolarsImpl(lf.select(context.selects))
-
     @staticmethod
     def build_query(expr: TableExpr) -> str | None:
         return None
@@ -47,9 +39,15 @@ class PolarsImpl(TableImpl):
     def backend_marker() -> Target:
         return Polars(lazy=True)
 
-    def export(self, target: Target) -> Any:
+    @staticmethod
+    def export(expr: TableExpr, target: Target) -> Any:
+        lf, context = table_expr_compile_with_context(expr)
+        lf = lf.select(context.selects)
         if isinstance(target, Polars):
-            return self.df if target.lazy else self.df.collect()
+            return lf if target.lazy else lf.collect()
+
+    def col_type(self, col_name: str) -> dtypes.DType:
+        return polars_type_to_pdt(self.df.collect_schema()[col_name])
 
     def cols(self) -> list[str]:
         return self.df.columns
