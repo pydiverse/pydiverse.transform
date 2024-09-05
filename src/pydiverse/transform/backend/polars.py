@@ -9,7 +9,7 @@ import polars as pl
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, Target
-from pydiverse.transform.ops.core import OPType
+from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
@@ -41,15 +41,15 @@ class PolarsImpl(TableImpl):
 
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
-        lf, context = table_expr_compile_with_context(expr)
-        lf = lf.select(context.selects)
+        lf, context = compile_table_expr(expr)
+        lf = lf.select(context.select)
         if isinstance(target, Polars):
             return lf if target.lazy else lf.collect()
 
     def col_type(self, col_name: str) -> dtypes.DType:
         return polars_type_to_pdt(self.df.collect_schema()[col_name])
 
-    def cols(self) -> list[str]:
+    def col_names(self) -> list[str]:
         return self.df.columns
 
     def schema(self) -> dict[str, dtypes.DType]:
@@ -58,16 +58,38 @@ class PolarsImpl(TableImpl):
         }
 
 
-def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
-    if isinstance(expr, Order):
-        return Order(col_expr_compile(expr.order_by), expr.descending, expr.nulls_last)
+# merges descending and null_last markers into the ordering expression
+def merge_desc_nulls_last(
+    order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool]
+) -> list[pl.Expr]:
+    with_signs: list[pl.Expr] = []
+    for ord, desc in zip(order_by, descending):
+        numeric = ord.rank("dense").cast(pl.Int64)
+        with_signs.append(-numeric if desc else numeric)
+    return [
+        expr.fill_null(
+            pl.len().cast(pl.Int64) + 1 if nl else -(pl.len().cast(pl.Int64) + 1)
+        )
+        for expr, nl in zip(with_signs, nulls_last)
+    ]
+
+
+def compile_order(order: Order, group_by: list[pl.Expr]) -> tuple[pl.Expr, bool, bool]:
+    return (
+        compile_col_expr(order.order_by, group_by),
+        order.descending,
+        order.nulls_last,
+    )
+
+
+def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
         return pl.col(expr.name)
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.operator_registry.get_operator(expr.name)
-        args: list[pl.Expr] = [col_expr_compile(arg, group_by) for arg in expr.args]
+        args: list[pl.Expr] = [compile_col_expr(arg, group_by) for arg in expr.args]
         impl = PolarsImpl.operator_registry.get_implementation(
             expr.name,
             tuple(arg.dtype for arg in expr.args),
@@ -78,7 +100,7 @@ def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
         if partition_by is None:
             partition_by = group_by
         else:
-            partition_by = [col_expr_compile(z, []) for z in partition_by]
+            partition_by = [compile_col_expr(z, []) for z in partition_by]
 
         arrange = expr.context_kwargs.get("arrange")
 
@@ -89,10 +111,10 @@ def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
 
         filter_cond = expr.context_kwargs.get("filter")
         if filter_cond:
-            filter_cond = [col_expr_compile(z, []) for z in filter_cond]
+            filter_cond = [compile_col_expr(z, []) for z in filter_cond]
 
         if (
-            op.ftype in (OPType.WINDOW, OPType.AGGREGATE)
+            op.ftype in (OpType.WINDOW, OpType.AGGREGATE)
             and arrange
             and not partition_by
         ):
@@ -105,7 +127,7 @@ def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
                 for arg in args
             ]
 
-        if op.ftype in (OPType.WINDOW, OPType.AGGREGATE) and filter_cond:
+        if op.ftype in (OpType.WINDOW, OpType.AGGREGATE) and filter_cond:
             # filtering needs to be done before applying the operator.
             args = [
                 arg.filter(filter_cond) if isinstance(arg, pl.Expr) else arg
@@ -117,9 +139,9 @@ def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
 
-        value: pl.Expr = impl(*[arg for arg in args])
+        value: pl.Expr = impl(*args)
 
-        if op.ftype == OPType.AGGREGATE:
+        if op.ftype == OpType.AGGREGATE:
             if filter_cond:
                 # TODO: allow AGGRRGATE + `filter` context_kwarg
                 raise NotImplementedError
@@ -132,7 +154,7 @@ def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
         # TODO: in the grouping / filter expressions, we should probably call
         # validate_table_args. look what it does and use it.
         # TODO: what happens if I put None or similar in a filter / partition_by?
-        if op.ftype == OPType.WINDOW:
+        if op.ftype == OpType.WINDOW:
             # if `verb` != "muatate", we should give a warning that this only works
             # for polars
 
@@ -146,7 +168,7 @@ def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
                 value = value.over(partition_by, order_by=order_by)
 
             elif arrange:
-                if op.ftype == OPType.AGGREGATE:
+                if op.ftype == OpType.AGGREGATE:
                     # TODO: don't fail, but give a warning that `arrange` is useless
                     # here
                     ...
@@ -172,30 +194,6 @@ def col_expr_compile(expr: ColExpr | Order, group_by: list[pl.Expr]) -> pl.Expr:
         raise AssertionError
 
 
-# merges descending and null_last markers into the ordering expression
-def merge_desc_nulls_last(
-    order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool]
-) -> list[pl.Expr]:
-    with_signs: list[pl.Expr] = []
-    for ord, desc in zip(order_by, descending):
-        numeric = ord.rank("dense").cast(pl.Int64)
-        with_signs.append(-numeric if desc else numeric)
-    return [
-        expr.fill_null(
-            pl.len().cast(pl.Int64) + 1 if nl else -(pl.len().cast(pl.Int64) + 1)
-        )
-        for expr, nl in zip(with_signs, nulls_last)
-    ]
-
-
-def compile_order(order: Order, group_by: list[pl.Expr]) -> tuple[pl.Expr, bool, bool]:
-    return (
-        col_expr_compile(order.order_by, group_by),
-        order.descending,
-        order.nulls_last,
-    )
-
-
 def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
     if isinstance(expr, ColFn):
         if expr.name == "__and__":
@@ -203,8 +201,8 @@ def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
         if expr.name == "__eq__":
             return [
                 (
-                    col_expr_compile(expr.args[0], []),
-                    col_expr_compile(expr.args[1], []),
+                    compile_col_expr(expr.args[0], []),
+                    compile_col_expr(expr.args[1], []),
                 )
             ]
 
@@ -214,48 +212,48 @@ def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
 @dataclasses.dataclass
 class CompilationContext:
     group_by: list[str]
-    selects: list[str]
+    select: list[str]
 
     def compiled_group_by(self) -> list[pl.Expr]:
         return [pl.col(name) for name in self.group_by]
 
 
-def table_expr_compile_with_context(
+def compile_table_expr(
     expr: TableExpr,
 ) -> tuple[pl.LazyFrame, CompilationContext]:
     if isinstance(expr, verbs.Select):
-        df, context = table_expr_compile_with_context(expr.table)
-        context.selects = [
-            col
-            for col in context.selects
-            if col in set(col.name for col in expr.selects)
+        df, ct = compile_table_expr(expr.table)
+        ct.select = [
+            col for col in ct.select if col in set(col.name for col in expr.selects)
         ]
-        return df, context
+        return df, ct
+
+    elif isinstance(expr, verbs.Rename):
+        df, ct = compile_table_expr(expr.table)
+        ct.select = [
+            (expr.name_map[name] if name in expr.name_map else name)
+            for name in ct.select
+        ]
+        return df.rename(expr.name_map), ct
 
     elif isinstance(expr, verbs.Mutate):
-        df, context = table_expr_compile_with_context(expr.table)
-        context.selects.extend(
-            name for name in expr.names if name not in set(context.selects)
-        )
+        df, ct = compile_table_expr(expr.table)
+        ct.select.extend(name for name in expr.names if name not in set(ct.select))
         return df.with_columns(
             **{
-                name: col_expr_compile(
+                name: compile_col_expr(
                     value,
-                    context.compiled_group_by(),
+                    ct.compiled_group_by(),
                 )
                 for name, value in zip(expr.names, expr.values)
             }
-        ), context
-
-    elif isinstance(expr, verbs.Rename):
-        df, context = table_expr_compile_with_context(expr.table)
-        return df.rename(expr.name_map), context
+        ), ct
 
     elif isinstance(expr, verbs.Join):
-        left_df, left_context = table_expr_compile_with_context(expr.left)
-        right_df, right_context = table_expr_compile_with_context(expr.right)
-        assert not left_context.compiled_group_by()
-        assert not right_context.compiled_group_by()
+        left_df, left_ct = compile_table_expr(expr.left)
+        right_df, right_ct = compile_table_expr(expr.right)
+        assert not left_ct.compiled_group_by()
+        assert not right_ct.compiled_group_by()
         left_on, right_on = zip(*compile_join_cond(expr.on))
         # we want a suffix everywhere but polars only appends it to duplicate columns
         right_df = right_df.rename(
@@ -270,50 +268,46 @@ def table_expr_compile_with_context(
             coalesce=False,
         ), CompilationContext(
             [],
-            left_context.selects
-            + [col_name + expr.suffix for col_name in right_context.selects],
+            left_ct.select + [col_name + expr.suffix for col_name in right_ct.select],
         )
 
     elif isinstance(expr, verbs.Filter):
-        df, context = table_expr_compile_with_context(expr.table)
+        df, ct = compile_table_expr(expr.table)
         if expr.filters:
             df = df.filter(
-                [col_expr_compile(f, context.compiled_group_by()) for f in expr.filters]
+                [compile_col_expr(f, ct.compiled_group_by()) for f in expr.filters]
             )
-        return df, context
+        return df, ct
 
     elif isinstance(expr, verbs.Arrange):
-        df, context = table_expr_compile_with_context(expr.table)
+        df, ct = compile_table_expr(expr.table)
         order_by, descending, nulls_last = zip(
-            *[
-                compile_order(order, context.compiled_group_by())
-                for order in expr.order_by
-            ]
+            *[compile_order(order, ct.compiled_group_by()) for order in expr.order_by]
         )
         return df.sort(
             order_by, descending=descending, nulls_last=nulls_last, maintain_order=True
-        ), context
+        ), ct
 
     elif isinstance(expr, verbs.GroupBy):
-        df, context = table_expr_compile_with_context(expr.table)
+        df, ct = compile_table_expr(expr.table)
         return df, CompilationContext(
             (
-                context.group_by + [col.name for col in expr.group_by]
+                ct.group_by + [col.name for col in expr.group_by]
                 if expr.add
                 else [col.name for col in expr.group_by]
             ),
-            context.selects,
+            ct.select,
         )
 
     elif isinstance(expr, verbs.Ungroup):
-        df, context = table_expr_compile_with_context(expr.table)
-        return df, context
+        df, ct = compile_table_expr(expr.table)
+        return df, ct
 
     elif isinstance(expr, verbs.Summarise):
-        df, context = table_expr_compile_with_context(expr.table)
-        compiled_group_by = context.compiled_group_by()
+        df, ct = compile_table_expr(expr.table)
+        compiled_group_by = ct.compiled_group_by()
         aggregations = [
-            col_expr_compile(value, []).alias(name)
+            compile_col_expr(value, []).alias(name)
             for name, value in zip(expr.names, expr.values)
         ]
 
@@ -322,12 +316,12 @@ def table_expr_compile_with_context(
         else:
             df = df.select(*aggregations)
 
-        return df, CompilationContext([], context.group_by + expr.names)
+        return df, CompilationContext([], ct.group_by + expr.names)
 
     elif isinstance(expr, verbs.SliceHead):
-        df, context = table_expr_compile_with_context(expr.table)
-        assert len(context.group_by) == 0
-        return df.slice(expr.offset, expr.n), context
+        df, ct = compile_table_expr(expr.table)
+        assert len(ct.group_by) == 0
+        return df.slice(expr.offset, expr.n), ct
 
     elif isinstance(expr, Table):
         assert isinstance(expr._impl, PolarsImpl)
@@ -352,7 +346,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.DType:
     elif isinstance(t, pl.Duration):
         return dtypes.Duration()
 
-    raise TypeError(f"polars type {t} is not supported")
+    raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
 
 
 def pdt_type_to_polars(t: dtypes.DType) -> pl.DataType:
@@ -371,7 +365,7 @@ def pdt_type_to_polars(t: dtypes.DType) -> pl.DataType:
     elif isinstance(t, dtypes.Duration):
         return pl.Duration()
 
-    raise TypeError(f"pydiverse.transform type {t} not supported for polars")
+    raise AssertionError
 
 
 def python_type_to_polars(t: type) -> pl.DataType:
@@ -390,7 +384,7 @@ def python_type_to_polars(t: type) -> pl.DataType:
     elif t is datetime.timedelta:
         return pl.Duration()
 
-    raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
+    raise TypeError(f"python builtin type {t} is not supported by pydiverse.transform")
 
 
 with PolarsImpl.op(ops.Mean()) as op:

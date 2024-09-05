@@ -14,7 +14,7 @@ from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree import verbs
+from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     Col,
     ColExpr,
@@ -86,7 +86,7 @@ class SqlImpl(TableImpl):
         return [col.name for col in self.table.columns]
 
     def schema(self) -> dict[str, DType]:
-        return {col.name: col.type for col in self.table.columns}
+        return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
 
 
 # checks that all leafs use the same sqa.Engine and returns it
@@ -313,6 +313,25 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         )
 
     return table, ct
+
+
+def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:
+    if isinstance(t, sqa.Integer):
+        return dtypes.Int()
+    if isinstance(t, sqa.Numeric):
+        return dtypes.Float()
+    if isinstance(t, sqa.String):
+        return dtypes.String()
+    if isinstance(t, sqa.Boolean):
+        return dtypes.Bool()
+    if isinstance(t, sqa.DateTime):
+        return dtypes.DateTime()
+    if isinstance(t, sqa.Date):
+        return dtypes.Date()
+    if isinstance(t, sqa.Interval):
+        return dtypes.Duration()
+
+    raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
 
 
 with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
