@@ -37,6 +37,8 @@ class Table(TableExpr, Generic[ImplT]):
         elif isinstance(resource, str):
             if isinstance(backend, SqlAlchemy):
                 self._impl = SqlImpl(resource, backend)
+                if name is None:
+                    name = self._impl.table.name
 
         if self._impl is None:
             raise AssertionError

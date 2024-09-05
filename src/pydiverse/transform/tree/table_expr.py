@@ -8,6 +8,10 @@ class TableExpr:
 
     __slots__ = ["name"]
 
+    def __post_init__(self):
+        # propagates the table name up the tree
+        self.name = self.table.name
+
     def __getitem__(self, key: str) -> col_expr.Col:
         if not isinstance(key, str):
             raise TypeError(
@@ -18,7 +22,7 @@ class TableExpr:
 
     def __getattr__(self, name: str) -> col_expr.Col:
         if name in ("__copy__", "__deepcopy__", "__setstate__", "__getstate__"):
-            # for hasattr to work correctly on dunder methods (e.g. __copy__)
+            # for hasattr to work correctly on dunder methods
             raise AttributeError
         return col_expr.Col(name, self)
 

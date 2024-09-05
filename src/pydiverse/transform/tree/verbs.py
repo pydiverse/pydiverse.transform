@@ -65,6 +65,9 @@ class Join(TableExpr):
     validate: JoinValidate
     suffix: str
 
+    def __post_init__(self):
+        self.name = self.left.name
+
     def clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
         left, left_map = self.left.clone()
         right, right_map = self.right.clone()
