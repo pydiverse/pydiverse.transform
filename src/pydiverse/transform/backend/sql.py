@@ -6,11 +6,12 @@ import inspect
 import operator
 from typing import Any
 
+import polars as pl
 import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.backend.targets import SqlAlchemy, Target
+from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import verbs
@@ -22,11 +23,12 @@ from pydiverse.transform.tree.col_expr import (
     LiteralCol,
     Order,
 )
+from pydiverse.transform.tree.dtypes import DType
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class SqlImpl(TableImpl):
-    Dialects: dict[str, type[TableImpl]]
+    Dialects: dict[str, type[TableImpl]] = {}
 
     def __new__(cls, *args, **kwargs) -> SqlImpl:
         engine: str | sqa.Engine = (
@@ -47,7 +49,9 @@ class SqlImpl(TableImpl):
     def __init__(self, table: str | sqa.Engine, conf: SqlAlchemy):
         assert type(self) is not SqlImpl
         self.engine = (
-            conf.engine if isinstance(conf.engine) else sqa.create_engine(conf.engine)
+            conf.engine
+            if isinstance(conf.engine, sqa.Engine)
+            else sqa.create_engine(conf.engine)
         )
         self.table = sqa.Table(
             table, sqa.MetaData(), schema=conf.schema, autoload_with=self.engine
@@ -59,8 +63,45 @@ class SqlImpl(TableImpl):
 
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
-        query, ct = compile_table_expr(expr)
-        # build select and stuff
+        engine = get_engine(expr)
+        table, query = compile_table_expr(expr)
+        sel = compile_query(table, query)
+        if isinstance(target, Polars):
+            with engine.connect() as conn:
+                return pl.read_database(sel, connection=conn)
+
+        raise NotImplementedError
+
+    @staticmethod
+    def build_query(expr: TableExpr) -> str | None:
+        engine = get_engine(expr)
+        sel = compile_query(*compile_table_expr(expr))
+        return str(
+            sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
+        )
+
+    def col_type(self, col_name: str) -> DType: ...
+
+    def col_names(self) -> list[str]:
+        return [col.name for col in self.table.columns]
+
+    def schema(self) -> dict[str, DType]:
+        return {col.name: col.type for col in self.table.columns}
+
+
+# checks that all leafs use the same sqa.Engine and returns it
+def get_engine(expr: TableExpr) -> sqa.Engine:
+    if isinstance(expr, verbs.Join):
+        engine = get_engine(expr.left)
+        right_engine = get_engine(expr.right)
+        if engine != right_engine:
+            raise NotImplementedError  # TODO: find some good error for this
+    elif isinstance(expr, Table):
+        engine = expr._impl.engine
+    else:
+        engine = get_engine(expr.table)
+
+    return engine
 
 
 def compile_order(
@@ -112,6 +153,7 @@ def compile_col_expr(
         filter_cond = expr.context_kwargs.get("filter")
         if filter_cond:
             filter_cond = [compile_col_expr(z, []) for z in filter_cond]
+            raise NotImplementedError
 
         # if something fails here, you may need to wrap literals in sqa.literal based
         # on whether the argument in the signature is const or not.
@@ -138,18 +180,18 @@ def compile_col_expr(
 class Query:
     name_to_sqa_col: dict[str, sqa.ColumnElement]
     select: list[tuple[ColExpr, str]]
-    join: list[Join] = []
-    group_by: list[ColExpr] = []
-    partition_by: list[ColExpr] = []
-    where: list[ColExpr] = []
-    having: list[ColExpr] = []
-    order_by: list[Order] = []
+    join: list[SqlJoin] = dataclasses.field(default_factory=list)
+    group_by: list[ColExpr] = dataclasses.field(default_factory=list)
+    partition_by: list[ColExpr] = dataclasses.field(default_factory=list)
+    where: list[ColExpr] = dataclasses.field(default_factory=list)
+    having: list[ColExpr] = dataclasses.field(default_factory=list)
+    order_by: list[Order] = dataclasses.field(default_factory=list)
     limit: int | None = None
     offset: int | None = None
 
 
 @dataclasses.dataclass(slots=True)
-class Join:
+class SqlJoin:
     right: sqa.Subquery
     on: ColExpr
     how: str
@@ -179,9 +221,6 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
         )
     )
 
-    # for the filter arg in aggregation functions, we somehow need to get the filtering
-    # condition in the having. Currently, this is difficult since we don't look at the
-    # expressions in the verbs before this stage here.
     having_cond = functools.reduce(operator.and_, query.having)
     sel = sel.having(
         compile_col_expr(having_cond, query.name_to_sqa_col, query.partition_by)
@@ -226,7 +265,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         table, ct = compile_table_expr(expr.left)
         right_query, right_ct = compile_table_expr(expr.right)
 
-        j = Join(right_query, expr.on, expr.how)
+        j = SqlJoin(right_query, expr.on, expr.how)
 
         if expr.how == "inner":
             ct.where.extend(right_ct.where)
@@ -269,7 +308,8 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
 
     elif isinstance(expr, Table):
         return expr._impl.table, Query(
-            [(ColName(col.name), col.name) for col in expr._impl.table.columns]
+            {col.name: col for col in expr._impl.table.columns},
+            [(ColName(col_name), col_name) for col_name in expr.col_names()],
         )
 
     return table, ct
