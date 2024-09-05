@@ -179,8 +179,8 @@ class Query:
     name_to_sqa_col: dict[str, sqa.ColumnElement]
     select: list[tuple[ColExpr, str]]
     join: list[SqlJoin] = dataclasses.field(default_factory=list)
-    group_by: list[ColExpr] = dataclasses.field(default_factory=list)
-    partition_by: list[ColExpr] = dataclasses.field(default_factory=list)
+    group_by: list[ColName] = dataclasses.field(default_factory=list)
+    partition_by: list[ColName] = dataclasses.field(default_factory=list)
     where: list[ColExpr] = dataclasses.field(default_factory=list)
     having: list[ColExpr] = dataclasses.field(default_factory=list)
     order_by: list[Order] = dataclasses.field(default_factory=list)
@@ -207,22 +207,25 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
             full=j.how == "outer",
         )
 
-    where_cond = functools.reduce(operator.and_, query.where)
-    sel = sel.where(
-        compile_col_expr(where_cond, query.name_to_sqa_col, query.partition_by)
-    )
-
-    sel = sel.group_by(
-        *(
-            compile_col_expr(col, query.name_to_sqa_col, query.partition_by)
-            for col in query.group_by
+    if query.where:
+        where_cond = functools.reduce(operator.and_, query.where)
+        sel = sel.where(
+            compile_col_expr(where_cond, query.name_to_sqa_col, query.partition_by)
         )
-    )
 
-    having_cond = functools.reduce(operator.and_, query.having)
-    sel = sel.having(
-        compile_col_expr(having_cond, query.name_to_sqa_col, query.partition_by)
-    )
+    if query.group_by:
+        sel = sel.group_by(
+            *(
+                compile_col_expr(col, query.name_to_sqa_col, query.partition_by)
+                for col in query.group_by
+            )
+        )
+
+    if query.having:
+        having_cond = functools.reduce(operator.and_, query.having)
+        sel = sel.having(
+            compile_col_expr(having_cond, query.name_to_sqa_col, query.partition_by)
+        )
 
     if query.limit is not None:
         sel = sel.limit(query.limit).offset(query.offset)
@@ -236,73 +239,109 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
         )
     )
 
-    sel = sel.order_by(
-        *(
-            compile_order(ord, query.name_to_sqa_col, query.partition_by)
-            for ord in query.order_by
+    if query.order_by:
+        sel = sel.order_by(
+            *(
+                compile_order(ord, query.name_to_sqa_col, query.partition_by)
+                for ord in query.order_by
+            )
         )
-    )
 
     return sel
 
 
 def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
     if isinstance(expr, verbs.Select):
-        table, ct = compile_table_expr(expr.table)
-        ct.select = [(col, col.name) for col in expr.selects]
+        table, query = compile_table_expr(expr.table)
+        query.select = [(col, col.name) for col in expr.selects]
 
     elif isinstance(expr, verbs.Rename):
         # drop verb?
         ...
 
     elif isinstance(expr, verbs.Mutate):
-        table, ct = compile_table_expr(expr.table)
-        ct.select.extend([(val, name) for val, name in zip(expr.values, expr.names)])
+        table, query = compile_table_expr(expr.table)
+        query.select.extend([(val, name) for val, name in zip(expr.values, expr.names)])
+        query.name_to_sqa_col.update(
+            {
+                name: compile_col_expr(val, query.name_to_sqa_col, query.partition_by)
+                for name, val in zip(expr.names, expr.values)
+            }
+        )
 
     elif isinstance(expr, verbs.Join):
-        table, ct = compile_table_expr(expr.left)
+        table, query = compile_table_expr(expr.left)
         right_query, right_ct = compile_table_expr(expr.right)
 
         j = SqlJoin(right_query, expr.on, expr.how)
 
         if expr.how == "inner":
-            ct.where.extend(right_ct.where)
+            query.where.extend(right_ct.where)
         elif expr.how == "left":
             j.on = functools.reduce(operator.and_, (j.on, *right_ct.where))
         elif expr.how == "outer":
-            if ct.where or right_ct.where:
+            if query.where or right_ct.where:
                 raise ValueError("invalid filter before outer join")
 
-        ct.join.append(j)
+        query.select.extend((col, name + expr.suffix) for col, name in right_ct.select)
+        query.join.append(j)
+        query.name_to_sqa_col.update(
+            {
+                name + expr.suffix: col_elem
+                for name, col_elem in right_ct.name_to_sqa_col
+            }
+        )
 
     elif isinstance(expr, verbs.Filter):
-        table, ct = compile_table_expr(expr.table)
+        table, query = compile_table_expr(expr.table)
 
-        if ct.group_by:
+        if query.group_by:
             # check whether we can move conditions from `having` clause to `where`. This
             # is possible if a condition only involves columns in `group_by`. Split up
             # the filter at __and__`s until no longer possible. TODO
-            ct.having.extend(expr.filters)
+            query.having.extend(expr.filters)
         else:
-            ct.where.extend(expr.filters)
+            query.where.extend(expr.filters)
 
     elif isinstance(expr, verbs.Arrange):
-        table, ct = compile_table_expr(expr.table)
+        table, query = compile_table_expr(expr.table)
         # TODO: we could remove duplicates here if we want. but if we do so, this should
         # not be done in the sql backend but on the abstract tree.
-        ct.order_by = expr.order_by + ct.order_by
+        query.order_by = expr.order_by + query.order_by
 
     elif isinstance(expr, verbs.Summarise):
-        table, ct = compile_table_expr(expr.table)
+        table, query = compile_table_expr(expr.table)
+        if query.group_by:
+            assert query.group_by == query.partition_by
+        query.group_by = query.partition_by
+        query.partition_by = []
+        query.select = [(col, col.name) for col in query.group_by] + [
+            (val, name) for val, name in zip(expr.values, expr.names)
+        ]
+        query.name_to_sqa_col.update(
+            {
+                name: compile_col_expr(val, query.name_to_sqa_col, query.partition_by)
+                for name, val in zip(expr.names, expr.values)
+            }
+        )
 
     elif isinstance(expr, verbs.SliceHead):
-        table, ct = compile_table_expr(expr.table)
-        if ct.limit is None:
-            ct.limit = expr.n
-            ct.offset = expr.offset
+        table, query = compile_table_expr(expr.table)
+        if query.limit is None:
+            query.limit = expr.n
+            query.offset = expr.offset
         else:
-            ct.limit = min(abs(ct.limit - expr.offset), expr.n)
-            ct.offset += expr.offset
+            query.limit = min(abs(query.limit - expr.offset), expr.n)
+            query.offset += expr.offset
+
+    elif isinstance(expr, verbs.GroupBy):
+        table, query = compile_table_expr(expr.table)
+        query.partition_by = expr.group_by
+
+    elif isinstance(expr, verbs.Ungroup):
+        table, query = compile_table_expr(expr.table)
+        assert not query.group_by
+        query.partition_by = []
 
     elif isinstance(expr, Table):
         return expr._impl.table, Query(
@@ -310,7 +349,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
             [(ColName(col_name), col_name) for col_name in expr.col_names()],
         )
 
-    return table, ct
+    return table, query
 
 
 def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:

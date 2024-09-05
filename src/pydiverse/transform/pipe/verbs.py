@@ -72,7 +72,7 @@ def export(expr: TableExpr, target: Target | None = None):
 
 
 @builtin_verb()
-def build_query(expr: TableExpr):
+def build_query(expr: TableExpr) -> str:
     return get_backend(expr).build_query(expr)
 
 
