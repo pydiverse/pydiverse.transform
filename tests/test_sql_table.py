@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
-
 import polars as pl
 import pytest
 import sqlalchemy as sa
@@ -176,22 +174,20 @@ class TestSqlTable:
             pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
         )
 
-        if sqlite3.sqlite_version_info >= (3, 39, 0):
-            assert_equal(
-                (
-                    tbl_left
-                    >> join(
-                        tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="_1729"
-                    )
-                    >> select(tbl_left.a, tbl_right.b)
-                ),
-                pl.DataFrame(
-                    {
-                        "a": [1.0, 2.0, 2.0, 3.0, 4.0, None],
-                        "b_1729": [1.0, 2.0, 2.0, None, None, 0.0],
-                    }
-                ),
-            )
+        assert_equal(
+            (
+                tbl_left
+                >> join(tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="_1729")
+                >> select(tbl_left.a, tbl_right.b)
+            ),
+            pl.DataFrame(
+                {
+                    "a": [1, 2, 2, 3, 4, None],
+                    "b_1729": [1, 2, 2, None, None, 0],
+                }
+            ),
+            check_row_order=False,
+        )
 
     def test_filter(self, tbl1, tbl2):
         # Simple filter expressions

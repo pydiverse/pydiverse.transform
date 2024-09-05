@@ -218,7 +218,7 @@ def compile_table_expr(
     if isinstance(expr, verbs.Select):
         df, ct = compile_table_expr(expr.table)
         ct.select = [
-            col for col in ct.select if col in set(col.name for col in expr.selects)
+            col for col in ct.select if col in set(col.name for col in expr.selected)
         ]
         return df, ct
 

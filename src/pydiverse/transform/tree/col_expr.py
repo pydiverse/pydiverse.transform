@@ -56,12 +56,13 @@ _dunder_expr_repr = {
 
 
 class ColExpr:
-    dtype: DType | None
-
     __slots__ = ["dtype"]
 
     __contains__ = None
     __iter__ = None
+
+    def __init__(self, dtype: DType | None = None):
+        self.dtype = dtype
 
     def _expr_repr(self) -> str:
         """String repr that, when executed, returns the same expression"""
@@ -86,7 +87,7 @@ class Col(ColExpr, Generic[ImplT]):
     def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
         self.name = name
         self.table = table
-        self.dtype = dtype
+        super().__init__(dtype)
 
     def __repr__(self):
         return f"<{self.table.name}.{self.name}>"
@@ -101,6 +102,7 @@ class Col(ColExpr, Generic[ImplT]):
 class ColName(ColExpr):
     def __init__(self, name: str):
         self.name = name
+        super().__init__()
 
     def __repr__(self):
         return f"<C.{self.name}>"
@@ -115,7 +117,7 @@ class ColName(ColExpr):
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
         self.val = val
-        self.dtype = python_type_to_pdt(type(val))
+        super().__init__(python_type_to_pdt(type(val)))
 
     def __repr__(self):
         return f"<Lit: {self.expr} ({self.typed_value.dtype})>"
@@ -134,6 +136,7 @@ class ColFn(ColExpr):
         self.context_kwargs = {
             key: val for key, val in kwargs.items() if val is not None
         }
+        super().__init__()
 
     def __repr__(self):
         args = [repr(e) for e in self.args] + [

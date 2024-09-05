@@ -253,11 +253,14 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
 def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
     if isinstance(expr, verbs.Select):
         table, query = compile_table_expr(expr.table)
-        query.select = [(col, col.name) for col in expr.selects]
+        query.select = [(col, col.name) for col in expr.selected]
 
     elif isinstance(expr, verbs.Rename):
-        # drop verb?
-        ...
+        table, query = compile_table_expr(expr.table)
+        query.name_to_sqa_col = {
+            (expr.name_map[name] if name in expr.name_map else name): col
+            for name, col in query.name_to_sqa_col.items()
+        }
 
     elif isinstance(expr, verbs.Mutate):
         table, query = compile_table_expr(expr.table)
@@ -288,7 +291,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         query.name_to_sqa_col.update(
             {
                 name + expr.suffix: col_elem
-                for name, col_elem in right_ct.name_to_sqa_col
+                for name, col_elem in right_ct.name_to_sqa_col.items()
             }
         )
 

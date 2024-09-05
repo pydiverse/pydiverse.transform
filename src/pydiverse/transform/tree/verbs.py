@@ -19,13 +19,13 @@ JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 @dataclasses.dataclass(eq=False, slots=True)
 class Select(TableExpr):
     table: TableExpr
-    selects: list[Col | ColName]
+    selected: list[Col | ColName]
 
     def clone(self) -> tuple[Select, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         new_self = Select(
             table,
-            [col.clone(table_map) for col in self.selects],
+            [col.clone(table_map) for col in self.selected],
         )
         table_map[self] = new_self
         return new_self, table_map
@@ -163,16 +163,16 @@ def propagate_names(
     expr: TableExpr, needed_cols: Map2d[TableExpr, set[str]]
 ) -> Map2d[TableExpr, dict[str, str]]:
     if isinstance(expr, Select):
-        for col in expr.selects:
+        for col in expr.selected:
             if isinstance(col, Col):
                 if col.table in needed_cols:
                     needed_cols[col.table].add(col.name)
                 else:
                     needed_cols[col.table] = set({col.name})
         col_to_name = propagate_names(expr.table, needed_cols)
-        expr.selects = [
+        expr.selected = [
             (ColName(col_to_name[col.table][col.name]) if isinstance(col, Col) else col)
-            for col in expr.selects
+            for col in expr.selected
         ]
 
     elif isinstance(expr, Rename):
@@ -262,14 +262,19 @@ def propagate_names(
 
 
 def propagate_types(expr: TableExpr) -> dict[str, DType]:
-    if isinstance(expr, (SliceHead, Ungroup, Select, GroupBy)):
+    if isinstance(expr, (SliceHead, Ungroup)):
         return propagate_types(expr.table)
 
-    if isinstance(expr, Rename):
+    elif isinstance(expr, Select):
         col_types = propagate_types(expr.table)
-        return {
+        expr.selected = [
+            col_expr.propagate_types(col, col_types) for col in expr.selected
+        ]
+
+    elif isinstance(expr, Rename):
+        col_types = {
             (expr.name_map[name] if name in expr.name_map else name): dtype
-            for name, dtype in col_types.items()
+            for name, dtype in propagate_types(expr.table).items()
         }
 
     elif isinstance(expr, (Mutate, Summarise)):
@@ -278,30 +283,35 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
         col_types.update(
             {name: value.dtype for name, value in zip(expr.names, expr.values)}
         )
-        return col_types
 
     elif isinstance(expr, Join):
-        col_types_left = propagate_types(expr.left)
-        col_types_right = {
+        col_types = propagate_types(expr.left)
+        col_types |= {
             name + expr.suffix: dtype
             for name, dtype in propagate_types(expr.right).items()
         }
-        return col_types_left | col_types_right
+        expr.on = col_expr.propagate_types(expr.on, col_types)
 
     elif isinstance(expr, Filter):
         col_types = propagate_types(expr.table)
         expr.filters = [col_expr.propagate_types(v, col_types) for v in expr.filters]
-        return col_types
 
     elif isinstance(expr, Arrange):
         col_types = propagate_types(expr.table)
         expr.order_by = [
             col_expr.propagate_types(ord, col_types) for ord in expr.order_by
         ]
-        return col_types
+
+    elif isinstance(expr, GroupBy):
+        col_types = propagate_types(expr.table)
+        expr.group_by = [
+            col_expr.propagate_types(col, col_types) for col in expr.group_by
+        ]
 
     elif isinstance(expr, Table):
-        return expr.schema
+        col_types = expr.schema
 
     else:
         raise TypeError
+
+    return col_types
