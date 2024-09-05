@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from typing import Any, Generic
 
 from pydiverse.transform._typing import ImplT
+from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.tree.dtypes import DType, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 from pydiverse.transform.tree.table_expr import TableExpr
@@ -132,7 +133,7 @@ class LiteralCol(ColExpr):
 class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr]):
         self.name = name
-        self.args = args
+        self.args = list(args)
         self.context_kwargs = {
             key: val for key, val in kwargs.items() if val is not None
         }
@@ -217,6 +218,33 @@ class FnAttr:
 
     def __call__(self, *args, **kwargs) -> ColExpr:
         return ColFn(self.name, self.arg, *args, **kwargs)
+
+
+def update_partition_by_kwarg(
+    expr: ColExpr | Order | list[ColExpr] | list[Order], group_by: list[Col | ColName]
+) -> ColExpr | Order | list[ColExpr] | list[Order]:
+    if isinstance(expr, list):
+        return [update_partition_by_kwarg(elem, group_by) for elem in expr]
+    elif isinstance(expr, Order):
+        expr.order_by = update_partition_by_kwarg(expr.order_by, group_by)
+    elif isinstance(expr, ColFn):
+        from pydiverse.transform.backend.polars import PolarsImpl
+
+        impl = PolarsImpl.operator_registry.get_operator(expr.name)
+        # TODO: what exactly are WINDOW / AGGREGATE fns? for the user? for the backend?
+        if (
+            impl.ftype in (OpType.WINDOW, OpType.AGGREGATE)
+            and "partition_by" not in expr.context_kwargs
+        ):
+            expr.context_kwargs["partition_by"] = group_by
+        expr.args = update_partition_by_kwarg(expr.args, group_by)
+        expr.context_kwargs = {
+            key: update_partition_by_kwarg(val, group_by)
+            for key, val in expr.context_kwargs.items()
+        }
+    else:
+        assert isinstance(expr, (Col, ColName, LiteralCol))
+    return expr
 
 
 def get_needed_cols(expr: ColExpr | Order) -> Map2d[TableExpr, set[str]]:

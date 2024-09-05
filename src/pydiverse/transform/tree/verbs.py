@@ -161,6 +161,40 @@ class Ungroup(TableExpr):
         return new_self, table_map
 
 
+def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
+    if isinstance(expr, (Select, Rename, SliceHead, Summarise)):
+        group_by = update_partition_by_kwarg(expr.table)
+
+    elif isinstance(expr, (Mutate)):
+        group_by = update_partition_by_kwarg(expr.table)
+        expr.values = col_expr.update_partition_by_kwarg(expr.values, group_by)
+
+    elif isinstance(expr, Join):
+        update_partition_by_kwarg(expr.left)
+        update_partition_by_kwarg(expr.right)
+        group_by = []
+
+    elif isinstance(expr, Filter):
+        group_by = update_partition_by_kwarg(expr.table)
+        expr.filters = col_expr.update_partition_by_kwarg(expr.filters, group_by)
+
+    elif isinstance(expr, Arrange):
+        group_by = update_partition_by_kwarg(expr.table)
+        expr.order_by = col_expr.update_partition_by_kwarg(expr.order_by, group_by)
+
+    elif isinstance(expr, GroupBy):
+        group_by = update_partition_by_kwarg(expr.table) + expr.group_by
+
+    elif isinstance(expr, Ungroup):
+        update_partition_by_kwarg(expr.table)
+        group_by = []
+
+    elif isinstance(expr, Table):
+        group_by = []
+
+    return group_by
+
+
 # returns Col -> ColName mapping and the list of available columns
 def propagate_names(
     expr: TableExpr, needed_cols: Map2d[TableExpr, set[str]]

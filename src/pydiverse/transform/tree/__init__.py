@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+from pydiverse.transform.util.map2d import Map2d
+
 from . import verbs
-from .col_expr import Map2d
 from .table_expr import TableExpr
 
-__all__ = ["propagate_names", "propagate_types", "TableExpr"]
+__all__ = ["preprocess", "TableExpr"]
 
 
-def propagate_names(expr: TableExpr):
+def preprocess(expr: TableExpr) -> TableExpr:
     verbs.propagate_names(expr, Map2d())
-
-
-def propagate_types(expr: TableExpr):
     verbs.propagate_types(expr)
+    verbs.update_partition_by_kwarg(expr)
