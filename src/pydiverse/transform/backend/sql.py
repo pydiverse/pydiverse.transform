@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import inspect
 import operator
 from typing import Any
 
@@ -27,30 +28,34 @@ from pydiverse.transform.tree.table_expr import TableExpr
 class SqlImpl(TableImpl):
     Dialects: dict[str, type[TableImpl]]
 
-    def __init__(
-        self,
-        table: str,
-        schema: str,
-        engine: sqa.Engine,
-    ):
-        assert not isinstance(
-            self, SqlImpl
-        ), "cannot instantiate abstract class `SqlImpl`"
-
-        self.table = sqa.Table(
-            table, sqa.MetaData(), schema=schema, autoload_with=engine
+    def __new__(cls, *args, **kwargs) -> SqlImpl:
+        engine: str | sqa.Engine = (
+            inspect.signature(cls.__init__)
+            .bind(None, *args, **kwargs)
+            .arguments["conf"]
+            .engine
         )
-        self.engine = engine
+
+        dialect = (
+            engine.dialect.name
+            if isinstance(engine, sqa.Engine)
+            else sqa.make_url(engine).get_dialect().name
+        )
+
+        return super().__new__(SqlImpl.Dialects[dialect])
+
+    def __init__(self, table: str | sqa.Engine, conf: SqlAlchemy):
+        assert type(self) is not SqlImpl
+        self.engine = (
+            conf.engine if isinstance(conf.engine) else sqa.create_engine(conf.engine)
+        )
+        self.table = sqa.Table(
+            table, sqa.MetaData(), schema=conf.schema, autoload_with=self.engine
+        )
 
     def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
         SqlImpl.Dialects[cls.dialect_name] = cls
-
-    # can also take a connection string for `engine`
-    @staticmethod
-    def from_engine(table: str | sqa.Table, conf: SqlAlchemy) -> SqlImpl:
-        if isinstance(conf.engine, str):
-            engine = sqa.create_engine(conf.engine)
-        return SqlImpl.Dialects[engine.dialect.name](table, conf.schema, engine)
 
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
