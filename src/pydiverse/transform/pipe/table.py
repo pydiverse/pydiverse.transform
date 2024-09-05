@@ -10,7 +10,6 @@ from pydiverse.transform.tree.col_expr import (
     Col,
     ColName,
 )
-from pydiverse.transform.tree.dtypes import DType
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -43,6 +42,7 @@ class Table(TableExpr, Generic[ImplT]):
             raise AssertionError
 
         self.name = name
+        self.schema = self._impl.schema()
 
     def __getitem__(self, key: str) -> Col:
         if not isinstance(key, str):
@@ -51,12 +51,12 @@ class Table(TableExpr, Generic[ImplT]):
                 f"str, got {type(key)} instead."
             )
         col = super().__getitem__(key)
-        col.dtype = self._impl.col_type(key)
+        col.dtype = self.schema[key]
         return col
 
     def __getattr__(self, name: str) -> Col:
         col = super().__getattr__(name)
-        col.dtype = self._impl.col_type(name)
+        col.dtype = self.schema[name]
         return col
 
     def __iter__(self) -> Iterable[Col]:
@@ -103,9 +103,6 @@ class Table(TableExpr, Generic[ImplT]):
 
     def col_names(self) -> list[str]:
         return self._impl.col_names()
-
-    def schema(self) -> dict[str, DType]:
-        return self._impl.schema()
 
     def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
         new_self = copy.copy(self)

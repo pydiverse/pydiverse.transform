@@ -46,15 +46,13 @@ class PolarsImpl(TableImpl):
         if isinstance(target, Polars):
             return lf if target.lazy else lf.collect()
 
-    def col_type(self, col_name: str) -> dtypes.DType:
-        return polars_type_to_pdt(self.df.collect_schema()[col_name])
-
     def col_names(self) -> list[str]:
         return self.df.columns
 
     def schema(self) -> dict[str, dtypes.DType]:
         return {
-            name: polars_type_to_pdt(dtype) for name, dtype in self.df.schema.items()
+            name: polars_type_to_pdt(dtype)
+            for name, dtype in self.df.collect_schema().items()
         }
 
 

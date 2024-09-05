@@ -80,8 +80,6 @@ class SqlImpl(TableImpl):
             sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
         )
 
-    def col_type(self, col_name: str) -> DType: ...
-
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]
 
