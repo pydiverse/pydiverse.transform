@@ -62,10 +62,8 @@ def collect(expr: TableExpr): ...
 
 
 @builtin_verb()
-def export(expr: TableExpr, target: Target | None = None):
+def export(expr: TableExpr, target: Target):
     SourceBackend: type[TableImpl] = get_backend(expr)
-    if target is None:
-        target = SourceBackend.backend_marker()
     tree.propagate_names(expr)
     tree.propagate_types(expr)
     return SourceBackend.export(expr, target)
@@ -78,7 +76,7 @@ def build_query(expr: TableExpr) -> str:
 
 @builtin_verb()
 def show_query(expr: TableExpr):
-    if query := build_query(expr):
+    if query := expr >> build_query():
         print(query)
     else:
         print(f"No query to show for {type(expr).__name__}")

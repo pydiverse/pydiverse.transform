@@ -36,10 +36,6 @@ class PolarsImpl(TableImpl):
         return None
 
     @staticmethod
-    def backend_marker() -> Target:
-        return Polars(lazy=True)
-
-    @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
         lf, context = compile_table_expr(expr)
         lf = lf.select(context.select)
