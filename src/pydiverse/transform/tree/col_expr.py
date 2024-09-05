@@ -128,7 +128,7 @@ class LiteralCol(ColExpr):
 
 
 class ColFn(ColExpr):
-    def __init__(self, name: str, *args: ColExpr, **kwargs: ColExpr):
+    def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr]):
         self.name = name
         self.args = args
         self.context_kwargs = {

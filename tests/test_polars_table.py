@@ -358,7 +358,7 @@ class TestPolarsLazyImpl:
 
         assert_equal(a, b)
 
-        # Self Join
+        # self join
         assert_equal(
             tbl2 >> join(x, tbl2.col1 == x.col1, "left", suffix="_right"),
             df2.join(

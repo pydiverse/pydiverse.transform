@@ -301,7 +301,7 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
         return col_types
 
     elif isinstance(expr, Table):
-        return expr.schema()
+        return expr.schema
 
     else:
         raise TypeError

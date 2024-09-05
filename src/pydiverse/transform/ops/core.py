@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from pydiverse.transform.tree.registry import OperatorSignature
 
 __all__ = [
-    "OPType",
+    "OpType",
     "Operator",
     "OperatorExtension",
     "Arity",
@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 
-class OPType(enum.IntEnum):
+class OpType(enum.IntEnum):
     EWISE = 1
     AGGREGATE = 2
     WINDOW = 3
@@ -55,7 +55,7 @@ class Operator:
     """
 
     name: str = NotImplemented
-    ftype: OPType = NotImplemented
+    ftype: OpType = NotImplemented
     signatures: list[str] = None
     context_kwargs: set[str] = None
 
@@ -134,11 +134,11 @@ class Binary(Arity):
 
 
 class ElementWise(Operator):
-    ftype = OPType.EWISE
+    ftype = OpType.EWISE
 
 
 class Aggregate(Operator):
-    ftype = OPType.AGGREGATE
+    ftype = OpType.AGGREGATE
     context_kwargs = {
         "partition_by",  # list[Col]
         "filter",  # SymbolicExpression (NOT a list)
@@ -146,7 +146,7 @@ class Aggregate(Operator):
 
 
 class Window(Operator):
-    ftype = OPType.WINDOW
+    ftype = OpType.WINDOW
     context_kwargs = {
         "arrange",  # list[Col]
         "partition_by",

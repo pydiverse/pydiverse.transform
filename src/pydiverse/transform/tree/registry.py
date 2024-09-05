@@ -115,11 +115,11 @@ class TypedOperatorImpl:
     return_type: dtypes.DType
 
     @classmethod
-    def from_operator_impl(cls, impl: OperatorImpl, rtype: dtypes.DType):
+    def from_operator_impl(cls, impl: OperatorImpl, return_type: dtypes.DType):
         return cls(
             operator=impl.operator,
             impl=impl,
-            rtype=rtype,
+            return_type=return_type,
         )
 
     def __call__(self, *args, **kwargs):

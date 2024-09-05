@@ -4,8 +4,8 @@ import functools
 
 import polars as pl
 
-from pydiverse.transform.backend.polars_table import PolarsEager
-from pydiverse.transform.backend.sql_table import SQLTableImpl
+from pydiverse.transform.backend.polars import PolarsImpl
+from pydiverse.transform.backend.sql_table import SqlImpl
 from pydiverse.transform.core import Table
 
 
@@ -27,7 +27,7 @@ def _cached_impl(fn):
 
 @_cached_impl
 def polars_impl(df: pl.DataFrame, name: str):
-    return PolarsEager(name, df)
+    return PolarsImpl(name, df)
 
 
 _sql_engine_cache = {}
@@ -54,7 +54,7 @@ def _sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
     df.write_database(
         name, engine, if_table_exists="replace", engine_options={"dtype": sql_dtypes}
     )
-    return SQLTableImpl(engine, name)
+    return SqlImpl(engine, name)
 
 
 @_cached_impl

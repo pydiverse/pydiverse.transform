@@ -7,7 +7,7 @@ import pytest
 import sqlalchemy as sa
 
 from pydiverse.transform import C
-from pydiverse.transform.backend.sql_table import SQLTableImpl
+from pydiverse.transform.backend.targets import Polars, SqlAlchemy
 from pydiverse.transform.errors import AlignmentError
 from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.table import Table
@@ -66,7 +66,7 @@ df_right = pl.DataFrame(
 
 @pytest.fixture
 def engine():
-    engine = sa.create_engine("sqlite:///:memory:")
+    engine = sa.create_engine("duckdb:///:memory:")
     df1.write_database("df1", engine, if_table_exists="replace")
     df2.write_database("df2", engine, if_table_exists="replace")
     df3.write_database("df3", engine, if_table_exists="replace")
@@ -78,35 +78,35 @@ def engine():
 
 @pytest.fixture
 def tbl1(engine):
-    return Table(SQLTableImpl(engine, "df1"))
+    return Table("df1", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl2(engine):
-    return Table(SQLTableImpl(engine, "df2"))
+    return Table("df2", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl3(engine):
-    return Table(SQLTableImpl(engine, "df3"))
+    return Table("df3", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl4(engine):
-    return Table(SQLTableImpl(engine, "df4"))
+    return Table("df4", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl_left(engine):
-    return Table(SQLTableImpl(engine, "df_left"))
+    return Table("df_left", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl_right(engine):
-    return Table(SQLTableImpl(engine, "df_right"))
+    return Table("df_right", SqlAlchemy(engine))
 
 
-class TestSQLTable:
+class TestSqlTable:
     def test_build_query(self, tbl1):
         query_str = tbl1 >> build_query()
         expected_out = "SELECT df1.col1 AS col1, df1.col2 AS col2 FROM df1"
@@ -123,7 +123,7 @@ class TestSQLTable:
         tbl1 >> show_query() >> collect()
 
     def test_export(self, tbl1):
-        assert_equal(tbl1 >> export(), df1)
+        assert_equal(tbl1 >> export(Polars(lazy=False)), df1)
 
     def test_select(self, tbl1, tbl2):
         assert_equal(tbl1 >> select(tbl1.col1), df1[["col1"]])
