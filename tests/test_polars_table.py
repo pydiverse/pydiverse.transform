@@ -76,29 +76,29 @@ df_dt = pl.DataFrame(
 )
 
 
-@pytest.fixture(params=["numpy", "arrow"])
+@pytest.fixture
 def dtype_backend(request):
     return request.param
 
 
 @pytest.fixture
 def tbl1():
-    return Table(df1)
+    return Table(df1, name="df1")
 
 
 @pytest.fixture
 def tbl2():
-    return Table(df2)
+    return Table(df2, name="df2")
 
 
 @pytest.fixture
 def tbl3():
-    return Table(df3)
+    return Table(df3, name="df3")
 
 
 @pytest.fixture
 def tbl4():
-    return Table(df4)
+    return Table(df4, name="df4")
 
 
 @pytest.fixture

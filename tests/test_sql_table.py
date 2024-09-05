@@ -189,7 +189,7 @@ class TestSqlTable:
             check_row_order=False,
         )
 
-    def test_filter(self, tbl1, tbl2):
+    def test_filter(self, tbl1):
         # Simple filter expressions
         assert_equal(tbl1 >> filter(), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == tbl1.col1), df1)
@@ -275,7 +275,7 @@ class TestSqlTable:
 
     def test_alias(self, tbl1, tbl2):
         x = tbl2 >> alias("x")
-        assert x._impl.name == "x"
+        assert x.name == "x"
 
         # Check that applying alias doesn't change the output
         a = (
