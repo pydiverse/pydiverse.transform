@@ -89,15 +89,11 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
             tuple(arg.dtype for arg in expr.args),
         )
 
-        # the `partition_by=` grouping overrides the `group_by` grouping
         partition_by = expr.context_kwargs.get("partition_by")
-        if partition_by is None:
-            partition_by = group_by
-        else:
-            partition_by = [compile_col_expr(z, []) for z in partition_by]
+        if partition_by:
+            partition_by = [compile_col_expr(col, []) for col in partition_by]
 
         arrange = expr.context_kwargs.get("arrange")
-
         if arrange:
             order_by, descending, nulls_last = zip(
                 *[compile_order(order, group_by) for order in arrange]
@@ -107,21 +103,20 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
         if filter_cond:
             filter_cond = [compile_col_expr(z, []) for z in filter_cond]
 
-        if (
-            op.ftype in (OpType.WINDOW, OpType.AGGREGATE)
-            and arrange
-            and not partition_by
-        ):
+        # The following `if` block is absolutely unecessary and just an optimization.
+        # Otherwise, `over` would be used for sorting, but we cannot pass descending /
+        # nulls_last there and the required workaround is probably slower than polars`s
+        # native `sort_by`.
+        if arrange and not partition_by:
             # order the args. if the table is grouped by group_by or
             # partition_by=, the groups will be sorted via over(order_by=)
             # anyways so it need not be done here.
-
             args = [
                 arg.sort_by(by=order_by, descending=descending, nulls_last=nulls_last)
                 for arg in args
             ]
 
-        if op.ftype in (OpType.WINDOW, OpType.AGGREGATE) and filter_cond:
+        if filter_cond:
             # filtering needs to be done before applying the operator.
             args = [
                 arg.filter(filter_cond) if isinstance(arg, pl.Expr) else arg
@@ -135,46 +130,31 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
 
         value: pl.Expr = impl(*args)
 
-        if op.ftype == OpType.AGGREGATE:
-            if filter_cond:
-                # TODO: allow AGGRRGATE + `filter` context_kwarg
-                raise NotImplementedError
+        if partition_by:
+            # when doing sort_by -> over in polars, for whatever reason the
+            # `nulls_last` argument is ignored. thus when both a grouping and an
+            # arrangment are specified, we manually add the descending and
+            # nulls_last markers to the ordering.
+            if arrange:
+                order_by = merge_desc_nulls_last(order_by, descending, nulls_last)
+            else:
+                order_by = None
+            value = value.over(partition_by, order_by=order_by)
 
-            if partition_by:
-                # technically, it probably wouldn't be too hard to support this in
-                # polars.
-                raise NotImplementedError
+        elif arrange:
+            if op.ftype == OpType.AGGREGATE:
+                # TODO: don't fail, but give a warning that `arrange` is useless
+                # here
+                ...
 
-        # TODO: in the grouping / filter expressions, we should probably call
-        # validate_table_args. look what it does and use it.
-        # TODO: what happens if I put None or similar in a filter / partition_by?
-        if op.ftype == OpType.WINDOW:
-            # if `verb` != "muatate", we should give a warning that this only works
-            # for polars
-
-            if partition_by:
-                # when doing sort_by -> over in polars, for whatever reason the
-                # `nulls_last` argument is ignored. thus when both a grouping and an
-                # arrangment are specified, we manually add the descending and
-                # nulls_last markers to the ordering.
-                if arrange:
-                    order_by = merge_desc_nulls_last(order_by, descending, nulls_last)
-                value = value.over(partition_by, order_by=order_by)
-
-            elif arrange:
-                if op.ftype == OpType.AGGREGATE:
-                    # TODO: don't fail, but give a warning that `arrange` is useless
-                    # here
-                    ...
-
-                # the function was executed on the ordered arguments. here we
-                # restore the original order of the table.
-                inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
-                    by=order_by,
-                    descending=descending,
-                    nulls_last=nulls_last,
-                )
-                value = value.sort_by(inv_permutation)
+            # the function was executed on the ordered arguments. here we
+            # restore the original order of the table.
+            inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
+                by=order_by,
+                descending=descending,
+                nulls_last=nulls_last,
+            )
+            value = value.sort_by(inv_permutation)
 
         return value
 

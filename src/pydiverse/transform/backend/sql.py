@@ -12,7 +12,6 @@ import sqlalchemy as sqa
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
-from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
@@ -118,14 +117,13 @@ def compile_order(
 def compile_col_expr(
     expr: ColExpr,
     name_to_sqa_col: dict[str, sqa.ColumnElement],
-    group_by: list[sqa.ColumnElement],
+    group_by: sqa.sql.expression.ClauseList,
 ) -> sqa.ColumnElement:
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
         # here, inserted columns referenced via C are implicitly expanded
         return name_to_sqa_col[expr.name]
     elif isinstance(expr, ColFn):
-        op = SqlImpl.operator_registry.get_operator(expr.name)
         args: list[sqa.ColumnElement] = [
             compile_col_expr(arg, name_to_sqa_col, group_by) for arg in expr.args
         ]
@@ -134,9 +132,7 @@ def compile_col_expr(
         )
 
         partition_by = expr.context_kwargs.get("partition_by")
-        if partition_by is None:
-            partition_by = group_by
-        else:
+        if partition_by is not None:
             partition_by = sqa.sql.expression.ClauseList(
                 *(compile_col_expr(col, name_to_sqa_col, []) for col in partition_by)
             )
@@ -155,11 +151,9 @@ def compile_col_expr(
             filter_cond = [compile_col_expr(z, []) for z in filter_cond]
             raise NotImplementedError
 
-        # if something fails here, you may need to wrap literals in sqa.literal based
-        # on whether the argument in the signature is const or not.
         value: sqa.ColumnElement = impl(*args)
 
-        if op.ftype in (OpType.WINDOW, OpType.AGGREGATE):
+        if partition_by or order_by:
             value = value.over(partition_by=partition_by, order_by=order_by)
 
         return value
@@ -344,11 +338,14 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
 
     elif isinstance(expr, verbs.GroupBy):
         table, query = compile_table_expr(expr.table)
-        query.partition_by = expr.group_by
+        if expr.add:
+            query.partition_by += expr.group_by
+        else:
+            query.partition_by = expr.group_by
 
     elif isinstance(expr, verbs.Ungroup):
         table, query = compile_table_expr(expr.table)
-        assert not query.group_by
+        assert not (query.partition_by and query.group_by)
         query.partition_by = []
 
     elif isinstance(expr, Table):
