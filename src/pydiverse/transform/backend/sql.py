@@ -106,13 +106,13 @@ def compile_order(
     order: Order,
     name_to_sqa_col: dict[str, sqa.ColumnElement],
     group_by: list[sqa.ColumnElement],
-):
-    raise NotImplementedError
-    return (
-        compile_col_expr(order.order_by, group_by),
-        order.descending,
-        order.nulls_last,
+) -> sqa.UnaryExpression:
+    order_expr = compile_col_expr(order.order_by, name_to_sqa_col, group_by)
+    order_expr = order_expr.desc() if order.descending else order_expr.asc()
+    order_expr = (
+        order_expr.nulls_last() if order.nulls_last else order_expr.nulls_first()
     )
+    return order_expr
 
 
 def compile_col_expr(
@@ -147,6 +147,8 @@ def compile_col_expr(
             order_by = sqa.sql.expression.ClauseList(
                 *(compile_order(order, name_to_sqa_col, group_by) for order in arrange)
             )
+        else:
+            order_by = None
 
         filter_cond = expr.context_kwargs.get("filter")
         if filter_cond:
@@ -163,7 +165,7 @@ def compile_col_expr(
         return value
 
     elif isinstance(expr, LiteralCol):
-        return expr.val
+        return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))
 
     raise AssertionError
 
@@ -286,7 +288,10 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
             if query.where or right_ct.where:
                 raise ValueError("invalid filter before outer join")
 
-        query.select.extend((col, name + expr.suffix) for col, name in right_ct.select)
+        query.select.extend(
+            (ColName(name + expr.suffix), name + expr.suffix)
+            for col, name in right_ct.select
+        )
         query.join.append(j)
         query.name_to_sqa_col.update(
             {
@@ -372,6 +377,25 @@ def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:
         return dtypes.Duration()
 
     raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
+
+
+def pdt_type_to_sqa(t: DType) -> sqa.types.TypeEngine:
+    if isinstance(t, dtypes.Int):
+        return sqa.Integer()
+    if isinstance(t, dtypes.Float):
+        return sqa.Numeric()
+    if isinstance(t, dtypes.String):
+        return sqa.String()
+    if isinstance(t, dtypes.Bool):
+        return sqa.Boolean()
+    if isinstance(t, dtypes.DateTime):
+        return sqa.DateTime()
+    if isinstance(t, dtypes.Date):
+        return sqa.Date()
+    if isinstance(t, dtypes.Duration):
+        return sqa.Interval()
+
+    raise AssertionError
 
 
 with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
