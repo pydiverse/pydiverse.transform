@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 import itertools
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Literal
 
 from pydiverse.transform.pipe.table import Table
@@ -21,12 +22,25 @@ JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 class UnaryVerb(TableExpr):
     table: TableExpr
 
-    def col_exprs(self) -> Iterable[ColExpr]: ...
+    def __post_init__(self):
+        # propagates the table name up the tree
+        self.name = self.table.name
+
+    def col_exprs(self) -> Iterable[ColExpr]:
+        return iter(())
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]): ...
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Select(UnaryVerb):
     selected: list[Col | ColName]
+
+    def col_exprs(self) -> Iterable[ColExpr]:
+        yield from self.selected
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        self.selected = [g(c) for c in self.selected]
 
     def clone(self) -> tuple[Select, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
@@ -54,6 +68,12 @@ class Mutate(UnaryVerb):
     names: list[str]
     values: list[ColExpr]
 
+    def col_exprs(self) -> Iterable[ColExpr]:
+        yield from self.values
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        self.values = [g(c) for c in self.values]
+
     def clone(self) -> tuple[Mutate, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         new_self = Mutate(table, self.names, [z.clone(table_map) for z in self.values])
@@ -64,6 +84,12 @@ class Mutate(UnaryVerb):
 @dataclasses.dataclass(eq=False, slots=True)
 class Filter(UnaryVerb):
     filters: list[ColExpr]
+
+    def col_exprs(self) -> Iterable[ColExpr]:
+        yield from self.filters
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        self.filters = [g(c) for c in self.filters]
 
     def clone(self) -> tuple[Filter, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
@@ -77,6 +103,12 @@ class Summarise(UnaryVerb):
     names: list[str]
     values: list[ColExpr]
 
+    def col_exprs(self) -> Iterable[ColExpr]:
+        yield from self.values
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        self.values = [g(c) for c in self.values]
+
     def clone(self) -> tuple[Summarise, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         new_self = Summarise(
@@ -89,6 +121,13 @@ class Summarise(UnaryVerb):
 @dataclasses.dataclass(eq=False, slots=True)
 class Arrange(UnaryVerb):
     order_by: list[Order]
+
+    def col_exprs(self) -> Iterable[ColExpr]:
+        yield from (ord.order_by for ord in self.order_by)
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        for ord in self.order_by:
+            ord.order_by = g(ord.order_by)
 
     def clone(self) -> tuple[Arrange, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
@@ -119,6 +158,12 @@ class SliceHead(UnaryVerb):
 class GroupBy(UnaryVerb):
     group_by: list[Col | ColName]
     add: bool
+
+    def col_exprs(self) -> Iterable[ColExpr]:
+        yield from self.group_by
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        self.group_by = [g(c) for c in self.group_by]
 
     def clone(self) -> tuple[GroupBy, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
@@ -160,35 +205,27 @@ class Join(TableExpr):
 
 
 def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
-    if isinstance(expr, (Select, Rename, SliceHead, Summarise)):
+    if isinstance(expr, UnaryVerb) and not isinstance(expr, Summarise):
         group_by = update_partition_by_kwarg(expr.table)
+        for c in expr.col_exprs():
+            col_expr.update_partition_by_kwarg(c, group_by)
 
-    elif isinstance(expr, (Mutate)):
-        group_by = update_partition_by_kwarg(expr.table)
-        expr.values = col_expr.update_partition_by_kwarg(expr.values, group_by)
+        if isinstance(expr, GroupBy):
+            group_by = expr.group_by
+
+        elif isinstance(expr, Ungroup):
+            group_by = []
 
     elif isinstance(expr, Join):
         update_partition_by_kwarg(expr.left)
         update_partition_by_kwarg(expr.right)
         group_by = []
 
-    elif isinstance(expr, Filter):
-        group_by = update_partition_by_kwarg(expr.table)
-        expr.filters = col_expr.update_partition_by_kwarg(expr.filters, group_by)
-
-    elif isinstance(expr, Arrange):
-        group_by = update_partition_by_kwarg(expr.table)
-        expr.order_by = col_expr.update_partition_by_kwarg(expr.order_by, group_by)
-
-    elif isinstance(expr, GroupBy):
-        group_by = update_partition_by_kwarg(expr.table) + expr.group_by
-
-    elif isinstance(expr, Ungroup):
-        update_partition_by_kwarg(expr.table)
+    elif isinstance(expr, (Summarise, Table)):
         group_by = []
 
-    elif isinstance(expr, Table):
-        group_by = []
+    else:
+        raise AssertionError
 
     return group_by
 
@@ -197,24 +234,27 @@ def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
 def propagate_names(
     expr: TableExpr, needed_cols: Map2d[TableExpr, set[str]]
 ) -> Map2d[TableExpr, dict[str, str]]:
-    if isinstance(expr, Select):
-        for col in expr.selected:
-            if isinstance(col, Col):
-                if col.table in needed_cols:
-                    needed_cols[col.table].add(col.name)
-                else:
-                    needed_cols[col.table] = set({col.name})
+    if isinstance(expr, UnaryVerb) and not isinstance(expr, Mutate):
+        for c in expr.col_exprs():
+            needed_cols.inner_update(col_expr.get_needed_cols(c))
         col_to_name = propagate_names(expr.table, needed_cols)
-        expr.selected = [
-            (ColName(col_to_name[col.table][col.name]) if isinstance(col, Col) else col)
-            for col in expr.selected
-        ]
+        expr.mutate_col_exprs(
+            functools.partial(col_expr.propagate_names, col_to_name=col_to_name)
+        )
 
-    elif isinstance(expr, Rename):
-        col_to_name = propagate_names(expr.table, needed_cols)
-        col_to_name.inner_map(lambda s: expr.name_map[s] if s in expr.name_map else s)
+        if isinstance(expr, Rename):
+            col_to_name.inner_map(
+                lambda s: expr.name_map[s] if s in expr.name_map else s
+            )
 
     elif isinstance(expr, Mutate):
+        # TODO: also need to do this for summarise, when the user overwrites a grouping
+        # col, e.g.
+        # s = t >> group_by(u) >> summarise(u=...)
+        # s >> mutate(v=(some expression containing t.u and s.u))
+        # maybe we could do this in the course of a more general rewrite of summarise
+        # to an empty summarise and a mutate
+
         for v in expr.values:
             needed_cols.inner_update(col_expr.get_needed_cols(v))
         col_to_name = propagate_names(expr.table, needed_cols)
@@ -250,42 +290,11 @@ def propagate_names(
         col_to_name.inner_update(col_to_name_right)
         expr.on = col_expr.propagate_names(expr.on, col_to_name)
 
-    elif isinstance(expr, Filter):
-        for v in expr.filters:
-            needed_cols.inner_update(col_expr.get_needed_cols(v))
-        col_to_name = propagate_names(expr.table, needed_cols)
-        expr.filters = [col_expr.propagate_names(v, col_to_name) for v in expr.filters]
-
-    elif isinstance(expr, Arrange):
-        for order in expr.order_by:
-            needed_cols.inner_update(col_expr.get_needed_cols(order.order_by))
-        col_to_name = propagate_names(expr.table, needed_cols)
-        expr.order_by = [
-            col_expr.propagate_names(ord, col_to_name) for ord in expr.order_by
-        ]
-
-    elif isinstance(expr, GroupBy):
-        for v in expr.group_by:
-            needed_cols.inner_update(col_expr.get_needed_cols(v))
-        col_to_name = propagate_names(expr.table, needed_cols)
-        expr.group_by = [
-            col_expr.propagate_names(v, col_to_name) for v in expr.group_by
-        ]
-
-    elif isinstance(expr, (Ungroup, SliceHead)):
-        return propagate_names(expr.table, needed_cols)
-
-    elif isinstance(expr, Summarise):
-        for v in expr.values:
-            needed_cols.inner_update(col_expr.get_needed_cols(v))
-        col_to_name = propagate_names(expr.table, needed_cols)
-        expr.values = [col_expr.propagate_names(v, col_to_name) for v in expr.values]
-
     elif isinstance(expr, Table):
         col_to_name = Map2d()
 
     else:
-        raise TypeError
+        raise AssertionError
 
     if expr in needed_cols:
         col_to_name.inner_update(
@@ -297,27 +306,22 @@ def propagate_names(
 
 
 def propagate_types(expr: TableExpr) -> dict[str, DType]:
-    if isinstance(expr, (SliceHead, Ungroup)):
-        return propagate_types(expr.table)
-
-    elif isinstance(expr, Select):
+    if isinstance(expr, (UnaryVerb)):
         col_types = propagate_types(expr.table)
-        expr.selected = [
-            col_expr.propagate_types(col, col_types) for col in expr.selected
-        ]
-
-    elif isinstance(expr, Rename):
-        col_types = {
-            (expr.name_map[name] if name in expr.name_map else name): dtype
-            for name, dtype in propagate_types(expr.table).items()
-        }
-
-    elif isinstance(expr, (Mutate, Summarise)):
-        col_types = propagate_types(expr.table)
-        expr.values = [col_expr.propagate_types(v, col_types) for v in expr.values]
-        col_types.update(
-            {name: value.dtype for name, value in zip(expr.names, expr.values)}
+        expr.mutate_col_exprs(
+            functools.partial(col_expr.propagate_types, col_types=col_types)
         )
+
+        if isinstance(expr, Rename):
+            col_types = {
+                (expr.name_map[name] if name in expr.name_map else name): dtype
+                for name, dtype in propagate_types(expr.table).items()
+            }
+
+        elif isinstance(expr, (Mutate, Summarise)):
+            col_types.update(
+                {name: value.dtype for name, value in zip(expr.names, expr.values)}
+            )
 
     elif isinstance(expr, Join):
         col_types = propagate_types(expr.left)
@@ -327,26 +331,10 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
         }
         expr.on = col_expr.propagate_types(expr.on, col_types)
 
-    elif isinstance(expr, Filter):
-        col_types = propagate_types(expr.table)
-        expr.filters = [col_expr.propagate_types(v, col_types) for v in expr.filters]
-
-    elif isinstance(expr, Arrange):
-        col_types = propagate_types(expr.table)
-        expr.order_by = [
-            col_expr.propagate_types(ord, col_types) for ord in expr.order_by
-        ]
-
-    elif isinstance(expr, GroupBy):
-        col_types = propagate_types(expr.table)
-        expr.group_by = [
-            col_expr.propagate_types(col, col_types) for col in expr.group_by
-        ]
-
     elif isinstance(expr, Table):
         col_types = expr.schema
 
     else:
-        raise TypeError
+        raise AssertionError
 
     return col_types

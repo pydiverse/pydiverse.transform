@@ -101,9 +101,9 @@ class Col(ColExpr, Generic[ImplT]):
 
 
 class ColName(ColExpr):
-    def __init__(self, name: str):
+    def __init__(self, name: str, dtype: DType | None = None):
         self.name = name
-        super().__init__()
+        super().__init__(dtype)
 
     def __repr__(self):
         return f"<C.{self.name}>"
@@ -220,14 +220,8 @@ class FnAttr:
         return ColFn(self.name, self.arg, *args, **kwargs)
 
 
-def update_partition_by_kwarg(
-    expr: ColExpr | Order | list[ColExpr] | list[Order], group_by: list[Col | ColName]
-) -> ColExpr | Order | list[ColExpr] | list[Order]:
-    if isinstance(expr, list):
-        return [update_partition_by_kwarg(elem, group_by) for elem in expr]
-    elif isinstance(expr, Order):
-        expr.order_by = update_partition_by_kwarg(expr.order_by, group_by)
-    elif isinstance(expr, ColFn):
+def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> None:
+    if isinstance(expr, ColFn):
         from pydiverse.transform.backend.polars import PolarsImpl
 
         impl = PolarsImpl.operator_registry.get_operator(expr.name)
@@ -237,14 +231,16 @@ def update_partition_by_kwarg(
             and "partition_by" not in expr.context_kwargs
         ):
             expr.context_kwargs["partition_by"] = group_by
-        expr.args = update_partition_by_kwarg(expr.args, group_by)
-        expr.context_kwargs = {
-            key: update_partition_by_kwarg(val, group_by)
-            for key, val in expr.context_kwargs.items()
-        }
+
+        for arg in expr.args:
+            update_partition_by_kwarg(arg, group_by)
+        for val in itertools.chain.from_iterable(expr.context_kwargs.values()):
+            if isinstance(val, Order):
+                update_partition_by_kwarg(val.order_by, group_by)
+            else:
+                update_partition_by_kwarg(val, group_by)
     else:
         assert isinstance(expr, (Col, ColName, LiteralCol))
-    return expr
 
 
 def get_needed_cols(expr: ColExpr | Order) -> Map2d[TableExpr, set[str]]:
@@ -268,47 +264,53 @@ def propagate_names(
     expr: ColExpr | Order, col_to_name: Map2d[TableExpr, dict[str, str]]
 ) -> ColExpr | Order:
     if isinstance(expr, Order):
-        expr.order_by = propagate_names(expr.order_by, col_to_name)
+        return Order(
+            propagate_names(expr.order_by, col_to_name),
+            expr.descending,
+            expr.nulls_last,
+        )
     if isinstance(expr, Col):
         return ColName(col_to_name[expr.table][expr.name])
     elif isinstance(expr, ColFn):
-        expr.args = [propagate_names(arg, col_to_name) for arg in expr.args]
-        expr.context_kwargs = {
-            key: [propagate_names(v, col_to_name) for v in arr]
-            for key, arr in expr.context_kwargs.items()
-        }
+        return ColFn(
+            expr.name,
+            *[propagate_names(arg, col_to_name) for arg in expr.args],
+            **{
+                key: [propagate_names(v, col_to_name) for v in arr]
+                for key, arr in expr.context_kwargs.items()
+            },
+        )
     elif isinstance(expr, CaseExpr):
         raise NotImplementedError
-
     return expr
 
 
-def propagate_types(
-    expr: ColExpr | Order, col_types: dict[str, DType]
-) -> ColExpr | Order:
+def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
+    assert not isinstance(expr, Col)
     if isinstance(expr, Order):
         return Order(
             propagate_types(expr.order_by, col_types), expr.descending, expr.nulls_last
         )
-    assert not isinstance(expr, Col)
-    if isinstance(expr, ColName):
-        expr.dtype = col_types[expr.name]
-        return expr
+    elif isinstance(expr, ColName):
+        return ColName(expr.name, col_types[expr.name])
     elif isinstance(expr, ColFn):
-        expr.args = [propagate_types(arg, col_types) for arg in expr.args]
-        expr.context_kwargs = {
-            key: [propagate_types(v, col_types) for v in arr]
-            for key, arr in expr.context_kwargs.items()
-        }
+        typed_fn = ColFn(
+            expr.name,
+            *(propagate_types(arg, col_types) for arg in expr.args),
+            **{
+                key: [propagate_types(val, col_types) for val in arr]
+                for key, arr in expr.context_kwargs.items()
+            },
+        )
+
         # TODO: create a backend agnostic registry
         from pydiverse.transform.backend.polars import PolarsImpl
 
-        expr.dtype = PolarsImpl.operator_registry.get_implementation(
-            expr.name, [arg.dtype for arg in expr.args]
+        typed_fn.dtype = PolarsImpl.operator_registry.get_implementation(
+            expr.name, [arg.dtype for arg in typed_fn.args]
         ).return_type
-        return expr
+        return typed_fn
     elif isinstance(expr, LiteralCol):
-        expr.dtype = python_type_to_pdt(type(expr.val))
         return expr
     else:
         return LiteralCol(expr)
