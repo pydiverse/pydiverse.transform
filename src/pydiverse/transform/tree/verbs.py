@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+from collections.abc import Iterable
 from typing import Literal
 
 from pydiverse.transform.pipe.table import Table
@@ -17,8 +18,14 @@ JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Select(TableExpr):
+class UnaryVerb(TableExpr):
     table: TableExpr
+
+    def col_exprs(self) -> Iterable[ColExpr]: ...
+
+
+@dataclasses.dataclass(eq=False, slots=True)
+class Select(UnaryVerb):
     selected: list[Col | ColName]
 
     def clone(self) -> tuple[Select, dict[TableExpr, TableExpr]]:
@@ -32,8 +39,7 @@ class Select(TableExpr):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Rename(TableExpr):
-    table: TableExpr
+class Rename(UnaryVerb):
     name_map: dict[str, str]
 
     def clone(self) -> tuple[Rename, dict[TableExpr, TableExpr]]:
@@ -44,14 +50,88 @@ class Rename(TableExpr):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Mutate(TableExpr):
-    table: TableExpr
+class Mutate(UnaryVerb):
     names: list[str]
     values: list[ColExpr]
 
     def clone(self) -> tuple[Mutate, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         new_self = Mutate(table, self.names, [z.clone(table_map) for z in self.values])
+        table_map[self] = new_self
+        return new_self, table_map
+
+
+@dataclasses.dataclass(eq=False, slots=True)
+class Filter(UnaryVerb):
+    filters: list[ColExpr]
+
+    def clone(self) -> tuple[Filter, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Filter(table, [z.clone(table_map) for z in self.filters])
+        table_map[self] = new_self
+        return new_self, table_map
+
+
+@dataclasses.dataclass(eq=False, slots=True)
+class Summarise(UnaryVerb):
+    names: list[str]
+    values: list[ColExpr]
+
+    def clone(self) -> tuple[Summarise, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Summarise(
+            table, self.names, [z.clone(table_map) for z in self.values]
+        )
+        table_map[self] = new_self
+        return new_self, table_map
+
+
+@dataclasses.dataclass(eq=False, slots=True)
+class Arrange(UnaryVerb):
+    order_by: list[Order]
+
+    def clone(self) -> tuple[Arrange, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Arrange(
+            table,
+            [
+                Order(z.order_by.clone(table_map), z.descending, z.nulls_last)
+                for z in self.order_by
+            ],
+        )
+        table_map[self] = new_self
+        return new_self, table_map
+
+
+@dataclasses.dataclass(eq=False, slots=True)
+class SliceHead(UnaryVerb):
+    n: int
+    offset: int
+
+    def clone(self) -> tuple[SliceHead, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = SliceHead(table, self.n, self.offset)
+        table_map[self] = new_self
+        return new_self, table_map
+
+
+@dataclasses.dataclass(eq=False, slots=True)
+class GroupBy(UnaryVerb):
+    group_by: list[Col | ColName]
+    add: bool
+
+    def clone(self) -> tuple[GroupBy, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Mutate(table, [z.clone(table_map) for z in self.group_by], self.add)
+        table_map[self] = new_self
+        return new_self, table_map
+
+
+@dataclasses.dataclass(eq=False, slots=True)
+class Ungroup(UnaryVerb):
+    def clone(self) -> tuple[Ungroup, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Ungroup(table)
         table_map[self] = new_self
         return new_self, table_map
 
@@ -77,88 +157,6 @@ class Join(TableExpr):
         )
         left_map[self] = new_self
         return new_self, left_map
-
-
-@dataclasses.dataclass(eq=False, slots=True)
-class Filter(TableExpr):
-    table: TableExpr
-    filters: list[ColExpr]
-
-    def clone(self) -> tuple[Filter, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        new_self = Filter(table, [z.clone(table_map) for z in self.filters])
-        table_map[self] = new_self
-        return new_self, table_map
-
-
-@dataclasses.dataclass(eq=False, slots=True)
-class Summarise(TableExpr):
-    table: TableExpr
-    names: list[str]
-    values: list[ColExpr]
-
-    def clone(self) -> tuple[Summarise, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        new_self = Summarise(
-            table, self.names, [z.clone(table_map) for z in self.values]
-        )
-        table_map[self] = new_self
-        return new_self, table_map
-
-
-@dataclasses.dataclass(eq=False, slots=True)
-class Arrange(TableExpr):
-    table: TableExpr
-    order_by: list[Order]
-
-    def clone(self) -> tuple[Arrange, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        new_self = Arrange(
-            table,
-            [
-                Order(z.order_by.clone(table_map), z.descending, z.nulls_last)
-                for z in self.order_by
-            ],
-        )
-        table_map[self] = new_self
-        return new_self, table_map
-
-
-@dataclasses.dataclass(eq=False, slots=True)
-class SliceHead(TableExpr):
-    table: TableExpr
-    n: int
-    offset: int
-
-    def clone(self) -> tuple[SliceHead, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        new_self = SliceHead(table, self.n, self.offset)
-        table_map[self] = new_self
-        return new_self, table_map
-
-
-@dataclasses.dataclass(eq=False, slots=True)
-class GroupBy(TableExpr):
-    table: TableExpr
-    group_by: list[Col | ColName]
-    add: bool
-
-    def clone(self) -> tuple[GroupBy, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        new_self = Mutate(table, [z.clone(table_map) for z in self.group_by], self.add)
-        table_map[self] = new_self
-        return new_self, table_map
-
-
-@dataclasses.dataclass(eq=False, slots=True)
-class Ungroup(TableExpr):
-    table: TableExpr
-
-    def clone(self) -> tuple[Ungroup, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        new_self = Ungroup(table)
-        table_map[self] = new_self
-        return new_self, table_map
 
 
 def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
