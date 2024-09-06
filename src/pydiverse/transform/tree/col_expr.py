@@ -361,7 +361,7 @@ class Order:
 
     def clone(self, table_map: dict[TableExpr, TableExpr]) -> Order:
         return Order(
-            [ord.clone(table_map) for ord in self.order_by],
+            self.order_by.clone(table_map),
             self.descending,
             self.nulls_last,
         )

@@ -184,7 +184,7 @@ class GroupBy(UnaryVerb):
 
     def clone(self) -> tuple[GroupBy, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        cloned = Mutate(table, [z.clone(table_map) for z in self.group_by], self.add)
+        cloned = GroupBy(table, [z.clone(table_map) for z in self.group_by], self.add)
         table_map[self] = cloned
         return cloned, table_map
 

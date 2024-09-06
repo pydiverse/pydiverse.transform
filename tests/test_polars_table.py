@@ -138,32 +138,32 @@ class TestPolarsLazyImpl:
         assert_equal(tbl1 >> select(), df1.select())
 
     def test_mutate(self, tbl1):
-        # assert_equal(
-        #     tbl1 >> mutate(col1times2=tbl1.col1 * 2),
-        #     pl.DataFrame(
-        #         {
-        #             "col1": [1, 2, 3, 4],
-        #             "col2": ["a", "b", "c", "d"],
-        #             "col1times2": [2, 4, 6, 8],
-        #         }
-        #     ),
-        # )
+        assert_equal(
+            tbl1 >> mutate(col1times2=tbl1.col1 * 2),
+            pl.DataFrame(
+                {
+                    "col1": [1, 2, 3, 4],
+                    "col2": ["a", "b", "c", "d"],
+                    "col1times2": [2, 4, 6, 8],
+                }
+            ),
+        )
 
-        # assert_equal(
-        #     tbl1 >> select() >> mutate(col1times2=tbl1.col1 * 2),
-        #     pl.DataFrame(
-        #         {
-        #             "col1times2": [2, 4, 6, 8],
-        #         }
-        #     ),
-        # )
+        assert_equal(
+            tbl1 >> select() >> mutate(col1times2=tbl1.col1 * 2),
+            pl.DataFrame(
+                {
+                    "col1times2": [2, 4, 6, 8],
+                }
+            ),
+        )
 
         # # Check proper column referencing
         t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2) >> select()
-        # assert_equal(
-        #     t >> mutate(x=t.col1, y=t.col2),
-        #     tbl1 >> select() >> mutate(x=tbl1.col2, y=tbl1.col1),
-        # )
+        assert_equal(
+            t >> mutate(x=t.col1, y=t.col2),
+            tbl1 >> select() >> mutate(x=tbl1.col2, y=tbl1.col1),
+        )
         assert_equal(
             t >> mutate(x=tbl1.col1, y=tbl1.col2),
             tbl1 >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
@@ -539,6 +539,8 @@ class TestPolarsLazyImpl:
             tl[col] = (col * 2) % 3
         for col in tr:
             tr[col] = (col * 2) % 5
+
+        tl = tl >> mutate(**{c: (tl[c] * 2 % 3) for c in tl})
 
         # Check if it worked...
         assert_equal(
