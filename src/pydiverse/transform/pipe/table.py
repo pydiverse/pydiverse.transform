@@ -107,5 +107,6 @@ class Table(TableExpr, Generic[ImplT]):
         return self._impl.col_names()
 
     def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
-        new_self = copy.copy(self)
-        return new_self, {self: new_self}
+        cloned = copy.copy(self)
+        cloned._impl = cloned._impl.clone()
+        return cloned, {self: cloned}

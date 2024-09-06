@@ -43,12 +43,12 @@ class Select(UnaryVerb):
 
     def clone(self) -> tuple[Select, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Select(
+        cloned = Select(
             table,
             [col.clone(table_map) for col in self.selected],
         )
-        table_map[self] = new_self
-        return new_self, table_map
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -63,12 +63,12 @@ class Drop(UnaryVerb):
 
     def clone(self) -> tuple[Drop, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Drop(
+        cloned = Drop(
             table,
             [col.clone(table_map) for col in self.dropped],
         )
-        table_map[self] = new_self
-        return new_self, table_map
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -77,9 +77,9 @@ class Rename(UnaryVerb):
 
     def clone(self) -> tuple[Rename, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Rename(table, self.name_map)
-        table_map[self] = new_self
-        return new_self, table_map
+        cloned = Rename(table, self.name_map)
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -95,9 +95,9 @@ class Mutate(UnaryVerb):
 
     def clone(self) -> tuple[Mutate, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Mutate(table, self.names, [z.clone(table_map) for z in self.values])
-        table_map[self] = new_self
-        return new_self, table_map
+        cloned = Mutate(table, self.names, [z.clone(table_map) for z in self.values])
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -112,9 +112,9 @@ class Filter(UnaryVerb):
 
     def clone(self) -> tuple[Filter, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Filter(table, [z.clone(table_map) for z in self.filters])
-        table_map[self] = new_self
-        return new_self, table_map
+        cloned = Filter(table, [z.clone(table_map) for z in self.filters])
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -130,11 +130,9 @@ class Summarise(UnaryVerb):
 
     def clone(self) -> tuple[Summarise, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Summarise(
-            table, self.names, [z.clone(table_map) for z in self.values]
-        )
-        table_map[self] = new_self
-        return new_self, table_map
+        cloned = Summarise(table, self.names, [z.clone(table_map) for z in self.values])
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -150,15 +148,15 @@ class Arrange(UnaryVerb):
 
     def clone(self) -> tuple[Arrange, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Arrange(
+        cloned = Arrange(
             table,
             [
                 Order(z.order_by.clone(table_map), z.descending, z.nulls_last)
                 for z in self.order_by
             ],
         )
-        table_map[self] = new_self
-        return new_self, table_map
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -168,9 +166,9 @@ class SliceHead(UnaryVerb):
 
     def clone(self) -> tuple[SliceHead, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = SliceHead(table, self.n, self.offset)
-        table_map[self] = new_self
-        return new_self, table_map
+        cloned = SliceHead(table, self.n, self.offset)
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -186,18 +184,18 @@ class GroupBy(UnaryVerb):
 
     def clone(self) -> tuple[GroupBy, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Mutate(table, [z.clone(table_map) for z in self.group_by], self.add)
-        table_map[self] = new_self
-        return new_self, table_map
+        cloned = Mutate(table, [z.clone(table_map) for z in self.group_by], self.add)
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Ungroup(UnaryVerb):
     def clone(self) -> tuple[Ungroup, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        new_self = Ungroup(table)
-        table_map[self] = new_self
-        return new_self, table_map
+        cloned = Ungroup(table)
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -216,11 +214,11 @@ class Join(TableExpr):
         left, left_map = self.left.clone()
         right, right_map = self.right.clone()
         left_map.update(right_map)
-        new_self = Join(
+        cloned = Join(
             left, right, self.on.clone(left_map), self.how, self.validate, self.suffix
         )
-        left_map[self] = new_self
-        return new_self, left_map
+        left_map[self] = cloned
+        return cloned, left_map
 
 
 # inserts renames before Mutate, Summarise or Join to prevent duplicate column names.

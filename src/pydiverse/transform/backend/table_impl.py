@@ -74,6 +74,8 @@ class TableImpl:
 
     def schema(self) -> dict[str, DType]: ...
 
+    def clone(self) -> TableImpl: ...
+
     def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         """Determine if a column is aligned with the table.
 

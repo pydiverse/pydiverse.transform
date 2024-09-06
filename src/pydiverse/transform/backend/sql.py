@@ -85,6 +85,11 @@ class SqlImpl(TableImpl):
     def schema(self) -> dict[str, DType]:
         return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
 
+    def clone(self) -> SqlImpl:
+        return SqlImpl(
+            self.table.name, SqlAlchemy(self.engine, schema=self.table.schema)
+        )
+
 
 # checks that all leafs use the same sqa.Engine and returns it
 def get_engine(expr: TableExpr) -> sqa.Engine:

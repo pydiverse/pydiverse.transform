@@ -28,9 +28,6 @@ class PolarsImpl(TableImpl):
     def __init__(self, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
 
-    def __deepcopy__(self, memo) -> PolarsImpl:
-        return PolarsImpl(self.df.clone())
-
     @staticmethod
     def build_query(expr: TableExpr) -> str | None:
         return None
@@ -50,6 +47,9 @@ class PolarsImpl(TableImpl):
             name: polars_type_to_pdt(dtype)
             for name, dtype in self.df.collect_schema().items()
         }
+
+    def clone(self) -> PolarsImpl:
+        return PolarsImpl(self.df.clone())
 
 
 # merges descending and null_last markers into the ordering expression
