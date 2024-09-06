@@ -65,6 +65,7 @@ def collect(expr: TableExpr): ...
 
 @builtin_verb()
 def export(expr: TableExpr, target: Target):
+    expr, _ = expr.clone()
     SourceBackend: type[TableImpl] = get_backend(expr)
     tree.preprocess(expr)
     return SourceBackend.export(expr, target)

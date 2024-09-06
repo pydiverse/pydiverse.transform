@@ -63,6 +63,7 @@ class SqlImpl(TableImpl):
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
         engine = get_engine(expr)
+        create_aliases(expr)
         table, query = compile_table_expr(expr)
         sel = compile_query(table, query)
         if isinstance(target, Polars):
@@ -86,9 +87,10 @@ class SqlImpl(TableImpl):
         return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
 
     def clone(self) -> SqlImpl:
-        return SqlImpl(
-            self.table.name, SqlAlchemy(self.engine, schema=self.table.schema)
-        )
+        cloned = object.__new__(self.__class__)
+        cloned.engine = self.engine
+        cloned.table = self.table
+        return cloned
 
 
 # checks that all leafs use the same sqa.Engine and returns it
@@ -104,6 +106,25 @@ def get_engine(expr: TableExpr) -> sqa.Engine:
         engine = get_engine(expr.table)
 
     return engine
+
+
+# Gives any leaf a unique alias to allow self-joins. We do this here to not force
+# the user to come up with dummy names that are not required later anymore. It has
+# to be done before a join so that all column references in the join subtrees remain
+# valid.
+def create_aliases(expr: TableExpr):
+    if isinstance(expr, verbs.UnaryVerb):
+        create_aliases(expr.table)
+    elif isinstance(expr, verbs.Join):
+        create_aliases(expr.left)
+        create_aliases(expr.right)
+    elif isinstance(expr, Table):
+        expr._impl.table = expr._impl.table.alias(
+            f"{expr._impl.table}_{str(hash(expr))}"
+        )
+
+    else:
+        raise AssertionError
 
 
 def compile_order(

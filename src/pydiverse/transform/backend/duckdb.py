@@ -14,6 +14,7 @@ class DuckDbImpl(SqlImpl):
     @staticmethod
     def export(expr: TableExpr, target: Target):
         if isinstance(target, Polars):
+            sql.create_aliases(expr)
             engine = sql.get_engine(expr)
             with engine.connect() as conn:
                 return pl.read_database(DuckDbImpl.build_query(expr), connection=conn)

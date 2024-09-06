@@ -294,7 +294,6 @@ class TestSqlTable:
             >> join(x, tbl2.col1 == x.col1, "left", suffix="42")
             >> alias("self_join")
         )
-        self_join >>= arrange(*self_join)
 
         self_join_expected = df2.join(
             df2,
@@ -304,11 +303,8 @@ class TestSqlTable:
             coalesce=False,
             suffix="42",
         )
-        self_join_expected = self_join_expected.sort(
-            by=[col._.name for col in self_join]
-        )
 
-        assert_equal(self_join, self_join_expected)
+        assert_equal(self_join, self_join_expected, check_row_order=False)
 
     def test_lambda_column(self, tbl1, tbl2):
         # Select
