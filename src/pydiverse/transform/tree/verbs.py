@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-import itertools
 from collections.abc import Callable, Iterable
 from typing import Literal
 
@@ -204,37 +203,64 @@ class Join(TableExpr):
         return new_self, left_map
 
 
-def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
-    if isinstance(expr, UnaryVerb) and not isinstance(expr, Summarise):
-        group_by = update_partition_by_kwarg(expr.table)
-        for c in expr.col_exprs():
-            col_expr.update_partition_by_kwarg(c, group_by)
+# inserts renames before Mutate, Summarise or Join to prevent duplicate column names.
+def rename_overwritten_cols(expr: TableExpr) -> tuple[set[str], list[str]]:
+    if isinstance(expr, UnaryVerb) and not isinstance(
+        expr, (Mutate, Summarise, GroupBy, Ungroup)
+    ):
+        return rename_overwritten_cols(expr.table)
 
-        if isinstance(expr, GroupBy):
-            group_by = expr.group_by
+    elif isinstance(expr, (Mutate, Summarise)):
+        available_cols, group_by = rename_overwritten_cols(expr.table)
+        if isinstance(expr, Summarise):
+            available_cols = set(group_by)
+        overwritten = set(name for name in expr.names if name in available_cols)
 
-        elif isinstance(expr, Ungroup):
-            group_by = []
+        if overwritten:
+            expr.table = Rename(
+                expr.table, {name: name + str(hash(expr.table)) for name in overwritten}
+            )
+            for val in expr.values:
+                col_expr.rename_overwritten_cols(val, expr.table.name_map)
 
-    elif isinstance(expr, Join):
-        update_partition_by_kwarg(expr.left)
-        update_partition_by_kwarg(expr.right)
+        available_cols |= set(
+            {
+                (name if name not in overwritten else expr.table.name_map[name])
+                for name in expr.names
+            }
+        )
+
+    elif isinstance(expr, GroupBy):
+        available_cols, group_by = rename_overwritten_cols(expr.table)
+        group_by = expr.group_by + group_by if expr.add else expr.group_by
+
+    elif isinstance(expr, Ungroup):
+        available_cols, _ = rename_overwritten_cols(expr.table)
         group_by = []
 
-    elif isinstance(expr, (Summarise, Table)):
+    elif isinstance(expr, Join):
+        left_available, _ = rename_overwritten_cols(expr.left)
+        right_avaialable, _ = rename_overwritten_cols(expr.right)
+        available_cols = left_available | set(
+            {name + expr.suffix for name in right_avaialable}
+        )
+        group_by = []
+
+    elif isinstance(expr, Table):
+        available_cols = set(expr.col_names())
         group_by = []
 
     else:
         raise AssertionError
 
-    return group_by
+    return available_cols, group_by
 
 
 # returns Col -> ColName mapping and the list of available columns
 def propagate_names(
     expr: TableExpr, needed_cols: Map2d[TableExpr, set[str]]
 ) -> Map2d[TableExpr, dict[str, str]]:
-    if isinstance(expr, UnaryVerb) and not isinstance(expr, Mutate):
+    if isinstance(expr, UnaryVerb):
         for c in expr.col_exprs():
             needed_cols.inner_update(col_expr.get_needed_cols(c))
         col_to_name = propagate_names(expr.table, needed_cols)
@@ -247,46 +273,11 @@ def propagate_names(
                 lambda s: expr.name_map[s] if s in expr.name_map else s
             )
 
-    elif isinstance(expr, Mutate):
-        # TODO: also need to do this for summarise, when the user overwrites a grouping
-        # col, e.g.
-        # s = t >> group_by(u) >> summarise(u=...)
-        # s >> mutate(v=(some expression containing t.u and s.u))
-        # maybe we could do this in the course of a more general rewrite of summarise
-        # to an empty summarise and a mutate
-
-        for v in expr.values:
-            needed_cols.inner_update(col_expr.get_needed_cols(v))
-        col_to_name = propagate_names(expr.table, needed_cols)
-        # overwritten columns still need to be stored since the user may access them
-        # later. They're not in the C-space anymore, however, so we give them
-        # {name}{hash of the previous table} as a dummy name.
-        overwritten = set(
-            name
-            for name in expr.names
-            if name
-            in set(
-                itertools.chain.from_iterable(v.values() for v in col_to_name.values())
-            )
-        )
-        # for the backends, we insert a Rename here that gives the overwritten cols
-        # their dummy names. The backends may thus assume that the user never overwrites
-        # column names
-        if overwritten:
-            rn = Rename(
-                expr.table, {name: name + str(hash(expr.table)) for name in overwritten}
-            )
-            col_to_name.inner_map(
-                lambda s: s + str(hash(expr.table)) if s in overwritten else s
-            )
-            expr.table = rn
-        expr.values = [col_expr.propagate_names(v, col_to_name) for v in expr.values]
-
     elif isinstance(expr, Join):
         needed_cols.inner_update(col_expr.get_needed_cols(expr.on))
         col_to_name = propagate_names(expr.left, needed_cols)
         col_to_name_right = propagate_names(expr.right, needed_cols)
-        col_to_name_right.inner_map(lambda s: s + expr.suffix)
+        col_to_name_right.inner_map(lambda name: name + expr.suffix)
         col_to_name.inner_update(col_to_name_right)
         expr.on = col_expr.propagate_names(expr.on, col_to_name)
 
@@ -324,8 +315,7 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
             )
 
     elif isinstance(expr, Join):
-        col_types = propagate_types(expr.left)
-        col_types |= {
+        col_types = propagate_types(expr.left) | {
             name + expr.suffix: dtype
             for name, dtype in propagate_types(expr.right).items()
         }
@@ -338,3 +328,30 @@ def propagate_types(expr: TableExpr) -> dict[str, DType]:
         raise AssertionError
 
     return col_types
+
+
+# returns the list of cols the table is currently grouped by
+def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
+    if isinstance(expr, UnaryVerb) and not isinstance(expr, Summarise):
+        group_by = update_partition_by_kwarg(expr.table)
+        for c in expr.col_exprs():
+            col_expr.update_partition_by_kwarg(c, group_by)
+
+        if isinstance(expr, GroupBy):
+            group_by = expr.group_by
+
+        elif isinstance(expr, Ungroup):
+            group_by = []
+
+    elif isinstance(expr, Join):
+        update_partition_by_kwarg(expr.left)
+        update_partition_by_kwarg(expr.right)
+        group_by = []
+
+    elif isinstance(expr, (Summarise, Table)):
+        group_by = []
+
+    else:
+        raise AssertionError
+
+    return group_by

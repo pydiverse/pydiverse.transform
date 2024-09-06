@@ -220,6 +220,18 @@ class FnAttr:
         return ColFn(self.name, self.arg, *args, **kwargs)
 
 
+def rename_overwritten_cols(expr: ColExpr, name_map: dict[str, str]):
+    if isinstance(expr, ColName):
+        if expr.name in name_map:
+            expr.name = name_map[expr.name]
+
+    elif isinstance(expr, ColFn):
+        for arg in expr.args:
+            rename_overwritten_cols(arg, name_map)
+        for val in itertools.chain.from_iterable(expr.context_kwargs.values()):
+            rename_overwritten_cols(val, name_map)
+
+
 def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> None:
     if isinstance(expr, ColFn):
         from pydiverse.transform.backend.polars import PolarsImpl
