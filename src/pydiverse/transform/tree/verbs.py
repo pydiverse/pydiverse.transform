@@ -51,6 +51,26 @@ class Select(UnaryVerb):
         return new_self, table_map
 
 
+@dataclasses.dataclass
+class Drop(UnaryVerb):
+    dropped: list[Col | ColName]
+
+    def col_exprs(self) -> Iterable[ColExpr]:
+        yield from self.dropped
+
+    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        self.selected = [g(c) for c in self.dropped]
+
+    def clone(self) -> tuple[Drop, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        new_self = Drop(
+            table,
+            [col.clone(table_map) for col in self.dropped],
+        )
+        table_map[self] = new_self
+        return new_self, table_map
+
+
 @dataclasses.dataclass(eq=False, slots=True)
 class Rename(UnaryVerb):
     name_map: dict[str, str]

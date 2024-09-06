@@ -14,6 +14,7 @@ from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
 from pydiverse.transform.tree.verbs import (
     Arrange,
+    Drop,
     Filter,
     GroupBy,
     Join,
@@ -32,6 +33,7 @@ __all__ = [
     "build_query",
     "show_query",
     "select",
+    "drop",
     "rename",
     "mutate",
     "join",
@@ -86,6 +88,11 @@ def show_query(expr: TableExpr):
 @builtin_verb()
 def select(expr: TableExpr, *args: Col | ColName):
     return Select(expr, list(args))
+
+
+@builtin_verb()
+def drop(expr: TableExpr, *args: Col | ColName):
+    return Drop(expr, list(args))
 
 
 @builtin_verb()
