@@ -81,7 +81,7 @@ class ColExpr:
             "converted to a boolean or used with the and, or, not keywords"
         )
 
-    def clone(self, table_map: dict[TableExpr, TableExpr]): ...
+    def clone(self, table_map: dict[TableExpr, TableExpr]) -> ColExpr: ...
 
 
 class Col(ColExpr, Generic[ImplT]):

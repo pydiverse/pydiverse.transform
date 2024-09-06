@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import functools
 from collections.abc import Callable, Iterable
@@ -28,7 +29,15 @@ class UnaryVerb(TableExpr):
     def col_exprs(self) -> Iterable[ColExpr]:
         return iter(())
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]): ...
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]): ...
+
+    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        cloned = copy.copy(self)
+        cloned.table = table
+        cloned.replace_col_exprs(lambda c: c.clone(table_map))
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -38,17 +47,8 @@ class Select(UnaryVerb):
     def col_exprs(self) -> Iterable[ColExpr]:
         yield from self.selected
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
         self.selected = [g(c) for c in self.selected]
-
-    def clone(self) -> tuple[Select, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Select(
-            table,
-            [col.clone(table_map) for col in self.selected],
-        )
-        table_map[self] = cloned
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -58,26 +58,17 @@ class Drop(UnaryVerb):
     def col_exprs(self) -> Iterable[ColExpr]:
         yield from self.dropped
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
         self.dropped = [g(c) for c in self.dropped]
-
-    def clone(self) -> tuple[Drop, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Drop(
-            table,
-            [col.clone(table_map) for col in self.dropped],
-        )
-        table_map[self] = cloned
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Rename(UnaryVerb):
     name_map: dict[str, str]
 
-    def clone(self) -> tuple[Rename, dict[TableExpr, TableExpr]]:
+    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        cloned = Rename(table, self.name_map)
+        cloned = Rename(table, copy.copy(self.name_map))
         table_map[self] = cloned
         return cloned, table_map
 
@@ -90,12 +81,14 @@ class Mutate(UnaryVerb):
     def col_exprs(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
-    def clone(self) -> tuple[Mutate, dict[TableExpr, TableExpr]]:
+    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        cloned = Mutate(table, self.names, [z.clone(table_map) for z in self.values])
+        cloned = Mutate(
+            table, copy.copy(self.names), [c.clone(table_map) for c in self.values]
+        )
         table_map[self] = cloned
         return cloned, table_map
 
@@ -107,14 +100,8 @@ class Filter(UnaryVerb):
     def col_exprs(self) -> Iterable[ColExpr]:
         yield from self.filters
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
         self.filters = [g(c) for c in self.filters]
-
-    def clone(self) -> tuple[Filter, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Filter(table, [z.clone(table_map) for z in self.filters])
-        table_map[self] = cloned
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -125,12 +112,14 @@ class Summarise(UnaryVerb):
     def col_exprs(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
-    def clone(self) -> tuple[Summarise, dict[TableExpr, TableExpr]]:
+    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
-        cloned = Summarise(table, self.names, [z.clone(table_map) for z in self.values])
+        cloned = Summarise(
+            table, copy.copy(self.names), [c.clone(table_map) for c in self.values]
+        )
         table_map[self] = cloned
         return cloned, table_map
 
@@ -142,33 +131,17 @@ class Arrange(UnaryVerb):
     def col_exprs(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
-        for ord in self.order_by:
-            ord.order_by = g(ord.order_by)
-
-    def clone(self) -> tuple[Arrange, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Arrange(
-            table,
-            [
-                Order(z.order_by.clone(table_map), z.descending, z.nulls_last)
-                for z in self.order_by
-            ],
-        )
-        table_map[self] = cloned
-        return cloned, table_map
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+        self.order_by = [
+            Order(g(ord.order_by), ord.descending, ord.nulls_last)
+            for ord in self.order_by
+        ]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class SliceHead(UnaryVerb):
     n: int
     offset: int
-
-    def clone(self) -> tuple[SliceHead, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = SliceHead(table, self.n, self.offset)
-        table_map[self] = cloned
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -179,23 +152,12 @@ class GroupBy(UnaryVerb):
     def col_exprs(self) -> Iterable[ColExpr]:
         yield from self.group_by
 
-    def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
         self.group_by = [g(c) for c in self.group_by]
-
-    def clone(self) -> tuple[GroupBy, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = GroupBy(table, [z.clone(table_map) for z in self.group_by], self.add)
-        table_map[self] = cloned
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Ungroup(UnaryVerb):
-    def clone(self) -> tuple[Ungroup, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Ungroup(table)
-        table_map[self] = cloned
-        return cloned, table_map
+class Ungroup(UnaryVerb): ...
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -285,7 +247,7 @@ def propagate_names(
         for c in expr.col_exprs():
             needed_cols.inner_update(col_expr.get_needed_cols(c))
         col_to_name = propagate_names(expr.table, needed_cols)
-        expr.mutate_col_exprs(
+        expr.replace_col_exprs(
             functools.partial(col_expr.propagate_names, col_to_name=col_to_name)
         )
 
@@ -320,7 +282,7 @@ def propagate_names(
 def propagate_types(expr: TableExpr) -> dict[str, DType]:
     if isinstance(expr, (UnaryVerb)):
         col_types = propagate_types(expr.table)
-        expr.mutate_col_exprs(
+        expr.replace_col_exprs(
             functools.partial(col_expr.propagate_types, col_types=col_types)
         )
 
