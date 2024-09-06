@@ -530,38 +530,10 @@ class TestPolarsLazyImpl:
             tbl1 >> arrange(tbl1.col1) >> mutate(a=tbl1.col1 * 2),
         )
 
-    def test_table_setitem(self, tbl_left, tbl_right):
-        tl = tbl_left >> alias("df_left")
-        tr = tbl_right >> alias("df_right")
-
-        # Iterate over cols and modify
-        for col in tl:
-            tl[col] = (col * 2) % 3
-        for col in tr:
-            tr[col] = (col * 2) % 5
-
-        tl = tl >> mutate(**{c: (tl[c] * 2 % 3) for c in tl})
-
-        # Check if it worked...
-        assert_equal(
-            (tl >> join(tr, C.a == C.b, "left", suffix="")),
-            (
-                tbl_left
-                >> mutate(a=(tbl_left.a * 2) % 3)
-                >> join(
-                    tbl_right
-                    >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    C.a == C.b,
-                    "left",
-                    suffix="",
-                )
-            ),
-        )
-
     def test_custom_verb(self, tbl1):
         @verb
         def double_col1(table):
-            table[C.col1] = C.col1 * 2
+            table >>= mutate(col1=C.col1 * 2)
             return table
 
         assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=C.col1 * 2))

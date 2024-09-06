@@ -64,7 +64,7 @@ df_right = pl.DataFrame(
 
 @pytest.fixture
 def engine():
-    engine = sa.create_engine("duckdb:///:memory:")
+    engine = sa.create_engine("sqlite:///:memory:")
     df1.write_database("df1", engine, if_table_exists="replace")
     df2.write_database("df2", engine, if_table_exists="replace")
     df3.write_database("df3", engine, if_table_exists="replace")
@@ -358,31 +358,6 @@ class TestSqlTable:
         assert_equal(
             tbl1 >> mutate(a=tbl1.col1 * 2) >> arrange(C.a),
             tbl1 >> arrange(tbl1.col1) >> mutate(a=tbl1.col1 * 2),
-        )
-
-    def test_table_setitem(self, tbl_left, tbl_right):
-        tl = tbl_left >> alias("df_left")
-        tr = tbl_right >> alias("df_right")
-
-        # Iterate over cols and modify
-        for col in tl:
-            tl[col] = (col * 2) % 3
-        for col in tr:
-            tr[col] = (col * 2) % 5
-
-        # Check if it worked...
-        assert_equal(
-            (tl >> join(tr, C.a == tr.b, "left")),
-            (
-                tbl_left
-                >> mutate(a=(tbl_left.a * 2) % 3)
-                >> join(
-                    tbl_right
-                    >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    C.a == C.b_df_right,
-                    "left",
-                )
-            ),
         )
 
     def test_select_without_tbl_ref(self, tbl2):
