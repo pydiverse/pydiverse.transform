@@ -251,6 +251,12 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         table, query = compile_table_expr(expr.table)
         query.select = [(col, col.name) for col in expr.selected]
 
+    if isinstance(expr, verbs.Drop):
+        table, query = compile_table_expr(expr.table)
+        query.select = [
+            (col, name) for col, name in query.select if name not in set(expr.dropped)
+        ]
+
     elif isinstance(expr, verbs.Rename):
         table, query = compile_table_expr(expr.table)
         query.name_to_sqa_col = {

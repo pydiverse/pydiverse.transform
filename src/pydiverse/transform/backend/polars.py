@@ -202,6 +202,13 @@ def compile_table_expr(
         ]
         return df, ct
 
+    elif isinstance(expr, verbs.Drop):
+        df, ct = compile_table_expr(expr.table)
+        ct.select = [
+            col for col in ct.select if col not in set(col.name for col in expr.dropped)
+        ]
+        return df, ct
+
     elif isinstance(expr, verbs.Rename):
         df, ct = compile_table_expr(expr.table)
         ct.select = [

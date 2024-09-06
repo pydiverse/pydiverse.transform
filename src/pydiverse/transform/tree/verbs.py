@@ -51,7 +51,7 @@ class Select(UnaryVerb):
         return new_self, table_map
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False, slots=True)
 class Drop(UnaryVerb):
     dropped: list[Col | ColName]
 
@@ -59,7 +59,7 @@ class Drop(UnaryVerb):
         yield from self.dropped
 
     def mutate_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
-        self.selected = [g(c) for c in self.dropped]
+        self.dropped = [g(c) for c in self.dropped]
 
     def clone(self) -> tuple[Drop, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
@@ -238,14 +238,17 @@ def rename_overwritten_cols(expr: TableExpr) -> tuple[set[str], list[str]]:
 
         if overwritten:
             expr.table = Rename(
-                expr.table, {name: name + str(hash(expr.table)) for name in overwritten}
+                expr.table, {name: name + str(hash(expr)) for name in overwritten}
             )
             for val in expr.values:
                 col_expr.rename_overwritten_cols(val, expr.table.name_map)
+            expr.table = Drop(
+                expr.table, [ColName(name) for name in expr.table.name_map.values()]
+            )
 
         available_cols |= set(
             {
-                (name if name not in overwritten else expr.table.name_map[name])
+                (name if name not in overwritten else name + str(hash(expr)))
                 for name in expr.names
             }
         )
