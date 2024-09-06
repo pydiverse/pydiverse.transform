@@ -270,27 +270,27 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
 
     elif isinstance(expr, verbs.Join):
         table, query = compile_table_expr(expr.left)
-        right_query, right_ct = compile_table_expr(expr.right)
+        right_table, right_query = compile_table_expr(expr.right)
 
-        j = SqlJoin(right_query, expr.on, expr.how)
+        j = SqlJoin(right_table, expr.on, expr.how)
 
         if expr.how == "inner":
-            query.where.extend(right_ct.where)
+            query.where.extend(right_query.where)
         elif expr.how == "left":
-            j.on = functools.reduce(operator.and_, (j.on, *right_ct.where))
+            j.on = functools.reduce(operator.and_, (j.on, *right_query.where))
         elif expr.how == "outer":
-            if query.where or right_ct.where:
+            if query.where or right_query.where:
                 raise ValueError("invalid filter before outer join")
 
         query.select.extend(
             (ColName(name + expr.suffix), name + expr.suffix)
-            for col, name in right_ct.select
+            for col, name in right_query.select
         )
         query.join.append(j)
         query.name_to_sqa_col.update(
             {
                 name + expr.suffix: col_elem
-                for name, col_elem in right_ct.name_to_sqa_col.items()
+                for name, col_elem in right_query.name_to_sqa_col.items()
             }
         )
 
