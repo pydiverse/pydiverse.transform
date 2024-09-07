@@ -3,42 +3,42 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from pydiverse.transform import ops
-from pydiverse.transform.backend.sql_table import SqlImpl
+from pydiverse.transform.backend.sql import SqlImpl
 
 
-class PostgresTableImpl(SqlImpl):
-    _dialect_name = "postgresql"
+class PostgresImpl(SqlImpl):
+    dialect_name = "postgresql"
 
 
-with PostgresTableImpl.op(ops.Less()) as op:
+with PostgresImpl.op(ops.Less()) as op:
 
     @op("str, str -> bool")
     def _lt(x, y):
         return x < y.collate("POSIX")
 
 
-with PostgresTableImpl.op(ops.LessEqual()) as op:
+with PostgresImpl.op(ops.LessEqual()) as op:
 
     @op("str, str -> bool")
     def _le(x, y):
         return x <= y.collate("POSIX")
 
 
-with PostgresTableImpl.op(ops.Greater()) as op:
+with PostgresImpl.op(ops.Greater()) as op:
 
     @op("str, str -> bool")
     def _gt(x, y):
         return x > y.collate("POSIX")
 
 
-with PostgresTableImpl.op(ops.GreaterEqual()) as op:
+with PostgresImpl.op(ops.GreaterEqual()) as op:
 
     @op("str, str -> bool")
     def _ge(x, y):
         return x >= y.collate("POSIX")
 
 
-with PostgresTableImpl.op(ops.Round()) as op:
+with PostgresImpl.op(ops.Round()) as op:
 
     @op.auto
     def _round(x, decimals=0):
@@ -55,14 +55,14 @@ with PostgresTableImpl.op(ops.Round()) as op:
         return sa.func.ROUND(x, decimals, type_=x.type)
 
 
-with PostgresTableImpl.op(ops.DtSecond()) as op:
+with PostgresImpl.op(ops.DtSecond()) as op:
 
     @op.auto
     def _second(x):
         return sa.func.FLOOR(sa.extract("second", x), type_=sa.Integer())
 
 
-with PostgresTableImpl.op(ops.DtMillisecond()) as op:
+with PostgresImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _millisecond(x):
@@ -70,7 +70,7 @@ with PostgresTableImpl.op(ops.DtMillisecond()) as op:
         return sa.func.FLOOR(sa.extract("milliseconds", x) % _1000, type_=sa.Integer())
 
 
-with PostgresTableImpl.op(ops.Greatest()) as op:
+with PostgresImpl.op(ops.Greatest()) as op:
 
     @op("str... -> str")
     def _greatest(*x):
@@ -78,7 +78,7 @@ with PostgresTableImpl.op(ops.Greatest()) as op:
         return sa.func.GREATEST(*(e.collate("POSIX") for e in x))
 
 
-with PostgresTableImpl.op(ops.Least()) as op:
+with PostgresImpl.op(ops.Least()) as op:
 
     @op("str... -> str")
     def _least(*x):
@@ -86,7 +86,7 @@ with PostgresTableImpl.op(ops.Least()) as op:
         return sa.func.LEAST(*(e.collate("POSIX") for e in x))
 
 
-with PostgresTableImpl.op(ops.Any()) as op:
+with PostgresImpl.op(ops.Any()) as op:
 
     @op.auto
     def _any(x, *, _window_partition_by=None, _window_order_by=None):
@@ -103,7 +103,7 @@ with PostgresTableImpl.op(ops.Any()) as op:
         )
 
 
-with PostgresTableImpl.op(ops.All()) as op:
+with PostgresImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
