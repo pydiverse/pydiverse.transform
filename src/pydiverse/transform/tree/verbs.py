@@ -35,7 +35,7 @@ class UnaryVerb(TableExpr):
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
         cloned.table = table
-        cloned.replace_col_exprs(lambda c: c.clone(table_map))
+        cloned.replace_col_exprs(lambda c: col_expr.clone(c, table_map))
         table_map[self] = cloned
         return cloned, table_map
 
@@ -87,7 +87,9 @@ class Mutate(UnaryVerb):
     def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = Mutate(
-            table, copy.copy(self.names), [c.clone(table_map) for c in self.values]
+            table,
+            copy.copy(self.names),
+            [col_expr.clone(val, table_map) for val in self.values],
         )
         table_map[self] = cloned
         return cloned, table_map
@@ -118,7 +120,9 @@ class Summarise(UnaryVerb):
     def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = Summarise(
-            table, copy.copy(self.names), [c.clone(table_map) for c in self.values]
+            table,
+            copy.copy(self.names),
+            [col_expr.clone(val, table_map) for val in self.values],
         )
         table_map[self] = cloned
         return cloned, table_map
@@ -177,7 +181,12 @@ class Join(TableExpr):
         right, right_map = self.right.clone()
         left_map.update(right_map)
         cloned = Join(
-            left, right, self.on.clone(left_map), self.how, self.validate, self.suffix
+            left,
+            right,
+            col_expr.clone(self.on, left_map),
+            self.how,
+            self.validate,
+            self.suffix,
         )
         left_map[self] = cloned
         return cloned, left_map

@@ -81,8 +81,6 @@ class ColExpr:
             "converted to a boolean or used with the and, or, not keywords"
         )
 
-    def clone(self, table_map: dict[TableExpr, TableExpr]) -> ColExpr: ...
-
 
 class Col(ColExpr, Generic[ImplT]):
     def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
@@ -96,9 +94,6 @@ class Col(ColExpr, Generic[ImplT]):
     def _expr_repr(self) -> str:
         return f"{self.table.name}.{self.name}"
 
-    def clone(self, table_map: dict[TableExpr, TableExpr]):
-        return Col(self.name, table_map[self.table], self.dtype)
-
 
 class ColName(ColExpr):
     def __init__(self, name: str, dtype: DType | None = None):
@@ -111,9 +106,6 @@ class ColName(ColExpr):
     def _expr_repr(self) -> str:
         return f"C.{self.name}"
 
-    def clone(self, table_map: dict[TableExpr, TableExpr]):
-        return self
-
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
@@ -125,9 +117,6 @@ class LiteralCol(ColExpr):
 
     def _expr_repr(self) -> str:
         return repr(self)
-
-    def clone(self, table_map: dict[TableExpr, TableExpr]):
-        return self
 
 
 class ColFn(ColExpr):
@@ -159,19 +148,6 @@ class ColFn(ColExpr):
         else:
             args_str = ", ".join(args[1:])
             return f"{args[0]}.{self.name}({args_str})"
-
-    def clone(self, table_map: dict[TableExpr, TableExpr]):
-        return ColFn(
-            self.name,
-            *[
-                arg.clone(table_map) if isinstance(arg, ColExpr) else arg
-                for arg in self.args
-            ],
-            **{
-                key: [val.clone(table_map) for val in arr]
-                for key, arr in self.context_kwargs.items()
-            },
-        )
 
 
 class CaseExpr(ColExpr):
@@ -328,6 +304,36 @@ def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
         return LiteralCol(expr)
 
 
+def clone(expr: ColExpr, table_map: dict[TableExpr, TableExpr]) -> ColExpr:
+    if isinstance(expr, Order):
+        return Order(clone(expr.order_by, table_map), expr.descending, expr.nulls_last)
+
+    if isinstance(expr, Col):
+        return Col(expr.name, table_map[expr.table], expr.dtype)
+
+    elif isinstance(expr, ColName):
+        return ColName(expr.name, expr.dtype)
+
+    elif isinstance(expr, LiteralCol):
+        return LiteralCol(expr.val)
+
+    elif isinstance(expr, ColFn):
+        return ColFn(
+            expr.name,
+            *(clone(arg, table_map) for arg in expr.args),
+            **{
+                kwarg: [clone(val, table_map) for val in arr]
+                for kwarg, arr in expr.context_kwargs.items()
+            },
+        )
+
+    elif isinstance(expr, CaseExpr):
+        raise NotImplementedError
+
+    else:
+        return expr
+
+
 @dataclasses.dataclass
 class Order:
     order_by: ColExpr
@@ -358,13 +364,6 @@ class Order:
         if nulls_last is None:
             nulls_last = False
         return Order(expr, descending, nulls_last)
-
-    def clone(self, table_map: dict[TableExpr, TableExpr]) -> Order:
-        return Order(
-            self.order_by.clone(table_map),
-            self.descending,
-            self.nulls_last,
-        )
 
 
 # Add all supported dunder methods to `ColExpr`. This has to be done, because Python
