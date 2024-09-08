@@ -68,6 +68,8 @@ class SqlImpl(TableImpl):
         sel = compile_query(table, query)
         if isinstance(target, Polars):
             with engine.connect() as conn:
+                # TODO: Provide schema_overrides to not get u32 and other unwanted
+                # integer / float types
                 return pl.read_database(sel, connection=conn)
 
         raise NotImplementedError
@@ -95,15 +97,20 @@ class SqlImpl(TableImpl):
 
 # checks that all leafs use the same sqa.Engine and returns it
 def get_engine(expr: TableExpr) -> sqa.Engine:
-    if isinstance(expr, verbs.Join):
+    if isinstance(expr, verbs.UnaryVerb):
+        engine = get_engine(expr.table)
+
+    elif isinstance(expr, verbs.Join):
         engine = get_engine(expr.left)
         right_engine = get_engine(expr.right)
         if engine != right_engine:
             raise NotImplementedError  # TODO: find some good error for this
+
     elif isinstance(expr, Table):
         engine = expr._impl.engine
+
     else:
-        engine = get_engine(expr.table)
+        raise AssertionError
 
     return engine
 
@@ -115,9 +122,11 @@ def get_engine(expr: TableExpr) -> sqa.Engine:
 def create_aliases(expr: TableExpr):
     if isinstance(expr, verbs.UnaryVerb):
         create_aliases(expr.table)
+
     elif isinstance(expr, verbs.Join):
         create_aliases(expr.left)
         create_aliases(expr.right)
+
     elif isinstance(expr, Table):
         expr._impl.table = expr._impl.table.alias(
             f"{expr._impl.table}_{str(hash(expr))}"
@@ -149,6 +158,7 @@ def compile_col_expr(
     if isinstance(expr, ColName):
         # here, inserted columns referenced via C are implicitly expanded
         return name_to_sqa_col[expr.name]
+
     elif isinstance(expr, ColFn):
         args: list[sqa.ColumnElement] = [
             compile_col_expr(arg, name_to_sqa_col, group_by) for arg in expr.args
@@ -277,14 +287,20 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         table, query = compile_table_expr(expr.table)
         query.select = [(col, col.name) for col in expr.selected]
 
-    if isinstance(expr, verbs.Drop):
+    elif isinstance(expr, verbs.Drop):
         table, query = compile_table_expr(expr.table)
         query.select = [
-            (col, name) for col, name in query.select if name not in set(expr.dropped)
+            (col, name)
+            for col, name in query.select
+            if name not in set({col.name for col in expr.dropped})
         ]
 
     elif isinstance(expr, verbs.Rename):
         table, query = compile_table_expr(expr.table)
+        query.select = [
+            (col, expr.name_map[name] if name in expr.name_map else name)
+            for col, name in query.select
+        ]
         query.name_to_sqa_col = {
             (expr.name_map[name] if name in expr.name_map else name): col
             for name, col in query.name_to_sqa_col.items()
