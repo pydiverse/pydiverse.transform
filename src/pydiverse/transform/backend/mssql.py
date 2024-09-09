@@ -46,14 +46,24 @@ class MsSqlImpl(SqlImpl):
 def convert_order_list(order_list: list[Order]) -> list[Order]:
     new_list = []
     for ord in order_list:
-        new_list.append(ord)
-        if ord.nulls_last and not ord.descending:
+        new_list.append(Order(ord.order_by, ord.descending, None))
+        # is True / is False are important here since we don't want to do this costly
+        # workaround if nulls_last is None (i.e. the user doesn't care)
+        if ord.nulls_last is True and not ord.descending:
             new_list.append(
-                Order(CaseExpr((ord.order_by.is_null(), 1), 0), ord.descending, None)
+                Order(
+                    CaseExpr([(ord.order_by.is_null(), LiteralCol(1))], LiteralCol(0)),
+                    False,
+                    None,
+                )
             )
-        elif not ord.nulls_last and ord.descending:
+        elif ord.nulls_last is False and ord.descending:
             new_list.append(
-                Order(CaseExpr((ord.order_by.is_null(), 0), 1), ord.descending, None)
+                Order(
+                    CaseExpr([(ord.order_by.is_null(), LiteralCol(0))], LiteralCol(1)),
+                    True,
+                    None,
+                )
             )
     return new_list
 

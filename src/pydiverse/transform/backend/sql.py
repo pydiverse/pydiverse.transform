@@ -148,9 +148,10 @@ def compile_order(
 ) -> sqa.UnaryExpression:
     order_expr = compile_col_expr(order.order_by, name_to_sqa_col)
     order_expr = order_expr.desc() if order.descending else order_expr.asc()
-    order_expr = (
-        order_expr.nulls_last() if order.nulls_last else order_expr.nulls_first()
-    )
+    if order.nulls_last is not None:
+        order_expr = (
+            order_expr.nulls_last() if order.nulls_last else order_expr.nulls_first()
+        )
     return order_expr
 
 
