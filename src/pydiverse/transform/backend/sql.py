@@ -15,6 +15,7 @@ from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
+    CaseExpr,
     Col,
     ColExpr,
     ColFn,
@@ -190,6 +191,18 @@ def compile_col_expr(
             value = value.over(partition_by=partition_by, order_by=order_by)
 
         return value
+
+    elif isinstance(expr, CaseExpr):
+        return sqa.case(
+            *(
+                (
+                    compile_col_expr(cond, name_to_sqa_col),
+                    compile_col_expr(val, name_to_sqa_col),
+                )
+                for cond, val in expr.cases
+            ),
+            else_=compile_col_expr(expr.default_val, name_to_sqa_col),
+        )
 
     elif isinstance(expr, LiteralCol):
         return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))

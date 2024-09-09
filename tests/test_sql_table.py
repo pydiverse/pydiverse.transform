@@ -382,6 +382,39 @@ class TestSqlTable:
             df4.with_columns(pl.col("col3").is_null().alias("u")),
         )
 
+    def test_case_expression(self, tbl3):
+        assert_equal(
+            (
+                tbl3
+                >> select()
+                >> mutate(
+                    col1=f.when(C.col1 == 0)
+                    .then(1)
+                    .when(C.col1 == 1)
+                    .then(2)
+                    .when(C.col1 == 2)
+                    .then(3)
+                    .otherwise(-1)
+                )
+            ),
+            (df3.select("col1") + 1),
+        )
+
+        assert_equal(
+            (
+                tbl3
+                >> select()
+                >> mutate(
+                    x=f.when(C.col1 == C.col2)
+                    .then(1)
+                    .when(C.col1 == C.col3)
+                    .then(2)
+                    .otherwise(C.col4)
+                )
+            ),
+            pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
+        )
+
 
 class TestSQLAligned:
     def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):
