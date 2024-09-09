@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import html
 import itertools
 import operator
 from collections.abc import Iterable
@@ -37,9 +38,11 @@ class ColExpr:
             "converted to a boolean or used with the and, or, not keywords"
         )
 
-    def _repr_html(self) -> str: ...
+    def _repr_html_(self) -> str:
+        return f"<pre>{html.escape(repr(self))}</pre>"
 
-    def _repr_pretty(self) -> str: ...
+    def _repr_pretty_(self, p, cycle):
+        p.text(str(self) if not cycle else "...")
 
 
 class Col(ColExpr, Generic[ImplT]):
@@ -48,8 +51,25 @@ class Col(ColExpr, Generic[ImplT]):
         self.table = table
         super().__init__(dtype)
 
-    def __repr__(self):
-        return f"<{self.table.name}.{self.name}>"
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__} {self.table.name}.{self.name}"
+            f"{f" ({self.dtype})" if self.dtype else ""}>"
+        )
+
+    def __str__(self) -> str:
+        try:
+            from pydiverse.transform.backend.targets import Polars
+            from pydiverse.transform.pipe.verbs import export, select
+
+            df = self.table >> select(self) >> export(Polars(lazy=False))
+            return str(df)
+        except Exception as e:
+            return (
+                repr(self)
+                + f"\ncould evaluate {repr(self)} due to"
+                + f"{e.__class__.__name__}: {str(e)}"
+            )
 
 
 class ColName(ColExpr):
@@ -57,8 +77,11 @@ class ColName(ColExpr):
         self.name = name
         super().__init__(dtype)
 
-    def __repr__(self):
-        return f"<C.{self.name}>"
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__} C.{self.name}"
+            f"{f" ({self.dtype})" if self.dtype else ""}>"
+        )
 
 
 class LiteralCol(ColExpr):
@@ -67,10 +90,7 @@ class LiteralCol(ColExpr):
         super().__init__(python_type_to_pdt(type(val)))
 
     def __repr__(self):
-        return f"<Lit: {self.val}>"
-
-    def _repr_expr(self) -> str:
-        return repr(self)
+        return f"<{self.__class__.__name__} {self.val} ({self.dtype})>"
 
 
 class ColFn(ColExpr):
@@ -82,9 +102,9 @@ class ColFn(ColExpr):
         }
         super().__init__()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         args = [repr(e) for e in self.args] + [
-            f"{k}={repr(v)}" for k, v in self.context_kwargs.items()
+            f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
         ]
         return f'{self.name}({", ".join(args)})'
 
@@ -97,6 +117,9 @@ class WhenClause:
     def then(self, value: ColExpr) -> CaseExpr:
         return CaseExpr((*self.cases, (self.cond, value)))
 
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.cond}>"
+
 
 class CaseExpr(ColExpr):
     def __init__(
@@ -107,13 +130,13 @@ class CaseExpr(ColExpr):
         self.cases = list(cases)
         self.default_val = default_val
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
-            "case("
+            f"<{self.__class__.__name__}"
             + functools.reduce(
                 operator.add, (f"{cond} -> {val}, " for cond, val in self.cases), ""
             )
-            + f"otherwise={self.default_val})"
+            + f"default={self.default_val}>"
         )
 
     def when(self, condition: ColExpr) -> WhenClause:
@@ -137,6 +160,9 @@ class FnAttr:
 
     def __call__(self, *args, **kwargs) -> ColExpr:
         return ColFn(self.name, self.arg, *args, **kwargs)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.name}({self.arg})>"
 
 
 def rename_overwritten_cols(expr: ColExpr, name_map: dict[str, str]):
