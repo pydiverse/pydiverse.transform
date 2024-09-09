@@ -4,12 +4,17 @@ from pydiverse.transform.tree.col_expr import (
     ColExpr,
     ColFn,
     Order,
+    WhenClause,
 )
 
 __all__ = [
     "count",
     "row_number",
 ]
+
+
+def when(condition: ColExpr) -> WhenClause:
+    return WhenClause([], condition)
 
 
 def count(expr: ColExpr | None = None):

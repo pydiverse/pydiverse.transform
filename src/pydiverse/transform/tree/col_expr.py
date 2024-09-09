@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 import itertools
+import operator
 from collections.abc import Iterable
 from typing import Any, Generic
 
@@ -150,19 +152,32 @@ class ColFn(ColExpr):
             return f"{args[0]}.{self.name}({args_str})"
 
 
+class WhenClause:
+    def __init__(self, cases: list[tuple[ColExpr, ColExpr]], cond: ColExpr):
+        self.cases = cases
+        self.cond = cond
+
+    def then(self, value: ColExpr) -> CaseExpr:
+        return CaseExpr((*self.cases, (self.cond, value)))
+
+
 class CaseExpr(ColExpr):
     def __init__(
-        self, switching_on: Any | None, cases: Iterable[tuple[Any, Any]], default: Any
+        self,
+        cases: Iterable[tuple[ColExpr, ColExpr]],
+        default_val: ColExpr | None = None,
     ):
-        self.switching_on = switching_on
         self.cases = list(cases)
-        self.default = default
+        self.default_val = default_val
 
     def __repr__(self):
-        if self.switching_on:
-            return f"case({self.switching_on}, {self.cases}, default={self.default})"
-        else:
-            return f"case({self.cases}, default={self.default})"
+        return (
+            "case("
+            + functools.reduce(
+                operator.add, (f"{cond} -> {val}, " for cond, val in self.cases), ""
+            )
+            + f"otherwise={self.default_val})"
+        )
 
     def _expr_repr(self) -> str:
         prefix = "f"
@@ -173,15 +188,15 @@ class CaseExpr(ColExpr):
         args.append(f"default={expr_repr(self.default)}")
         return f"{prefix}.case({', '.join(args)})"
 
-    def iter_children(self):
-        if self.switching_on:
-            yield self.switching_on
+    def when(self, condition: ColExpr) -> WhenClause:
+        if self.default_val is not None:
+            raise TypeError("cannot call `when` on a case expression after `otherwise`")
+        return WhenClause(self.cases, condition)
 
-        for k, v in self.cases:
-            yield k
-            yield v
-
-        yield self.default
+    def otherwise(self, value: ColExpr) -> CaseExpr:
+        if self.default_val is not None:
+            raise TypeError("cannot call `otherwise` twice on a case expression")
+        self.default_val = value
 
 
 @dataclasses.dataclass
