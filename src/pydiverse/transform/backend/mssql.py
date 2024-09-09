@@ -1,110 +1,62 @@
 from __future__ import annotations
 
-import sqlalchemy as sa
+from typing import Any
+
+import sqlalchemy as sqa
 
 from pydiverse.transform import ops
-from pydiverse.transform._typing import CallableT
-from pydiverse.transform.backend.sql_table import SQLTableImpl
-from pydiverse.transform.core.expressions import TypedValue
-from pydiverse.transform.core.expressions.expressions import Col
-from pydiverse.transform.core.util import OrderingDescriptor
-from pydiverse.transform.ops import Operator, OPType
-from pydiverse.transform.tree import dtypes
+from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.backend.targets import Target
+from pydiverse.transform.tree import dtypes, verbs
+from pydiverse.transform.tree.col_expr import (
+    CaseExpr,
+    ColExpr,
+    ColFn,
+    ColName,
+    LiteralCol,
+    Order,
+)
 from pydiverse.transform.tree.registry import TypedOperatorImpl
+from pydiverse.transform.tree.table_expr import TableExpr
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
-class MSSqlTableImpl(SQLTableImpl):
-    _dialect_name = "mssql"
+class MsSqlImpl(SqlImpl):
+    dialect_name = "mssql"
+
+    @staticmethod
+    def export(expr: TableExpr, target: Target) -> Any:
+        convert_table_bool_bit(expr)
+        return SqlImpl.export(expr, target)
 
     def _build_select_select(self, select):
         s = []
         for name, uuid_ in self.selected_cols():
-            sql_col = self.cols[uuid_].compiled(self.sql_columns)
-            if not isinstance(sql_col, sa.sql.ColumnElement):
-                sql_col = sa.literal(sql_col)
-            if dtypes.Bool().same_kind(self.cols[uuid_].dtype):
+            sql_col = self.col_names[uuid_].compiled(self.sql_columns)
+            if not isinstance(sql_col, sqa.sql.ColumnElement):
+                sql_col = sqa.literal(sql_col)
+            if dtypes.Bool().same_kind(self.col_names[uuid_].dtype):
                 # Make sure that any boolean values get stored as bit
-                sql_col = sa.cast(sql_col, sa.Boolean())
+                sql_col = sqa.cast(sql_col, sqa.Boolean())
             s.append(sql_col.label(name))
         return select.with_only_columns(*s)
 
     def _order_col(
-        self, col: sa.SQLColumnExpression, ordering: OrderingDescriptor
-    ) -> list[sa.SQLColumnExpression]:
+        self, col: sqa.SQLColumnExpression, ordering
+    ) -> list[sqa.SQLColumnExpression]:
         # MSSQL doesn't support nulls first / nulls last
         order_by_expressions = []
 
         # asc implies nulls first
         if not ordering.nulls_first and ordering.asc:
-            order_by_expressions.append(sa.func.iif(col.is_(None), 1, 0))
+            order_by_expressions.append(sqa.func.iif(col.is_(None), 1, 0))
 
         # desc implies nulls last
         if ordering.nulls_first and not ordering.asc:
-            order_by_expressions.append(sa.func.iif(col.is_(None), 0, 1))
+            order_by_expressions.append(sqa.func.iif(col.is_(None), 0, 1))
 
         order_by_expressions.append(col.asc() if ordering.asc else col.desc())
         return order_by_expressions
-
-    class ExpressionCompiler(SQLTableImpl.ExpressionCompiler):
-        def translate(self, expr, **kwargs):
-            mssql_bool_as_bit = True
-            if verb := kwargs.get("verb"):
-                mssql_bool_as_bit = verb not in ("filter", "join")
-
-            return super().translate(
-                expr, **kwargs, mssql_bool_as_bit=mssql_bool_as_bit
-            )
-
-        def _translate(self, expr, **kwargs):
-            if context := kwargs.get("context"):
-                if context == "case_val":
-                    kwargs["mssql_bool_as_bit"] = True
-                elif context == "case_cond":
-                    kwargs["mssql_bool_as_bit"] = False
-
-            return super()._translate(expr, **kwargs)
-
-        def _translate_col(self, col: Col, **kwargs):
-            # If mssql_bool_as_bit is true, then we can just return the
-            # precompiled col. Otherwise, we must recompile it to ensure
-            # we return booleans as bools and not as bits.
-            if kwargs.get("mssql_bool_as_bit") is True:
-                return super()._translate_col(col, **kwargs)
-
-            # Can either be a base SQL column, or a reference to an expression
-            if col.uuid in self.backend.sql_columns:
-                is_bool = dtypes.Bool().same_kind(self.backend.cols[col.uuid].dtype)
-
-                def sql_col(cols, **kw):
-                    sql_col = cols[col.uuid]
-                    if is_bool:
-                        return mssql_convert_bit_to_bool(sql_col)
-                    return sql_col
-
-                return TypedValue(sql_col, col.dtype, OPType.EWISE)
-
-            meta_data = self.backend.cols[col.uuid]
-            return self._translate(meta_data.expr, **kwargs)
-
-        def _translate_function_value(
-            self, implementation, op_args, context_kwargs, *, verb=None, **kwargs
-        ):
-            value = super()._translate_function_value(
-                implementation,
-                op_args,
-                context_kwargs,
-                verb=verb,
-                **kwargs,
-            )
-
-            bool_as_bit = kwargs.get("mssql_bool_as_bit")
-            returns_bool_as_bit = mssql_op_returns_bool_as_bit(implementation)
-            return mssql_convert_bool_bit_value(value, bool_as_bit, returns_bool_as_bit)
-
-        def _translate_function_arguments(self, expr, operator, **kwargs):
-            kwargs["mssql_bool_as_bit"] = mssql_op_wants_bool_as_bit(operator)
-            return super()._translate_function_arguments(expr, operator, **kwargs)
 
 
 # Boolean / Bit Conversion
@@ -116,18 +68,65 @@ class MSSqlTableImpl(SQLTableImpl):
 # back to booleans.
 
 
-def mssql_op_wants_bool_as_bit(operator: Operator) -> bool:
-    # These operations want boolean types (not BIT) as input
-    exceptions = [
-        ops.logical.BooleanBinary,
-        ops.logical.Invert,
-    ]
+def convert_col_bool_bit(
+    expr: ColExpr | Order, wants_bool_as_bit: bool
+) -> ColExpr | Order:
+    if isinstance(expr, ColName):
+        if isinstance(expr.dtype, dtypes.Bool):
+            return expr == LiteralCol(1)
+        return expr
 
-    for exception in exceptions:
-        if isinstance(operator, exception):
-            return False
+    elif isinstance(expr, ColFn):
+        op = MsSqlImpl.operator_registry.get_operator(expr.name)
+        wants_bool_as_bit_input = not isinstance(
+            op, ops.logical.BooleanBinary, ops.logical.Invert
+        )
 
-    return True
+        converted = ColFn(
+            expr.name,
+            *(convert_col_bool_bit(arg, wants_bool_as_bit_input) for arg in expr.args),
+            **{
+                key: [convert_col_bool_bit(val, wants_bool_as_bit) for val in arr]
+                for key, arr in expr.context_kwargs
+            },
+        )
+
+        impl = MsSqlImpl.operator_registry.get_implementation(
+            expr.name, tuple(arg.dtype for arg in expr.args)
+        )
+        returns_bool_as_bit = mssql_op_returns_bool_as_bit(impl)
+
+        if wants_bool_as_bit and not returns_bool_as_bit:
+            return CaseExpr([(converted, LiteralCol(1))], LiteralCol(0))
+        elif not wants_bool_as_bit and returns_bool_as_bit:
+            return converted == LiteralCol(1)
+
+        return converted
+
+    elif isinstance(expr, CaseExpr):
+        return CaseExpr(
+            [
+                (
+                    convert_col_bool_bit(cond, False),
+                    convert_col_bool_bit(val, True),
+                )
+                for cond, val in expr.cases
+            ],
+            convert_col_bool_bit(expr.default_val, wants_bool_as_bit),
+        )
+
+
+def convert_table_bool_bit(expr: TableExpr):
+    if isinstance(expr, verbs.UnaryVerb):
+        convert_table_bool_bit(expr.table)
+        expr.replace_col_exprs(
+            lambda col: convert_col_bool_bit(col, not isinstance(expr, verbs.Filter))
+        )
+
+    elif isinstance(expr, verbs.Join):
+        convert_table_bool_bit(expr.left)
+        convert_table_bool_bit(expr.right)
+        expr.on = convert_col_bool_bit(expr.on, False)
 
 
 def mssql_op_returns_bool_as_bit(implementation: TypedOperatorImpl) -> bool | None:
@@ -141,45 +140,7 @@ def mssql_op_returns_bool_as_bit(implementation: TypedOperatorImpl) -> bool | No
     return True
 
 
-def mssql_convert_bit_to_bool(x: sa.SQLColumnExpression):
-    return x == sa.literal_column("1")
-
-
-def mssql_convert_bool_to_bit(x: sa.SQLColumnExpression):
-    return sa.case(
-        (x, sa.literal_column("1")),
-        (sa.not_(x), sa.literal_column("0")),
-    )
-
-
-def mssql_convert_bool_bit_value(
-    value_func: CallableT,
-    wants_bool_as_bit: bool | None,
-    is_bool_as_bit: bool | None,
-) -> CallableT:
-    if wants_bool_as_bit is True and is_bool_as_bit is False:
-
-        def value(*args, **kwargs):
-            x = value_func(*args, **kwargs)
-            return mssql_convert_bool_to_bit(x)
-
-        return value
-
-    if wants_bool_as_bit is False and is_bool_as_bit is True:
-
-        def value(*args, **kwargs):
-            x = value_func(*args, **kwargs)
-            return mssql_convert_bit_to_bool(x)
-
-        return value
-
-    return value_func
-
-
-# Operators
-
-
-with MSSqlTableImpl.op(ops.Equal()) as op:
+with MsSqlImpl.op(ops.Equal()) as op:
 
     @op("str, str -> bool")
     def _eq(x, y):
@@ -189,7 +150,7 @@ with MSSqlTableImpl.op(ops.Equal()) as op:
         return x == y
 
 
-with MSSqlTableImpl.op(ops.NotEqual()) as op:
+with MsSqlImpl.op(ops.NotEqual()) as op:
 
     @op("str, str -> bool")
     def _ne(x, y):
@@ -199,7 +160,7 @@ with MSSqlTableImpl.op(ops.NotEqual()) as op:
         return x != y
 
 
-with MSSqlTableImpl.op(ops.Less()) as op:
+with MsSqlImpl.op(ops.Less()) as op:
 
     @op("str, str -> bool")
     def _lt(x, y):
@@ -209,7 +170,7 @@ with MSSqlTableImpl.op(ops.Less()) as op:
         return x < y
 
 
-with MSSqlTableImpl.op(ops.LessEqual()) as op:
+with MsSqlImpl.op(ops.LessEqual()) as op:
 
     @op("str, str -> bool")
     def _le(x, y):
@@ -219,7 +180,7 @@ with MSSqlTableImpl.op(ops.LessEqual()) as op:
         return x <= y
 
 
-with MSSqlTableImpl.op(ops.Greater()) as op:
+with MsSqlImpl.op(ops.Greater()) as op:
 
     @op("str, str -> bool")
     def _gt(x, y):
@@ -229,7 +190,7 @@ with MSSqlTableImpl.op(ops.Greater()) as op:
         return x > y
 
 
-with MSSqlTableImpl.op(ops.GreaterEqual()) as op:
+with MsSqlImpl.op(ops.GreaterEqual()) as op:
 
     @op("str, str -> bool")
     def _ge(x, y):
@@ -239,7 +200,7 @@ with MSSqlTableImpl.op(ops.GreaterEqual()) as op:
         return x >= y
 
 
-with MSSqlTableImpl.op(ops.Pow()) as op:
+with MsSqlImpl.op(ops.Pow()) as op:
 
     @op.auto
     def _pow(lhs, rhs):
@@ -247,35 +208,35 @@ with MSSqlTableImpl.op(ops.Pow()) as op:
         # This means, that if lhs is a decimal, then we may very easily loose
         # a lot of precision if the exponent is <= 1
         # https://learn.microsoft.com/en-us/sql/t-sql/functions/power-transact-sql?view=sql-server-ver16
-        return sa.func.POWER(sa.cast(lhs, sa.Double()), rhs, type_=sa.Double())
+        return sqa.func.POWER(sqa.cast(lhs, sqa.Double()), rhs, type_=sqa.Double())
 
 
-with MSSqlTableImpl.op(ops.RPow()) as op:
+with MsSqlImpl.op(ops.RPow()) as op:
 
     @op.auto
     def _rpow(rhs, lhs):
         return _pow(lhs, rhs)
 
 
-with MSSqlTableImpl.op(ops.StrLen()) as op:
+with MsSqlImpl.op(ops.StrLen()) as op:
 
     @op.auto
     def _str_length(x):
         warn_non_standard(
             "MSSQL ignores trailing whitespace when computing string length",
         )
-        return sa.func.LENGTH(x, type_=sa.Integer())
+        return sqa.func.LENGTH(x, type_=sqa.Integer())
 
 
-with MSSqlTableImpl.op(ops.StrReplaceAll()) as op:
+with MsSqlImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
     def _replace(x, y, z):
         x = x.collate("Latin1_General_CS_AS")
-        return sa.func.REPLACE(x, y, z, type_=x.type)
+        return sqa.func.REPLACE(x, y, z, type_=x.type)
 
 
-with MSSqlTableImpl.op(ops.StrStartsWith()) as op:
+with MsSqlImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
@@ -283,7 +244,7 @@ with MSSqlTableImpl.op(ops.StrStartsWith()) as op:
         return x.startswith(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.StrEndsWith()) as op:
+with MsSqlImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
@@ -291,7 +252,7 @@ with MSSqlTableImpl.op(ops.StrEndsWith()) as op:
         return x.endswith(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.StrContains()) as op:
+with MsSqlImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):
@@ -299,26 +260,26 @@ with MSSqlTableImpl.op(ops.StrContains()) as op:
         return x.contains(y, autoescape=True)
 
 
-with MSSqlTableImpl.op(ops.StrSlice()) as op:
+with MsSqlImpl.op(ops.StrSlice()) as op:
 
     @op.auto
     def _str_slice(x, offset, length):
-        return sa.func.SUBSTRING(x, offset + 1, length)
+        return sqa.func.SUBSTRING(x, offset + 1, length)
 
 
-with MSSqlTableImpl.op(ops.DtDayOfWeek()) as op:
+with MsSqlImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _day_of_week(x):
         # Offset DOW such that Mon=1, Sun=7
-        _1 = sa.literal_column("1")
-        _2 = sa.literal_column("2")
-        _7 = sa.literal_column("7")
-        return (sa.extract("dow", x) + sa.text("@@DATEFIRST") - _2) % _7 + _1
+        _1 = sqa.literal_column("1")
+        _2 = sqa.literal_column("2")
+        _7 = sqa.literal_column("7")
+        return (sqa.extract("dow", x) + sqa.text("@@DATEFIRST") - _2) % _7 + _1
 
 
-with MSSqlTableImpl.op(ops.Mean()) as op:
+with MsSqlImpl.op(ops.Mean()) as op:
 
     @op.auto
     def _mean(x):
-        return sa.func.AVG(sa.cast(x, sa.Double()), type_=sa.Double())
+        return sqa.func.AVG(sqa.cast(x, sqa.Double()), type_=sqa.Double())

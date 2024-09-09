@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .duckdb import DuckDbImpl
+from .mssql import MsSqlImpl
 from .polars import PolarsImpl
 from .postgres import PostgresImpl
 from .sql import SqlImpl
