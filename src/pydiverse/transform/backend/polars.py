@@ -287,7 +287,7 @@ def compile_table_expr(
         else:
             df = df.select(*aggregations)
 
-        select = group_by + expr.names
+        select = expr.names
         group_by = []
 
     elif isinstance(expr, verbs.SliceHead):

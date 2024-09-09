@@ -302,7 +302,7 @@ class TestPolarsLazyImpl:
 
         assert_equal(
             tbl3 >> group_by(tbl3.col1) >> summarise(mean=tbl3.col4.mean()),
-            pl.DataFrame({"col1": [0, 1, 2], "mean": [1.5, 5.5, 9.5]}),
+            pl.DataFrame({"mean": [1.5, 5.5, 9.5]}),
             check_row_order=False,
         )
 

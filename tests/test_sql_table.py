@@ -65,6 +65,12 @@ df_right = pl.DataFrame(
 @pytest.fixture
 def engine():
     engine = sa.create_engine("sqlite:///:memory:")
+    # engine = sa.create_engine("postgresql://sa:Pydiverse23@127.0.0.1:6543")
+    # engine = sa.create_engine(
+    #     "mssql+pyodbc://sa:PydiQuant27@127.0.0.1:1433"
+    #     "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+    # )
+
     df1.write_database("df1", engine, if_table_exists="replace")
     df2.write_database("df2", engine, if_table_exists="replace")
     df3.write_database("df3", engine, if_table_exists="replace")
@@ -237,7 +243,7 @@ class TestSqlTable:
 
         assert_equal(
             tbl3 >> group_by(tbl3.col1) >> summarise(mean=tbl3.col4.mean()),
-            pl.DataFrame({"col1": [0, 1, 2], "mean": [1.5, 5.5, 9.5]}),
+            pl.DataFrame({"mean": [1.5, 5.5, 9.5]}),
             check_row_order=False,
         )
 
