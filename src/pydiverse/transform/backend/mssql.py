@@ -8,10 +8,10 @@ import sqlalchemy as sqa
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
-    Cast,
     ColExpr,
     ColFn,
     ColName,
@@ -30,16 +30,7 @@ class MsSqlImpl(SqlImpl):
         convert_table_bool_bit(expr)
         set_nulls_position_table(expr)
         sql.create_aliases(expr, {})
-        table, query = sql.compile_table_expr(expr)
-        query.select = [
-            (
-                (Cast(col, dtypes.Bool()), name)
-                if isinstance(col.dtype, dtypes.Bool)
-                else (col, name)
-            )
-            for col, name in query.select
-        ]
-
+        table, query, _ = sql.compile_table_expr(expr)
         return sql.compile_query(table, query)
 
 
@@ -143,7 +134,7 @@ def convert_col_bool_bit(
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr([(converted, LiteralCol(1))], LiteralCol(0))
             elif not wants_bool_as_bit and returns_bool_as_bit:
-                return converted == LiteralCol(1)
+                return ColFn("__eq__", converted, LiteralCol(1), dtype=dtypes.Bool())
 
         return converted
 
@@ -178,6 +169,9 @@ def convert_table_bool_bit(expr: TableExpr):
         convert_table_bool_bit(expr.left)
         convert_table_bool_bit(expr.right)
         expr.on = convert_col_bool_bit(expr.on, False)
+
+    else:
+        assert isinstance(expr, Table)
 
 
 with MsSqlImpl.op(ops.Equal()) as op:

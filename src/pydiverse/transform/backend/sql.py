@@ -77,7 +77,8 @@ class SqlImpl(TableImpl):
     @classmethod
     def build_select(cls, expr: TableExpr) -> sqa.Select:
         create_aliases(expr, {})
-        return compile_query(*compile_table_expr(expr))
+        table, query, _ = compile_table_expr(expr)
+        return compile_query(table, query)
 
     @classmethod
     def export(cls, expr: TableExpr, target: Target) -> Any:
@@ -230,14 +231,13 @@ def compile_col_expr(
 
 @dataclasses.dataclass(slots=True)
 class Query:
-    name_to_sqa_col: dict[str, sqa.ColumnElement]
-    select: list[tuple[ColExpr, str]]
+    select: list[tuple[sqa.ColumnElement, str]]
     join: list[SqlJoin] = dataclasses.field(default_factory=list)
-    group_by: list[ColName] = dataclasses.field(default_factory=list)
-    partition_by: list[ColName] = dataclasses.field(default_factory=list)
-    where: list[ColExpr] = dataclasses.field(default_factory=list)
-    having: list[ColExpr] = dataclasses.field(default_factory=list)
-    order_by: list[Order] = dataclasses.field(default_factory=list)
+    group_by: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    partition_by: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    where: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    having: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    order_by: list[sqa.UnaryExpression] = dataclasses.field(default_factory=list)
     limit: int | None = None
     offset: int | None = None
 
@@ -245,7 +245,7 @@ class Query:
 @dataclasses.dataclass(slots=True)
 class SqlJoin:
     right: sqa.Subquery
-    on: ColExpr
+    on: sqa.ColumnElement
     how: str
 
 
@@ -253,52 +253,47 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
     sel = table.select().select_from(table)
 
     for j in query.join:
-        compiled_on = compile_col_expr(j.on, query.name_to_sqa_col)
         sel = sel.join(
             j.right,
-            onclause=compiled_on,
+            onclause=j.on,
             isouter=j.how != "inner",
             full=j.how == "outer",
         )
 
     if query.where:
-        where_cond = functools.reduce(operator.and_, query.where)
-        sel = sel.where(compile_col_expr(where_cond, query.name_to_sqa_col))
+        sel = sel.where(*query.where)
 
     if query.group_by:
-        sel = sel.group_by(
-            *(compile_col_expr(col, query.name_to_sqa_col) for col in query.group_by)
-        )
+        sel = sel.group_by(*query.group_by)
 
     if query.having:
-        having_cond = functools.reduce(operator.and_, query.having)
-        sel = sel.having(compile_col_expr(having_cond, query.name_to_sqa_col))
+        sel = sel.having(*query.having)
 
     if query.limit is not None:
         sel = sel.limit(query.limit).offset(query.offset)
 
     sel = sel.with_only_columns(
-        *(
-            compile_col_expr(col_expr, query.name_to_sqa_col).label(col_name)
-            for col_expr, col_name in query.select
-        )
+        *(col.label(col_name) for col, col_name in query.select)
     )
 
     if query.order_by:
-        sel = sel.order_by(
-            *(compile_order(ord, query.name_to_sqa_col) for ord in query.order_by)
-        )
+        sel = sel.order_by(*query.order_by)
 
     return sel
 
 
-def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
+def compile_table_expr(
+    expr: TableExpr,
+) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
+    if isinstance(expr, verbs.UnaryVerb):
+        table, query, name_to_sqa_col = compile_table_expr(expr.table)
+
     if isinstance(expr, verbs.Select):
-        table, query = compile_table_expr(expr.table)
-        query.select = [(col, col.name) for col in expr.selected]
+        query.select = [
+            (compile_col_expr(col, name_to_sqa_col), col.name) for col in expr.selected
+        ]
 
     elif isinstance(expr, verbs.Drop):
-        table, query = compile_table_expr(expr.table)
         query.select = [
             (col, name)
             for col, name in query.select
@@ -306,31 +301,95 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         ]
 
     elif isinstance(expr, verbs.Rename):
-        table, query = compile_table_expr(expr.table)
+        name_to_sqa_col = {
+            (expr.name_map[name] if name in expr.name_map else name): col
+            for name, col in name_to_sqa_col.items()
+        }
         query.select = [
             (col, expr.name_map[name] if name in expr.name_map else name)
             for col, name in query.select
         ]
-        query.name_to_sqa_col = {
-            (expr.name_map[name] if name in expr.name_map else name): col
-            for name, col in query.name_to_sqa_col.items()
-        }
 
     elif isinstance(expr, verbs.Mutate):
-        table, query = compile_table_expr(expr.table)
-        query.select.extend([(val, name) for val, name in zip(expr.values, expr.names)])
-        query.name_to_sqa_col.update(
+        compiled_values = [
+            compile_col_expr(val, name_to_sqa_col) for val in expr.values
+        ]
+        query.select.extend(
+            [(val, name) for val, name in zip(compiled_values, expr.names)]
+        )
+        name_to_sqa_col.update(
+            {name: val for name, val in zip(expr.names, compiled_values)}
+        )
+
+    elif isinstance(expr, verbs.Filter):
+        if expr.filters:
+            if query.group_by:
+                # check whether we can move conditions from `having` clause to `where`.
+                # This is possible if a condition only involves columns in `group_by`.
+                # Split up the filter at __and__`s until no longer possible. TODO
+                query.having.extend(
+                    compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
+                )
+            else:
+                query.where.extend(
+                    compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
+                )
+
+    elif isinstance(expr, verbs.Arrange):
+        # TODO: we could remove duplicates here if we want. but if we do so, this should
+        # not be done in the sql backend but on the abstract tree.
+        query.order_by = [
+            compile_order(ord, name_to_sqa_col) for ord in expr.order_by
+        ] + query.order_by
+
+    elif isinstance(expr, verbs.Summarise):
+        if query.group_by:
+            assert query.group_by == query.partition_by
+        query.group_by = query.partition_by
+        query.partition_by = []
+        # TODO: keep group cols or not? decide on abstract tree and extend summarise if
+        # wanted
+        compiled_values = [
+            compile_col_expr(val, name_to_sqa_col) for val in expr.values
+        ]
+        query.select = [(val, name) for val, name in zip(compiled_values, expr.names)]
+        name_to_sqa_col.update(
+            {name: val for name, val in zip(expr.names, compiled_values)}
+        )
+
+    elif isinstance(expr, verbs.SliceHead):
+        if query.limit is None:
+            query.limit = expr.n
+            query.offset = expr.offset
+        else:
+            query.limit = min(abs(query.limit - expr.offset), expr.n)
+            query.offset += expr.offset
+
+    elif isinstance(expr, verbs.GroupBy):
+        compiled_group_by = [
+            compile_col_expr(col, name_to_sqa_col) for col in expr.group_by
+        ]
+        if expr.add:
+            query.partition_by += compiled_group_by
+        else:
+            query.partition_by = compiled_group_by
+
+    elif isinstance(expr, verbs.Ungroup):
+        assert not (query.partition_by and query.group_by)
+        query.partition_by = []
+
+    elif isinstance(expr, verbs.Join):
+        table, query, name_to_sqa_col = compile_table_expr(expr.left)
+        right_table, right_query, right_name_to_sqa_col = compile_table_expr(expr.right)
+
+        name_to_sqa_col.update(
             {
-                name: compile_col_expr(val, query.name_to_sqa_col)
-                for name, val in zip(expr.names, expr.values)
+                name + expr.suffix: col_elem
+                for name, col_elem in right_name_to_sqa_col.items()
             }
         )
 
-    elif isinstance(expr, verbs.Join):
-        table, query = compile_table_expr(expr.left)
-        right_table, right_query = compile_table_expr(expr.right)
-
-        j = SqlJoin(right_table, expr.on, expr.how)
+        j = SqlJoin(right_table, compile_col_expr(expr.on, name_to_sqa_col), expr.how)
 
         if expr.how == "inner":
             query.where.extend(right_query.where)
@@ -341,78 +400,20 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
                 raise ValueError("invalid filter before outer join")
 
         query.select.extend(
-            (ColName(name + expr.suffix, col.dtype), name + expr.suffix)
-            for col, name in right_query.select
+            (col, name + expr.suffix) for col, name in right_query.select
         )
         query.join.append(j)
-        query.name_to_sqa_col.update(
-            {
-                name + expr.suffix: col_elem
-                for name, col_elem in right_query.name_to_sqa_col.items()
-            }
-        )
-
-    elif isinstance(expr, verbs.Filter):
-        table, query = compile_table_expr(expr.table)
-
-        if query.group_by:
-            # check whether we can move conditions from `having` clause to `where`. This
-            # is possible if a condition only involves columns in `group_by`. Split up
-            # the filter at __and__`s until no longer possible. TODO
-            query.having.extend(expr.filters)
-        else:
-            query.where.extend(expr.filters)
-
-    elif isinstance(expr, verbs.Arrange):
-        table, query = compile_table_expr(expr.table)
-        # TODO: we could remove duplicates here if we want. but if we do so, this should
-        # not be done in the sql backend but on the abstract tree.
-        query.order_by = expr.order_by + query.order_by
-
-    elif isinstance(expr, verbs.Summarise):
-        table, query = compile_table_expr(expr.table)
-        if query.group_by:
-            assert query.group_by == query.partition_by
-        query.group_by = query.partition_by
-        query.partition_by = []
-        query.select = [(col, col.name) for col in query.group_by] + [
-            (val, name) for val, name in zip(expr.values, expr.names)
-        ]
-        query.name_to_sqa_col.update(
-            {
-                name: compile_col_expr(val, query.name_to_sqa_col)
-                for name, val in zip(expr.names, expr.values)
-            }
-        )
-
-    elif isinstance(expr, verbs.SliceHead):
-        table, query = compile_table_expr(expr.table)
-        if query.limit is None:
-            query.limit = expr.n
-            query.offset = expr.offset
-        else:
-            query.limit = min(abs(query.limit - expr.offset), expr.n)
-            query.offset += expr.offset
-
-    elif isinstance(expr, verbs.GroupBy):
-        table, query = compile_table_expr(expr.table)
-        if expr.add:
-            query.partition_by += expr.group_by
-        else:
-            query.partition_by = expr.group_by
-
-    elif isinstance(expr, verbs.Ungroup):
-        table, query = compile_table_expr(expr.table)
-        assert not (query.partition_by and query.group_by)
-        query.partition_by = []
 
     elif isinstance(expr, Table):
-        return expr._impl.table, Query(
+        return (
+            expr._impl.table,
+            Query(
+                [(col, col.name) for col in expr._impl.table.columns],
+            ),
             {col.name: col for col in expr._impl.table.columns},
-            [(ColName(name, dtype), name) for name, dtype in expr.schema.items()],
         )
 
-    return table, query
+    return table, query, name_to_sqa_col
 
 
 def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:
