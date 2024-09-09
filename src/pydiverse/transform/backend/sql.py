@@ -77,7 +77,7 @@ class SqlImpl(TableImpl):
     @classmethod
     def build_select(cls, expr: TableExpr) -> sqa.Select:
         create_aliases(expr, {})
-        table, query, _ = compile_table_expr(expr)
+        table, query, _ = cls.compile_table_expr(expr)
         return compile_query(table, query)
 
     @classmethod
@@ -100,133 +100,237 @@ class SqlImpl(TableImpl):
             sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
         )
 
+    @classmethod
+    def compile_order(
+        cls,
+        order: Order,
+        name_to_sqa_col: dict[str, sqa.ColumnElement],
+    ) -> sqa.UnaryExpression:
+        order_expr = cls.compile_col_expr(order.order_by, name_to_sqa_col)
+        order_expr = order_expr.desc() if order.descending else order_expr.asc()
+        if order.nulls_last is not None:
+            order_expr = (
+                order_expr.nulls_last()
+                if order.nulls_last
+                else order_expr.nulls_first()
+            )
+        return order_expr
 
-def get_engine(expr: TableExpr) -> sqa.Engine:
-    if isinstance(expr, verbs.UnaryVerb):
-        engine = get_engine(expr.table)
+    @classmethod
+    def compile_col_expr(
+        cls,
+        expr: ColExpr,
+        name_to_sqa_col: dict[str, sqa.ColumnElement],
+    ) -> sqa.ColumnElement:
+        assert not isinstance(expr, Col)
+        if isinstance(expr, ColName):
+            # here, inserted columns referenced via C are implicitly expanded
+            return name_to_sqa_col[expr.name]
 
-    elif isinstance(expr, verbs.Join):
-        engine = get_engine(expr.left)
-        right_engine = get_engine(expr.right)
-        if engine != right_engine:
-            raise NotImplementedError  # TODO: find some good error for this
-
-    elif isinstance(expr, Table):
-        engine = expr._impl.engine
-
-    else:
-        raise AssertionError
-
-    return engine
-
-
-# Gives any leaf a unique alias to allow self-joins. We do this here to not force
-# the user to come up with dummy names that are not required later anymore. It has
-# to be done before a join so that all column references in the join subtrees remain
-# valid.
-def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str, int]:
-    if isinstance(expr, verbs.UnaryVerb):
-        return create_aliases(expr.table, num_occurences)
-
-    elif isinstance(expr, verbs.Join):
-        return create_aliases(expr.right, create_aliases(expr.left, num_occurences))
-
-    elif isinstance(expr, Table):
-        if cnt := num_occurences.get(expr._impl.table.name):
-            expr._impl.table = expr._impl.table.alias(f"{expr._impl.table.name}_{cnt}")
-        else:
-            cnt = 0
-        num_occurences[expr._impl.table.name] = cnt + 1
-        return num_occurences
-
-    else:
-        raise AssertionError
-
-
-def compile_order(
-    order: Order,
-    name_to_sqa_col: dict[str, sqa.ColumnElement],
-) -> sqa.UnaryExpression:
-    order_expr = compile_col_expr(order.order_by, name_to_sqa_col)
-    order_expr = order_expr.desc() if order.descending else order_expr.asc()
-    if order.nulls_last is not None:
-        order_expr = (
-            order_expr.nulls_last() if order.nulls_last else order_expr.nulls_first()
-        )
-    return order_expr
-
-
-def compile_col_expr(
-    expr: ColExpr,
-    name_to_sqa_col: dict[str, sqa.ColumnElement],
-) -> sqa.ColumnElement:
-    assert not isinstance(expr, Col)
-    if isinstance(expr, ColName):
-        # here, inserted columns referenced via C are implicitly expanded
-        return name_to_sqa_col[expr.name]
-
-    elif isinstance(expr, ColFn):
-        args: list[sqa.ColumnElement] = [
-            compile_col_expr(arg, name_to_sqa_col) for arg in expr.args
-        ]
-        impl = SqlImpl.operator_registry.get_implementation(
-            expr.name, tuple(arg.dtype for arg in expr.args)
-        )
-
-        partition_by = expr.context_kwargs.get("partition_by")
-        if partition_by is not None:
-            partition_by = sqa.sql.expression.ClauseList(
-                *(compile_col_expr(col, name_to_sqa_col) for col in partition_by)
+        elif isinstance(expr, ColFn):
+            args: list[sqa.ColumnElement] = [
+                cls.compile_col_expr(arg, name_to_sqa_col) for arg in expr.args
+            ]
+            impl = cls.operator_registry.get_implementation(
+                expr.name, tuple(arg.dtype for arg in expr.args)
             )
 
-        arrange = expr.context_kwargs.get("arrange")
-
-        if arrange:
-            order_by = sqa.sql.expression.ClauseList(
-                *(compile_order(order, name_to_sqa_col) for order in arrange)
-            )
-        else:
-            order_by = None
-
-        filter_cond = expr.context_kwargs.get("filter")
-        if filter_cond:
-            filter_cond = [compile_col_expr(z, name_to_sqa_col) for z in filter_cond]
-            raise NotImplementedError
-
-        value: sqa.ColumnElement = impl(*args)
-
-        if partition_by or order_by:
-            value = value.over(partition_by=partition_by, order_by=order_by)
-
-        return value
-
-    elif isinstance(expr, CaseExpr):
-        return sqa.case(
-            *(
-                (
-                    compile_col_expr(cond, name_to_sqa_col),
-                    compile_col_expr(val, name_to_sqa_col),
+            partition_by = expr.context_kwargs.get("partition_by")
+            if partition_by is not None:
+                partition_by = sqa.sql.expression.ClauseList(
+                    *(
+                        cls.compile_col_expr(col, name_to_sqa_col)
+                        for col in partition_by
+                    )
                 )
-                for cond, val in expr.cases
-            ),
-            else_=compile_col_expr(expr.default_val, name_to_sqa_col),
-        )
 
-    elif isinstance(expr, LiteralCol):
-        return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))
+            arrange = expr.context_kwargs.get("arrange")
 
-    elif isinstance(expr, Cast):
-        return sqa.cast(
-            compile_col_expr(expr.value, name_to_sqa_col), pdt_type_to_sqa(expr.dtype)
-        )
+            if arrange:
+                order_by = sqa.sql.expression.ClauseList(
+                    *(cls.compile_order(order, name_to_sqa_col) for order in arrange)
+                )
+            else:
+                order_by = None
 
-    raise AssertionError
+            filter_cond = expr.context_kwargs.get("filter")
+            if filter_cond:
+                filter_cond = [
+                    cls.compile_col_expr(z, name_to_sqa_col) for z in filter_cond
+                ]
+                raise NotImplementedError
 
+            value: sqa.ColumnElement = impl(*args)
 
-# the compilation function only deals with one subquery. It assumes that any col
-# it uses that is created by a subquery has the string name given to it in the
-# name propagation stage. A subquery is thus responsible for inserting the right
-# `AS` in the `SELECT` clause.
+            if partition_by or order_by:
+                value = value.over(partition_by=partition_by, order_by=order_by)
+
+            return value
+
+        elif isinstance(expr, CaseExpr):
+            return sqa.case(
+                *(
+                    (
+                        cls.compile_col_expr(cond, name_to_sqa_col),
+                        cls.compile_col_expr(val, name_to_sqa_col),
+                    )
+                    for cond, val in expr.cases
+                ),
+                else_=cls.compile_col_expr(expr.default_val, name_to_sqa_col),
+            )
+
+        elif isinstance(expr, LiteralCol):
+            return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))
+
+        elif isinstance(expr, Cast):
+            return sqa.cast(
+                cls.compile_col_expr(expr.value, name_to_sqa_col),
+                pdt_type_to_sqa(expr.dtype),
+            )
+
+        raise AssertionError
+
+    # the compilation function only deals with one subquery. It assumes that any col
+    # it uses that is created by a subquery has the string name given to it in the
+    # name propagation stage. A subquery is thus responsible for inserting the right
+    # `AS` in the `SELECT` clause.
+
+    @classmethod
+    def compile_table_expr(
+        cls,
+        expr: TableExpr,
+    ) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
+        if isinstance(expr, verbs.UnaryVerb):
+            table, query, name_to_sqa_col = cls.compile_table_expr(expr.table)
+
+        if isinstance(expr, verbs.Select):
+            query.select = [
+                (cls.compile_col_expr(col, name_to_sqa_col), col.name)
+                for col in expr.selected
+            ]
+
+        elif isinstance(expr, verbs.Drop):
+            query.select = [
+                (col, name)
+                for col, name in query.select
+                if name not in set({col.name for col in expr.dropped})
+            ]
+
+        elif isinstance(expr, verbs.Rename):
+            name_to_sqa_col = {
+                (expr.name_map[name] if name in expr.name_map else name): col
+                for name, col in name_to_sqa_col.items()
+            }
+            query.select = [
+                (col, expr.name_map[name] if name in expr.name_map else name)
+                for col, name in query.select
+            ]
+
+        elif isinstance(expr, verbs.Mutate):
+            compiled_values = [
+                cls.compile_col_expr(val, name_to_sqa_col) for val in expr.values
+            ]
+            query.select.extend(
+                [(val, name) for val, name in zip(compiled_values, expr.names)]
+            )
+            name_to_sqa_col.update(
+                {name: val for name, val in zip(expr.names, compiled_values)}
+            )
+
+        elif isinstance(expr, verbs.Filter):
+            if expr.filters:
+                if query.group_by:
+                    query.having.extend(
+                        cls.compile_col_expr(fil, name_to_sqa_col)
+                        for fil in expr.filters
+                    )
+                else:
+                    query.where.extend(
+                        cls.compile_col_expr(fil, name_to_sqa_col)
+                        for fil in expr.filters
+                    )
+
+        elif isinstance(expr, verbs.Arrange):
+            query.order_by = [
+                cls.compile_order(ord, name_to_sqa_col) for ord in expr.order_by
+            ] + query.order_by
+
+        elif isinstance(expr, verbs.Summarise):
+            if query.group_by:
+                assert query.group_by == query.partition_by
+            query.group_by = query.partition_by
+            query.partition_by = []
+            compiled_values = [
+                cls.compile_col_expr(val, name_to_sqa_col) for val in expr.values
+            ]
+            query.select = [
+                (val, name) for val, name in zip(compiled_values, expr.names)
+            ]
+            name_to_sqa_col.update(
+                {name: val for name, val in zip(expr.names, compiled_values)}
+            )
+
+        elif isinstance(expr, verbs.SliceHead):
+            if query.limit is None:
+                query.limit = expr.n
+                query.offset = expr.offset
+            else:
+                query.limit = min(abs(query.limit - expr.offset), expr.n)
+                query.offset += expr.offset
+
+        elif isinstance(expr, verbs.GroupBy):
+            compiled_group_by = [
+                cls.compile_col_expr(col, name_to_sqa_col) for col in expr.group_by
+            ]
+            if expr.add:
+                query.partition_by += compiled_group_by
+            else:
+                query.partition_by = compiled_group_by
+
+        elif isinstance(expr, verbs.Ungroup):
+            assert not (query.partition_by and query.group_by)
+            query.partition_by = []
+
+        elif isinstance(expr, verbs.Join):
+            table, query, name_to_sqa_col = cls.compile_table_expr(expr.left)
+            right_table, right_query, right_name_to_sqa_col = cls.compile_table_expr(
+                expr.right
+            )
+
+            name_to_sqa_col.update(
+                {
+                    name + expr.suffix: col_elem
+                    for name, col_elem in right_name_to_sqa_col.items()
+                }
+            )
+
+            j = SqlJoin(
+                right_table, cls.compile_col_expr(expr.on, name_to_sqa_col), expr.how
+            )
+
+            if expr.how == "inner":
+                query.where.extend(right_query.where)
+            elif expr.how == "left":
+                j.on = functools.reduce(operator.and_, (j.on, *right_query.where))
+            elif expr.how == "outer":
+                if query.where or right_query.where:
+                    raise ValueError("invalid filter before outer join")
+
+            query.select.extend(
+                (col, name + expr.suffix) for col, name in right_query.select
+            )
+            query.join.append(j)
+
+        elif isinstance(expr, Table):
+            return (
+                expr._impl.table,
+                Query(
+                    [(col, col.name) for col in expr._impl.table.columns],
+                ),
+                {col.name: col for col in expr._impl.table.columns},
+            )
+
+        return table, query, name_to_sqa_col
 
 
 @dataclasses.dataclass(slots=True)
@@ -282,138 +386,46 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
     return sel
 
 
-def compile_table_expr(
-    expr: TableExpr,
-) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
+# Gives any leaf a unique alias to allow self-joins. We do this here to not force
+# the user to come up with dummy names that are not required later anymore. It has
+# to be done before a join so that all column references in the join subtrees remain
+# valid.
+def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str, int]:
     if isinstance(expr, verbs.UnaryVerb):
-        table, query, name_to_sqa_col = compile_table_expr(expr.table)
-
-    if isinstance(expr, verbs.Select):
-        query.select = [
-            (compile_col_expr(col, name_to_sqa_col), col.name) for col in expr.selected
-        ]
-
-    elif isinstance(expr, verbs.Drop):
-        query.select = [
-            (col, name)
-            for col, name in query.select
-            if name not in set({col.name for col in expr.dropped})
-        ]
-
-    elif isinstance(expr, verbs.Rename):
-        name_to_sqa_col = {
-            (expr.name_map[name] if name in expr.name_map else name): col
-            for name, col in name_to_sqa_col.items()
-        }
-        query.select = [
-            (col, expr.name_map[name] if name in expr.name_map else name)
-            for col, name in query.select
-        ]
-
-    elif isinstance(expr, verbs.Mutate):
-        compiled_values = [
-            compile_col_expr(val, name_to_sqa_col) for val in expr.values
-        ]
-        query.select.extend(
-            [(val, name) for val, name in zip(compiled_values, expr.names)]
-        )
-        name_to_sqa_col.update(
-            {name: val for name, val in zip(expr.names, compiled_values)}
-        )
-
-    elif isinstance(expr, verbs.Filter):
-        if expr.filters:
-            if query.group_by:
-                # check whether we can move conditions from `having` clause to `where`.
-                # This is possible if a condition only involves columns in `group_by`.
-                # Split up the filter at __and__`s until no longer possible. TODO
-                query.having.extend(
-                    compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
-                )
-            else:
-                query.where.extend(
-                    compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
-                )
-
-    elif isinstance(expr, verbs.Arrange):
-        # TODO: we could remove duplicates here if we want. but if we do so, this should
-        # not be done in the sql backend but on the abstract tree.
-        query.order_by = [
-            compile_order(ord, name_to_sqa_col) for ord in expr.order_by
-        ] + query.order_by
-
-    elif isinstance(expr, verbs.Summarise):
-        if query.group_by:
-            assert query.group_by == query.partition_by
-        query.group_by = query.partition_by
-        query.partition_by = []
-        # TODO: keep group cols or not? decide on abstract tree and extend summarise if
-        # wanted
-        compiled_values = [
-            compile_col_expr(val, name_to_sqa_col) for val in expr.values
-        ]
-        query.select = [(val, name) for val, name in zip(compiled_values, expr.names)]
-        name_to_sqa_col.update(
-            {name: val for name, val in zip(expr.names, compiled_values)}
-        )
-
-    elif isinstance(expr, verbs.SliceHead):
-        if query.limit is None:
-            query.limit = expr.n
-            query.offset = expr.offset
-        else:
-            query.limit = min(abs(query.limit - expr.offset), expr.n)
-            query.offset += expr.offset
-
-    elif isinstance(expr, verbs.GroupBy):
-        compiled_group_by = [
-            compile_col_expr(col, name_to_sqa_col) for col in expr.group_by
-        ]
-        if expr.add:
-            query.partition_by += compiled_group_by
-        else:
-            query.partition_by = compiled_group_by
-
-    elif isinstance(expr, verbs.Ungroup):
-        assert not (query.partition_by and query.group_by)
-        query.partition_by = []
+        return create_aliases(expr.table, num_occurences)
 
     elif isinstance(expr, verbs.Join):
-        table, query, name_to_sqa_col = compile_table_expr(expr.left)
-        right_table, right_query, right_name_to_sqa_col = compile_table_expr(expr.right)
-
-        name_to_sqa_col.update(
-            {
-                name + expr.suffix: col_elem
-                for name, col_elem in right_name_to_sqa_col.items()
-            }
-        )
-
-        j = SqlJoin(right_table, compile_col_expr(expr.on, name_to_sqa_col), expr.how)
-
-        if expr.how == "inner":
-            query.where.extend(right_query.where)
-        elif expr.how == "left":
-            j.on = functools.reduce(operator.and_, (j.on, *right_query.where))
-        elif expr.how == "outer":
-            if query.where or right_query.where:
-                raise ValueError("invalid filter before outer join")
-
-        query.select.extend(
-            (col, name + expr.suffix) for col, name in right_query.select
-        )
-        query.join.append(j)
+        return create_aliases(expr.right, create_aliases(expr.left, num_occurences))
 
     elif isinstance(expr, Table):
-        return (
-            expr._impl.table,
-            Query(
-                [(col, col.name) for col in expr._impl.table.columns],
-            ),
-            {col.name: col for col in expr._impl.table.columns},
-        )
+        if cnt := num_occurences.get(expr._impl.table.name):
+            expr._impl.table = expr._impl.table.alias(f"{expr._impl.table.name}_{cnt}")
+        else:
+            cnt = 0
+        num_occurences[expr._impl.table.name] = cnt + 1
+        return num_occurences
 
-    return table, query, name_to_sqa_col
+    else:
+        raise AssertionError
+
+
+def get_engine(expr: TableExpr) -> sqa.Engine:
+    if isinstance(expr, verbs.UnaryVerb):
+        engine = get_engine(expr.table)
+
+    elif isinstance(expr, verbs.Join):
+        engine = get_engine(expr.left)
+        right_engine = get_engine(expr.right)
+        if engine != right_engine:
+            raise NotImplementedError  # TODO: find some good error for this
+
+    elif isinstance(expr, Table):
+        engine = expr._impl.engine
+
+    else:
+        raise AssertionError
+
+    return engine
 
 
 def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:

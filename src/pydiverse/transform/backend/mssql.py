@@ -30,7 +30,7 @@ class MsSqlImpl(SqlImpl):
         convert_table_bool_bit(expr)
         set_nulls_position_table(expr)
         sql.create_aliases(expr, {})
-        table, query, _ = sql.compile_table_expr(expr)
+        table, query, _ = cls.compile_table_expr(expr)
         return sql.compile_query(table, query)
 
 
