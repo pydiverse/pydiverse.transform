@@ -435,12 +435,13 @@ class TestPolarsLazyImpl:
                 tbl3
                 >> select()
                 >> mutate(
-                    col1=C.col1.case(
-                        (0, 1),
-                        (1, 2),
-                        (2, 3),
-                        default=-1,
-                    )
+                    col1=f.when(C.col1 == 0)
+                    .then(1)
+                    .when(C.col1 == 1)
+                    .then(2)
+                    .when(C.col1 == 2)
+                    .then(3)
+                    .otherwise(-1)
                 )
             ),
             (df3.select("col1") + 1),
@@ -451,26 +452,11 @@ class TestPolarsLazyImpl:
                 tbl3
                 >> select()
                 >> mutate(
-                    x=C.col1.case(
-                        (C.col2, 1),
-                        (C.col3, 2),
-                        default=0,
-                    )
-                )
-            ),
-            pl.DataFrame({"x": [1, 1, 0, 0, 0, 2, 1, 1, 0, 0, 2, 0]}),
-        )
-
-        assert_equal(
-            (
-                tbl3
-                >> select()
-                >> mutate(
-                    x=f.case(
-                        (C.col1 == C.col2, 1),
-                        (C.col1 == C.col3, 2),
-                        default=C.col4,
-                    )
+                    x=f.when(C.col1 == C.col2)
+                    .then(1)
+                    .when(C.col1 == C.col3)
+                    .then(2)
+                    .otherwise(C.col4)
                 )
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),

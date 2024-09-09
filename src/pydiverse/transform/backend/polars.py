@@ -158,7 +158,11 @@ def compile_col_expr(expr: ColExpr) -> pl.Expr:
         return value
 
     elif isinstance(expr, CaseExpr):
-        raise NotImplementedError
+        assert len(expr.cases) >= 1
+        compiled = pl  # to initialize the when/then-chain
+        for cond, val in expr.cases:
+            compiled = compiled.when(compile_col_expr(cond)).then(compile_col_expr(val))
+        return compiled.otherwise(compile_col_expr(expr.default_val))
 
     elif isinstance(expr, LiteralCol):
         return pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype))
