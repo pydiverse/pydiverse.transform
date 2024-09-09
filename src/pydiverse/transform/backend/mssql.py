@@ -132,7 +132,9 @@ def convert_col_bool_bit(
             returns_bool_as_bit = not isinstance(op, ops.logical.Logical)
 
             if wants_bool_as_bit and not returns_bool_as_bit:
-                return CaseExpr([(converted, LiteralCol(1))], LiteralCol(0))
+                return CaseExpr(
+                    [(converted, LiteralCol(1)), (~converted, LiteralCol(0))]
+                )
             elif not wants_bool_as_bit and returns_bool_as_bit:
                 return ColFn("__eq__", converted, LiteralCol(1), dtype=dtypes.Bool())
 
