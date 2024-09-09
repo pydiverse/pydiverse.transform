@@ -16,49 +16,6 @@ from pydiverse.transform.tree.table_expr import TableExpr
 from pydiverse.transform.util import Map2d
 
 
-def expr_repr(it: Any):
-    if isinstance(it, ColExpr):
-        return it._expr_repr()
-    if isinstance(it, (list, tuple)):
-        return f"[{ ', '.join([expr_repr(e) for e in it]) }]"
-    return repr(it)
-
-
-_dunder_expr_repr = {
-    "__add__": lambda lhs, rhs: f"({lhs} + {rhs})",
-    "__radd__": lambda rhs, lhs: f"({lhs} + {rhs})",
-    "__sub__": lambda lhs, rhs: f"({lhs} - {rhs})",
-    "__rsub__": lambda rhs, lhs: f"({lhs} - {rhs})",
-    "__mul__": lambda lhs, rhs: f"({lhs} * {rhs})",
-    "__rmul__": lambda rhs, lhs: f"({lhs} * {rhs})",
-    "__truediv__": lambda lhs, rhs: f"({lhs} / {rhs})",
-    "__rtruediv__": lambda rhs, lhs: f"({lhs} / {rhs})",
-    "__floordiv__": lambda lhs, rhs: f"({lhs} // {rhs})",
-    "__rfloordiv__": lambda rhs, lhs: f"({lhs} // {rhs})",
-    "__pow__": lambda lhs, rhs: f"({lhs} ** {rhs})",
-    "__rpow__": lambda rhs, lhs: f"({lhs} ** {rhs})",
-    "__mod__": lambda lhs, rhs: f"({lhs} % {rhs})",
-    "__rmod__": lambda rhs, lhs: f"({lhs} % {rhs})",
-    "__round__": lambda x, y=None: f"round({x}, {y})" if y else f"round({x})",
-    "__pos__": lambda x: f"(+{x})",
-    "__neg__": lambda x: f"(-{x})",
-    "__abs__": lambda x: f"abs({x})",
-    "__and__": lambda lhs, rhs: f"({lhs} & {rhs})",
-    "__rand__": lambda rhs, lhs: f"({lhs} & {rhs})",
-    "__or__": lambda lhs, rhs: f"({lhs} | {rhs})",
-    "__ror__": lambda rhs, lhs: f"({lhs} | {rhs})",
-    "__xor__": lambda lhs, rhs: f"({lhs} ^ {rhs})",
-    "__rxor__": lambda rhs, lhs: f"({lhs} ^ {rhs})",
-    "__invert__": lambda x: f"(~{x})",
-    "__lt__": lambda lhs, rhs: f"({lhs} < {rhs})",
-    "__le__": lambda lhs, rhs: f"({lhs} <= {rhs})",
-    "__eq__": lambda lhs, rhs: f"({lhs} == {rhs})",
-    "__ne__": lambda lhs, rhs: f"({lhs} != {rhs})",
-    "__gt__": lambda lhs, rhs: f"({lhs} > {rhs})",
-    "__ge__": lambda lhs, rhs: f"({lhs} >= {rhs})",
-}
-
-
 class ColExpr:
     __slots__ = ["dtype"]
 
@@ -67,10 +24,6 @@ class ColExpr:
 
     def __init__(self, dtype: DType | None = None):
         self.dtype = dtype
-
-    def _expr_repr(self) -> str:
-        """String repr that, when executed, returns the same expression"""
-        raise NotImplementedError
 
     def __getattr__(self, name: str) -> FnAttr:
         if name.startswith("_") and name.endswith("_"):
@@ -84,6 +37,10 @@ class ColExpr:
             "converted to a boolean or used with the and, or, not keywords"
         )
 
+    def _repr_html(self) -> str: ...
+
+    def _repr_pretty(self) -> str: ...
+
 
 class Col(ColExpr, Generic[ImplT]):
     def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
@@ -94,9 +51,6 @@ class Col(ColExpr, Generic[ImplT]):
     def __repr__(self):
         return f"<{self.table.name}.{self.name}>"
 
-    def _expr_repr(self) -> str:
-        return f"{self.table.name}.{self.name}"
-
 
 class ColName(ColExpr):
     def __init__(self, name: str, dtype: DType | None = None):
@@ -106,9 +60,6 @@ class ColName(ColExpr):
     def __repr__(self):
         return f"<C.{self.name}>"
 
-    def _expr_repr(self) -> str:
-        return f"C.{self.name}"
-
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
@@ -116,9 +67,9 @@ class LiteralCol(ColExpr):
         super().__init__(python_type_to_pdt(type(val)))
 
     def __repr__(self):
-        return f"<Lit: {self.expr} ({self.typed_value.dtype})>"
+        return f"<Lit: {self.val}>"
 
-    def _expr_repr(self) -> str:
+    def _repr_expr(self) -> str:
         return repr(self)
 
 
@@ -136,21 +87,6 @@ class ColFn(ColExpr):
             f"{k}={repr(v)}" for k, v in self.context_kwargs.items()
         ]
         return f'{self.name}({", ".join(args)})'
-
-    def _expr_repr(self) -> str:
-        args = [expr_repr(e) for e in self.args] + [
-            f"{k}={expr_repr(v)}" for k, v in self.context_kwargs.items()
-        ]
-
-        if self.name in _dunder_expr_repr:
-            return _dunder_expr_repr[self.name](*args)
-
-        if len(self.args) == 0:
-            args_str = ", ".join(args)
-            return f"f.{self.name}({args_str})"
-        else:
-            args_str = ", ".join(args[1:])
-            return f"{args[0]}.{self.name}({args_str})"
 
 
 class WhenClause:
@@ -179,15 +115,6 @@ class CaseExpr(ColExpr):
             )
             + f"otherwise={self.default_val})"
         )
-
-    def _expr_repr(self) -> str:
-        prefix = "f"
-        if self.switching_on:
-            prefix = expr_repr(self.switching_on)
-
-        args = [expr_repr(case) for case in self.cases]
-        args.append(f"default={expr_repr(self.default)}")
-        return f"{prefix}.case({', '.join(args)})"
 
     def when(self, condition: ColExpr) -> WhenClause:
         if self.default_val is not None:
