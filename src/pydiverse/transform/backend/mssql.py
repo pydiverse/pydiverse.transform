@@ -5,11 +5,12 @@ from typing import Any
 import sqlalchemy as sqa
 
 from pydiverse.transform import ops
+from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
-from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Cast,
     ColExpr,
     ColFn,
     ColName,
@@ -24,22 +25,20 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
 
-    @staticmethod
-    def export(expr: TableExpr, target: Target) -> Any:
+    @classmethod
+    def build_select(cls, expr: TableExpr) -> Any:
         convert_table_bool_bit(expr)
-        return SqlImpl.export(expr, target)
-
-    def _build_select_select(self, select):
-        s = []
-        for name, uuid_ in self.selected_cols():
-            sql_col = self.col_names[uuid_].compiled(self.sql_columns)
-            if not isinstance(sql_col, sqa.sql.ColumnElement):
-                sql_col = sqa.literal(sql_col)
-            if dtypes.Bool().same_kind(self.col_names[uuid_].dtype):
-                # Make sure that any boolean values get stored as bit
-                sql_col = sqa.cast(sql_col, sqa.Boolean())
-            s.append(sql_col.label(name))
-        return select.with_only_columns(*s)
+        sql.create_aliases(expr)
+        table, query = sql.compile_table_expr(expr)
+        query.select = [
+            (
+                (Cast(col, dtypes.Bool()), name)
+                if isinstance(col.dtype, dtypes.Bool)
+                else (col, name)
+            )
+            for col, name in query.select
+        ]
+        return sql.compile_query(table, query)
 
     def _order_col(
         self, col: sqa.SQLColumnExpression, ordering

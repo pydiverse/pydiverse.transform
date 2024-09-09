@@ -16,6 +16,7 @@ from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Cast,
     Col,
     ColExpr,
     ColFn,
@@ -73,12 +74,15 @@ class SqlImpl(TableImpl):
         cloned.table = self.table
         return cloned
 
-    @staticmethod
-    def export(expr: TableExpr, target: Target) -> Any:
-        engine = get_engine(expr)
+    @classmethod
+    def build_select(cls, expr: TableExpr) -> sqa.Select:
         create_aliases(expr)
-        table, query = compile_table_expr(expr)
-        sel = compile_query(table, query)
+        return compile_query(*compile_table_expr(expr))
+
+    @classmethod
+    def export(cls, expr: TableExpr, target: Target) -> Any:
+        sel = cls.build_select(expr)
+        engine = get_engine(expr)
         if isinstance(target, Polars):
             with engine.connect() as conn:
                 # TODO: Provide schema_overrides to not get u32 and other unwanted
@@ -87,10 +91,10 @@ class SqlImpl(TableImpl):
 
         raise NotImplementedError
 
-    @staticmethod
-    def build_query(expr: TableExpr) -> str | None:
+    @classmethod
+    def build_query(cls, expr: TableExpr) -> str | None:
+        sel = cls.build_select(expr)
         engine = get_engine(expr)
-        sel = compile_query(*compile_table_expr(expr))
         return str(
             sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
         )
@@ -206,6 +210,9 @@ def compile_col_expr(
 
     elif isinstance(expr, LiteralCol):
         return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))
+
+    elif isinstance(expr, Cast):
+        return sqa.cast(compile_col_expr(expr.value), pdt_type_to_sqa(expr.dtype))
 
     raise AssertionError
 

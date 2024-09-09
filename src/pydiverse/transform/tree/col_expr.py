@@ -200,6 +200,12 @@ class CaseExpr(ColExpr):
         return CaseExpr(self.cases, value)
 
 
+class Cast(ColExpr):
+    def __init__(self, value: ColExpr, dtype: DType):
+        self.value = value
+        super().__init__(dtype)
+
+
 @dataclasses.dataclass
 class FnAttr:
     name: str
