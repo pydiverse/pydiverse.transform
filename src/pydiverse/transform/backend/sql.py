@@ -60,6 +60,18 @@ class SqlImpl(TableImpl):
         super().__init_subclass__(**kwargs)
         SqlImpl.Dialects[cls.dialect_name] = cls
 
+    def col_names(self) -> list[str]:
+        return [col.name for col in self.table.columns]
+
+    def schema(self) -> dict[str, DType]:
+        return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
+
+    def clone(self) -> SqlImpl:
+        cloned = object.__new__(self.__class__)
+        cloned.engine = self.engine
+        cloned.table = self.table
+        return cloned
+
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
         engine = get_engine(expr)
@@ -82,20 +94,7 @@ class SqlImpl(TableImpl):
             sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
         )
 
-    def col_names(self) -> list[str]:
-        return [col.name for col in self.table.columns]
 
-    def schema(self) -> dict[str, DType]:
-        return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
-
-    def clone(self) -> SqlImpl:
-        cloned = object.__new__(self.__class__)
-        cloned.engine = self.engine
-        cloned.table = self.table
-        return cloned
-
-
-# checks that all leafs use the same sqa.Engine and returns it
 def get_engine(expr: TableExpr) -> sqa.Engine:
     if isinstance(expr, verbs.UnaryVerb):
         engine = get_engine(expr.table)
@@ -139,9 +138,8 @@ def create_aliases(expr: TableExpr):
 def compile_order(
     order: Order,
     name_to_sqa_col: dict[str, sqa.ColumnElement],
-    group_by: list[sqa.ColumnElement],
 ) -> sqa.UnaryExpression:
-    order_expr = compile_col_expr(order.order_by, name_to_sqa_col, group_by)
+    order_expr = compile_col_expr(order.order_by, name_to_sqa_col)
     order_expr = order_expr.desc() if order.descending else order_expr.asc()
     order_expr = (
         order_expr.nulls_last() if order.nulls_last else order_expr.nulls_first()
@@ -152,7 +150,6 @@ def compile_order(
 def compile_col_expr(
     expr: ColExpr,
     name_to_sqa_col: dict[str, sqa.ColumnElement],
-    group_by: sqa.sql.expression.ClauseList,
 ) -> sqa.ColumnElement:
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
@@ -161,7 +158,7 @@ def compile_col_expr(
 
     elif isinstance(expr, ColFn):
         args: list[sqa.ColumnElement] = [
-            compile_col_expr(arg, name_to_sqa_col, group_by) for arg in expr.args
+            compile_col_expr(arg, name_to_sqa_col) for arg in expr.args
         ]
         impl = SqlImpl.operator_registry.get_implementation(
             expr.name, tuple(arg.dtype for arg in expr.args)
@@ -170,21 +167,21 @@ def compile_col_expr(
         partition_by = expr.context_kwargs.get("partition_by")
         if partition_by is not None:
             partition_by = sqa.sql.expression.ClauseList(
-                *(compile_col_expr(col, name_to_sqa_col, []) for col in partition_by)
+                *(compile_col_expr(col, name_to_sqa_col) for col in partition_by)
             )
 
         arrange = expr.context_kwargs.get("arrange")
 
         if arrange:
             order_by = sqa.sql.expression.ClauseList(
-                *(compile_order(order, name_to_sqa_col, group_by) for order in arrange)
+                *(compile_order(order, name_to_sqa_col) for order in arrange)
             )
         else:
             order_by = None
 
         filter_cond = expr.context_kwargs.get("filter")
         if filter_cond:
-            filter_cond = [compile_col_expr(z, []) for z in filter_cond]
+            filter_cond = [compile_col_expr(z, name_to_sqa_col) for z in filter_cond]
             raise NotImplementedError
 
         value: sqa.ColumnElement = impl(*args)
@@ -231,7 +228,7 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
     sel = table.select().select_from(table)
 
     for j in query.join:
-        compiled_on = compile_col_expr(j.on, query.name_to_sqa_col, query.partition_by)
+        compiled_on = compile_col_expr(j.on, query.name_to_sqa_col)
         sel = sel.join(
             j.right,
             onclause=compiled_on,
@@ -241,42 +238,30 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
 
     if query.where:
         where_cond = functools.reduce(operator.and_, query.where)
-        sel = sel.where(
-            compile_col_expr(where_cond, query.name_to_sqa_col, query.partition_by)
-        )
+        sel = sel.where(compile_col_expr(where_cond, query.name_to_sqa_col))
 
     if query.group_by:
         sel = sel.group_by(
-            *(
-                compile_col_expr(col, query.name_to_sqa_col, query.partition_by)
-                for col in query.group_by
-            )
+            *(compile_col_expr(col, query.name_to_sqa_col) for col in query.group_by)
         )
 
     if query.having:
         having_cond = functools.reduce(operator.and_, query.having)
-        sel = sel.having(
-            compile_col_expr(having_cond, query.name_to_sqa_col, query.partition_by)
-        )
+        sel = sel.having(compile_col_expr(having_cond, query.name_to_sqa_col))
 
     if query.limit is not None:
         sel = sel.limit(query.limit).offset(query.offset)
 
     sel = sel.with_only_columns(
         *(
-            compile_col_expr(col_expr, query.name_to_sqa_col, query.partition_by).label(
-                col_name
-            )
+            compile_col_expr(col_expr, query.name_to_sqa_col).label(col_name)
             for col_expr, col_name in query.select
         )
     )
 
     if query.order_by:
         sel = sel.order_by(
-            *(
-                compile_order(ord, query.name_to_sqa_col, query.partition_by)
-                for ord in query.order_by
-            )
+            *(compile_order(ord, query.name_to_sqa_col) for ord in query.order_by)
         )
 
     return sel
@@ -311,7 +296,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         query.select.extend([(val, name) for val, name in zip(expr.values, expr.names)])
         query.name_to_sqa_col.update(
             {
-                name: compile_col_expr(val, query.name_to_sqa_col, query.partition_by)
+                name: compile_col_expr(val, query.name_to_sqa_col)
                 for name, val in zip(expr.names, expr.values)
             }
         )
@@ -370,7 +355,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
         ]
         query.name_to_sqa_col.update(
             {
-                name: compile_col_expr(val, query.name_to_sqa_col, query.partition_by)
+                name: compile_col_expr(val, query.name_to_sqa_col)
                 for name, val in zip(expr.names, expr.values)
             }
         )

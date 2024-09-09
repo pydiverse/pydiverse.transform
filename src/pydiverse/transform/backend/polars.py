@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import datetime
 from typing import Any
 
@@ -34,8 +33,8 @@ class PolarsImpl(TableImpl):
 
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
-        lf, context = compile_table_expr(expr)
-        lf = lf.select(context.select)
+        lf, select, _ = compile_table_expr(expr)
+        lf = lf.select(select)
         if isinstance(target, Polars):
             return lf if target.lazy else lf.collect()
 
@@ -68,22 +67,22 @@ def merge_desc_nulls_last(
     ]
 
 
-def compile_order(order: Order, group_by: list[pl.Expr]) -> tuple[pl.Expr, bool, bool]:
+def compile_order(order: Order) -> tuple[pl.Expr, bool, bool]:
     return (
-        compile_col_expr(order.order_by, group_by),
+        compile_col_expr(order.order_by),
         order.descending,
         order.nulls_last,
     )
 
 
-def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
+def compile_col_expr(expr: ColExpr) -> pl.Expr:
     assert not isinstance(expr, Col)
     if isinstance(expr, ColName):
         return pl.col(expr.name)
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.operator_registry.get_operator(expr.name)
-        args: list[pl.Expr] = [compile_col_expr(arg, group_by) for arg in expr.args]
+        args: list[pl.Expr] = [compile_col_expr(arg) for arg in expr.args]
         impl = PolarsImpl.operator_registry.get_implementation(
             expr.name,
             tuple(arg.dtype for arg in expr.args),
@@ -91,17 +90,17 @@ def compile_col_expr(expr: ColExpr, group_by: list[pl.Expr]) -> pl.Expr:
 
         partition_by = expr.context_kwargs.get("partition_by")
         if partition_by:
-            partition_by = [compile_col_expr(col, []) for col in partition_by]
+            partition_by = [compile_col_expr(col) for col in partition_by]
 
         arrange = expr.context_kwargs.get("arrange")
         if arrange:
             order_by, descending, nulls_last = zip(
-                *[compile_order(order, group_by) for order in arrange]
+                *[compile_order(order) for order in arrange]
             )
 
         filter_cond = expr.context_kwargs.get("filter")
         if filter_cond:
-            filter_cond = [compile_col_expr(z, []) for z in filter_cond]
+            filter_cond = [compile_col_expr(cond) for cond in filter_cond]
 
         # The following `if` block is absolutely unecessary and just an optimization.
         # Otherwise, `over` would be used for sorting, but we cannot pass descending /
@@ -175,140 +174,133 @@ def compile_join_cond(expr: ColExpr) -> list[tuple[pl.Expr, pl.Expr]]:
         if expr.name == "__eq__":
             return [
                 (
-                    compile_col_expr(expr.args[0], []),
-                    compile_col_expr(expr.args[1], []),
+                    compile_col_expr(expr.args[0]),
+                    compile_col_expr(expr.args[1]),
                 )
             ]
 
     raise AssertionError()
 
 
-@dataclasses.dataclass
-class CompilationContext:
-    group_by: list[str]
-    select: list[str]
-
-    def compiled_group_by(self) -> list[pl.Expr]:
-        return [pl.col(name) for name in self.group_by]
-
-
+# returns the compiled LazyFrame, the list of selected cols (selection on the frame
+# must happen at the end since we need to store intermediate columns) and the cols
+# the table is currently grouped by.
 def compile_table_expr(
     expr: TableExpr,
-) -> tuple[pl.LazyFrame, CompilationContext]:
+) -> tuple[pl.LazyFrame, list[str], list[str]]:
     if isinstance(expr, verbs.Select):
-        df, ct = compile_table_expr(expr.table)
-        ct.select = [
-            col for col in ct.select if col in set(col.name for col in expr.selected)
+        df, select, group_by = compile_table_expr(expr.table)
+        select = [
+            col for col in select if col in set(col.name for col in expr.selected)
         ]
-        return df, ct
 
     elif isinstance(expr, verbs.Drop):
-        df, ct = compile_table_expr(expr.table)
-        ct.select = [
-            col for col in ct.select if col not in set(col.name for col in expr.dropped)
+        df, select, group_by = compile_table_expr(expr.table)
+        select = [
+            col for col in select if col not in set(col.name for col in expr.dropped)
         ]
-        return df, ct
 
     elif isinstance(expr, verbs.Rename):
-        df, ct = compile_table_expr(expr.table)
-        ct.select = [
-            (expr.name_map[name] if name in expr.name_map else name)
-            for name in ct.select
+        df, select, group_by = compile_table_expr(expr.table)
+        df = df.rename(expr.name_map)
+        select = [
+            (expr.name_map[name] if name in expr.name_map else name) for name in select
         ]
-        return df.rename(expr.name_map), ct
+        group_by = [
+            (expr.name_map[name] if name in expr.name_map else name)
+            for name in group_by
+        ]
 
     elif isinstance(expr, verbs.Mutate):
-        df, ct = compile_table_expr(expr.table)
-        ct.select.extend(name for name in expr.names if name not in set(ct.select))
-        return df.with_columns(
+        df, select, group_by = compile_table_expr(expr.table)
+        select.extend(name for name in expr.names if name not in set(select))
+        df = df.with_columns(
             **{
-                name: compile_col_expr(
-                    value,
-                    ct.compiled_group_by(),
-                )
+                name: compile_col_expr(value)
                 for name, value in zip(expr.names, expr.values)
             }
-        ), ct
+        )
 
     elif isinstance(expr, verbs.Join):
-        left_df, left_ct = compile_table_expr(expr.left)
-        right_df, right_ct = compile_table_expr(expr.right)
-        assert not left_ct.compiled_group_by()
-        assert not right_ct.compiled_group_by()
+        # may assume the tables were not grouped before join
+        left_df, left_select, _ = compile_table_expr(expr.left)
+        right_df, right_select, _ = compile_table_expr(expr.right)
+
         left_on, right_on = zip(*compile_join_cond(expr.on))
         # we want a suffix everywhere but polars only appends it to duplicate columns
         right_df = right_df.rename(
             {name: name + expr.suffix for name in right_df.columns}
         )
-        return left_df.join(
+
+        df = left_df.join(
             right_df,
             left_on=left_on,
             right_on=right_on,
             how=expr.how,
             validate=expr.validate,
             coalesce=False,
-        ), CompilationContext(
-            [],
-            left_ct.select + [col_name + expr.suffix for col_name in right_ct.select],
         )
+        select = left_select + [col_name + expr.suffix for col_name in right_select]
+        group_by = []
 
     elif isinstance(expr, verbs.Filter):
-        df, ct = compile_table_expr(expr.table)
+        df, select, group_by = compile_table_expr(expr.table)
         if expr.filters:
-            df = df.filter(
-                [compile_col_expr(f, ct.compiled_group_by()) for f in expr.filters]
-            )
-        return df, ct
+            df = df.filter([compile_col_expr(fil) for fil in expr.filters])
 
     elif isinstance(expr, verbs.Arrange):
-        df, ct = compile_table_expr(expr.table)
+        df, select, group_by = compile_table_expr(expr.table)
         order_by, descending, nulls_last = zip(
-            *[compile_order(order, ct.compiled_group_by()) for order in expr.order_by]
+            *[compile_order(order) for order in expr.order_by]
         )
-        return df.sort(
-            order_by, descending=descending, nulls_last=nulls_last, maintain_order=True
-        ), ct
+        df = df.sort(
+            order_by,
+            descending=descending,
+            nulls_last=nulls_last,
+            maintain_order=True,
+        )
 
     elif isinstance(expr, verbs.GroupBy):
-        df, ct = compile_table_expr(expr.table)
-        return df, CompilationContext(
-            (
-                ct.group_by + [col.name for col in expr.group_by]
-                if expr.add
-                else [col.name for col in expr.group_by]
-            ),
-            ct.select,
+        df, select, group_by = compile_table_expr(expr.table)
+        group_by = (
+            group_by + [col.name for col in expr.group_by]
+            if expr.add
+            else [col.name for col in expr.group_by]
         )
 
     elif isinstance(expr, verbs.Ungroup):
-        df, ct = compile_table_expr(expr.table)
-        return df, ct
+        df, select, group_by = compile_table_expr(expr.table)
 
     elif isinstance(expr, verbs.Summarise):
-        df, ct = compile_table_expr(expr.table)
-        compiled_group_by = ct.compiled_group_by()
+        df, select, group_by = compile_table_expr(expr.table)
         aggregations = [
-            compile_col_expr(value, []).alias(name)
+            compile_col_expr(value).alias(name)
             for name, value in zip(expr.names, expr.values)
         ]
 
-        if compiled_group_by:
-            df = df.group_by(*compiled_group_by).agg(*aggregations)
+        if group_by:
+            df = df.group_by(*(pl.col(name) for name in group_by)).agg(*aggregations)
         else:
             df = df.select(*aggregations)
 
-        return df, CompilationContext([], ct.group_by + expr.names)
+        select = group_by + expr.names
+        group_by = []
 
     elif isinstance(expr, verbs.SliceHead):
-        df, ct = compile_table_expr(expr.table)
-        assert len(ct.group_by) == 0
-        return df.slice(expr.offset, expr.n), ct
+        df, select, group_by = compile_table_expr(expr.table)
+        assert len(group_by) == 0
+        df = df.slice(expr.offset, expr.n)
 
     elif isinstance(expr, Table):
         assert isinstance(expr._impl, PolarsImpl)
-        return expr._impl.df, CompilationContext([], expr.col_names())
+        df = expr._impl.df
+        select = expr.col_names()
+        group_by = []
 
-    raise AssertionError
+    else:
+        raise AssertionError
+
+    return df, select, group_by
 
 
 def polars_type_to_pdt(t: pl.DataType) -> dtypes.DType:
