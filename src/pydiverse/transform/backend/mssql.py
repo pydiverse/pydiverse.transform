@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 import sqlalchemy as sqa
@@ -97,25 +98,30 @@ def set_nulls_position_col(expr: ColExpr):
 def convert_col_bool_bit(
     expr: ColExpr | Order, wants_bool_as_bit: bool
 ) -> ColExpr | Order:
-    if isinstance(expr, ColName):
+    if isinstance(expr, Order):
+        return Order(
+            convert_col_bool_bit(expr.order_by), expr.descending, expr.nulls_last
+        )
+
+    elif isinstance(expr, ColName):
         if isinstance(expr.dtype, dtypes.Bool):
-            return expr == LiteralCol(1)
+            return ColFn("__eq__", expr, LiteralCol(1), dtype=dtypes.Bool())
         return expr
 
     elif isinstance(expr, ColFn):
         op = MsSqlImpl.operator_registry.get_operator(expr.name)
         wants_bool_as_bit_input = not isinstance(
-            op, ops.logical.BooleanBinary, ops.logical.Invert
+            op, (ops.logical.BooleanBinary, ops.logical.Invert)
         )
 
-        converted = ColFn(
-            expr.name,
-            *(convert_col_bool_bit(arg, wants_bool_as_bit_input) for arg in expr.args),
-            **{
-                key: [convert_col_bool_bit(val, wants_bool_as_bit) for val in arr]
-                for key, arr in expr.context_kwargs
-            },
-        )
+        converted = copy.copy(expr)
+        converted.args = [
+            convert_col_bool_bit(arg, wants_bool_as_bit_input) for arg in expr.args
+        ]
+        converted.context_kwargs = {
+            key: [convert_col_bool_bit(val, wants_bool_as_bit) for val in arr]
+            for key, arr in expr.context_kwargs
+        }
 
         impl = MsSqlImpl.operator_registry.get_implementation(
             expr.name, tuple(arg.dtype for arg in expr.args)
@@ -132,16 +138,23 @@ def convert_col_bool_bit(
         return converted
 
     elif isinstance(expr, CaseExpr):
-        return CaseExpr(
-            [
-                (
-                    convert_col_bool_bit(cond, False),
-                    convert_col_bool_bit(val, True),
-                )
-                for cond, val in expr.cases
-            ],
-            convert_col_bool_bit(expr.default_val, wants_bool_as_bit),
+        converted = copy.copy(expr)
+        converted.cases = [
+            (
+                convert_col_bool_bit(cond, False),
+                convert_col_bool_bit(val, True),
+            )
+            for cond, val in expr.cases
+        ]
+        converted.default_val = convert_col_bool_bit(
+            expr.default_val, wants_bool_as_bit
         )
+        return converted
+
+    elif isinstance(expr, LiteralCol):
+        return expr
+
+    raise AssertionError
 
 
 def convert_table_bool_bit(expr: TableExpr):
