@@ -215,7 +215,9 @@ def compile_col_expr(
         return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))
 
     elif isinstance(expr, Cast):
-        return sqa.cast(compile_col_expr(expr.value), pdt_type_to_sqa(expr.dtype))
+        return sqa.cast(
+            compile_col_expr(expr.value, name_to_sqa_col), pdt_type_to_sqa(expr.dtype)
+        )
 
     raise AssertionError
 
@@ -339,7 +341,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
                 raise ValueError("invalid filter before outer join")
 
         query.select.extend(
-            (ColName(name + expr.suffix), name + expr.suffix)
+            (ColName(name + expr.suffix, col.dtype), name + expr.suffix)
             for col, name in right_query.select
         )
         query.join.append(j)
@@ -407,7 +409,7 @@ def compile_table_expr(expr: TableExpr) -> tuple[sqa.Table, Query]:
     elif isinstance(expr, Table):
         return expr._impl.table, Query(
             {col.name: col for col in expr._impl.table.columns},
-            [(ColName(col_name), col_name) for col_name in expr.col_names()],
+            [(ColName(name, dtype), name) for name, dtype in expr.schema.items()],
         )
 
     return table, query
