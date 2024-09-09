@@ -16,7 +16,6 @@ from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
-    Cast,
     Col,
     ColExpr,
     ColFn,
@@ -181,12 +180,6 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, LiteralCol):
             return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))
-
-        elif isinstance(expr, Cast):
-            return sqa.cast(
-                cls.compile_col_expr(expr.value, name_to_sqa_col),
-                pdt_type_to_sqa(expr.dtype),
-            )
 
         raise AssertionError
 
