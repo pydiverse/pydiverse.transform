@@ -17,7 +17,6 @@ from pydiverse.transform.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform.tree.registry import TypedOperatorImpl
 from pydiverse.transform.tree.table_expr import TableExpr
 from pydiverse.transform.util.warnings import warn_non_standard
 
@@ -28,6 +27,7 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def build_select(cls, expr: TableExpr) -> Any:
         convert_table_bool_bit(expr)
+        set_nulls_position_table(expr)
         sql.create_aliases(expr)
         table, query = sql.compile_table_expr(expr)
         query.select = [
@@ -38,24 +38,51 @@ class MsSqlImpl(SqlImpl):
             )
             for col, name in query.select
         ]
+
         return sql.compile_query(table, query)
 
-    def _order_col(
-        self, col: sqa.SQLColumnExpression, ordering
-    ) -> list[sqa.SQLColumnExpression]:
-        # MSSQL doesn't support nulls first / nulls last
-        order_by_expressions = []
 
-        # asc implies nulls first
-        if not ordering.nulls_first and ordering.asc:
-            order_by_expressions.append(sqa.func.iif(col.is_(None), 1, 0))
+def convert_order_list(order_list: list[Order]) -> list[Order]:
+    new_list = []
+    for ord in order_list:
+        new_list.append(ord)
+        if ord.nulls_last and not ord.descending:
+            new_list.append(
+                Order(CaseExpr((ord.order_by.is_null(), 1), 0), ord.descending, None)
+            )
+        elif not ord.nulls_last and ord.descending:
+            new_list.append(
+                Order(CaseExpr((ord.order_by.is_null(), 0), 1), ord.descending, None)
+            )
+    return new_list
 
-        # desc implies nulls last
-        if ordering.nulls_first and not ordering.asc:
-            order_by_expressions.append(sqa.func.iif(col.is_(None), 0, 1))
 
-        order_by_expressions.append(col.asc() if ordering.asc else col.desc())
-        return order_by_expressions
+def set_nulls_position_table(expr: TableExpr):
+    if isinstance(expr, verbs.UnaryVerb):
+        set_nulls_position_table(expr.table)
+        for col in expr.col_exprs():
+            set_nulls_position_col(col)
+
+        if isinstance(expr, verbs.Arrange):
+            expr.order_by = convert_order_list(expr.order_by)
+
+    elif isinstance(expr, verbs.Join):
+        set_nulls_position_table(expr.left)
+        set_nulls_position_table(expr.right)
+
+
+def set_nulls_position_col(expr: ColExpr):
+    if isinstance(expr, ColFn):
+        for arg in expr.args:
+            set_nulls_position_col(arg)
+        if arr := expr.context_kwargs.get("arrange"):
+            expr.context_kwargs["arrange"] = convert_order_list(arr)
+
+    elif isinstance(expr, CaseExpr):
+        set_nulls_position_col(expr.default_val)
+        for cond, val in expr.cases:
+            set_nulls_position_col(cond)
+            set_nulls_position_col(val)
 
 
 # Boolean / Bit Conversion
@@ -93,12 +120,14 @@ def convert_col_bool_bit(
         impl = MsSqlImpl.operator_registry.get_implementation(
             expr.name, tuple(arg.dtype for arg in expr.args)
         )
-        returns_bool_as_bit = mssql_op_returns_bool_as_bit(impl)
 
-        if wants_bool_as_bit and not returns_bool_as_bit:
-            return CaseExpr([(converted, LiteralCol(1))], LiteralCol(0))
-        elif not wants_bool_as_bit and returns_bool_as_bit:
-            return converted == LiteralCol(1)
+        if isinstance(impl.return_type, dtypes.Bool):
+            returns_bool_as_bit = not isinstance(op, ops.logical.Logical)
+
+            if wants_bool_as_bit and not returns_bool_as_bit:
+                return CaseExpr([(converted, LiteralCol(1))], LiteralCol(0))
+            elif not wants_bool_as_bit and returns_bool_as_bit:
+                return converted == LiteralCol(1)
 
         return converted
 
@@ -126,17 +155,6 @@ def convert_table_bool_bit(expr: TableExpr):
         convert_table_bool_bit(expr.left)
         convert_table_bool_bit(expr.right)
         expr.on = convert_col_bool_bit(expr.on, False)
-
-
-def mssql_op_returns_bool_as_bit(implementation: TypedOperatorImpl) -> bool | None:
-    if not dtypes.Bool().same_kind(implementation.return_type):
-        return None
-
-    # These operations return boolean types (not BIT)
-    if isinstance(implementation.operator, ops.logical.Logical):
-        return False
-
-    return True
 
 
 with MsSqlImpl.op(ops.Equal()) as op:
