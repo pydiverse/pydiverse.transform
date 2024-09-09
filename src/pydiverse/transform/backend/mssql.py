@@ -28,7 +28,7 @@ class MsSqlImpl(SqlImpl):
     def build_select(cls, expr: TableExpr) -> Any:
         convert_table_bool_bit(expr)
         set_nulls_position_table(expr)
-        sql.create_aliases(expr)
+        sql.create_aliases(expr, {})
         table, query = sql.compile_table_expr(expr)
         query.select = [
             (

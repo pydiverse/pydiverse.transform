@@ -76,7 +76,7 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def build_select(cls, expr: TableExpr) -> sqa.Select:
-        create_aliases(expr)
+        create_aliases(expr, {})
         return compile_query(*compile_table_expr(expr))
 
     @classmethod
@@ -123,18 +123,20 @@ def get_engine(expr: TableExpr) -> sqa.Engine:
 # the user to come up with dummy names that are not required later anymore. It has
 # to be done before a join so that all column references in the join subtrees remain
 # valid.
-def create_aliases(expr: TableExpr):
+def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str, int]:
     if isinstance(expr, verbs.UnaryVerb):
-        create_aliases(expr.table)
+        return create_aliases(expr.table, num_occurences)
 
     elif isinstance(expr, verbs.Join):
-        create_aliases(expr.left)
-        create_aliases(expr.right)
+        return create_aliases(expr.right, create_aliases(expr.left, num_occurences))
 
     elif isinstance(expr, Table):
-        expr._impl.table = expr._impl.table.alias(
-            f"{expr._impl.table}_{str(hash(expr))}"
-        )
+        if cnt := num_occurences.get(expr._impl.table.name):
+            expr._impl.table = expr._impl.table.alias(f"{expr._impl.table.name}_{cnt}")
+        else:
+            cnt = 0
+        num_occurences[expr._impl.table.name] = cnt + 1
+        return num_occurences
 
     else:
         raise AssertionError
