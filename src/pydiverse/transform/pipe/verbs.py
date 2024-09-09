@@ -73,7 +73,10 @@ def export(expr: TableExpr, target: Target):
 
 @builtin_verb()
 def build_query(expr: TableExpr) -> str:
-    return get_backend(expr).build_query(expr)
+    expr, _ = expr.clone()
+    SourceBackend: type[TableImpl] = get_backend(expr)
+    tree.preprocess(expr)
+    return SourceBackend.build_query(expr)
 
 
 @builtin_verb()

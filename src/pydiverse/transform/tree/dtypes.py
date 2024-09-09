@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 from abc import ABC, abstractmethod
+from types import NoneType
 
 from pydiverse.transform._typing import T
 from pydiverse.transform.errors import ExpressionTypeError
@@ -154,6 +155,8 @@ def python_type_to_pdt(t: type) -> DType:
         return Date()
     elif t is datetime.timedelta:
         return Duration()
+    elif t is NoneType:
+        return NoneDType()
 
     raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
 

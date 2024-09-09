@@ -133,7 +133,8 @@ def convert_col_bool_bit(
 
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr(
-                    [(converted, LiteralCol(1)), (~converted, LiteralCol(0))]
+                    [(converted, LiteralCol(1)), (~converted, LiteralCol(0))],
+                    LiteralCol(None),
                 )
             elif not wants_bool_as_bit and returns_bool_as_bit:
                 return ColFn("__eq__", converted, LiteralCol(1), dtype=dtypes.Bool())

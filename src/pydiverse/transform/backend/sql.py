@@ -431,18 +431,20 @@ def get_engine(expr: TableExpr) -> sqa.Engine:
 def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:
     if isinstance(t, sqa.Integer):
         return dtypes.Int()
-    if isinstance(t, sqa.Numeric):
+    elif isinstance(t, sqa.Numeric):
         return dtypes.Float()
-    if isinstance(t, sqa.String):
+    elif isinstance(t, sqa.String):
         return dtypes.String()
-    if isinstance(t, sqa.Boolean):
+    elif isinstance(t, sqa.Boolean):
         return dtypes.Bool()
-    if isinstance(t, sqa.DateTime):
+    elif isinstance(t, sqa.DateTime):
         return dtypes.DateTime()
-    if isinstance(t, sqa.Date):
+    elif isinstance(t, sqa.Date):
         return dtypes.Date()
-    if isinstance(t, sqa.Interval):
+    elif isinstance(t, sqa.Interval):
         return dtypes.Duration()
+    elif isinstance(t, sqa.Null):
+        return dtypes.NoneDType()
 
     raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
 
@@ -450,18 +452,20 @@ def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:
 def pdt_type_to_sqa(t: DType) -> sqa.types.TypeEngine:
     if isinstance(t, dtypes.Int):
         return sqa.Integer()
-    if isinstance(t, dtypes.Float):
+    elif isinstance(t, dtypes.Float):
         return sqa.Numeric()
-    if isinstance(t, dtypes.String):
+    elif isinstance(t, dtypes.String):
         return sqa.String()
-    if isinstance(t, dtypes.Bool):
+    elif isinstance(t, dtypes.Bool):
         return sqa.Boolean()
-    if isinstance(t, dtypes.DateTime):
+    elif isinstance(t, dtypes.DateTime):
         return sqa.DateTime()
-    if isinstance(t, dtypes.Date):
+    elif isinstance(t, dtypes.Date):
         return sqa.Date()
-    if isinstance(t, dtypes.Duration):
+    elif isinstance(t, dtypes.Duration):
         return sqa.Interval()
+    elif isinstance(t, dtypes.NoneDType):
+        return sqa.types.NullType()
 
     raise AssertionError
 

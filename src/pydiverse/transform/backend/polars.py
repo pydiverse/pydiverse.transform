@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from types import NoneType
 from typing import Any
 
 import polars as pl
@@ -322,6 +323,8 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.DType:
         return dtypes.Date()
     elif isinstance(t, pl.Duration):
         return dtypes.Duration()
+    elif isinstance(t, pl.Null):
+        return dtypes.NoneDType()
 
     raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
 
@@ -341,6 +344,8 @@ def pdt_type_to_polars(t: dtypes.DType) -> pl.DataType:
         return pl.Date()
     elif isinstance(t, dtypes.Duration):
         return pl.Duration()
+    elif isinstance(t, dtypes.NoneDType):
+        return pl.Null()
 
     raise AssertionError
 
@@ -360,6 +365,8 @@ def python_type_to_polars(t: type) -> pl.DataType:
         return pl.Date()
     elif t is datetime.timedelta:
         return pl.Duration()
+    elif t is NoneType:
+        return pl.Null()
 
     raise TypeError(f"python builtin type {t} is not supported by pydiverse.transform")
 
