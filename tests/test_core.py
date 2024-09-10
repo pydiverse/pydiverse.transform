@@ -3,9 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.pipe.pipeable import (
-    col_to_table,
     inverse_partial,
     verb,
 )
@@ -95,15 +93,6 @@ class TestDispatchers:
 
         assert 5 >> subtract(3) == 2
         assert 5 >> add_10 >> subtract(5) == 10
-
-    def test_col_to_table(self, tbl1):
-        assert col_to_table(15) == 15
-        assert col_to_table(tbl1) == tbl1
-
-        c1_tbl = col_to_table(tbl1.col1._)
-        assert isinstance(c1_tbl, TableImpl)
-        assert c1_tbl.available_cols == {tbl1.col1._.uuid}
-        assert list(c1_tbl.named_cols.fwd) == ["col1"]
 
 
 class TestBuiltinVerbs:

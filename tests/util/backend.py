@@ -4,12 +4,11 @@ import functools
 
 import polars as pl
 
-from pydiverse.transform.backend.polars import PolarsImpl
-from pydiverse.transform.backend.sql_table import SqlImpl
-from pydiverse.transform.core import Table
+from pydiverse.transform.backend.targets import SqlAlchemy
+from pydiverse.transform.pipe.table import Table
 
 
-def _cached_impl(fn):
+def _cached_table(fn):
     cache = {}
 
     @functools.wraps(fn)
@@ -25,16 +24,16 @@ def _cached_impl(fn):
     return wrapped
 
 
-@_cached_impl
-def polars_impl(df: pl.DataFrame, name: str):
-    return PolarsImpl(name, df)
+@_cached_table
+def polars_table(df: pl.DataFrame, name: str):
+    return Table(df, name=name)
 
 
 _sql_engine_cache = {}
 
 
-def _sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
-    import sqlalchemy as sa
+def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
+    import sqlalchemy as sqa
 
     global _sql_engine_cache
 
@@ -43,7 +42,7 @@ def _sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
     if url in _sql_engine_cache:
         engine = _sql_engine_cache[url]
     else:
-        engine = sa.create_engine(url)
+        engine = sqa.create_engine(url)
         _sql_engine_cache[url] = engine
 
     sql_dtypes = {}
@@ -54,34 +53,34 @@ def _sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
     df.write_database(
         name, engine, if_table_exists="replace", engine_options={"dtype": sql_dtypes}
     )
-    return SqlImpl(engine, name)
+    return Table(name, SqlAlchemy(engine))
 
 
-@_cached_impl
-def sqlite_impl(df: pl.DataFrame, name: str):
-    return _sql_table(df, name, "sqlite:///:memory:")
+@_cached_table
+def sqlite_table(df: pl.DataFrame, name: str):
+    return sql_table(df, name, "sqlite:///:memory:")
 
 
-@_cached_impl
-def duckdb_impl(df: pl.DataFrame, name: str):
-    return _sql_table(df, name, "duckdb:///:memory:")
+@_cached_table
+def duckdb_table(df: pl.DataFrame, name: str):
+    return sql_table(df, name, "duckdb:///:memory:")
 
 
-@_cached_impl
-def postgres_impl(df: pl.DataFrame, name: str):
+@_cached_table
+def postgres_table(df: pl.DataFrame, name: str):
     url = "postgresql://sa:Pydiverse23@127.0.0.1:6543"
-    return _sql_table(df, name, url)
+    return sql_table(df, name, url)
 
 
-@_cached_impl
-def mssql_impl(df: pl.DataFrame, name: str):
+@_cached_table
+def mssql_table(df: pl.DataFrame, name: str):
     from sqlalchemy.dialects.mssql import DATETIME2
 
     url = (
         "mssql+pyodbc://sa:PydiQuant27@127.0.0.1:1433"
         "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
     )
-    return _sql_table(
+    return sql_table(
         df,
         name,
         url,
@@ -91,19 +90,10 @@ def mssql_impl(df: pl.DataFrame, name: str):
     )
 
 
-def impl_to_table_callable(fn):
-    @functools.wraps(fn)
-    def wrapped(df: pl.DataFrame, name: str):
-        impl = fn(df, name)
-        return Table(impl)
-
-    return wrapped
-
-
 BACKEND_TABLES = {
-    "polars": impl_to_table_callable(polars_impl),
-    "sqlite": impl_to_table_callable(sqlite_impl),
-    "duckdb": impl_to_table_callable(duckdb_impl),
-    "postgres": impl_to_table_callable(postgres_impl),
-    "mssql": impl_to_table_callable(mssql_impl),
+    "polars": polars_table,
+    "sqlite": sqlite_table,
+    "duckdb": duckdb_table,
+    "postgres": postgres_table,
+    "mssql": mssql_table,
 }

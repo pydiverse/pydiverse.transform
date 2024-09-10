@@ -76,7 +76,7 @@ class Table(TableExpr, Generic[ImplT]):
 
             return (
                 f"Table: {self.name}, backend: {type(self._impl).__name__}\n"
-                f"{self >> export(Polars(lazy=False))}"
+                f"{self >> export(Polars())}"
             )
         except Exception as e:
             return (
@@ -95,7 +95,7 @@ class Table(TableExpr, Generic[ImplT]):
             from pydiverse.transform.pipe.verbs import export
 
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
-            html += (self >> export(Polars(lazy=False)))._repr_html_()
+            html += (self >> export(Polars()))._repr_html_()
         except Exception as e:
             html += (
                 "</br><pre>Failed to collect table due to an exception:\n"

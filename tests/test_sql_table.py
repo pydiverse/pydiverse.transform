@@ -127,7 +127,7 @@ class TestSqlTable:
         tbl1 >> show_query() >> collect()
 
     def test_export(self, tbl1):
-        assert_equal(tbl1 >> export(Polars(lazy=False)), df1)
+        assert_equal(tbl1 >> export(Polars()), df1)
 
     def test_select(self, tbl1, tbl2):
         assert_equal(tbl1 >> select(tbl1.col1), df1[["col1"]])

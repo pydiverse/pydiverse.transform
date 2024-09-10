@@ -62,7 +62,7 @@ class Col(ColExpr, Generic[ImplT]):
             from pydiverse.transform.backend.targets import Polars
             from pydiverse.transform.pipe.verbs import export, select
 
-            df = self.table >> select(self) >> export(Polars(lazy=False))
+            df = self.table >> select(self) >> export(Polars())
             return str(df)
         except Exception as e:
             return (

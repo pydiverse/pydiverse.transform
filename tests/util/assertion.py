@@ -15,12 +15,8 @@ from pydiverse.transform.tree.table_expr import TableExpr
 
 
 def assert_equal(left, right, check_dtypes=False, check_row_order=True):
-    left_df = (
-        left >> export(Polars(lazy=False)) if isinstance(left, TableExpr) else left
-    )
-    right_df = (
-        right >> export(Polars(lazy=False)) if isinstance(right, TableExpr) else right
-    )
+    left_df = left >> export(Polars()) if isinstance(left, TableExpr) else left
+    right_df = right >> export(Polars()) if isinstance(right, TableExpr) else right
 
     try:
         assert_frame_equal(
@@ -71,9 +67,9 @@ def assert_result_equal(
 
     if exception and not may_throw:
         with pytest.raises(exception):
-            pipe_factory(*x) >> export()
+            pipe_factory(*x) >> export(Polars())
         with pytest.raises(exception):
-            pipe_factory(*y) >> export()
+            pipe_factory(*y) >> export(Polars())
         return
 
     did_raise_warning = False
@@ -83,10 +79,10 @@ def assert_result_equal(
             query_x = pipe_factory(*x)
             query_y = pipe_factory(*y)
 
-            dfx: pl.DataFrame = (query_x >> export()).with_columns(
+            dfx: pl.DataFrame = (query_x >> export(Polars())).with_columns(
                 pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
             )
-            dfy: pl.DataFrame = (query_y >> export()).with_columns(
+            dfy: pl.DataFrame = (query_y >> export(Polars())).with_columns(
                 pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
             )
 
