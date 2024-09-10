@@ -14,7 +14,7 @@ from pydiverse.transform.pipe.verbs import (
     select,
     ungroup,
 )
-from tests.util import assert_result_equal, full_sort
+from tests.util import assert_result_equal
 
 
 def test_ungroup(df3):
@@ -83,8 +83,8 @@ def test_ungrouped_join(df1, df3, how):
         lambda t, u: t
         >> group_by(t.col1)
         >> ungroup()
-        >> join(u, t.col1 == u.col1, how=how)
-        >> full_sort(),
+        >> join(u, t.col1 == u.col1, how=how),
+        check_row_order=False,
     )
 
 

@@ -12,7 +12,7 @@ from pydiverse.transform.pipe.verbs import (
     slice_head,
     summarise,
 )
-from tests.util import assert_result_equal, full_sort
+from tests.util import assert_result_equal
 
 
 def test_simple(df3):
@@ -83,18 +83,17 @@ def test_with_join(df1, df2):
     assert_result_equal(
         (df1, df2),
         lambda t, u: t
-        >> full_sort()
-        >> arrange(*t)
+        >> arrange(*t.cols())
         >> slice_head(3)
-        >> left_join(u, t.col1 == u.col1)
-        >> full_sort(),
+        >> left_join(u, t.col1 == u.col1),
+        check_row_order=False,
     )
 
     assert_result_equal(
         (df1, df2),
         lambda t, u: t
-        >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1)
-        >> full_sort(),
+        >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1),
+        check_row_order=False,
         exception=ValueError,
         may_throw=True,
     )

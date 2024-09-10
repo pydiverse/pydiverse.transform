@@ -12,7 +12,7 @@ from pydiverse.transform.pipe.verbs import (
     summarise,
     ungroup,
 )
-from tests.util import assert_result_equal, full_sort
+from tests.util import assert_result_equal
 
 
 def test_simple_ungrouped(df3):
@@ -203,7 +203,6 @@ def test_arrange_argument(df3):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(x=C.col4.shift(1, arrange=[-C.col3]))
-        >> full_sort()
         >> select(C.x),
     )
 
@@ -212,25 +211,18 @@ def test_arrange_argument(df3):
         lambda t: t
         >> group_by(t.col2)
         >> mutate(x=f.row_number(arrange=[-C.col4]))
-        >> full_sort()
         >> select(C.x),
     )
 
     # Ungrouped
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=C.col4.shift(1, arrange=[-C.col3]))
-        >> full_sort()
-        >> select(C.x),
+        lambda t: t >> mutate(x=C.col4.shift(1, arrange=[-C.col3])) >> select(C.x),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=f.row_number(arrange=[-C.col4]))
-        >> full_sort()
-        >> select(C.x),
+        lambda t: t >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(C.x),
     )
 
 
