@@ -3,9 +3,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Iterable
 from html import escape
-from typing import Generic
 
-from pydiverse.transform._typing import ImplT
 from pydiverse.transform.tree.col_expr import (
     Col,
     ColName,
@@ -13,7 +11,7 @@ from pydiverse.transform.tree.col_expr import (
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
-class Table(TableExpr, Generic[ImplT]):
+class Table(TableExpr):
     """
     All attributes of a table are columns except for the `_impl` attribute
     which is a reference to the underlying table implementation.

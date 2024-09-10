@@ -14,7 +14,7 @@ from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.dtypes import DType, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 from pydiverse.transform.tree.table_expr import TableExpr
-from pydiverse.transform.util import Map2d
+from pydiverse.transform.util.map2d import Map2d
 
 
 class ColExpr:
@@ -163,6 +163,52 @@ class FnAttr:
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.name}({self.arg})>"
+
+
+@dataclasses.dataclass
+class Order:
+    order_by: ColExpr
+    descending: bool
+    nulls_last: bool
+
+    # the given `expr` may contain nulls_last markers or `-` (descending markers). the
+    # order_by of the Order does not contain these special functions and can thus be
+    # translated normally.
+    @staticmethod
+    def from_col_expr(expr: ColExpr) -> Order:
+        descending = False
+        nulls_last = None
+        while isinstance(expr, ColFn):
+            if expr.name == "__neg__":
+                descending = not descending
+            elif nulls_last is None:
+                if expr.name == "nulls_last":
+                    nulls_last = True
+                elif expr.name == "nulls_first":
+                    nulls_last = False
+            if expr.name in ("__neg__", "__pos__", "nulls_last", "nulls_first"):
+                assert len(expr.args) == 1
+                assert len(expr.context_kwargs) == 0
+                expr = expr.args[0]
+            else:
+                break
+        if nulls_last is None:
+            nulls_last = False
+        return Order(expr, descending, nulls_last)
+
+
+# Add all supported dunder methods to `ColExpr`. This has to be done, because Python
+# doesn't call __getattr__ for dunder methods.
+def create_operator(op):
+    def impl(*args, **kwargs):
+        return ColFn(op, *args, **kwargs)
+
+    return impl
+
+
+for dunder in OperatorRegistry.SUPPORTED_DUNDER:
+    setattr(ColExpr, dunder, create_operator(dunder))
+del create_operator
 
 
 def rename_overwritten_cols(expr: ColExpr, name_map: dict[str, str]):
@@ -355,49 +401,3 @@ def clone(expr: ColExpr, table_map: dict[TableExpr, TableExpr]) -> ColExpr:
 
     else:
         return expr
-
-
-@dataclasses.dataclass
-class Order:
-    order_by: ColExpr
-    descending: bool
-    nulls_last: bool
-
-    # the given `expr` may contain nulls_last markers or `-` (descending markers). the
-    # order_by of the Order does not contain these special functions and can thus be
-    # translated normally.
-    @staticmethod
-    def from_col_expr(expr: ColExpr) -> Order:
-        descending = False
-        nulls_last = None
-        while isinstance(expr, ColFn):
-            if expr.name == "__neg__":
-                descending = not descending
-            elif nulls_last is None:
-                if expr.name == "nulls_last":
-                    nulls_last = True
-                elif expr.name == "nulls_first":
-                    nulls_last = False
-            if expr.name in ("__neg__", "__pos__", "nulls_last", "nulls_first"):
-                assert len(expr.args) == 1
-                assert len(expr.context_kwargs) == 0
-                expr = expr.args[0]
-            else:
-                break
-        if nulls_last is None:
-            nulls_last = False
-        return Order(expr, descending, nulls_last)
-
-
-# Add all supported dunder methods to `ColExpr`. This has to be done, because Python
-# doesn't call __getattr__ for dunder methods.
-def create_operator(op):
-    def impl(*args, **kwargs):
-        return ColFn(op, *args, **kwargs)
-
-    return impl
-
-
-for dunder in OperatorRegistry.SUPPORTED_DUNDER:
-    setattr(ColExpr, dunder, create_operator(dunder))
-del create_operator
