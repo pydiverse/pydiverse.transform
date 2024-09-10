@@ -6,7 +6,6 @@ from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import col_expr, dtypes, verbs
 from pydiverse.transform.tree.col_expr import ColExpr, ColName
 from pydiverse.transform.tree.table_expr import TableExpr
-from pydiverse.transform.util.map2d import Map2d
 
 
 # inserts renames before Mutate, Summarise or Join to prevent duplicate column names.
@@ -67,40 +66,40 @@ def rename_overwritten_cols(expr: TableExpr) -> tuple[set[str], list[str]]:
 
 # returns Col -> ColName mapping and the list of available columns
 def propagate_names(
-    expr: TableExpr, needed_cols: Map2d[TableExpr, set[str]]
-) -> Map2d[TableExpr, dict[str, str]]:
+    expr: TableExpr, needed_cols: set[tuple[TableExpr, str]]
+) -> dict[tuple[TableExpr, str], str]:
     if isinstance(expr, verbs.UnaryVerb):
         for c in expr.col_exprs():
-            needed_cols.inner_update(col_expr.get_needed_cols(c))
+            needed_cols |= col_expr.get_needed_cols(c)
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.replace_col_exprs(
             functools.partial(col_expr.propagate_names, col_to_name=col_to_name)
         )
 
         if isinstance(expr, verbs.Rename):
-            col_to_name.inner_map(
-                lambda s: expr.name_map[s] if s in expr.name_map else s
-            )
+            col_to_name = {
+                key: (expr.name_map[name] if name in expr.name_map else name)
+                for key, name in col_to_name.items()
+            }
 
     elif isinstance(expr, verbs.Join):
-        needed_cols.inner_update(col_expr.get_needed_cols(expr.on))
+        needed_cols |= col_expr.get_needed_cols(expr.on)
         col_to_name = propagate_names(expr.left, needed_cols)
         col_to_name_right = propagate_names(expr.right, needed_cols)
-        col_to_name_right.inner_map(lambda name: name + expr.suffix)
-        col_to_name.inner_update(col_to_name_right)
+        col_to_name |= {
+            key: name + expr.suffix for key, name in col_to_name_right.items()
+        }
         expr.on = col_expr.propagate_names(expr.on, col_to_name)
 
     elif isinstance(expr, Table):
-        col_to_name = Map2d()
+        col_to_name = dict()
 
     else:
         raise AssertionError
 
-    if expr in needed_cols:
-        col_to_name.inner_update(
-            Map2d({expr: {name: name for name in needed_cols[expr]}})
-        )
-        del needed_cols[expr]
+    for table, name in needed_cols:
+        if expr is table:
+            col_to_name[(expr, name)] = name
 
     return col_to_name
 

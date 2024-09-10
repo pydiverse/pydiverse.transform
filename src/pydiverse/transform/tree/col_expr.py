@@ -14,7 +14,6 @@ from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.dtypes import DType, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 from pydiverse.transform.tree.table_expr import TableExpr
-from pydiverse.transform.util.map2d import Map2d
 
 
 class ColExpr:
@@ -278,34 +277,31 @@ def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> N
         assert isinstance(expr, (Col, ColName, LiteralCol))
 
 
-def get_needed_cols(expr: ColExpr | Order) -> Map2d[TableExpr, set[str]]:
+def get_needed_cols(expr: ColExpr | Order) -> set[tuple[TableExpr, str]]:
     if isinstance(expr, Order):
         return get_needed_cols(expr.order_by)
 
     if isinstance(expr, Col):
-        return Map2d({expr.table: {expr.name}})
+        return set({(expr.table, expr.name)})
 
     elif isinstance(expr, ColFn):
-        needed_cols = Map2d()
+        needed_cols = set()
         for val in itertools.chain(expr.args, *expr.context_kwargs.values()):
-            needed_cols.inner_update(get_needed_cols(val))
+            needed_cols |= get_needed_cols(val)
         return needed_cols
 
     elif isinstance(expr, CaseExpr):
         needed_cols = get_needed_cols(expr.default_val)
         for cond, val in expr.cases:
-            needed_cols.inner_update(get_needed_cols(cond))
-            needed_cols.inner_update(get_needed_cols(val))
+            needed_cols |= get_needed_cols(cond)
+            needed_cols |= get_needed_cols(val)
         return needed_cols
 
-    elif isinstance(expr, LiteralCol):
-        return Map2d()
-
-    return Map2d()
+    return set()
 
 
 def propagate_names(
-    expr: ColExpr | Order, col_to_name: Map2d[TableExpr, dict[str, str]]
+    expr: ColExpr | Order, col_to_name: dict[tuple[TableExpr, str], str]
 ) -> ColExpr | Order:
     if isinstance(expr, Order):
         return Order(
@@ -315,7 +311,7 @@ def propagate_names(
         )
 
     if isinstance(expr, Col):
-        return ColName(col_to_name[expr.table][expr.name])
+        return ColName(col_to_name[(expr.table, expr.name)])
 
     elif isinstance(expr, ColFn):
         return ColFn(
