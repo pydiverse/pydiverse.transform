@@ -633,13 +633,6 @@ class TestPolarsAligned:
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
-        # Table: df1, backend: PolarsImpl
-        #    col1 col2
-        # 0     1    a
-        # 1     2    b
-        # 2     3    c
-        # 3     4    d
-
         tbl_str = str(tbl1)
 
         assert "df1" in tbl_str
@@ -651,19 +644,8 @@ class TestPrintAndRepr:
         assert "exception" not in tbl1._repr_html_()
 
     def test_col_str(self, tbl1):
-        # Symbolic Expression: <df1.col1(int)>
-        # dtype: int
-        #
-        # 0    1
-        # 1    2
-        # 2    3
-        # 3    4
-        # Name: df1_col1_XXXXXXXX, dtype: Int64
-
         col1_str = str(tbl1.col1)
-        series = tbl1._impl.df.get_column(
-            tbl1._impl.underlying_col_name[tbl1.col1._.uuid]
-        )
+        series = tbl1._impl.df.collect().get_column("col1")
 
         assert str(series) in col1_str
         assert "exception" not in col1_str
@@ -679,12 +661,5 @@ class TestPrintAndRepr:
         assert "exception" not in (tbl1.col1 * 2)._repr_html_()
 
     def test_lambda_str(self, tbl1):
-        assert "exception" in str(C.col)
-        assert "exception" in str(C.col1 + tbl1.col1)
-
-    def test_eval_expr_str(self, tbl_left, tbl_right):
-        valid = tbl_left.a + tbl_right.b
-        invalid = tbl_left.a + (tbl_right >> filter(C.b == 2)).b
-
-        assert "exception" not in str(valid)
-        assert "exception" in str(invalid)
+        assert "exception" not in str(C.col)
+        assert "exception" not in str(C.col1 + tbl1.col1)

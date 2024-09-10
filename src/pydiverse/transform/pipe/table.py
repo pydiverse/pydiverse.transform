@@ -71,25 +71,31 @@ class Table(TableExpr, Generic[ImplT]):
 
     def __str__(self):
         try:
+            from pydiverse.transform.backend.targets import Polars
+            from pydiverse.transform.pipe.verbs import export
+
             return (
-                f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n"
-                f"{self._impl.to_polars().df}"
+                f"Table: {self.name}, backend: {type(self._impl).__name__}\n"
+                f"{self >> export(Polars(lazy=False))}"
             )
         except Exception as e:
             return (
-                f"Table: {self._impl.name}, backend: {type(self._impl).__name__}\n"
-                "Failed to collect table due to an exception:\n"
+                f"Table: {self.name}, backend: {type(self._impl).__name__}\n"
+                "failed to collect table due to an exception. "
                 f"{type(e).__name__}: {str(e)}"
             )
 
     def _repr_html_(self) -> str | None:
         html = (
-            f"Table <code>{self._impl.name}</code> using"
+            f"Table <code>{self.name}</code> using"
             f" <code>{type(self._impl).__name__}</code> backend:</br>"
         )
         try:
+            from pydiverse.transform.backend.targets import Polars
+            from pydiverse.transform.pipe.verbs import export
+
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
-            html += (self._impl.to_polars().df)._repr_html_()
+            html += (self >> export(Polars(lazy=False)))._repr_html_()
         except Exception as e:
             html += (
                 "</br><pre>Failed to collect table due to an exception:\n"
