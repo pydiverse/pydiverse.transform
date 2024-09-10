@@ -98,11 +98,15 @@ def drop(expr: TableExpr, *args: Col | ColName):
 
 @builtin_verb()
 def rename(expr: TableExpr, name_map: dict[str, str]):
+    if not isinstance(name_map, dict) or not name_map:
+        raise TypeError("`name_map` argument to `rename` must be a nonempty dict")
     return Rename(expr, name_map)
 
 
 @builtin_verb()
 def mutate(expr: TableExpr, **kwargs: ColExpr):
+    if not kwargs:
+        raise TypeError("`mutate` requires at least one name-column-pair")
     return Mutate(expr, list(kwargs.keys()), list(kwargs.values()))
 
 
@@ -129,18 +133,20 @@ outer_join = functools.partial(join, how="outer")
 
 
 @builtin_verb()
-def filter(expr: TableExpr, *args: ColExpr):
-    return Filter(expr, list(args))
+def filter(expr: TableExpr, predicate: ColExpr, *additional_predicates: ColExpr):
+    return Filter(expr, list(predicate, *additional_predicates))
 
 
 @builtin_verb()
-def arrange(expr: TableExpr, *args: ColExpr):
-    return Arrange(expr, list(Order.from_col_expr(ord) for ord in args))
+def arrange(expr: TableExpr, by: ColExpr, *additional_by: ColExpr):
+    return Arrange(expr, list(Order.from_col_expr(ord) for ord in (by, *additional_by)))
 
 
 @builtin_verb()
-def group_by(expr: TableExpr, *args: Col | ColName, add=False):
-    return GroupBy(expr, list(args), add)
+def group_by(
+    expr: TableExpr, col: Col | ColName, *additional_cols: Col | ColName, add=False
+):
+    return GroupBy(expr, list(col, *additional_cols), add)
 
 
 @builtin_verb()
@@ -150,6 +156,10 @@ def ungroup(expr: TableExpr):
 
 @builtin_verb()
 def summarise(expr: TableExpr, **kwargs: ColExpr):
+    if not kwargs:
+        # if we want to include the grouping columns after summarise by default,
+        # an empty summarise should be allowed
+        raise TypeError("`summarise` requires at least one name-column-pair")
     return Summarise(expr, list(kwargs.keys()), list(kwargs.values()))
 
 

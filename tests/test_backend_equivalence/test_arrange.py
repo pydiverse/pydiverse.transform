@@ -9,7 +9,9 @@ from tests.util import assert_result_equal
 
 
 def test_noop(df1):
-    assert_result_equal(df1, lambda t: t >> arrange())
+    assert_result_equal(
+        df1, lambda t: t >> arrange(), may_throw=True, exception=TypeError
+    )
 
 
 def test_arrange(df2):
