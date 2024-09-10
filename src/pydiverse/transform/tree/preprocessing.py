@@ -24,7 +24,7 @@ def rename_overwritten_cols(expr: TableExpr) -> tuple[set[str], list[str]]:
 
         if overwritten:
             expr.table = verbs.Rename(
-                expr.table, {name: name + str(hash(expr)) for name in overwritten}
+                expr.table, {name: f"{name}_{str(hash(expr))}" for name in overwritten}
             )
             for val in expr.values:
                 col_expr.rename_overwritten_cols(val, expr.table.name_map)
@@ -34,7 +34,7 @@ def rename_overwritten_cols(expr: TableExpr) -> tuple[set[str], list[str]]:
 
         available_cols |= set(
             {
-                (name if name not in overwritten else name + str(hash(expr)))
+                (name if name not in overwritten else f"{name}_{str(hash(expr))}")
                 for name in expr.names
             }
         )

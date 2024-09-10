@@ -161,7 +161,7 @@ class SqlImpl(TableImpl):
 
             value: sqa.ColumnElement = impl(*args)
 
-            if partition_by or order_by:
+            if partition_by is not None or order_by is not None:
                 value = value.over(partition_by=partition_by, order_by=order_by)
 
             return value
@@ -599,7 +599,7 @@ with SqlImpl.op(ops.StrToLower()) as op:
 with SqlImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
-    def _replace(x, y, z):
+    def _replace_all(x, y, z):
         return sqa.func.REPLACE(x, y, z, type_=x.type)
 
 

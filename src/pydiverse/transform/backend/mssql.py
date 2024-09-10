@@ -268,7 +268,7 @@ with MsSqlImpl.op(ops.StrLen()) as op:
 with MsSqlImpl.op(ops.StrReplaceAll()) as op:
 
     @op.auto
-    def _replace(x, y, z):
+    def _replace_all(x, y, z):
         x = x.collate("Latin1_General_CS_AS")
         return sqa.func.REPLACE(x, y, z, type_=x.type)
 

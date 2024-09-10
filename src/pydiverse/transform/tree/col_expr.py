@@ -87,7 +87,9 @@ class ColName(ColExpr):
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
         self.val = val
-        super().__init__(python_type_to_pdt(type(val)))
+        dtype = python_type_to_pdt(type(val))
+        dtype.const = True
+        super().__init__(dtype)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.val} ({self.dtype})>"
@@ -269,8 +271,8 @@ def get_needed_cols(expr: ColExpr | Order) -> Map2d[TableExpr, set[str]]:
 
     elif isinstance(expr, ColFn):
         needed_cols = Map2d()
-        for v in itertools.chain(expr.args, expr.context_kwargs.values()):
-            needed_cols.inner_update(get_needed_cols(v))
+        for val in itertools.chain(expr.args, *expr.context_kwargs.values()):
+            needed_cols.inner_update(get_needed_cols(val))
         return needed_cols
 
     elif isinstance(expr, CaseExpr):

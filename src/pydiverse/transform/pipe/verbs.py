@@ -134,7 +134,7 @@ outer_join = functools.partial(join, how="outer")
 
 @builtin_verb()
 def filter(expr: TableExpr, predicate: ColExpr, *additional_predicates: ColExpr):
-    return Filter(expr, list(predicate, *additional_predicates))
+    return Filter(expr, list((predicate, *additional_predicates)))
 
 
 @builtin_verb()
@@ -146,7 +146,7 @@ def arrange(expr: TableExpr, by: ColExpr, *additional_by: ColExpr):
 def group_by(
     expr: TableExpr, col: Col | ColName, *additional_cols: Col | ColName, add=False
 ):
-    return GroupBy(expr, list(col, *additional_cols), add)
+    return GroupBy(expr, list((col, *additional_cols)), add)
 
 
 @builtin_verb()
