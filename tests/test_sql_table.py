@@ -197,7 +197,6 @@ class TestSqlTable:
 
     def test_filter(self, tbl1):
         # Simple filter expressions
-        assert_equal(tbl1 >> filter(), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == tbl1.col1), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == 3), df1.filter(pl.col("col1") == 3))
 

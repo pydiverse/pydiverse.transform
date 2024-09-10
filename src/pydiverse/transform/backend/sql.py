@@ -179,7 +179,7 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(expr, LiteralCol):
-            return sqa.literal(expr.val, type_=pdt_type_to_sqa(expr.dtype))
+            return expr.val
 
         raise AssertionError
 

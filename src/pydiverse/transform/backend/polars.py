@@ -166,7 +166,7 @@ def compile_col_expr(expr: ColExpr) -> pl.Expr:
         return compiled.otherwise(compile_col_expr(expr.default_val))
 
     elif isinstance(expr, LiteralCol):
-        return pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype))
+        return expr.val
 
     else:
         raise AssertionError
@@ -592,7 +592,9 @@ with PolarsImpl.op(ops.IsIn()) as op:
 
     @op.auto
     def _isin(x, *values):
-        return pl.any_horizontal(x == v for v in values)
+        return pl.any_horizontal(
+            (x == v if v is not None else x.is_null()) for v in values
+        )
 
 
 with PolarsImpl.op(ops.StrContains()) as op:

@@ -43,7 +43,7 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
         if ord.nulls_last is True and not ord.descending:
             new_list.append(
                 Order(
-                    CaseExpr([(ord.order_by.is_null(), LiteralCol(1))], LiteralCol(0)),
+                    CaseExpr([(ord.order_by.is_null(), 1)], 0),
                     False,
                     None,
                 )
@@ -51,7 +51,7 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
         elif ord.nulls_last is False and ord.descending:
             new_list.append(
                 Order(
-                    CaseExpr([(ord.order_by.is_null(), LiteralCol(0))], LiteralCol(1)),
+                    CaseExpr([(ord.order_by.is_null(), 0)], 1),
                     True,
                     None,
                 )
@@ -133,11 +133,11 @@ def convert_col_bool_bit(
 
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr(
-                    [(converted, LiteralCol(1)), (~converted, LiteralCol(0))],
-                    LiteralCol(None),
+                    [(converted, 1), (~converted, 0)],
+                    None,
                 )
             elif not wants_bool_as_bit and returns_bool_as_bit:
-                return ColFn("__eq__", converted, LiteralCol(1), dtype=dtypes.Bool())
+                return ColFn("__eq__", converted, 1, dtype=dtypes.Bool())
 
         return converted
 
