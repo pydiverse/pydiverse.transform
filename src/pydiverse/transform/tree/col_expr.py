@@ -280,7 +280,7 @@ def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> N
         # TODO: backend agnostic registry
         from pydiverse.transform.backend.polars import PolarsImpl
 
-        impl = PolarsImpl.operator_registry.get_operator(expr.name)
+        impl = PolarsImpl.registry.get_op(expr.name)
         # TODO: what exactly are WINDOW / AGGREGATE fns? for the user? for the backend?
         if (
             impl.ftype in (OpType.WINDOW, OpType.AGGREGATE)
@@ -387,7 +387,7 @@ def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
         # TODO: create a backend agnostic registry
         from pydiverse.transform.backend.polars import PolarsImpl
 
-        typed_fn.dtype = PolarsImpl.operator_registry.get_implementation(
+        typed_fn.dtype = PolarsImpl.registry.get_impl(
             expr.name, [arg.dtype for arg in typed_fn.args]
         ).return_type
         return typed_fn

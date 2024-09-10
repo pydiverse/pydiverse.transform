@@ -130,7 +130,7 @@ class SqlImpl(TableImpl):
             args: list[sqa.ColumnElement] = [
                 cls.compile_col_expr(arg, name_to_sqa_col) for arg in expr.args
             ]
-            impl = cls.operator_registry.get_implementation(
+            impl = cls.registry.get_impl(
                 expr.name, tuple(arg.dtype for arg in expr.args)
             )
 

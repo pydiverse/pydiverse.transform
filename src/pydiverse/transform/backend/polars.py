@@ -82,9 +82,9 @@ def compile_col_expr(expr: ColExpr) -> pl.Expr:
         return pl.col(expr.name)
 
     elif isinstance(expr, ColFn):
-        op = PolarsImpl.operator_registry.get_operator(expr.name)
+        op = PolarsImpl.registry.get_op(expr.name)
         args: list[pl.Expr] = [compile_col_expr(arg) for arg in expr.args]
-        impl = PolarsImpl.operator_registry.get_implementation(
+        impl = PolarsImpl.registry.get_impl(
             expr.name,
             tuple(arg.dtype for arg in expr.args),
         )
@@ -113,6 +113,8 @@ def compile_col_expr(expr: ColExpr) -> pl.Expr:
             # anyways so it need not be done here.
             args = [
                 arg.sort_by(by=order_by, descending=descending, nulls_last=nulls_last)
+                if isinstance(arg, pl.Expr)
+                else arg
                 for arg in args
             ]
 

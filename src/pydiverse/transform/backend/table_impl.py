@@ -49,7 +49,7 @@ class TableImpl:
             summarising operation.
     """
 
-    operator_registry = OperatorRegistry("AbstractTableImpl")
+    registry = OperatorRegistry("AbstractTableImpl")
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -62,7 +62,7 @@ class TableImpl:
             if hasattr(super_cls, "operator_registry"):
                 super_reg = super_cls.operator_registry
                 break
-        cls.operator_registry = OperatorRegistry(cls.__name__, super_reg)
+        cls.registry = OperatorRegistry(cls.__name__, super_reg)
 
     @staticmethod
     def build_query(expr: TableExpr) -> str | None: ...
@@ -112,9 +112,7 @@ class TableImpl:
 
     @classmethod
     def op(cls, operator: Operator, **kwargs) -> OperatorRegistrationContextManager:
-        return OperatorRegistrationContextManager(
-            cls.operator_registry, operator, **kwargs
-        )
+        return OperatorRegistrationContextManager(cls.registry, operator, **kwargs)
 
     #### Helpers ####
 

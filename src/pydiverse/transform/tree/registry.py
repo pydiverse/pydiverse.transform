@@ -228,7 +228,7 @@ class OperatorRegistry:
         self.registered_ops.add(operator)
         self.ALL_REGISTERED_OPS.add(name)
 
-    def get_operator(self, name: str) -> Operator | None:
+    def get_op(self, name: str) -> Operator | None:
         if impl_store := self.implementations.get(name, None):
             return impl_store.operator
 
@@ -238,7 +238,7 @@ class OperatorRegistry:
             raise ValueError(f"No implementation for operator '{name}' found")
         return self.super_registry.get_operator(name)
 
-    def add_implementation(
+    def add_impl(
         self,
         operator: Operator,
         impl: Callable,
@@ -262,7 +262,7 @@ class OperatorRegistry:
         else:
             implementation_store.add_implementation(op_impl)
 
-    def get_implementation(self, name, args_signature) -> TypedOperatorImpl:
+    def get_impl(self, name, args_signature) -> TypedOperatorImpl:
         if name not in self.ALL_REGISTERED_OPS:
             raise ValueError(f"No operator named '{name}'.")
 
@@ -573,7 +573,7 @@ class OperatorRegistrationContextManager:
             raise TypeError("Signature must be of type str.")
 
         def decorator(func):
-            self.registry.add_implementation(
+            self.registry.add_impl(
                 self.operator,
                 func,
                 signature,
@@ -591,7 +591,7 @@ class OperatorRegistrationContextManager:
             raise ValueError(f"Operator {self.operator} has not default signatures.")
 
         for signature in self.operator.signatures:
-            self.registry.add_implementation(
+            self.registry.add_impl(
                 self.operator,
                 func,
                 signature,
@@ -609,7 +609,7 @@ class OperatorRegistrationContextManager:
 
         def decorator(func):
             for sig in extension.signatures:
-                self.registry.add_implementation(self.operator, func, sig, variant)
+                self.registry.add_impl(self.operator, func, sig, variant)
             return func
 
         return decorator
