@@ -1,14 +1,6 @@
 from __future__ import annotations
 
-import copy
 from functools import partial, reduce, wraps
-from typing import Any
-
-from pydiverse.transform.core.util import bidict, traverse
-from pydiverse.transform.tree.col_expr import (
-    Col,
-    ColName,
-)
 
 
 class Pipeable:
@@ -60,18 +52,9 @@ class inverse_partial(partial):
 
 
 def verb(func):
-    from pydiverse.transform.pipe.table import Table
-
-    def copy_tables(arg: Any = None):
-        return traverse(arg, lambda x: copy.copy(x) if isinstance(x, Table) else x)
-
     @wraps(func)
     def wrapper(*args, **kwargs):
-        # Copy Table objects to prevent mutating them
-        # This can be the case if the user uses __setitem__ inside the verb
         def f(*args, **kwargs):
-            args = copy_tables(args)
-            kwargs = copy_tables(kwargs)
             return func(*args, **kwargs)
 
         f = inverse_partial(f, *args, **kwargs)  # Bind arguments
@@ -91,56 +74,3 @@ def builtin_verb(backends=None):
         return wrapper
 
     return decorator
-
-
-# Helper
-
-
-def col_to_table(arg: Any = None):
-    """
-    Takes a single argument and if it is a column, replaces it with a table
-    implementation that only contains that one column.
-
-    This allows for more eager style code where you perform operations on
-    columns like with the following example::
-
-        def get_c(b, tB):
-            tC = b >> left_join(tB, b == tB.b)
-            return tC[tB.c]
-        feature_col = get_c(tblA.b, tblB)
-
-    """
-    from pydiverse.transform.pipe.verbs import select
-
-    if isinstance(arg, Col):
-        table = (arg.table >> select(arg))._impl
-        col = table.get_col(arg)
-
-        table.available_cols = {col.uuid}
-        table.named_cols = bidict({col.name: col.uuid})
-        return table
-    elif isinstance(arg, ColName):
-        raise ValueError("Can't start a pipe with a lambda column.")
-
-    return arg
-
-
-def unwrap_tables(arg: Any = None):
-    """
-    Takes an instance or collection of `Table` objects and replaces them with
-    their implementation.
-    """
-    from pydiverse.transform.pipe.table import Table
-
-    return traverse(arg, lambda x: x._impl if isinstance(x, Table) else x)
-
-
-def wrap_tables(arg: Any = None):
-    """
-    Takes an instance or collection of `AbstractTableImpl` objects and wraps
-    them in a `Table` object. This is an inverse to the `unwrap_tables` function.
-    """
-    from pydiverse.transform.backend.table_impl import AbstractTableImpl
-    from pydiverse.transform.pipe.table import Table
-
-    return traverse(arg, lambda x: Table(x) if isinstance(x, AbstractTableImpl) else x)

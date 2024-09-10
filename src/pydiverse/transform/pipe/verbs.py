@@ -6,9 +6,6 @@ from typing import Literal
 from pydiverse.transform import tree
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Target
-from pydiverse.transform.core.util import (
-    ordered_set,
-)
 from pydiverse.transform.pipe.pipeable import builtin_verb
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
@@ -102,45 +99,6 @@ def drop(expr: TableExpr, *args: Col | ColName):
 @builtin_verb()
 def rename(expr: TableExpr, name_map: dict[str, str]):
     return Rename(expr, name_map)
-    # Type check
-    for k, v in name_map.items():
-        if not isinstance(k, str) or not isinstance(v, str):
-            raise TypeError(
-                f"Key and Value of `name_map` must both be strings: ({k!r}, {v!r})"
-            )
-
-    # Reference col that doesn't exist
-    if missing_cols := name_map.keys() - expr.named_cols.fwd.keys():
-        raise KeyError("Table has no columns named: " + ", ".join(missing_cols))
-
-    # Can't rename two cols to the same name
-    _seen = set()
-    if duplicate_names := {
-        name for name in name_map.values() if name in _seen or _seen.add(name)
-    }:
-        raise ValueError(
-            "Can't rename multiple columns to the same name: "
-            + ", ".join(duplicate_names)
-        )
-
-    # Can't rename a column to one that already exists
-    unmodified_cols = expr.named_cols.fwd.keys() - name_map.keys()
-    if duplicate_names := unmodified_cols & set(name_map.values()):
-        raise ValueError(
-            "Table already contains columns named: " + ", ".join(duplicate_names)
-        )
-
-    # Rename
-    new_tbl = expr.copy()
-    new_tbl.selects = ordered_set(name_map.get(name, name) for name in new_tbl.selects)
-
-    uuid_name_map = {new_tbl.named_cols.fwd[old]: new for old, new in name_map.items()}
-    for uuid in uuid_name_map:
-        del new_tbl.named_cols.bwd[uuid]
-    for uuid, name in uuid_name_map.items():
-        new_tbl.named_cols.bwd[uuid] = name
-
-    return new_tbl
 
 
 @builtin_verb()
