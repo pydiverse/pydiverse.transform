@@ -44,6 +44,17 @@ class ColExpr:
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
+    def map(
+        self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr = None
+    ) -> CaseExpr:
+        return CaseExpr(
+            (
+                (self.isin(*(key if isinstance(key, Iterable) else (key,))), val)
+                for key, val in mapping.items()
+            ),
+            default,
+        )
+
 
 class Col(ColExpr, Generic[ImplT]):
     def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
@@ -96,12 +107,17 @@ class LiteralCol(ColExpr):
 
 
 class ColFn(ColExpr):
-    def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr]):
+    def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
         self.args = list(args)
         self.context_kwargs = {
             key: val for key, val in kwargs.items() if val is not None
         }
+        if arrange := self.context_kwargs.get("arrange"):
+            self.context_kwargs["arrange"] = [
+                Order.from_col_expr(expr) if isinstance(expr, ColExpr) else expr
+                for expr in arrange
+            ]
         super().__init__()
 
     def __repr__(self) -> str:
