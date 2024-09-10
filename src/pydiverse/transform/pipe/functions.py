@@ -3,7 +3,6 @@ from __future__ import annotations
 from pydiverse.transform.tree.col_expr import (
     ColExpr,
     ColFn,
-    Order,
     WhenClause,
 )
 
@@ -27,7 +26,7 @@ def count(expr: ColExpr | None = None):
 def row_number(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
     return ColFn(
         "row_number",
-        arrange=[Order.from_col_expr(ord) for ord in arrange],
+        arrange=arrange,
         partition_by=partition_by,
     )
 
@@ -35,7 +34,7 @@ def row_number(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = N
 def rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
     return ColFn(
         "rank",
-        arrange=[Order.from_col_expr(ord) for ord in arrange],
+        arrange=arrange,
         partition_by=partition_by,
     )
 
@@ -43,7 +42,7 @@ def rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
 def dense_rank(*, arrange: list[ColExpr], partition_by: list[ColExpr] | None = None):
     return ColFn(
         "dense_rank",
-        arrange=[Order.from_col_expr(ord) for ord in arrange],
+        arrange=arrange,
         partition_by=partition_by,
     )
 

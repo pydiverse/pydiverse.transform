@@ -159,10 +159,17 @@ class SqlImpl(TableImpl):
                 ]
                 raise NotImplementedError
 
-            value: sqa.ColumnElement = impl(*args)
+            # we need this since some backends cannot do `any` / `all` as a window
+            # function, so we need to emulate it via `max` / `min`.
+            if (partition_by is not None or order_by is not None) and (
+                window_impl := impl.get_variant("window")
+            ):
+                value = window_impl(*args, partition_by=partition_by, order_by=order_by)
 
-            if partition_by is not None or order_by is not None:
-                value = value.over(partition_by=partition_by, order_by=order_by)
+            else:
+                value: sqa.ColumnElement = impl(*args)
+                if partition_by is not None or order_by is not None:
+                    value = value.over(partition_by=partition_by, order_by=order_by)
 
             return value
 
@@ -543,11 +550,7 @@ with SqlImpl.op(ops.Round()) as op:
 with SqlImpl.op(ops.IsIn()) as op:
 
     @op.auto
-    def _isin(x, *values, _verb=None):
-        if _verb == "filter":
-            # In WHERE and HAVING clause, we can use the IN operator
-            return x.in_(values)
-        # In SELECT we must replace it with the corresponding boolean expression
+    def _isin(x, *values):
         return functools.reduce(operator.or_, map(lambda v: x == v, values))
 
 
@@ -759,11 +762,11 @@ with SqlImpl.op(ops.Any()) as op:
         return sqa.func.coalesce(sqa.func.max(x), sqa.false())
 
     @op.auto(variant="window")
-    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+    def _any(x, *, partition_by=None, order_by=None):
         return sqa.func.coalesce(
             sqa.func.max(x).over(
-                partition_by=_window_partition_by,
-                order_by=_window_order_by,
+                partition_by=partition_by,
+                order_by=order_by,
             ),
             sqa.false(),
         )
@@ -776,11 +779,11 @@ with SqlImpl.op(ops.All()) as op:
         return sqa.func.coalesce(sqa.func.min(x), sqa.false())
 
     @op.auto(variant="window")
-    def _all(x, *, _window_partition_by=None, _window_order_by=None):
+    def _all(x, *, partition_by=None, order_by=None):
         return sqa.func.coalesce(
             sqa.func.min(x).over(
-                partition_by=_window_partition_by,
-                order_by=_window_order_by,
+                partition_by=partition_by,
+                order_by=order_by,
             ),
             sqa.false(),
         )
@@ -813,18 +816,18 @@ with SqlImpl.op(ops.Shift()) as op:
         by,
         empty_value=None,
         *,
-        _window_partition_by=None,
-        _window_order_by=None,
+        partition_by=None,
+        order_by=None,
     ):
         if by == 0:
             return x
         if by > 0:
             return sqa.func.LAG(x, by, empty_value, type_=x.type).over(
-                partition_by=_window_partition_by, order_by=_window_order_by
+                partition_by=partition_by, order_by=order_by
             )
         if by < 0:
             return sqa.func.LEAD(x, -by, empty_value, type_=x.type).over(
-                partition_by=_window_partition_by, order_by=_window_order_by
+                partition_by=partition_by, order_by=order_by
             )
 
 

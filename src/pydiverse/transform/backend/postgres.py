@@ -93,11 +93,11 @@ with PostgresImpl.op(ops.Any()) as op:
         return sa.func.coalesce(sa.func.BOOL_OR(x, type_=sa.Boolean()), sa.false())
 
     @op.auto(variant="window")
-    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+    def _any(x, *, partition_by=None, order_by=None):
         return sa.func.coalesce(
             sa.func.BOOL_OR(x, type_=sa.Boolean()).over(
-                partition_by=_window_partition_by,
-                order_by=_window_order_by,
+                partition_by=partition_by,
+                order_by=order_by,
             ),
             sa.false(),
         )
@@ -110,11 +110,11 @@ with PostgresImpl.op(ops.All()) as op:
         return sa.func.coalesce(sa.func.BOOL_AND(x, type_=sa.Boolean()), sa.false())
 
     @op.auto(variant="window")
-    def _all(x, *, _window_partition_by=None, _window_order_by=None):
+    def _all(x, *, partition_by=None, order_by=None):
         return sa.func.coalesce(
             sa.func.BOOL_AND(x, type_=sa.Boolean()).over(
-                partition_by=_window_partition_by,
-                order_by=_window_order_by,
+                partition_by=partition_by,
+                order_by=order_by,
             ),
             sa.false(),
         )
