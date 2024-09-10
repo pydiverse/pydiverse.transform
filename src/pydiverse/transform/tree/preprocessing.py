@@ -4,7 +4,7 @@ import functools
 
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import col_expr, dtypes, verbs
-from pydiverse.transform.tree.col_expr import ColExpr, ColName
+from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -69,8 +69,11 @@ def propagate_names(
     expr: TableExpr, needed_cols: set[tuple[TableExpr, str]]
 ) -> dict[tuple[TableExpr, str], str]:
     if isinstance(expr, verbs.UnaryVerb):
-        for c in expr.col_exprs():
-            needed_cols |= col_expr.get_needed_cols(c)
+        for col in expr.col_exprs():
+            for node in col.iter_nodes():
+                if isinstance(node, Col):
+                    needed_cols.add((node.table, node.name))
+
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.replace_col_exprs(
             functools.partial(col_expr.propagate_names, col_to_name=col_to_name)
@@ -83,7 +86,10 @@ def propagate_names(
             }
 
     elif isinstance(expr, verbs.Join):
-        needed_cols |= col_expr.get_needed_cols(expr.on)
+        for node in expr.on.iter_nodes():
+            if isinstance(node, Col):
+                needed_cols.add((node.table, node.name))
+
         col_to_name = propagate_names(expr.left, needed_cols)
         col_to_name_right = propagate_names(expr.right, needed_cols)
         col_to_name |= {

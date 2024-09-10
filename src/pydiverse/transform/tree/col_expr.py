@@ -54,6 +54,10 @@ class ColExpr:
             default,
         )
 
+    # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
+    # and `Order` expressions are not yielded.
+    def iter_nodes(self) -> Iterable[ColExpr]: ...
+
 
 class Col(ColExpr, Generic[ImplT]):
     def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
@@ -81,6 +85,9 @@ class Col(ColExpr, Generic[ImplT]):
                 + f"{e.__class__.__name__}: {str(e)}"
             )
 
+    def iter_nodes(self) -> Iterable[ColExpr]:
+        yield self
+
 
 class ColName(ColExpr):
     def __init__(self, name: str, dtype: DType | None = None):
@@ -93,6 +100,9 @@ class ColName(ColExpr):
             f"{f" ({self.dtype})" if self.dtype else ""}>"
         )
 
+    def iter_nodes(self) -> Iterable[ColExpr]:
+        yield self
+
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
@@ -103,6 +113,9 @@ class LiteralCol(ColExpr):
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.val} ({self.dtype})>"
+
+    def iter_nodes(self) -> Iterable[ColExpr]:
+        yield self
 
 
 class ColFn(ColExpr):
@@ -124,6 +137,14 @@ class ColFn(ColExpr):
             f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
         ]
         return f'{self.name}({", ".join(args)})'
+
+    def iter_nodes(self) -> Iterable[ColExpr]:
+        yield self
+        for val in itertools.chain(self.args, *self.context_kwargs.values()):
+            if isinstance(val, ColExpr):
+                yield from val.iter_nodes()
+            elif isinstance(val, Order):
+                yield from val.order_by.iter_nodes()
 
 
 class WhenClause:
@@ -165,6 +186,14 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             raise TypeError("cannot call `otherwise` twice on a case expression")
         return CaseExpr(self.cases, value)
+
+    def iter_nodes(self) -> Iterable[ColExpr]:
+        yield self
+        for expr in itertools.chain.from_iterable(self.cases):
+            if isinstance(expr, ColExpr):
+                yield from expr.iter_nodes()
+        if isinstance(self.default_val, ColExpr):
+            yield self.default_val
 
 
 @dataclasses.dataclass
