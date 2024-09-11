@@ -9,7 +9,7 @@ import operator
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
+from pydiverse.transform.errors import DataTypeError, FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.dtypes import Bool, Dtype, python_type_to_pdt
@@ -54,7 +54,12 @@ class ColExpr:
     ) -> CaseExpr:
         return CaseExpr(
             (
-                (self.isin(*(key if isinstance(key, Iterable) else (key,))), val)
+                (
+                    self.isin(
+                        *wrap_literal(key if isinstance(key, Iterable) else (key,))
+                    ),
+                    wrap_literal(val),
+                )
                 for key, val in mapping.items()
             ),
             default,
@@ -304,11 +309,11 @@ class CaseExpr(ColExpr):
                 ]
             )
         except Exception as e:
-            raise ExpressionTypeError(f"invalid case expression: {e}") from ...
+            raise DataTypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
             if not isinstance(cond.dtype, Bool):
-                raise ExpressionTypeError(
+                raise DataTypeError(
                     f"invalid case expression: condition {cond} has type {cond.dtype} "
                     "but all conditions must be boolean"
                 )
@@ -596,7 +601,7 @@ def clone(
                 (clone(cond, table_map), clone(val, table_map))
                 for cond, val in expr.cases
             ],
-            clone(expr.default_val, table_map),
+            clone(wrap_literal(expr.default_val), table_map),
         )
 
     raise AssertionError

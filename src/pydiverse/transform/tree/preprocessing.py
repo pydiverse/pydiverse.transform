@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 
+from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import col_expr, verbs
@@ -145,6 +146,16 @@ def propagate_types(
             ftype_map.update(
                 {name: value.ftype for name, value in zip(expr.names, expr.values)}
             )
+
+        if isinstance(expr, verbs.Summarise):
+            for node in expr.iter_col_nodes():
+                if node.ftype == Ftype.WINDOW:
+                    # TODO: keep a mapping str -> ColExpr to the expanded expressions.
+                    # Then traverse that expression and find the name of the window fn.
+                    raise FunctionTypeError(
+                        f"forbidden window function in expression `{node}` in "
+                        "`summarise`"
+                    )
 
     elif isinstance(expr, verbs.Join):
         dtype_map, ftype_map = propagate_types(expr.left)

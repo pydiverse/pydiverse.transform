@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
+from pydiverse.transform.errors import DataTypeError, FunctionTypeError
 from pydiverse.transform.pipe.verbs import (
     group_by,
     mutate,
@@ -118,7 +118,7 @@ def test_invalid_value_dtype(df4):
                 }
             )
         ),
-        exception=ExpressionTypeError,
+        exception=DataTypeError,
     )
 
 

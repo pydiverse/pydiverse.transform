@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from types import NoneType
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.errors import ExpressionTypeError
+from pydiverse.transform.errors import DataTypeError
 
 
 class Dtype(ABC):
@@ -228,6 +228,6 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
             promoted = dtype
             continue
 
-        raise ExpressionTypeError(f"incompatible types {dtype} and {promoted}")
+        raise DataTypeError(f"incompatible types {dtype} and {promoted}")
 
     return promoted

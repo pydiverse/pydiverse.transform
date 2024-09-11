@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from functools import partial
 from typing import TYPE_CHECKING, Callable
 
-from pydiverse.transform.errors import ExpressionTypeError
+from pydiverse.transform.errors import DataTypeError
 from pydiverse.transform.tree import dtypes
 
 if TYPE_CHECKING:
@@ -535,7 +535,7 @@ class OperatorImplStore:
                             for name, types_ in templates.items()
                         }
                         yield node, templates, type_promotion_indices
-                    except ExpressionTypeError:
+                    except DataTypeError:
                         print(f"Can't promote: {templates}")
                         pass
 
