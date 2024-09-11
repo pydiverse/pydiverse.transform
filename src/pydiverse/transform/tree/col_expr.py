@@ -18,14 +18,10 @@ from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class ColExpr:
-    __slots__ = ["dtype", "ftype"]
+    __slots__ = ["_dtype", "_ftype"]
 
     __contains__ = None
     __iter__ = None
-
-    def __init__(self, dtype: Dtype | None = None, ftype: Ftype | None = None):
-        self.dtype = dtype
-        self.ftype = ftype
 
     def __getattr__(self, name: str) -> FnAttr:
         if name.startswith("_") and name.endswith("_"):
@@ -45,9 +41,9 @@ class ColExpr:
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
-    def get_dtype(self) -> Dtype: ...
+    def dtype(self) -> Dtype: ...
 
-    def get_ftype(self, agg_is_window: bool) -> Ftype: ...
+    def ftype(self, agg_is_window: bool) -> Ftype: ...
 
     def map(
         self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr = None
@@ -79,17 +75,15 @@ class Col(ColExpr):
         self,
         name: str,
         table: TableExpr,
-        dtype: Dtype | None = None,
-        ftype: Ftype | None = None,
     ) -> Col:
         self.name = name
         self.table = table
-        super().__init__(dtype, ftype)
+        self._dtype, self._ftype = table.schema[name]
 
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__} {self.table.name}.{self.name}"
-            f"{f" ({self.dtype})" if self.dtype else ""}>"
+            f"({self.dtype()})>"
         )
 
     def __str__(self) -> str:
@@ -112,24 +106,25 @@ class ColName(ColExpr):
         self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None
     ):
         self.name = name
-        super().__init__(dtype, ftype)
+        self._dtype = dtype
+        self._ftype = ftype
 
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__} C.{self.name}"
-            f"{f" ({self.dtype})" if self.dtype else ""}>"
+            f"{f" ({self.dtype()})" if self.dtype() else ""}>"
         )
 
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
         self.val = val
-        dtype = python_type_to_pdt(type(val))
-        dtype.const = True
-        super().__init__(dtype, Ftype.EWISE)
+        self._dtype = python_type_to_pdt(type(val))
+        self._dtype.const = True
+        self._ftype = Ftype.EWISE
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} {self.val} ({self.dtype})>"
+        return f"<{self.__class__.__name__} {self.val} ({self.dtype()})>"
 
 
 class ColFn(ColExpr):
@@ -142,7 +137,6 @@ class ColFn(ColExpr):
                 Order.from_col_expr(expr) if isinstance(expr, ColExpr) else expr
                 for expr in arrange
             ]
-        super().__init__()
 
     def __repr__(self) -> str:
         args = [repr(e) for e in self.args] + [
@@ -164,7 +158,7 @@ class ColFn(ColExpr):
         }
         return g(new_fn)
 
-    def get_ftype(self, agg_is_window: bool):
+    def ftype(self, agg_is_window: bool):
         """
         Determine the ftype based on a function implementation and the arguments.
 
@@ -176,14 +170,14 @@ class ColFn(ColExpr):
         function raises an Exception.
         """
 
-        if self.ftype is not None:
-            return self.ftype
+        if self._ftype is not None:
+            return self._ftype
 
         from pydiverse.transform.backend.polars import PolarsImpl
 
         op = PolarsImpl.registry.get_op(self.name)
 
-        ftypes = [arg.ftype for arg in self.args]
+        ftypes = [arg.ftype() for arg in self.args]
         if op.ftype == Ftype.AGGREGATE and agg_is_window:
             op_ftype = Ftype.WINDOW
         else:
@@ -191,11 +185,11 @@ class ColFn(ColExpr):
 
         if op_ftype == Ftype.EWISE:
             if Ftype.WINDOW in ftypes:
-                self.ftype = Ftype.WINDOW
+                self._ftype = Ftype.WINDOW
             elif Ftype.AGGREGATE in ftypes:
-                self.ftype = Ftype.AGGREGATE
+                self._ftype = Ftype.AGGREGATE
             else:
-                self.ftype = op_ftype
+                self._ftype = op_ftype
 
         elif op_ftype == Ftype.AGGREGATE:
             if Ftype.WINDOW in ftypes:
@@ -209,7 +203,7 @@ class ColFn(ColExpr):
                     "cannot nest an aggregate function inside an aggregate function"
                     f" ({op.name})."
                 )
-            self.ftype = op_ftype
+            self._ftype = op_ftype
 
         else:
             if Ftype.WINDOW in ftypes:
@@ -217,9 +211,9 @@ class ColFn(ColExpr):
                     "cannot nest a window function inside a window function"
                     f" ({op.name})."
                 )
-            self.ftype = op_ftype
+            self._ftype = op_ftype
 
-        return self.ftype
+        return self._ftype
 
 
 @dataclasses.dataclass
@@ -273,16 +267,6 @@ class CaseExpr(ColExpr):
             + f"default={self.default_val}>"
         )
 
-    def when(self, condition: ColExpr) -> WhenClause:
-        if self.default_val is not None:
-            raise TypeError("cannot call `when` on a case expression after `otherwise`")
-        return WhenClause(self.cases, wrap_literal(condition))
-
-    def otherwise(self, value: ColExpr) -> CaseExpr:
-        if self.default_val is not None:
-            raise TypeError("cannot call `otherwise` twice on a case expression")
-        return CaseExpr(self.cases, wrap_literal(value))
-
     def iter_nodes(self) -> Iterable[ColExpr]:
         for expr in itertools.chain.from_iterable(self.cases):
             yield from expr.iter_nodes()
@@ -297,45 +281,45 @@ class CaseExpr(ColExpr):
         new_case_expr.default_val = self.default_val.map_nodes(g)
         return g(new_case_expr)
 
-    def get_dtype(self):
-        if self.dtype is not None:
-            return self.dtype
+    def dtype(self):
+        if self._dtype is not None:
+            return self._dtype
 
         try:
-            self.dtype = dtypes.promote_dtypes(
+            self._dtype = dtypes.promote_dtypes(
                 [
-                    self.default_val.dtype.without_modifiers(),
-                    *(val.dtype.without_modifiers() for _, val in self.cases),
+                    self.default_val.dtype().without_modifiers(),
+                    *(val.dtype().without_modifiers() for _, val in self.cases),
                 ]
             )
         except Exception as e:
             raise DataTypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
-            if not isinstance(cond.dtype, Bool):
+            if not isinstance(cond.dtype(), Bool):
                 raise DataTypeError(
-                    f"invalid case expression: condition {cond} has type {cond.dtype} "
-                    "but all conditions must be boolean"
+                    "invalid case expression: condition {cond} has type "
+                    f"{cond.dtype()} but all conditions must be boolean"
                 )
 
-    def get_ftype(self):
-        if self.ftype is not None:
-            return self.ftype
+    def ftype(self):
+        if self._ftype is not None:
+            return self._ftype
 
         val_ftypes = set()
-        if self.default_val is not None and not self.default_val.dtype.const:
-            val_ftypes.add(self.default_val.ftype)
+        if self.default_val is not None and not self.default_val.dtype().const:
+            val_ftypes.add(self.default_val._ftype)
 
         for _, val in self.cases:
-            if not val.dtype.const:
-                val_ftypes.add(val.ftype)
+            if not val.dtype().const:
+                val_ftypes.add(val.ftype())
 
         if len(val_ftypes) == 0:
-            self.ftype = Ftype.EWISE
+            self._ftype = Ftype.EWISE
         elif len(val_ftypes) == 1:
-            (self.ftype,) = val_ftypes
+            (self._ftype,) = val_ftypes
         elif Ftype.WINDOW in val_ftypes:
-            self.ftype = Ftype.WINDOW
+            self._ftype = Ftype.WINDOW
         else:
             # AGGREGATE and EWISE are incompatible
             raise FunctionTypeError(
@@ -345,6 +329,16 @@ class CaseExpr(ColExpr):
             )
 
         return self.ftype
+
+    def when(self, condition: ColExpr) -> WhenClause:
+        if self.default_val is not None:
+            raise TypeError("cannot call `when` on a case expression after `otherwise`")
+        return WhenClause(self.cases, wrap_literal(condition))
+
+    def otherwise(self, value: ColExpr) -> CaseExpr:
+        if self.default_val is not None:
+            raise TypeError("cannot call `otherwise` twice on a case expression")
+        return CaseExpr(self.cases, wrap_literal(value))
 
 
 @dataclasses.dataclass
