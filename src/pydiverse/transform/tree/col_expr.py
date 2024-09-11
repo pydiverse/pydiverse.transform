@@ -394,12 +394,12 @@ for dunder in OperatorRegistry.SUPPORTED_DUNDER:
 del create_operator
 
 
-def wrap_literal(expr: Any) -> ColExpr | Order | Iterable[ColExpr] | dict[Any, ColExpr]:
+def wrap_literal(expr: Any) -> Any:
     if isinstance(expr, ColExpr | Order):
         return expr
     elif isinstance(expr, dict):
         return {key: wrap_literal(val) for key, val in expr.items()}
-    elif isinstance(expr, Iterable):
+    elif isinstance(expr, (list, tuple)):
         return expr.__class__(wrap_literal(elem) for elem in expr)
     else:
         return LiteralCol(expr)

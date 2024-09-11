@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import functools
 
 from pydiverse.transform.ops.core import Ftype
@@ -29,14 +28,9 @@ def rename_overwritten_cols(expr: TableExpr) -> tuple[set[str], list[str]]:
                 expr.table, {name: f"{name}_{str(hash(expr))}" for name in overwritten}
             )
 
-            def rename_col_expr(node: ColExpr):
+            for node in expr.iter_col_nodes():
                 if isinstance(node, ColName) and node.name in expr.table.name_map:
-                    new_node = copy.copy(node)
-                    new_node.name = expr.table.name_map[node.name]
-                    return new_node
-                return node
-
-            expr.map_col_nodes(rename_col_expr)
+                    node.name = expr.table.name_map[node.name]
 
             expr.table = verbs.Drop(
                 expr.table, [ColName(name) for name in expr.table.name_map.values()]
@@ -154,9 +148,15 @@ def propagate_types(
 
     elif isinstance(expr, verbs.Join):
         dtype_map, ftype_map = propagate_types(expr.left)
-        right_dtypes, right_ftypes = propagate_types(expr.right)
-        dtype_map |= {name + expr.suffix: dtype for name, dtype in right_dtypes.items()}
-        ftype_map |= {name + expr.suffix: ftype for name, ftype in right_ftypes.items()}
+        right_dtype_map, right_ftype_map = propagate_types(expr.right)
+
+        dtype_map |= {
+            name + expr.suffix: dtype for name, dtype in right_dtype_map.items()
+        }
+        ftype_map |= {
+            name + expr.suffix: ftype for name, ftype in right_ftype_map.items()
+        }
+
         expr.on = col_expr.propagate_types(expr.on, dtype_map, ftype_map, False)
 
     elif isinstance(expr, Table):

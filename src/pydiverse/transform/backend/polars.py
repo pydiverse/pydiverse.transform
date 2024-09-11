@@ -168,6 +168,8 @@ def compile_col_expr(expr: ColExpr) -> pl.Expr:
         return compiled.otherwise(compile_col_expr(expr.default_val))
 
     elif isinstance(expr, LiteralCol):
+        if isinstance(expr.dtype, dtypes.String):
+            return pl.lit(expr.val)  # polars interprets strings as column names
         return expr.val
 
     else:

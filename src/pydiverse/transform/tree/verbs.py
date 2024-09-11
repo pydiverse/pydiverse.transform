@@ -31,7 +31,9 @@ class UnaryVerb(TableExpr):
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
 
-    def map_col_nodes(self, g: Callable[[ColExpr], ColExpr]): ...
+    def map_col_nodes(
+        self, g: Callable[[ColExpr], ColExpr]
+    ): ...  # TODO simplify things with this
 
     def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()

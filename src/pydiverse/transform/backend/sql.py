@@ -433,7 +433,7 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
         sel = sel.limit(query.limit).offset(query.offset)
 
     sel = sel.with_only_columns(
-        *(col.label(col_name) for col, col_name in query.select)
+        *(sqa.label(col_name, col) for col, col_name in query.select)
     )
 
     if query.order_by:
