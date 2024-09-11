@@ -6,24 +6,25 @@ import html
 import itertools
 import operator
 from collections.abc import Iterable
-from typing import Any, Generic
+from typing import Any
 
-from pydiverse.transform._typing import ImplT
-from pydiverse.transform.ops.core import OpType
+from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.dtypes import DType, python_type_to_pdt
+from pydiverse.transform.tree.dtypes import Dtype, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class ColExpr:
-    __slots__ = ["dtype"]
+    __slots__ = ["dtype", "ftype"]
 
     __contains__ = None
     __iter__ = None
 
-    def __init__(self, dtype: DType | None = None):
+    def __init__(self, dtype: Dtype | None = None, ftype: Ftype | None = None):
         self.dtype = dtype
+        self.ftype = ftype
 
     def __getattr__(self, name: str) -> FnAttr:
         if name.startswith("_") and name.endswith("_"):
@@ -59,11 +60,17 @@ class ColExpr:
     def iter_nodes(self) -> Iterable[ColExpr]: ...
 
 
-class Col(ColExpr, Generic[ImplT]):
-    def __init__(self, name: str, table: TableExpr, dtype: DType | None = None) -> Col:
+class Col(ColExpr):
+    def __init__(
+        self,
+        name: str,
+        table: TableExpr,
+        dtype: Dtype | None = None,
+        ftype: Ftype | None = None,
+    ) -> Col:
         self.name = name
         self.table = table
-        super().__init__(dtype)
+        super().__init__(dtype, ftype)
 
     def __repr__(self) -> str:
         return (
@@ -90,9 +97,11 @@ class Col(ColExpr, Generic[ImplT]):
 
 
 class ColName(ColExpr):
-    def __init__(self, name: str, dtype: DType | None = None):
+    def __init__(
+        self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None
+    ):
         self.name = name
-        super().__init__(dtype)
+        super().__init__(dtype, ftype)
 
     def __repr__(self) -> str:
         return (
@@ -109,7 +118,7 @@ class LiteralCol(ColExpr):
         self.val = val
         dtype = python_type_to_pdt(type(val))
         dtype.const = True
-        super().__init__(dtype)
+        super().__init__(dtype, Ftype.EWISE)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.val} ({self.dtype})>"
@@ -146,6 +155,58 @@ class ColFn(ColExpr):
             elif isinstance(val, Order):
                 yield from val.order_by.iter_nodes()
 
+    def determine_ftype(self, agg_is_window: bool):
+        """
+        Determine the ftype based on a function implementation and the arguments.
+
+            e(e) -> e       a(e) -> a       w(e) -> w
+            e(a) -> a       a(a) -> Err     w(a) -> w
+            e(w) -> w       a(w) -> Err     w(w) -> Err
+
+        If the implementation ftype is incompatible with the arguments, this
+        function raises an Exception.
+        """
+
+        from pydiverse.transform.backend.polars import PolarsImpl
+
+        op = PolarsImpl.registry.get_op(self.name)
+
+        ftypes = [arg.ftype for arg in self.args]
+        if op.ftype == Ftype.AGGREGATE and agg_is_window:
+            op_ftype = Ftype.WINDOW
+        else:
+            op_ftype = op.ftype
+
+        if op_ftype == Ftype.EWISE:
+            if Ftype.WINDOW in ftypes:
+                self.ftype = Ftype.WINDOW
+            elif Ftype.AGGREGATE in ftypes:
+                self.ftype = Ftype.AGGREGATE
+            else:
+                self.ftype = op_ftype
+
+        elif op_ftype == Ftype.AGGREGATE:
+            if Ftype.WINDOW in ftypes:
+                raise FunctionTypeError(
+                    "cannot nest a window function inside an aggregate function"
+                    f" ({op.name})."
+                )
+
+            if Ftype.AGGREGATE in ftypes:
+                raise FunctionTypeError(
+                    "cannot nest an aggregate function inside an aggregate function"
+                    f" ({op.name})."
+                )
+            self.ftype = op_ftype
+
+        else:
+            if Ftype.WINDOW in ftypes:
+                raise FunctionTypeError(
+                    "cannot nest a window function inside a window function"
+                    f" ({op.name})."
+                )
+            self.ftype = op_ftype
+
 
 class WhenClause:
     def __init__(self, cases: list[tuple[ColExpr, ColExpr]], cond: ColExpr):
@@ -167,6 +228,7 @@ class CaseExpr(ColExpr):
     ):
         self.cases = list(cases)
         self.default_val = default_val
+        super().__init__()
 
     def __repr__(self) -> str:
         return (
@@ -194,6 +256,8 @@ class CaseExpr(ColExpr):
                 yield from expr.iter_nodes()
         if isinstance(self.default_val, ColExpr):
             yield self.default_val
+
+    def determine_ftype(self): ...
 
 
 @dataclasses.dataclass
@@ -283,7 +347,7 @@ def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> N
         impl = PolarsImpl.registry.get_op(expr.name)
         # TODO: what exactly are WINDOW / AGGREGATE fns? for the user? for the backend?
         if (
-            impl.ftype in (OpType.WINDOW, OpType.AGGREGATE)
+            impl.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
             and "partition_by" not in expr.context_kwargs
         ):
             expr.context_kwargs["partition_by"] = group_by
@@ -364,22 +428,35 @@ def propagate_names(
     return expr
 
 
-def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
+def propagate_types(
+    expr: ColExpr,
+    dtype_map: dict[str, Dtype],
+    ftype_map: dict[str, Ftype],
+    agg_is_window: bool,
+) -> ColExpr:
     assert not isinstance(expr, Col)
     if isinstance(expr, Order):
         return Order(
-            propagate_types(expr.order_by, col_types), expr.descending, expr.nulls_last
+            propagate_types(expr.order_by, dtype_map, ftype_map, agg_is_window),
+            expr.descending,
+            expr.nulls_last,
         )
 
     elif isinstance(expr, ColName):
-        return ColName(expr.name, col_types[expr.name])
+        return ColName(expr.name, dtype_map[expr.name], ftype_map[expr.name])
 
     elif isinstance(expr, ColFn):
         typed_fn = ColFn(
             expr.name,
-            *(propagate_types(arg, col_types) for arg in expr.args),
+            *(
+                propagate_types(arg, dtype_map, ftype_map, agg_is_window)
+                for arg in expr.args
+            ),
             **{
-                key: [propagate_types(val, col_types) for val in arr]
+                key: [
+                    propagate_types(val, dtype_map, ftype_map, agg_is_window)
+                    for val in arr
+                ]
                 for key, arr in expr.context_kwargs.items()
             },
         )
@@ -387,21 +464,29 @@ def propagate_types(expr: ColExpr, col_types: dict[str, DType]) -> ColExpr:
         # TODO: create a backend agnostic registry
         from pydiverse.transform.backend.polars import PolarsImpl
 
-        typed_fn.dtype = PolarsImpl.registry.get_impl(
+        impl = PolarsImpl.registry.get_impl(
             expr.name, [arg.dtype for arg in typed_fn.args]
-        ).return_type
+        )
+        typed_fn.dtype = impl.return_type
+        typed_fn.determine_ftype(agg_is_window)
         return typed_fn
 
     elif isinstance(expr, CaseExpr):
         typed_cases: list[tuple[ColExpr, ColExpr]] = []
         for cond, val in expr.cases:
             typed_cases.append(
-                (propagate_types(cond, col_types), propagate_types(val, col_types))
+                (
+                    propagate_types(cond, dtype_map, ftype_map, agg_is_window),
+                    propagate_types(val, dtype_map, ftype_map, agg_is_window),
+                )
             )
             # TODO: error message, check that the value types of all cases and the
             # default match
             assert isinstance(typed_cases[-1][0].dtype, dtypes.Bool)
-        return CaseExpr(typed_cases, propagate_types(expr.default_val, col_types))
+        return CaseExpr(
+            typed_cases,
+            propagate_types(expr.default_val, dtype_map, ftype_map, agg_is_window),
+        )
 
     elif isinstance(expr, LiteralCol):
         return expr  # TODO: can literal columns even occur here?

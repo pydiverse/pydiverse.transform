@@ -9,7 +9,7 @@ import polars as pl
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, Target
-from pydiverse.transform.ops.core import OpType
+from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
@@ -42,7 +42,7 @@ class PolarsImpl(TableImpl):
     def col_names(self) -> list[str]:
         return self.df.columns
 
-    def schema(self) -> dict[str, dtypes.DType]:
+    def schema(self) -> dict[str, dtypes.Dtype]:
         return {
             name: polars_type_to_pdt(dtype)
             for name, dtype in self.df.collect_schema().items()
@@ -144,7 +144,7 @@ def compile_col_expr(expr: ColExpr) -> pl.Expr:
             value = value.over(partition_by, order_by=order_by)
 
         elif arrange:
-            if op.ftype == OpType.AGGREGATE:
+            if op.ftype == Ftype.AGGREGATE:
                 # TODO: don't fail, but give a warning that `arrange` is useless
                 # here
                 ...
@@ -310,7 +310,7 @@ def compile_table_expr(
     return df, select, group_by
 
 
-def polars_type_to_pdt(t: pl.DataType) -> dtypes.DType:
+def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     if t.is_float():
         return dtypes.Float()
     elif t.is_integer():
@@ -331,7 +331,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.DType:
     raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
 
 
-def pdt_type_to_polars(t: dtypes.DType) -> pl.DataType:
+def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
     if isinstance(t, dtypes.Float):
         return pl.Float64()
     elif isinstance(t, dtypes.Int):

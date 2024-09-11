@@ -12,7 +12,7 @@ import sqlalchemy as sqa
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
-from pydiverse.transform.ops.core import OpType
+from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
@@ -24,7 +24,7 @@ from pydiverse.transform.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform.tree.dtypes import DType
+from pydiverse.transform.tree.dtypes import Dtype
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -65,7 +65,7 @@ class SqlImpl(TableImpl):
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]
 
-    def schema(self) -> dict[str, DType]:
+    def schema(self) -> dict[str, Dtype]:
         return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
 
     def clone(self) -> SqlImpl:
@@ -236,7 +236,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.Mutate):
             if any(
-                cls.registry.get_op(node.name).ftype == OpType.WINDOW
+                cls.registry.get_op(node.name).ftype == Ftype.WINDOW
                 for node in expr.iter_col_expr_nodes()
                 if isinstance(node, ColFn)
             ):
@@ -256,7 +256,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.Filter):
             if query.limit is not None or any(
-                cls.registry.get_op(node.name).ftype == OpType.WINDOW
+                cls.registry.get_op(node.name).ftype == Ftype.WINDOW
                 for node in expr.iter_col_expr_nodes()
                 if isinstance(node, ColFn)
             ):
@@ -290,7 +290,7 @@ class SqlImpl(TableImpl):
                 or query.limit is not None
                 or any(
                     cls.registry.get_op(node.name).ftype
-                    in (OpType.WINDOW, OpType.AGGREGATE)
+                    in (Ftype.WINDOW, Ftype.AGGREGATE)
                     for node in expr.iter_col_expr_nodes()
                     if isinstance(node, ColFn)
                 )
@@ -508,7 +508,7 @@ def get_engine(expr: TableExpr) -> sqa.Engine:
     return engine
 
 
-def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:
+def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
     if isinstance(t, sqa.Integer):
         return dtypes.Int()
     elif isinstance(t, sqa.Numeric):
@@ -529,7 +529,7 @@ def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> DType:
     raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
 
 
-def pdt_type_to_sqa(t: DType) -> sqa.types.TypeEngine:
+def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
     if isinstance(t, dtypes.Int):
         return sqa.Integer()
     elif isinstance(t, dtypes.Float):

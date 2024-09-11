@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import functools
 
+from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree import col_expr, dtypes, verbs
+from pydiverse.transform.tree import col_expr, verbs
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName
+from pydiverse.transform.tree.dtypes import Dtype
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -109,38 +111,53 @@ def propagate_names(
     return col_to_name
 
 
-def propagate_types(expr: TableExpr) -> dict[str, dtypes.DType]:
+def propagate_types(
+    expr: TableExpr,
+) -> tuple[dict[str, Dtype], dict[str, Ftype]]:
     if isinstance(expr, (verbs.UnaryVerb)):
-        col_types = propagate_types(expr.table)
+        dtype_map, ftype_map = propagate_types(expr.table)
         expr.replace_col_exprs(
-            functools.partial(col_expr.propagate_types, col_types=col_types)
+            functools.partial(
+                col_expr.propagate_types,
+                col_dtypes=dtype_map,
+                col_ftypes=ftype_map,
+                agg_is_window=not isinstance(expr, verbs.Summarise),
+            )
         )
 
         if isinstance(expr, verbs.Rename):
-            col_types = {
+            dtype_map = {
                 (expr.name_map[name] if name in expr.name_map else name): dtype
-                for name, dtype in propagate_types(expr.table).items()
+                for name, dtype in dtype_map.items()
+            }
+            ftype_map = {
+                (expr.name_map[name] if name in expr.name_map else name): ftype
+                for name, ftype in ftype_map.items()
             }
 
         elif isinstance(expr, (verbs.Mutate, verbs.Summarise)):
-            col_types.update(
+            dtype_map.update(
                 {name: value.dtype for name, value in zip(expr.names, expr.values)}
+            )
+            ftype_map.update(
+                {name: value.ftype for name, value in zip(expr.names, expr.values)}
             )
 
     elif isinstance(expr, verbs.Join):
-        col_types = propagate_types(expr.left) | {
-            name + expr.suffix: dtype
-            for name, dtype in propagate_types(expr.right).items()
-        }
-        expr.on = col_expr.propagate_types(expr.on, col_types)
+        dtype_map, ftype_map = propagate_types(expr.left)
+        right_dtypes, right_ftypes = propagate_types(expr.right)
+        dtype_map |= {name + expr.suffix: dtype for name, dtype in right_dtypes.items()}
+        ftype_map |= {name + expr.suffix: ftype for name, ftype in right_ftypes.items()}
+        expr.on = col_expr.propagate_types(expr.on, dtype_map, ftype_map, False)
 
     elif isinstance(expr, Table):
-        col_types = expr.schema
+        dtype_map = expr.schema
+        ftype_map = {name: Ftype.EWISE for name in expr.col_names()}
 
     else:
         raise AssertionError
 
-    return col_types
+    return dtype_map, ftype_map
 
 
 # returns the list of cols the table is currently grouped by

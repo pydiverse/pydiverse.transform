@@ -112,10 +112,10 @@ class TypedOperatorImpl:
 
     operator: Operator
     impl: OperatorImpl
-    return_type: dtypes.DType
+    return_type: dtypes.Dtype
 
     @classmethod
-    def from_operator_impl(cls, impl: OperatorImpl, return_type: dtypes.DType):
+    def from_operator_impl(cls, impl: OperatorImpl, return_type: dtypes.Dtype):
         return cls(
             operator=impl.operator,
             impl=impl,
@@ -194,9 +194,9 @@ class OperatorRegistry:
 
     def __init__(self, name, super_registry=None):
         self.name = name
-        self.super_registry = super_registry
+        self.super_registry: OperatorRegistry | None = super_registry
         self.registered_ops: set[Operator] = set()
-        self.implementations: dict[str, OperatorImplementationStore] = dict()
+        self.implementations: dict[str, OperatorImplStore] = dict()
         self.check_super: dict[str, bool] = dict()
 
     def register_op(self, operator: Operator, check_super=True):
@@ -222,7 +222,7 @@ class OperatorRegistry:
                 " in this registry."
             )
 
-        self.implementations[name] = OperatorImplementationStore(operator)
+        self.implementations[name] = OperatorImplStore(operator)
         self.check_super[name] = check_super
 
         self.registered_ops.add(operator)
@@ -236,7 +236,7 @@ class OperatorRegistry:
         # registry and check if it has been defined there.
         if self.super_registry is None or not self.check_super.get(name, True):
             raise ValueError(f"No implementation for operator '{name}' found")
-        return self.super_registry.get_operator(name)
+        return self.super_registry.get_op(name)
 
     def add_impl(
         self,
@@ -254,20 +254,20 @@ class OperatorRegistry:
         signature = OperatorSignature.parse(signature)
         operator.validate_signature(signature)
 
-        implementation_store = self.implementations[operator.name]
+        impl_store = self.implementations[operator.name]
         op_impl = OperatorImpl(operator, impl, signature)
 
         if variant:
-            implementation_store.add_variant(variant, op_impl)
+            impl_store.add_variant(variant, op_impl)
         else:
-            implementation_store.add_implementation(op_impl)
+            impl_store.add_impl(op_impl)
 
     def get_impl(self, name, args_signature) -> TypedOperatorImpl:
         if name not in self.ALL_REGISTERED_OPS:
             raise ValueError(f"No operator named '{name}'.")
 
         for dtype in args_signature:
-            if not isinstance(dtype, dtypes.DType):
+            if not isinstance(dtype, dtypes.Dtype):
                 raise TypeError(
                     "Expected elements of `args_signature` to be of type DType,"
                     f" but found element of type {type(dtype).__name__} instead."
@@ -284,7 +284,7 @@ class OperatorRegistry:
                 f"No implementation for operator '{name}' found that matches signature"
                 f" '{args_signature}'."
             )
-        return self.super_registry.get_implementation(name, args_signature)
+        return self.super_registry.get_impl(name, args_signature)
 
 
 class OperatorSignature:
@@ -314,7 +314,7 @@ class OperatorSignature:
 
     """
 
-    def __init__(self, args: list[dtypes.DType], rtype: dtypes.DType):
+    def __init__(self, args: list[dtypes.Dtype], rtype: dtypes.Dtype):
         """
         :param args: Tuple of argument types.
         :param rtype: The return type.
@@ -389,7 +389,7 @@ class OperatorSignature:
         return self.args[-1].vararg
 
 
-class OperatorImplementationStore:
+class OperatorImplStore:
     """
     Stores all implementations for a specific operation in a trie according to
     their signature. This enables us to easily find the best matching
@@ -399,9 +399,9 @@ class OperatorImplementationStore:
     @dataclasses.dataclass
     class TrieNode:
         __slots__ = ("value", "operator", "children")
-        value: dtypes.DType
+        value: dtypes.Dtype
         operator: OperatorImpl | None
-        children: list[OperatorImplementationStore.TrieNode]
+        children: list[OperatorImplStore.TrieNode]
 
         def __repr__(self):
             self_text = f"({self.value} - {self.operator})"
@@ -415,7 +415,7 @@ class OperatorImplementationStore:
         self.operator = operator
         self.root = self.TrieNode("ROOT", None, [])  # type: ignore
 
-    def add_implementation(self, operator: OperatorImpl):
+    def add_impl(self, operator: OperatorImpl):
         node = self.get_node(operator.signature, create_missing=True)
         if node.operator is not None:
             raise ValueError(
@@ -453,7 +453,7 @@ class OperatorImplementationStore:
         return node
 
     def find_best_match(
-        self, signature: tuple[dtypes.DType]
+        self, signature: tuple[dtypes.Dtype]
     ) -> TypedOperatorImpl | None:
         matches = list(self._find_matches(signature))
 
@@ -483,8 +483,8 @@ class OperatorImplementationStore:
         return TypedOperatorImpl.from_operator_impl(best_match[0].operator, rtype)
 
     def _find_matches(
-        self, signature: tuple[dtypes.DType]
-    ) -> Iterable[TrieNode, dict[str, dtypes.DType, tuple[int, ...]]]:
+        self, signature: tuple[dtypes.Dtype]
+    ) -> Iterable[TrieNode, dict[str, dtypes.Dtype, tuple[int, ...]]]:
         """Yield all operators that match the input signature"""
 
         # Case 0 arguments:
@@ -494,16 +494,16 @@ class OperatorImplementationStore:
 
         # Case 1+ args:
         def does_match(
-            dtype: dtypes.DType,
-            node: OperatorImplementationStore.TrieNode,
+            dtype: dtypes.Dtype,
+            node: OperatorImplStore.TrieNode,
         ) -> bool:
             if isinstance(node.value, dtypes.Template):
                 return node.value.modifiers_compatible(dtype)
             return dtype.can_promote_to(node.value)
 
-        stack: list[
-            tuple[OperatorImplementationStore.TrieNode, int, dict, tuple[int, ...]]
-        ] = [(child, 0, dict(), tuple()) for child in self.root.children]
+        stack: list[tuple[OperatorImplStore.TrieNode, int, dict, tuple[int, ...]]] = [
+            (child, 0, dict(), tuple()) for child in self.root.children
+        ]
 
         while stack:
             node, s_i, templates, type_promotion_indices = stack.pop()

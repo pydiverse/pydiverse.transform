@@ -11,7 +11,7 @@ from pydiverse.transform.tree.registry import (
 
 
 def assert_signature(
-    s: OperatorSignature, args: list[dtypes.DType], rtype: dtypes.DType
+    s: OperatorSignature, args: list[dtypes.Dtype], rtype: dtypes.Dtype
 ):
     assert len(s.args) == len(args)
 
