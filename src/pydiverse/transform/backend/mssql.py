@@ -137,7 +137,7 @@ def convert_col_bool_bit(
                     None,
                 )
             elif not wants_bool_as_bit and returns_bool_as_bit:
-                return ColFn("__eq__", converted, 1, dtype=dtypes.Bool())
+                return ColFn("__eq__", converted, LiteralCol(1), dtype=dtypes.Bool())
 
         return converted
 

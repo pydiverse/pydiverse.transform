@@ -8,7 +8,7 @@ from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.pipe.pipeable import builtin_verb
 from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
+from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order, wrap_literal
 from pydiverse.transform.tree.verbs import (
     Arrange,
     Drop,
@@ -21,6 +21,7 @@ from pydiverse.transform.tree.verbs import (
     SliceHead,
     Summarise,
     TableExpr,
+    UnaryVerb,
     Ungroup,
 )
 
@@ -107,7 +108,7 @@ def rename(expr: TableExpr, name_map: dict[str, str]):
 def mutate(expr: TableExpr, **kwargs: ColExpr):
     if not kwargs:
         raise TypeError("`mutate` requires at least one name-column-pair")
-    return Mutate(expr, list(kwargs.keys()), list(kwargs.values()))
+    return Mutate(expr, list(kwargs.keys()), wrap_literal(list(kwargs.values())))
 
 
 @builtin_verb()
@@ -124,7 +125,7 @@ def join(
         suffix = f"_{right.name}"
     if suffix is None:
         suffix = "_right"
-    return Join(left, right, on, how, validate, suffix)
+    return Join(left, right, wrap_literal(on), how, validate, suffix)
 
 
 inner_join = functools.partial(join, how="inner")
@@ -134,19 +135,22 @@ outer_join = functools.partial(join, how="outer")
 
 @builtin_verb()
 def filter(expr: TableExpr, predicate: ColExpr, *additional_predicates: ColExpr):
-    return Filter(expr, list((predicate, *additional_predicates)))
+    return Filter(expr, wrap_literal(list((predicate, *additional_predicates))))
 
 
 @builtin_verb()
 def arrange(expr: TableExpr, by: ColExpr, *additional_by: ColExpr):
-    return Arrange(expr, list(Order.from_col_expr(ord) for ord in (by, *additional_by)))
+    return Arrange(
+        expr,
+        wrap_literal(list(Order.from_col_expr(ord) for ord in (by, *additional_by))),
+    )
 
 
 @builtin_verb()
 def group_by(
     expr: TableExpr, col: Col | ColName, *additional_cols: Col | ColName, add=False
 ):
-    return GroupBy(expr, list((col, *additional_cols)), add)
+    return GroupBy(expr, wrap_literal(list((col, *additional_cols))), add)
 
 
 @builtin_verb()
@@ -160,7 +164,7 @@ def summarise(expr: TableExpr, **kwargs: ColExpr):
         # if we want to include the grouping columns after summarise by default,
         # an empty summarise should be allowed
         raise TypeError("`summarise` requires at least one name-column-pair")
-    return Summarise(expr, list(kwargs.keys()), list(kwargs.values()))
+    return Summarise(expr, list(kwargs.keys()), wrap_literal(list(kwargs.values())))
 
 
 @builtin_verb()
@@ -169,9 +173,10 @@ def slice_head(expr: TableExpr, n: int, *, offset: int = 0):
 
 
 def get_backend(expr: TableExpr) -> type[TableImpl]:
-    if isinstance(expr, Table):
-        return expr._impl.__class__
+    if isinstance(expr, UnaryVerb):
+        return get_backend(expr.table)
     elif isinstance(expr, Join):
         return get_backend(expr.left)
     else:
-        return get_backend(expr.table)
+        assert isinstance(expr, Table)
+        return expr._impl.__class__

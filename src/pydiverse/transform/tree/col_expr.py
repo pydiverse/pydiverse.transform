@@ -131,9 +131,7 @@ class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
         self.args = list(args)
-        self.context_kwargs = {
-            key: val for key, val in kwargs.items() if val is not None
-        }
+        self.context_kwargs = kwargs
         if arrange := self.context_kwargs.get("arrange"):
             self.context_kwargs["arrange"] = [
                 Order.from_col_expr(expr) if isinstance(expr, ColExpr) else expr
@@ -219,13 +217,33 @@ class ColFn(ColExpr):
         return self.ftype
 
 
+@dataclasses.dataclass
+class FnAttr:
+    name: str
+    arg: ColExpr
+
+    def __getattr__(self, name) -> FnAttr:
+        return FnAttr(f"{self.name}.{name}", self.arg)
+
+    def __call__(self, *args, **kwargs) -> ColExpr:
+        return ColFn(
+            self.name,
+            wrap_literal(self.arg),
+            *wrap_literal(args),
+            **wrap_literal(kwargs),
+        )
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.name}({self.arg})>"
+
+
 class WhenClause:
     def __init__(self, cases: list[tuple[ColExpr, ColExpr]], cond: ColExpr):
         self.cases = cases
         self.cond = cond
 
     def then(self, value: ColExpr) -> CaseExpr:
-        return CaseExpr((*self.cases, (self.cond, value)))
+        return CaseExpr((*self.cases, (self.cond, wrap_literal(value))))
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.cond}>"
@@ -253,12 +271,12 @@ class CaseExpr(ColExpr):
     def when(self, condition: ColExpr) -> WhenClause:
         if self.default_val is not None:
             raise TypeError("cannot call `when` on a case expression after `otherwise`")
-        return WhenClause(self.cases, condition)
+        return WhenClause(self.cases, wrap_literal(condition))
 
     def otherwise(self, value: ColExpr) -> CaseExpr:
         if self.default_val is not None:
             raise TypeError("cannot call `otherwise` twice on a case expression")
-        return CaseExpr(self.cases, value)
+        return CaseExpr(self.cases, wrap_literal(value))
 
     def iter_nodes(self) -> Iterable[ColExpr]:
         for expr in itertools.chain.from_iterable(self.cases):
@@ -325,21 +343,6 @@ class CaseExpr(ColExpr):
 
 
 @dataclasses.dataclass
-class FnAttr:
-    name: str
-    arg: ColExpr
-
-    def __getattr__(self, name) -> FnAttr:
-        return FnAttr(f"{self.name}.{name}", self.arg)
-
-    def __call__(self, *args, **kwargs) -> ColExpr:
-        return ColFn(self.name, self.arg, *args, **kwargs)
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {self.name}({self.arg})>"
-
-
-@dataclasses.dataclass
 class Order:
     order_by: ColExpr
     descending: bool
@@ -381,7 +384,7 @@ class Order:
 # doesn't call __getattr__ for dunder methods.
 def create_operator(op):
     def impl(*args, **kwargs):
-        return ColFn(op, *args, **kwargs)
+        return ColFn(op, *wrap_literal(args), **wrap_literal(kwargs))
 
     return impl
 
@@ -389,6 +392,17 @@ def create_operator(op):
 for dunder in OperatorRegistry.SUPPORTED_DUNDER:
     setattr(ColExpr, dunder, create_operator(dunder))
 del create_operator
+
+
+def wrap_literal(expr: Any) -> ColExpr | Order | Iterable[ColExpr] | dict[Any, ColExpr]:
+    if isinstance(expr, ColExpr | Order):
+        return expr
+    elif isinstance(expr, dict):
+        return {key: wrap_literal(val) for key, val in expr.items()}
+    elif isinstance(expr, Iterable):
+        return expr.__class__(wrap_literal(elem) for elem in expr)
+    else:
+        return LiteralCol(expr)
 
 
 def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> None:
@@ -548,15 +562,16 @@ def propagate_types(
     elif isinstance(expr, LiteralCol):
         return expr  # TODO: can literal columns even occur here?
 
-    else:  # TODO: add type checking. check if it is one of the supported builtins
-        return LiteralCol(expr)
+    raise AssertionError
 
 
-def clone(expr: ColExpr, table_map: dict[TableExpr, TableExpr]) -> ColExpr:
+def clone(
+    expr: ColExpr | Order, table_map: dict[TableExpr, TableExpr]
+) -> ColExpr | Order:
     if isinstance(expr, Order):
         return Order(clone(expr.order_by, table_map), expr.descending, expr.nulls_last)
 
-    if isinstance(expr, Col):
+    elif isinstance(expr, Col):
         return Col(expr.name, table_map[expr.table], expr.dtype)
 
     elif isinstance(expr, ColName):
@@ -584,5 +599,4 @@ def clone(expr: ColExpr, table_map: dict[TableExpr, TableExpr]) -> ColExpr:
             clone(expr.default_val, table_map),
         )
 
-    else:
-        return expr
+    raise AssertionError
