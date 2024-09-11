@@ -8,10 +8,10 @@ import operator
 from collections.abc import Iterable
 from typing import Any
 
-from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.dtypes import Dtype, python_type_to_pdt
+from pydiverse.transform.tree.dtypes import Bool, Dtype, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 from pydiverse.transform.tree.table_expr import TableExpr
 
@@ -43,6 +43,10 @@ class ColExpr:
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+    def get_dtype(self) -> Dtype: ...
+
+    def get_ftype(self, agg_is_window: bool) -> Ftype: ...
 
     def map(
         self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr = None
@@ -155,7 +159,7 @@ class ColFn(ColExpr):
             elif isinstance(val, Order):
                 yield from val.order_by.iter_nodes()
 
-    def determine_ftype(self, agg_is_window: bool):
+    def get_ftype(self, agg_is_window: bool):
         """
         Determine the ftype based on a function implementation and the arguments.
 
@@ -166,6 +170,9 @@ class ColFn(ColExpr):
         If the implementation ftype is incompatible with the arguments, this
         function raises an Exception.
         """
+
+        if self.ftype is not None:
+            return self.ftype
 
         from pydiverse.transform.backend.polars import PolarsImpl
 
@@ -206,6 +213,8 @@ class ColFn(ColExpr):
                     f" ({op.name})."
                 )
             self.ftype = op_ftype
+
+        return self.ftype
 
 
 class WhenClause:
@@ -257,7 +266,54 @@ class CaseExpr(ColExpr):
         if isinstance(self.default_val, ColExpr):
             yield self.default_val
 
-    def determine_ftype(self): ...
+    def get_dtype(self):
+        if self.dtype is not None:
+            return self.dtype
+
+        try:
+            self.dtype = dtypes.promote_dtypes(
+                [
+                    self.default_val.dtype.without_modifiers(),
+                    *(val.dtype.without_modifiers() for _, val in self.cases),
+                ]
+            )
+        except Exception as e:
+            raise ExpressionTypeError(f"invalid case expression: {e}") from ...
+
+        for cond, _ in self.cases:
+            if not isinstance(cond.dtype, Bool):
+                raise ExpressionTypeError(
+                    f"invalid case expression: condition {cond} has type {cond.dtype} "
+                    "but all conditions must be boolean"
+                )
+
+    def get_ftype(self):
+        if self.ftype is not None:
+            return self.ftype
+
+        val_ftypes = set()
+        if self.default_val is not None and not self.default_val.dtype.const:
+            val_ftypes.add(self.default_val.ftype)
+
+        for _, val in self.cases:
+            if not val.dtype.const:
+                val_ftypes.add(val.ftype)
+
+        if len(val_ftypes) == 0:
+            self.ftype = Ftype.EWISE
+        elif len(val_ftypes) == 1:
+            (self.ftype,) = val_ftypes
+        elif Ftype.WINDOW in val_ftypes:
+            self.ftype = Ftype.WINDOW
+        else:
+            # AGGREGATE and EWISE are incompatible
+            raise FunctionTypeError(
+                "Incompatible function types found in case statement: " ", ".join(
+                    val_ftypes
+                )
+            )
+
+        return self.ftype
 
 
 @dataclasses.dataclass
@@ -468,7 +524,7 @@ def propagate_types(
             expr.name, [arg.dtype for arg in typed_fn.args]
         )
         typed_fn.dtype = impl.return_type
-        typed_fn.determine_ftype(agg_is_window)
+        typed_fn.get_ftype(agg_is_window)
         return typed_fn
 
     elif isinstance(expr, CaseExpr):
@@ -483,10 +539,15 @@ def propagate_types(
             # TODO: error message, check that the value types of all cases and the
             # default match
             assert isinstance(typed_cases[-1][0].dtype, dtypes.Bool)
-        return CaseExpr(
+
+        typed_case = CaseExpr(
             typed_cases,
             propagate_types(expr.default_val, dtype_map, ftype_map, agg_is_window),
         )
+        typed_case.get_dtype()
+        typed_case.get_ftype()
+
+        return typed_case
 
     elif isinstance(expr, LiteralCol):
         return expr  # TODO: can literal columns even occur here?

@@ -524,7 +524,7 @@ def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
     elif isinstance(t, sqa.Interval):
         return dtypes.Duration()
     elif isinstance(t, sqa.Null):
-        return dtypes.NoneDType()
+        return dtypes.NoneDtype()
 
     raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
 
@@ -544,7 +544,7 @@ def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
         return sqa.Date()
     elif isinstance(t, dtypes.Duration):
         return sqa.Interval()
-    elif isinstance(t, dtypes.NoneDType):
+    elif isinstance(t, dtypes.NoneDtype):
         return sqa.types.NullType()
 
     raise AssertionError

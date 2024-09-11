@@ -134,7 +134,7 @@ class Template(Dtype):
         return True
 
 
-class NoneDType(Dtype):
+class NoneDtype(Dtype):
     """DType used to represent the `None` value."""
 
     name = "none"
@@ -156,7 +156,7 @@ def python_type_to_pdt(t: type) -> Dtype:
     elif t is datetime.timedelta:
         return Duration()
     elif t is NoneType:
-        return NoneDType()
+        return NoneDtype()
 
     raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
 
@@ -205,20 +205,20 @@ def dtype_from_string(t: str) -> Dtype:
     if base_type == "duration":
         return Duration(const=is_const, vararg=is_vararg)
     if base_type == "none":
-        return NoneDType(const=is_const, vararg=is_vararg)
+        return NoneDtype(const=is_const, vararg=is_vararg)
 
     raise ValueError(f"Unknown type '{base_type}'")
 
 
 def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
     if len(dtypes) == 0:
-        raise ValueError("Expected non empty list of dtypes")
+        raise ValueError("expected non empty list of dtypes")
 
     promoted = dtypes[0]
     for dtype in dtypes[1:]:
-        if isinstance(dtype, NoneDType):
+        if isinstance(dtype, NoneDtype):
             continue
-        if isinstance(promoted, NoneDType):
+        if isinstance(promoted, NoneDtype):
             promoted = dtype
             continue
 
@@ -228,6 +228,6 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
             promoted = dtype
             continue
 
-        raise ExpressionTypeError(f"Incompatible types {dtype} and {promoted}.")
+        raise ExpressionTypeError(f"incompatible types {dtype} and {promoted}")
 
     return promoted

@@ -326,7 +326,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     elif isinstance(t, pl.Duration):
         return dtypes.Duration()
     elif isinstance(t, pl.Null):
-        return dtypes.NoneDType()
+        return dtypes.NoneDtype()
 
     raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
 
@@ -346,7 +346,7 @@ def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
         return pl.Date()
     elif isinstance(t, dtypes.Duration):
         return pl.Duration()
-    elif isinstance(t, dtypes.NoneDType):
+    elif isinstance(t, dtypes.NoneDtype):
         return pl.Null()
 
     raise AssertionError

@@ -119,8 +119,8 @@ def propagate_types(
         expr.replace_col_exprs(
             functools.partial(
                 col_expr.propagate_types,
-                col_dtypes=dtype_map,
-                col_ftypes=ftype_map,
+                dtype_map=dtype_map,
+                ftype_map=ftype_map,
                 agg_is_window=not isinstance(expr, verbs.Summarise),
             )
         )
