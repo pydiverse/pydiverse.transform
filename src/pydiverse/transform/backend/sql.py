@@ -236,9 +236,9 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.Mutate):
             if any(
-                cls.registry.get_op(node.name).ftype == Ftype.WINDOW
-                for node in expr.iter_col_expr_nodes()
-                if isinstance(node, ColFn)
+                node.ftype == Ftype.WINDOW
+                for node in expr.iter_col_exprs()
+                if isinstance(node, ColName)
             ):
                 table, query, name_to_sqa_col = build_subquery(
                     table, query, needed_cols
@@ -256,9 +256,9 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.Filter):
             if query.limit is not None or any(
-                cls.registry.get_op(node.name).ftype == Ftype.WINDOW
-                for node in expr.iter_col_expr_nodes()
-                if isinstance(node, ColFn)
+                node.ftype == Ftype.WINDOW
+                for node in expr.iter_col_exprs()
+                if isinstance(node, ColName)
             ):
                 table, query, name_to_sqa_col = build_subquery(
                     table, query, needed_cols
@@ -284,15 +284,13 @@ class SqlImpl(TableImpl):
             ] + query.order_by
 
         elif isinstance(expr, verbs.Summarise):
-            # TODO: maybe write operator / implementation up front into a ColFn node?
             if (
                 (bool(query.group_by) and query.group_by != query.partition_by)
                 or query.limit is not None
                 or any(
-                    cls.registry.get_op(node.name).ftype
-                    in (Ftype.WINDOW, Ftype.AGGREGATE)
-                    for node in expr.iter_col_expr_nodes()
-                    if isinstance(node, ColFn)
+                    node.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
+                    for node in expr.iter_col_exprs()
+                    if isinstance(node, ColName)
                 )
             ):
                 table, query, name_to_sqa_col = build_subquery(
