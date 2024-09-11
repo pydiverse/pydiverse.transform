@@ -69,10 +69,9 @@ def propagate_names(
     expr: TableExpr, needed_cols: set[tuple[TableExpr, str]]
 ) -> dict[tuple[TableExpr, str], str]:
     if isinstance(expr, verbs.UnaryVerb):
-        for col in expr.col_exprs():
-            for node in col.iter_nodes():
-                if isinstance(node, Col):
-                    needed_cols.add((node.table, node.name))
+        for node in expr.iter_col_expr_nodes():
+            if isinstance(node, Col):
+                needed_cols.add((node.table, node.name))
 
         col_to_name = propagate_names(expr.table, needed_cols)
         expr.replace_col_exprs(
@@ -148,7 +147,7 @@ def propagate_types(expr: TableExpr) -> dict[str, dtypes.DType]:
 def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
     if isinstance(expr, verbs.UnaryVerb) and not isinstance(expr, verbs.Summarise):
         group_by = update_partition_by_kwarg(expr.table)
-        for c in expr.col_exprs():
+        for c in expr.iter_col_exprs():
             col_expr.update_partition_by_kwarg(c, group_by)
 
         if isinstance(expr, verbs.GroupBy):

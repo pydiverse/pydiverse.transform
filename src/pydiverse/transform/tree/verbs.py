@@ -22,8 +22,12 @@ class UnaryVerb(TableExpr):
         # propagates the table name up the tree
         self.name = self.table.name
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         return iter(())
+
+    def iter_col_expr_nodes(self) -> Iterable[ColExpr]:
+        for col in self.iter_col_exprs():
+            yield from col.iter_nodes()
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]): ...
 
@@ -40,7 +44,7 @@ class UnaryVerb(TableExpr):
 class Select(UnaryVerb):
     selected: list[Col | ColName]
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         yield from self.selected
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
@@ -51,7 +55,7 @@ class Select(UnaryVerb):
 class Drop(UnaryVerb):
     dropped: list[Col | ColName]
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         yield from self.dropped
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
@@ -74,7 +78,7 @@ class Mutate(UnaryVerb):
     names: list[str]
     values: list[ColExpr]
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         yield from self.values
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
@@ -95,7 +99,7 @@ class Mutate(UnaryVerb):
 class Filter(UnaryVerb):
     filters: list[ColExpr]
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         yield from self.filters
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
@@ -107,7 +111,7 @@ class Summarise(UnaryVerb):
     names: list[str]
     values: list[ColExpr]
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         yield from self.values
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
@@ -128,7 +132,7 @@ class Summarise(UnaryVerb):
 class Arrange(UnaryVerb):
     order_by: list[Order]
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
@@ -149,7 +153,7 @@ class GroupBy(UnaryVerb):
     group_by: list[Col | ColName]
     add: bool
 
-    def col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_exprs(self) -> Iterable[ColExpr]:
         yield from self.group_by
 
     def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):

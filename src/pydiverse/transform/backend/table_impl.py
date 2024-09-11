@@ -49,18 +49,18 @@ class TableImpl:
             summarising operation.
     """
 
-    registry = OperatorRegistry("AbstractTableImpl")
+    registry = OperatorRegistry("TableImpl")
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
-        # Add new `operator_registry` class variable to subclass.
+        # Add new `registry` class variable to subclass.
         # We define the super registry by walking up the MRO. This allows us
         # to check for potential operation definitions in the parent classes.
         super_reg = None
         for super_cls in cls.__mro__:
-            if hasattr(super_cls, "operator_registry"):
-                super_reg = super_cls.operator_registry
+            if hasattr(super_cls, "registry"):
+                super_reg = super_cls.registry
                 break
         cls.registry = OperatorRegistry(cls.__name__, super_reg)
 

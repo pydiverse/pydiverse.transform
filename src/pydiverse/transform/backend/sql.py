@@ -12,6 +12,7 @@ import sqlalchemy as sqa
 from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
+from pydiverse.transform.ops.core import OpType
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
@@ -76,7 +77,7 @@ class SqlImpl(TableImpl):
     @classmethod
     def build_select(cls, expr: TableExpr) -> sqa.Select:
         create_aliases(expr, {})
-        table, query, _ = cls.compile_table_expr(expr)
+        table, query, _ = cls.compile_table_expr(expr, set())
         return compile_query(table, query)
 
     @classmethod
@@ -197,11 +198,18 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_table_expr(
-        cls,
-        expr: TableExpr,
+        cls, expr: TableExpr, needed_cols: set[str]
     ) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
         if isinstance(expr, verbs.UnaryVerb):
-            table, query, name_to_sqa_col = cls.compile_table_expr(expr.table)
+            table, query, name_to_sqa_col = cls.compile_table_expr(
+                expr.table, needed_cols
+            )
+
+            needed_cols |= {
+                node.name
+                for node in expr.iter_col_expr_nodes()
+                if isinstance(node, ColName)
+            }
 
         if isinstance(expr, verbs.Select):
             query.select = [
@@ -227,6 +235,15 @@ class SqlImpl(TableImpl):
             ]
 
         elif isinstance(expr, verbs.Mutate):
+            if any(
+                cls.registry.get_op(node.name).ftype == OpType.WINDOW
+                for node in expr.iter_col_expr_nodes()
+                if isinstance(node, ColFn)
+            ):
+                table, query, name_to_sqa_col = build_subquery(
+                    table, query, needed_cols
+                )
+
             compiled_values = [
                 cls.compile_col_expr(val, name_to_sqa_col) for val in expr.values
             ]
@@ -238,28 +255,55 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(expr, verbs.Filter):
-            if expr.filters:
-                if query.group_by:
-                    query.having.extend(
-                        cls.compile_col_expr(fil, name_to_sqa_col)
-                        for fil in expr.filters
-                    )
-                else:
-                    query.where.extend(
-                        cls.compile_col_expr(fil, name_to_sqa_col)
-                        for fil in expr.filters
-                    )
+            if query.limit is not None or any(
+                cls.registry.get_op(node.name).ftype == OpType.WINDOW
+                for node in expr.iter_col_expr_nodes()
+                if isinstance(node, ColFn)
+            ):
+                table, query, name_to_sqa_col = build_subquery(
+                    table, query, needed_cols
+                )
+
+            if query.group_by:
+                query.having.extend(
+                    cls.compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
+                )
+            else:
+                query.where.extend(
+                    cls.compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
+                )
 
         elif isinstance(expr, verbs.Arrange):
+            if query.limit is not None:
+                table, query, name_to_sqa_col = build_subquery(
+                    table, query, needed_cols
+                )
+
             query.order_by = [
                 cls.compile_order(ord, name_to_sqa_col) for ord in expr.order_by
             ] + query.order_by
 
         elif isinstance(expr, verbs.Summarise):
+            # TODO: maybe write operator / implementation up front into a ColFn node?
+            if (
+                (bool(query.group_by) and query.group_by != query.partition_by)
+                or query.limit is not None
+                or any(
+                    cls.registry.get_op(node.name).ftype
+                    in (OpType.WINDOW, OpType.AGGREGATE)
+                    for node in expr.iter_col_expr_nodes()
+                    if isinstance(node, ColFn)
+                )
+            ):
+                table, query, name_to_sqa_col = build_subquery(
+                    table, query, needed_cols
+                )
+
             if query.group_by:
                 assert query.group_by == query.partition_by
             query.group_by = query.partition_by
             query.partition_by = []
+            query.order_by = []
             compiled_values = [
                 cls.compile_col_expr(val, name_to_sqa_col) for val in expr.values
             ]
@@ -279,6 +323,11 @@ class SqlImpl(TableImpl):
                 query.offset += expr.offset
 
         elif isinstance(expr, verbs.GroupBy):
+            if query.limit is not None:
+                table, query, name_to_sqa_col = build_subquery(
+                    table, query, needed_cols
+                )
+
             compiled_group_by = [
                 cls.compile_col_expr(col, name_to_sqa_col) for col in expr.group_by
             ]
@@ -292,10 +341,21 @@ class SqlImpl(TableImpl):
             query.partition_by = []
 
         elif isinstance(expr, verbs.Join):
-            table, query, name_to_sqa_col = cls.compile_table_expr(expr.left)
-            right_table, right_query, right_name_to_sqa_col = cls.compile_table_expr(
-                expr.right
+            table, query, name_to_sqa_col = cls.compile_table_expr(
+                expr.left, needed_cols
             )
+            right_table, right_query, right_name_to_sqa_col = cls.compile_table_expr(
+                expr.right, needed_cols
+            )
+
+            needed_cols |= {
+                node.name for node in expr.on.iter_nodes() if isinstance(node, ColName)
+            }
+
+            if query.limit is not None:
+                table, query, name_to_sqa_col = build_subquery(
+                    table, query, needed_cols
+                )
 
             name_to_sqa_col.update(
                 {
@@ -384,6 +444,26 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
         sel = sel.order_by(*query.order_by)
 
     return sel
+
+
+def build_subquery(
+    table: sqa.Table,
+    query: Query,
+    needed_cols: set[str],
+) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
+    query.select = [(col, name) for col, name in query.select if name in needed_cols]
+    table = compile_query(table, query).subquery()
+
+    query.select = [(col, col.name) for col in table.columns]
+    query.join = []
+    query.group_by = []
+    query.where = []
+    query.having = []
+    query.order_by = []
+    query.limit = None
+    query.offset = None
+
+    return table, query, {col.name: col for col in table.columns}
 
 
 # Gives any leaf a unique alias to allow self-joins. We do this here to not force

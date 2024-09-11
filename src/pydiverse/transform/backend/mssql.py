@@ -62,7 +62,7 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
 def set_nulls_position_table(expr: TableExpr):
     if isinstance(expr, verbs.UnaryVerb):
         set_nulls_position_table(expr.table)
-        for col in expr.col_exprs():
+        for col in expr.iter_col_exprs():
             set_nulls_position_col(col)
 
         if isinstance(expr, verbs.Arrange):
@@ -110,7 +110,7 @@ def convert_col_bool_bit(
         return expr
 
     elif isinstance(expr, ColFn):
-        op = MsSqlImpl.operator_registry.get_operator(expr.name)
+        op = MsSqlImpl.registry.get_op(expr.name)
         wants_bool_as_bit_input = not isinstance(
             op, (ops.logical.BooleanBinary, ops.logical.Invert)
         )
@@ -124,7 +124,7 @@ def convert_col_bool_bit(
             for key, arr in expr.context_kwargs
         }
 
-        impl = MsSqlImpl.operator_registry.get_implementation(
+        impl = MsSqlImpl.registry.get_impl(
             expr.name, tuple(arg.dtype for arg in expr.args)
         )
 
