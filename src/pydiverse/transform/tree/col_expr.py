@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import functools
 import html
 import itertools
 import operator
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
@@ -61,7 +62,11 @@ class ColExpr:
 
     # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
     # and `Order` expressions are not yielded.
-    def iter_nodes(self) -> Iterable[ColExpr]: ...
+    def iter_nodes(self) -> Iterable[ColExpr]:
+        yield self
+
+    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+        return g(self)
 
 
 class Col(ColExpr):
@@ -96,9 +101,6 @@ class Col(ColExpr):
                 + f"{e.__class__.__name__}: {str(e)}"
             )
 
-    def iter_nodes(self) -> Iterable[ColExpr]:
-        yield self
-
 
 class ColName(ColExpr):
     def __init__(
@@ -113,9 +115,6 @@ class ColName(ColExpr):
             f"{f" ({self.dtype})" if self.dtype else ""}>"
         )
 
-    def iter_nodes(self) -> Iterable[ColExpr]:
-        yield self
-
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
@@ -126,9 +125,6 @@ class LiteralCol(ColExpr):
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.val} ({self.dtype})>"
-
-    def iter_nodes(self) -> Iterable[ColExpr]:
-        yield self
 
 
 class ColFn(ColExpr):
@@ -152,12 +148,18 @@ class ColFn(ColExpr):
         return f'{self.name}({", ".join(args)})'
 
     def iter_nodes(self) -> Iterable[ColExpr]:
-        yield self
         for val in itertools.chain(self.args, *self.context_kwargs.values()):
-            if isinstance(val, ColExpr):
-                yield from val.iter_nodes()
-            elif isinstance(val, Order):
-                yield from val.order_by.iter_nodes()
+            yield from val.iter_nodes()
+        yield self
+
+    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+        new_fn = copy.copy(self)
+        new_fn.args = [arg.map_nodes(g) for arg in self.args]
+        new_fn.context_kwargs = {
+            key: [val.map_nodes(g) for val in arr]
+            for key, arr in self.context_kwargs.items()
+        }
+        return g(new_fn)
 
     def get_ftype(self, agg_is_window: bool):
         """
@@ -259,12 +261,18 @@ class CaseExpr(ColExpr):
         return CaseExpr(self.cases, value)
 
     def iter_nodes(self) -> Iterable[ColExpr]:
-        yield self
         for expr in itertools.chain.from_iterable(self.cases):
-            if isinstance(expr, ColExpr):
-                yield from expr.iter_nodes()
-        if isinstance(self.default_val, ColExpr):
-            yield self.default_val
+            yield from expr.iter_nodes()
+        yield from self.default_val.iter_nodes()
+        yield self
+
+    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+        new_case_expr = copy.copy(self)
+        new_case_expr.cases = [
+            (cond.map_nodes(g), val.map_nodes(g)) for cond, val in self.cases
+        ]
+        new_case_expr.default_val = self.default_val.map_nodes(g)
+        return g(new_case_expr)
 
     def get_dtype(self):
         if self.dtype is not None:
@@ -362,6 +370,12 @@ class Order:
             nulls_last = False
         return Order(expr, descending, nulls_last)
 
+    def iter_nodes(self) -> Iterable[ColExpr]:
+        yield from self.order_by.iter_nodes()
+
+    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> Order:
+        return Order(self.order_by.map_nodes(g), self.descending, self.nulls_last)
+
 
 # Add all supported dunder methods to `ColExpr`. This has to be done, because Python
 # doesn't call __getattr__ for dunder methods.
@@ -375,24 +389,6 @@ def create_operator(op):
 for dunder in OperatorRegistry.SUPPORTED_DUNDER:
     setattr(ColExpr, dunder, create_operator(dunder))
 del create_operator
-
-
-def rename_overwritten_cols(expr: ColExpr, name_map: dict[str, str]):
-    if isinstance(expr, ColName):
-        if expr.name in name_map:
-            expr.name = name_map[expr.name]
-
-    elif isinstance(expr, ColFn):
-        for arg in expr.args:
-            rename_overwritten_cols(arg, name_map)
-        for val in itertools.chain.from_iterable(expr.context_kwargs.values()):
-            rename_overwritten_cols(val, name_map)
-
-    elif isinstance(expr, CaseExpr):
-        rename_overwritten_cols(expr.default_val, name_map)
-        for cond, val in expr.cases:
-            rename_overwritten_cols(cond, name_map)
-            rename_overwritten_cols(val, name_map)
 
 
 def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> None:

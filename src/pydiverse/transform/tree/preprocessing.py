@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import functools
 
 from pydiverse.transform.ops.core import Ftype
@@ -27,8 +28,16 @@ def rename_overwritten_cols(expr: TableExpr) -> tuple[set[str], list[str]]:
             expr.table = verbs.Rename(
                 expr.table, {name: f"{name}_{str(hash(expr))}" for name in overwritten}
             )
-            for val in expr.values:
-                col_expr.rename_overwritten_cols(val, expr.table.name_map)
+
+            def rename_col_expr(node: ColExpr):
+                if isinstance(node, ColName) and node.name in expr.table.name_map:
+                    new_node = copy.copy(node)
+                    new_node.name = expr.table.name_map[node.name]
+                    return new_node
+                return node
+
+            expr.map_col_nodes(rename_col_expr)
+
             expr.table = verbs.Drop(
                 expr.table, [ColName(name) for name in expr.table.name_map.values()]
             )
@@ -71,12 +80,12 @@ def propagate_names(
     expr: TableExpr, needed_cols: set[tuple[TableExpr, str]]
 ) -> dict[tuple[TableExpr, str], str]:
     if isinstance(expr, verbs.UnaryVerb):
-        for node in expr.iter_col_expr_nodes():
+        for node in expr.iter_col_nodes():
             if isinstance(node, Col):
                 needed_cols.add((node.table, node.name))
 
         col_to_name = propagate_names(expr.table, needed_cols)
-        expr.replace_col_exprs(
+        expr.map_col_roots(
             functools.partial(col_expr.propagate_names, col_to_name=col_to_name)
         )
 
@@ -116,7 +125,7 @@ def propagate_types(
 ) -> tuple[dict[str, Dtype], dict[str, Ftype]]:
     if isinstance(expr, (verbs.UnaryVerb)):
         dtype_map, ftype_map = propagate_types(expr.table)
-        expr.replace_col_exprs(
+        expr.map_col_roots(
             functools.partial(
                 col_expr.propagate_types,
                 dtype_map=dtype_map,
@@ -164,7 +173,7 @@ def propagate_types(
 def update_partition_by_kwarg(expr: TableExpr) -> list[ColExpr]:
     if isinstance(expr, verbs.UnaryVerb) and not isinstance(expr, verbs.Summarise):
         group_by = update_partition_by_kwarg(expr.table)
-        for c in expr.iter_col_exprs():
+        for c in expr.iter_col_roots():
             col_expr.update_partition_by_kwarg(c, group_by)
 
         if isinstance(expr, verbs.GroupBy):

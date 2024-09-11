@@ -206,9 +206,7 @@ class SqlImpl(TableImpl):
             )
 
             needed_cols |= {
-                node.name
-                for node in expr.iter_col_expr_nodes()
-                if isinstance(node, ColName)
+                node.name for node in expr.iter_col_nodes() if isinstance(node, ColName)
             }
 
         if isinstance(expr, verbs.Select):
@@ -237,7 +235,7 @@ class SqlImpl(TableImpl):
         elif isinstance(expr, verbs.Mutate):
             if any(
                 node.ftype == Ftype.WINDOW
-                for node in expr.iter_col_exprs()
+                for node in expr.iter_col_roots()
                 if isinstance(node, ColName)
             ):
                 table, query, name_to_sqa_col = build_subquery(
@@ -257,7 +255,7 @@ class SqlImpl(TableImpl):
         elif isinstance(expr, verbs.Filter):
             if query.limit is not None or any(
                 node.ftype == Ftype.WINDOW
-                for node in expr.iter_col_exprs()
+                for node in expr.iter_col_roots()
                 if isinstance(node, ColName)
             ):
                 table, query, name_to_sqa_col = build_subquery(
@@ -289,7 +287,7 @@ class SqlImpl(TableImpl):
                 or query.limit is not None
                 or any(
                     node.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
-                    for node in expr.iter_col_exprs()
+                    for node in expr.iter_col_roots()
                     if isinstance(node, ColName)
                 )
             ):
@@ -444,6 +442,8 @@ def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
     return sel
 
 
+# TODO: do we want `alias` to automatically create a subquery? or add a flag to the node
+# that a subquery would be allowed? or special verb to mark subquery?
 def build_subquery(
     table: sqa.Table,
     query: Query,

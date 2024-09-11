@@ -22,20 +22,22 @@ class UnaryVerb(TableExpr):
         # propagates the table name up the tree
         self.name = self.table.name
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
 
-    def iter_col_expr_nodes(self) -> Iterable[ColExpr]:
-        for col in self.iter_col_exprs():
+    def iter_col_nodes(self) -> Iterable[ColExpr]:
+        for col in self.iter_col_roots():
             yield from col.iter_nodes()
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]): ...
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
+
+    def map_col_nodes(self, g: Callable[[ColExpr], ColExpr]): ...
 
     def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
         cloned.table = table
-        cloned.replace_col_exprs(lambda c: col_expr.clone(c, table_map))
+        cloned.map_col_roots(lambda c: col_expr.clone(c, table_map))
         table_map[self] = cloned
         return cloned, table_map
 
@@ -44,10 +46,10 @@ class UnaryVerb(TableExpr):
 class Select(UnaryVerb):
     selected: list[Col | ColName]
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.selected
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.selected = [g(c) for c in self.selected]
 
 
@@ -55,10 +57,10 @@ class Select(UnaryVerb):
 class Drop(UnaryVerb):
     dropped: list[Col | ColName]
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.dropped
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.dropped = [g(c) for c in self.dropped]
 
 
@@ -78,10 +80,10 @@ class Mutate(UnaryVerb):
     names: list[str]
     values: list[ColExpr]
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
     def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
@@ -99,10 +101,10 @@ class Mutate(UnaryVerb):
 class Filter(UnaryVerb):
     filters: list[ColExpr]
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.filters
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.filters = [g(c) for c in self.filters]
 
 
@@ -111,10 +113,10 @@ class Summarise(UnaryVerb):
     names: list[str]
     values: list[ColExpr]
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
     def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
@@ -132,10 +134,10 @@ class Summarise(UnaryVerb):
 class Arrange(UnaryVerb):
     order_by: list[Order]
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.order_by = [
             Order(g(ord.order_by), ord.descending, ord.nulls_last)
             for ord in self.order_by
@@ -153,10 +155,10 @@ class GroupBy(UnaryVerb):
     group_by: list[Col | ColName]
     add: bool
 
-    def iter_col_exprs(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
 
-    def replace_col_exprs(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.group_by = [g(c) for c in self.group_by]
 
 
