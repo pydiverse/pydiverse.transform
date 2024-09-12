@@ -40,9 +40,8 @@ class Verb(TableExpr):
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
 
-    def map_col_nodes(
-        self, g: Callable[[ColExpr], ColExpr]
-    ): ...  # TODO simplify things with this
+    def map_col_nodes(self, g: Callable[[ColExpr], ColExpr]):
+        self.map_col_roots(lambda root: root.map_nodes(g))
 
     def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
@@ -50,6 +49,7 @@ class Verb(TableExpr):
         cloned.table = table
         cloned._needed_cols = copy.copy(self._needed_cols)
         cloned.map_col_roots(lambda c: col_expr.clone(c, table_map))
+        cloned._group_by = [col_expr.clone(col, table_map) for col in cloned._group_by]
         table_map[self] = cloned
         return cloned, table_map
 
@@ -242,10 +242,18 @@ class Join(Verb):
             raise ValueError(f"cannot join grouped table `{self.table.name}`")
         elif self.right._group_by:
             raise ValueError(f"cannot join grouped table `{self.right.name}`")
-        Verb.__post_init__(self)
-        self._schema |= {
-            name + self.suffix: val for name, val in self.right._schema.items()
-        }
+        TableExpr.__init__(
+            self,
+            self.table.name,
+            self.table._schema
+            | {name + self.suffix: val for name, val in self.right._schema.items()},
+            [],
+        )
+        self.map_col_nodes(
+            lambda expr: expr
+            if not isinstance(expr, ColName)
+            else Col(expr.name, self.table)
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield self.on

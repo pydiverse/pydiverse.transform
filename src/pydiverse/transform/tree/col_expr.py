@@ -44,7 +44,7 @@ class ColExpr:
     def dtype(self) -> Dtype:
         return self._dtype
 
-    def ftype(self, agg_is_window: bool) -> Ftype:
+    def ftype(self, agg_is_window: bool = False) -> Ftype:
         return self._ftype
 
     def map(
@@ -178,7 +178,7 @@ class ColFn(ColExpr):
 
         return self._dtype
 
-    def ftype(self, agg_is_window: bool):
+    def ftype(self, agg_is_window: bool = False):
         """
         Determine the ftype based on a function implementation and the arguments.
 
@@ -322,7 +322,7 @@ class CaseExpr(ColExpr):
                     f"{cond.dtype()} but all conditions must be boolean"
                 )
 
-    def ftype(self):
+    def ftype(self, agg_is_window: bool = False):
         if self._ftype is not None:
             return self._ftype
 
@@ -422,36 +422,6 @@ def wrap_literal(expr: Any) -> Any:
         return expr.__class__(wrap_literal(elem) for elem in expr)
     else:
         return LiteralCol(expr)
-
-
-def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> None:
-    if isinstance(expr, ColFn):
-        # TODO: backend agnostic registry
-        from pydiverse.transform.backend.polars import PolarsImpl
-
-        impl = PolarsImpl.registry.get_op(expr.name)
-        if (
-            impl.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
-            and "partition_by" not in expr.context_kwargs
-        ):
-            expr.context_kwargs["partition_by"] = group_by
-
-        for arg in expr.args:
-            update_partition_by_kwarg(arg, group_by)
-        for val in itertools.chain.from_iterable(expr.context_kwargs.values()):
-            if isinstance(val, Order):
-                update_partition_by_kwarg(val.order_by, group_by)
-            else:
-                update_partition_by_kwarg(val, group_by)
-
-    elif isinstance(expr, CaseExpr):
-        update_partition_by_kwarg(expr.default_val, group_by)
-        for cond, val in expr.cases:
-            update_partition_by_kwarg(cond, group_by)
-            update_partition_by_kwarg(val, group_by)
-
-    else:
-        assert isinstance(expr, (Col, ColName, LiteralCol))
 
 
 def clone(

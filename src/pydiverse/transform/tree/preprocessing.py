@@ -1,17 +1,26 @@
 from __future__ import annotations
 
+from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree import col_expr, verbs
-from pydiverse.transform.tree.col_expr import Col
+from pydiverse.transform.tree import verbs
+from pydiverse.transform.tree.col_expr import Col, ColFn
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
 # returns the list of cols the table is currently grouped by
 def update_partition_by_kwarg(expr: TableExpr):
     if isinstance(expr, verbs.Verb) and not isinstance(expr, verbs.Summarise):
-        group_by = update_partition_by_kwarg(expr.table)
-        for c in expr.iter_col_roots():
-            col_expr.update_partition_by_kwarg(c, group_by)
+        update_partition_by_kwarg(expr.table)
+        for node in expr.iter_col_nodes():
+            if isinstance(node, ColFn):
+                from pydiverse.transform.backend.polars import PolarsImpl
+
+                impl = PolarsImpl.registry.get_op(node.name)
+                if (
+                    impl.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
+                    and "partition_by" not in node.context_kwargs
+                ):
+                    node.context_kwargs["partition_by"] = expr._group_by
 
         if isinstance(expr, verbs.Join):
             update_partition_by_kwarg(expr.right)
@@ -51,7 +60,7 @@ def propagate_needed_cols(expr: TableExpr):
 
         for node in expr.iter_col_nodes():
             if isinstance(node, Col):
-                node.table._needed_cols.append(node.name)
+                node.table._needed_cols.append(node)
 
     else:
         assert isinstance(expr, Table)

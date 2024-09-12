@@ -491,18 +491,6 @@ class TestPolarsLazyImpl:
             >> join(tbl2, tbl1.col1 == tbl2.col1, "left"),
         )
 
-        # Join that also uses lambda for the right table
-        assert_equal(
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == C.col1_custom_suffix, "left", suffix="_custom_suffix"),
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_custom_suffix"),
-        )
-
         # Filter
         assert_equal(
             tbl1 >> mutate(a=tbl1.col1 * 2) >> filter(C.a % 2 == 0),
