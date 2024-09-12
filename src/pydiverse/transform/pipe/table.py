@@ -42,11 +42,11 @@ class Table(TableExpr):
         if self._impl is None:
             raise AssertionError
 
-        self.name = name
-        self._schema = {
-            name: (dtype, Ftype.EWISE) for name, dtype in self._impl.schema().items()
-        }
-        self._group_by = []
+        super().__init__(
+            name,
+            {name: (dtype, Ftype.EWISE) for name, dtype in self._impl.schema().items()},
+            [],
+        )
 
     def __iter__(self) -> Iterable[Col]:
         return iter(self.cols())
