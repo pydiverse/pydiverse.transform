@@ -5,6 +5,8 @@ import dataclasses
 from collections.abc import Callable, Iterable
 from typing import Literal
 
+from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import col_expr
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
 from pydiverse.transform.tree.table_expr import TableExpr
@@ -15,12 +17,19 @@ JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class UnaryVerb(TableExpr):
+class Verb(TableExpr):
     table: TableExpr
 
     def __post_init__(self):
-        # propagates the table name up the tree
+        # propagates the table name and schema up the tree
         self.name = self.table.name
+        self._schema = self.table._schema
+        self._group_by = self.table._group_by
+        self.map_col_nodes(
+            lambda expr: expr
+            if not isinstance(expr, ColName)
+            else Col(expr.name, self.table)
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
@@ -35,7 +44,7 @@ class UnaryVerb(TableExpr):
         self, g: Callable[[ColExpr], ColExpr]
     ): ...  # TODO simplify things with this
 
-    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
+    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
         cloned.table = table
@@ -45,8 +54,8 @@ class UnaryVerb(TableExpr):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Select(UnaryVerb):
-    selected: list[Col | ColName]
+class Select(Verb):
+    selected: list[Col]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.selected
@@ -56,8 +65,8 @@ class Select(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Drop(UnaryVerb):
-    dropped: list[Col | ColName]
+class Drop(Verb):
+    dropped: list[Col]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.dropped
@@ -67,10 +76,23 @@ class Drop(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Rename(UnaryVerb):
+class Rename(Verb):
     name_map: dict[str, str]
 
-    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
+    def __post_init__(self):
+        super().__post_init__()
+        new_schema = copy.copy(self._schema)
+        for name, _ in self.name_map:
+            if name not in self._schema:
+                raise ValueError(f"no column with name `{name}` in table `{self.name}`")
+            del new_schema[name]
+        for name, replacement in self.name_map:
+            if replacement in new_schema:
+                raise ValueError(f"duplicate column name `{replacement}`")
+            new_schema[replacement] = self._schema[name]
+        self._schema = new_schema
+
+    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = Rename(table, copy.copy(self.name_map))
         table_map[self] = cloned
@@ -78,9 +100,17 @@ class Rename(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Mutate(UnaryVerb):
+class Mutate(Verb):
     names: list[str]
     values: list[ColExpr]
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._schema = copy.copy(self._schema)
+        for name, val in zip(self.names, self.values):
+            if name in self._schema:
+                raise ValueError(f"column with name `{name}` already exists")
+            self._schema[name] = val.dtype(), val.ftype(False)
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -88,7 +118,7 @@ class Mutate(UnaryVerb):
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
-    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
+    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = Mutate(
             table,
@@ -100,7 +130,7 @@ class Mutate(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Filter(UnaryVerb):
+class Filter(Verb):
     filters: list[ColExpr]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -111,9 +141,27 @@ class Filter(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Summarise(UnaryVerb):
+class Summarise(Verb):
     names: list[str]
     values: list[ColExpr]
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._schema = copy.copy(self._schema)
+        for name, val in zip(self.names, self.values):
+            if name in self._schema:
+                raise ValueError(f"column with name `{name}` already exists")
+            self._schema[name] = val.dtype(), val.ftype(False)
+
+        for node in self.iter_col_nodes():
+            if node.ftype == Ftype.WINDOW:
+                # TODO: traverse thet expression and find the name of the window fn. It
+                # does not matter if this means traversing the whole tree since we're
+                # stopping execution anyway.
+                raise FunctionTypeError(
+                    f"forbidden window function in expression `{node}` in "
+                    "`summarise`"
+                )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -121,7 +169,7 @@ class Summarise(UnaryVerb):
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
-    def clone(self) -> tuple[UnaryVerb, dict[TableExpr, TableExpr]]:
+    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = Summarise(
             table,
@@ -133,7 +181,7 @@ class Summarise(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Arrange(UnaryVerb):
+class Arrange(Verb):
     order_by: list[Order]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -147,15 +195,22 @@ class Arrange(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class SliceHead(UnaryVerb):
+class SliceHead(Verb):
     n: int
     offset: int
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class GroupBy(UnaryVerb):
-    group_by: list[Col | ColName]
+class GroupBy(Verb):
+    group_by: list[Col]
     add: bool
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.add:
+            self._group_by += self.group_by
+        else:
+            self._group_by = self.group_by
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
@@ -165,12 +220,15 @@ class GroupBy(UnaryVerb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Ungroup(UnaryVerb): ...
+class Ungroup(Verb):
+    def __post_init__(self):
+        super().__post_init__()
+        self._group_by = []
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Join(TableExpr):
-    left: TableExpr
+class Join(Verb):
+    table: TableExpr
     right: TableExpr
     on: ColExpr
     how: JoinHow
@@ -178,10 +236,21 @@ class Join(TableExpr):
     suffix: str
 
     def __post_init__(self):
-        self.name = self.left.name
+        if self.table._group_by:
+            raise ValueError(f"cannot join grouped table `{self.table.name}`")
+        elif self.right._group_by:
+            raise ValueError(f"cannot join grouped table `{self.right.name}`")
+        super.__post_init__()
+        self._schema |= {name + self.suffix: val for name, val in self.right._schema}
+
+    def iter_col_roots(self) -> Iterable[ColExpr]:
+        yield self.on
+
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.on = g(self.on)
 
     def clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
-        left, left_map = self.left.clone()
+        left, left_map = self.table.clone()
         right, right_map = self.right.clone()
         left_map.update(right_map)
         cloned = Join(

@@ -21,8 +21,8 @@ from pydiverse.transform.tree.verbs import (
     SliceHead,
     Summarise,
     TableExpr,
-    UnaryVerb,
     Ungroup,
+    Verb,
 )
 
 __all__ = [
@@ -173,10 +173,10 @@ def slice_head(expr: TableExpr, n: int, *, offset: int = 0):
 
 
 def get_backend(expr: TableExpr) -> type[TableImpl]:
-    if isinstance(expr, UnaryVerb):
+    if isinstance(expr, Verb):
         return get_backend(expr.table)
     elif isinstance(expr, Join):
-        return get_backend(expr.left)
+        return get_backend(expr.table)
     else:
         assert isinstance(expr, Table)
         return expr._impl.__class__

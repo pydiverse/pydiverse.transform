@@ -232,7 +232,7 @@ def compile_table_expr(
 
     elif isinstance(expr, verbs.Join):
         # may assume the tables were not grouped before join
-        left_df, left_select, _ = compile_table_expr(expr.left)
+        left_df, left_select, _ = compile_table_expr(expr.table)
         right_df, right_select, _ = compile_table_expr(expr.right)
 
         left_on, right_on = zip(*compile_join_cond(expr.on))

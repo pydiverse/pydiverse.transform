@@ -200,7 +200,7 @@ class SqlImpl(TableImpl):
     def compile_table_expr(
         cls, expr: TableExpr, needed_cols: set[str]
     ) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
-        if isinstance(expr, verbs.UnaryVerb):
+        if isinstance(expr, verbs.Verb):
             table, query, name_to_sqa_col = cls.compile_table_expr(
                 expr.table, needed_cols
             )
@@ -338,7 +338,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.Join):
             table, query, name_to_sqa_col = cls.compile_table_expr(
-                expr.left, needed_cols
+                expr.table, needed_cols
             )
             right_table, right_query, right_name_to_sqa_col = cls.compile_table_expr(
                 expr.right, needed_cols
@@ -469,11 +469,11 @@ def build_subquery(
 # to be done before a join so that all column references in the join subtrees remain
 # valid.
 def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str, int]:
-    if isinstance(expr, verbs.UnaryVerb):
+    if isinstance(expr, verbs.Verb):
         return create_aliases(expr.table, num_occurences)
 
     elif isinstance(expr, verbs.Join):
-        return create_aliases(expr.right, create_aliases(expr.left, num_occurences))
+        return create_aliases(expr.right, create_aliases(expr.table, num_occurences))
 
     elif isinstance(expr, Table):
         if cnt := num_occurences.get(expr._impl.table.name):
@@ -488,11 +488,11 @@ def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str,
 
 
 def get_engine(expr: TableExpr) -> sqa.Engine:
-    if isinstance(expr, verbs.UnaryVerb):
+    if isinstance(expr, verbs.Verb):
         engine = get_engine(expr.table)
 
     elif isinstance(expr, verbs.Join):
-        engine = get_engine(expr.left)
+        engine = get_engine(expr.table)
         right_engine = get_engine(expr.right)
         if engine != right_engine:
             raise NotImplementedError  # TODO: find some good error for this

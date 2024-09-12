@@ -60,7 +60,7 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
 
 
 def set_nulls_position_table(expr: TableExpr):
-    if isinstance(expr, verbs.UnaryVerb):
+    if isinstance(expr, verbs.Verb):
         set_nulls_position_table(expr.table)
         for col in expr.iter_col_roots():
             set_nulls_position_col(col)
@@ -69,7 +69,7 @@ def set_nulls_position_table(expr: TableExpr):
             expr.order_by = convert_order_list(expr.order_by)
 
     elif isinstance(expr, verbs.Join):
-        set_nulls_position_table(expr.left)
+        set_nulls_position_table(expr.table)
         set_nulls_position_table(expr.right)
 
 
@@ -162,14 +162,14 @@ def convert_col_bool_bit(
 
 
 def convert_table_bool_bit(expr: TableExpr):
-    if isinstance(expr, verbs.UnaryVerb):
+    if isinstance(expr, verbs.Verb):
         convert_table_bool_bit(expr.table)
         expr.map_col_roots(
             lambda col: convert_col_bool_bit(col, not isinstance(expr, verbs.Filter))
         )
 
     elif isinstance(expr, verbs.Join):
-        convert_table_bool_bit(expr.left)
+        convert_table_bool_bit(expr.table)
         convert_table_bool_bit(expr.right)
         expr.on = convert_col_bool_bit(expr.on, False)
 
