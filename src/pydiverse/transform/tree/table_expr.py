@@ -6,11 +6,13 @@ from pydiverse.transform.tree.dtypes import Dtype
 
 
 class TableExpr:
+    __slots__ = ["name", "_schema", "_group_by", "_needed_cols"]
+
     def __init__(
         self,
-        name: str | None = None,
-        _schema: dict[str, tuple[Dtype, Ftype]] | None = None,
-        _group_by: list[col_expr.Col] | None = None,
+        name: str,
+        _schema: dict[str, tuple[Dtype, Ftype]],
+        _group_by: list[col_expr.Col],
     ):
         self.name = name
         self._schema = _schema

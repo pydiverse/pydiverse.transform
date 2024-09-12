@@ -22,9 +22,9 @@ class Verb(TableExpr):
 
     def __post_init__(self):
         # propagates the table name and schema up the tree
-        self.name = self.table.name
-        self._schema = self.table._schema
-        self._group_by = self.table._group_by
+        TableExpr.__init__(
+            self, self.table.name, self.table._schema, self.table._group_by
+        )
         self.map_col_nodes(
             lambda expr: expr
             if not isinstance(expr, ColName)
@@ -48,6 +48,7 @@ class Verb(TableExpr):
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
         cloned.table = table
+        cloned._needed_cols = copy.copy(self._needed_cols)
         cloned.map_col_roots(lambda c: col_expr.clone(c, table_map))
         table_map[self] = cloned
         return cloned, table_map
