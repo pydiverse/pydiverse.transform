@@ -80,13 +80,13 @@ class Rename(Verb):
     name_map: dict[str, str]
 
     def __post_init__(self):
-        super().__post_init__()
+        Verb.__post_init__(self)
         new_schema = copy.copy(self._schema)
-        for name, _ in self.name_map:
+        for name, _ in self.name_map.items():
             if name not in self._schema:
                 raise ValueError(f"no column with name `{name}` in table `{self.name}`")
             del new_schema[name]
-        for name, replacement in self.name_map:
+        for name, replacement in self.name_map.items():
             if replacement in new_schema:
                 raise ValueError(f"duplicate column name `{replacement}`")
             new_schema[replacement] = self._schema[name]
@@ -105,7 +105,7 @@ class Mutate(Verb):
     values: list[ColExpr]
 
     def __post_init__(self):
-        super().__post_init__()
+        Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
             self._schema[name] = val.dtype(), val.ftype(False)
@@ -144,7 +144,7 @@ class Summarise(Verb):
     values: list[ColExpr]
 
     def __post_init__(self):
-        super().__post_init__()
+        Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
             self._schema[name] = val.dtype(), val.ftype(False)
@@ -196,7 +196,7 @@ class SliceHead(Verb):
     offset: int
 
     def __post_init__(self):
-        super().__post_init__()
+        Verb.__post_init__(self)
         if self._group_by:
             raise ValueError("cannot apply `slice_head` to a grouped table")
 
@@ -207,7 +207,7 @@ class GroupBy(Verb):
     add: bool
 
     def __post_init__(self):
-        super().__post_init__()
+        Verb.__post_init__(self)
         if self.add:
             self._group_by += self.group_by
         else:
@@ -223,7 +223,7 @@ class GroupBy(Verb):
 @dataclasses.dataclass(eq=False, slots=True)
 class Ungroup(Verb):
     def __post_init__(self):
-        super().__post_init__()
+        Verb.__post_init__(self)
         self._group_by = []
 
 
@@ -241,8 +241,10 @@ class Join(Verb):
             raise ValueError(f"cannot join grouped table `{self.table.name}`")
         elif self.right._group_by:
             raise ValueError(f"cannot join grouped table `{self.right.name}`")
-        super.__post_init__()
-        self._schema |= {name + self.suffix: val for name, val in self.right._schema}
+        Verb.__post_init__(self)
+        self._schema |= {
+            name + self.suffix: val for name, val in self.right._schema.items()
+        }
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield self.on

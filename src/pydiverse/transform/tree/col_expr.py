@@ -142,6 +142,9 @@ class ColFn(ColExpr):
                 for expr in arrange
             ]
 
+        self._dtype = None
+        self._ftype = None
+
     def __repr__(self) -> str:
         args = [repr(e) for e in self.args] + [
             f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
@@ -194,7 +197,7 @@ class ColFn(ColExpr):
 
         op = PolarsImpl.registry.get_op(self.name)
 
-        ftypes = [arg.ftype() for arg in self.args]
+        ftypes = [arg.ftype(agg_is_window) for arg in self.args]
         if op.ftype == Ftype.AGGREGATE and agg_is_window:
             op_ftype = Ftype.WINDOW
         else:
@@ -427,7 +430,6 @@ def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> N
         from pydiverse.transform.backend.polars import PolarsImpl
 
         impl = PolarsImpl.registry.get_op(expr.name)
-        # TODO: what exactly are WINDOW / AGGREGATE fns? for the user? for the backend?
         if (
             impl.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
             and "partition_by" not in expr.context_kwargs
@@ -459,10 +461,10 @@ def clone(
         return Order(clone(expr.order_by, table_map), expr.descending, expr.nulls_last)
 
     elif isinstance(expr, Col):
-        return Col(expr.name, table_map[expr.table], expr.dtype)
+        return Col(expr.name, table_map[expr.table])
 
     elif isinstance(expr, ColName):
-        return ColName(expr.name, expr.dtype)
+        return ColName(expr.name)
 
     elif isinstance(expr, LiteralCol):
         return LiteralCol(expr.val)

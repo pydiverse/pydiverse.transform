@@ -120,16 +120,13 @@ class SqlImpl(TableImpl):
     def compile_col_expr(
         cls,
         expr: ColExpr,
-        name_to_sqa_col: dict[str, sqa.ColumnElement],
     ) -> sqa.ColumnElement:
-        assert not isinstance(expr, Col)
-        if isinstance(expr, ColName):
-            # here, inserted columns referenced via C are implicitly expanded
-            return name_to_sqa_col[expr.name]
+        if isinstance(expr, Col):
+            return expr._sqa_col
 
         elif isinstance(expr, ColFn):
             args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(arg, name_to_sqa_col) for arg in expr.args
+                cls.compile_col_expr(arg) for arg in expr.args
             ]
             impl = cls.registry.get_impl(
                 expr.name, tuple(arg.dtype for arg in expr.args)
@@ -138,26 +135,21 @@ class SqlImpl(TableImpl):
             partition_by = expr.context_kwargs.get("partition_by")
             if partition_by is not None:
                 partition_by = sqa.sql.expression.ClauseList(
-                    *(
-                        cls.compile_col_expr(col, name_to_sqa_col)
-                        for col in partition_by
-                    )
+                    *(cls.compile_col_expr(col) for col in partition_by)
                 )
 
             arrange = expr.context_kwargs.get("arrange")
 
             if arrange:
                 order_by = sqa.sql.expression.ClauseList(
-                    *(cls.compile_order(order, name_to_sqa_col) for order in arrange)
+                    *(cls.compile_order(order) for order in arrange)
                 )
             else:
                 order_by = None
 
             filter_cond = expr.context_kwargs.get("filter")
             if filter_cond:
-                filter_cond = [
-                    cls.compile_col_expr(z, name_to_sqa_col) for z in filter_cond
-                ]
+                filter_cond = [cls.compile_col_expr(fil) for fil in filter_cond]
                 raise NotImplementedError
 
             # we need this since some backends cannot do `any` / `all` as a window
@@ -177,13 +169,10 @@ class SqlImpl(TableImpl):
         elif isinstance(expr, CaseExpr):
             return sqa.case(
                 *(
-                    (
-                        cls.compile_col_expr(cond, name_to_sqa_col),
-                        cls.compile_col_expr(val, name_to_sqa_col),
-                    )
+                    (cls.compile_col_expr(cond), cls.compile_col_expr(val))
                     for cond, val in expr.cases
                 ),
-                else_=cls.compile_col_expr(expr.default_val, name_to_sqa_col),
+                else_=cls.compile_col_expr(expr.default_val),
             )
 
         elif isinstance(expr, LiteralCol):
@@ -198,16 +187,10 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_table_expr(
-        cls, expr: TableExpr, needed_cols: set[str]
+        cls, expr: TableExpr
     ) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
         if isinstance(expr, verbs.Verb):
-            table, query, name_to_sqa_col = cls.compile_table_expr(
-                expr.table, needed_cols
-            )
-
-            needed_cols |= {
-                node.name for node in expr.iter_col_nodes() if isinstance(node, ColName)
-            }
+            table, query, name_to_sqa_col = cls.compile_table_expr(expr.table)
 
         if isinstance(expr, verbs.Select):
             query.select = [
@@ -238,9 +221,7 @@ class SqlImpl(TableImpl):
                 for node in expr.iter_col_roots()
                 if isinstance(node, ColName)
             ):
-                table, query, name_to_sqa_col = build_subquery(
-                    table, query, needed_cols
-                )
+                table, query, name_to_sqa_col = build_subquery(table, query)
 
             compiled_values = [
                 cls.compile_col_expr(val, name_to_sqa_col) for val in expr.values
@@ -248,6 +229,7 @@ class SqlImpl(TableImpl):
             query.select.extend(
                 [(val, name) for val, name in zip(compiled_values, expr.names)]
             )
+
             name_to_sqa_col.update(
                 {name: val for name, val in zip(expr.names, compiled_values)}
             )
@@ -258,9 +240,7 @@ class SqlImpl(TableImpl):
                 for node in expr.iter_col_roots()
                 if isinstance(node, ColName)
             ):
-                table, query, name_to_sqa_col = build_subquery(
-                    table, query, needed_cols
-                )
+                table, query, name_to_sqa_col = build_subquery(table, query)
 
             if query.group_by:
                 query.having.extend(
@@ -273,9 +253,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.Arrange):
             if query.limit is not None:
-                table, query, name_to_sqa_col = build_subquery(
-                    table, query, needed_cols
-                )
+                table, query, name_to_sqa_col = build_subquery(table, query)
 
             query.order_by = [
                 cls.compile_order(ord, name_to_sqa_col) for ord in expr.order_by
@@ -291,9 +269,7 @@ class SqlImpl(TableImpl):
                     if isinstance(node, ColName)
                 )
             ):
-                table, query, name_to_sqa_col = build_subquery(
-                    table, query, needed_cols
-                )
+                table, query, name_to_sqa_col = build_subquery(table, query)
 
             if query.group_by:
                 assert query.group_by == query.partition_by
@@ -320,9 +296,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.GroupBy):
             if query.limit is not None:
-                table, query, name_to_sqa_col = build_subquery(
-                    table, query, needed_cols
-                )
+                table, query, name_to_sqa_col = build_subquery(table, query)
 
             compiled_group_by = [
                 cls.compile_col_expr(col, name_to_sqa_col) for col in expr.group_by
@@ -337,21 +311,13 @@ class SqlImpl(TableImpl):
             query.partition_by = []
 
         elif isinstance(expr, verbs.Join):
-            table, query, name_to_sqa_col = cls.compile_table_expr(
-                expr.table, needed_cols
-            )
+            table, query, name_to_sqa_col = cls.compile_table_expr(expr.table)
             right_table, right_query, right_name_to_sqa_col = cls.compile_table_expr(
-                expr.right, needed_cols
+                expr.right
             )
-
-            needed_cols |= {
-                node.name for node in expr.on.iter_nodes() if isinstance(node, ColName)
-            }
 
             if query.limit is not None:
-                table, query, name_to_sqa_col = build_subquery(
-                    table, query, needed_cols
-                )
+                table, query, name_to_sqa_col = build_subquery(table, query)
 
             name_to_sqa_col.update(
                 {
@@ -385,6 +351,9 @@ class SqlImpl(TableImpl):
                 ),
                 {col.name: col for col in expr._impl.table.columns},
             )
+
+        for col in expr._needed_cols:
+            col._sqa_col = name_to_sqa_col[col.name]
 
         return table, query, name_to_sqa_col
 
