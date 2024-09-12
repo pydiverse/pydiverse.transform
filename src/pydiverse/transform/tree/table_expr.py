@@ -1,29 +1,30 @@
 from __future__ import annotations
 
 from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.tree.col_expr import Col
+from pydiverse.transform.tree import col_expr
 from pydiverse.transform.tree.dtypes import Dtype
 
 
 class TableExpr:
     name: str | None
     _schema: dict[str, tuple[Dtype, Ftype]]
+    _group_by: list[col_expr.Col]
 
-    __slots__ = ["name", "schema", "ftype_schema"]
+    __slots__ = ["name", "_schema", "_group_by"]
 
-    def __getitem__(self, key: str) -> Col:
+    def __getitem__(self, key: str) -> col_expr.Col:
         if not isinstance(key, str):
             raise TypeError(
                 f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
                 f"str, got {type(key)} instead."
             )
-        return Col(key, self)
+        return col_expr.Col(key, self)
 
-    def __getattr__(self, name: str) -> Col:
+    def __getattr__(self, name: str) -> col_expr.Col:
         if name in ("__copy__", "__deepcopy__", "__setstate__", "__getstate__"):
             # for hasattr to work correctly on dunder methods
             raise AttributeError
-        return Col(name, self)
+        return col_expr.Col(name, self)
 
     def __eq__(self, rhs):
         if not isinstance(rhs, TableExpr):

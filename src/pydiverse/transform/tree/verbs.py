@@ -108,8 +108,6 @@ class Mutate(Verb):
         super().__post_init__()
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
-            if name in self._schema:
-                raise ValueError(f"column with name `{name}` already exists")
             self._schema[name] = val.dtype(), val.ftype(False)
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -149,8 +147,6 @@ class Summarise(Verb):
         super().__post_init__()
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
-            if name in self._schema:
-                raise ValueError(f"column with name `{name}` already exists")
             self._schema[name] = val.dtype(), val.ftype(False)
 
         for node in self.iter_col_nodes():
@@ -198,6 +194,11 @@ class Arrange(Verb):
 class SliceHead(Verb):
     n: int
     offset: int
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self._group_by:
+            raise ValueError("cannot apply `slice_head` to a grouped table")
 
 
 @dataclasses.dataclass(eq=False, slots=True)

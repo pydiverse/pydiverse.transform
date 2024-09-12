@@ -118,12 +118,12 @@ def tbl_dt():
 
 class TestPolarsLazyImpl:
     def test_dtype(self, tbl1, tbl2):
-        assert isinstance(tbl1.col1.dtype, dtypes.Int)
-        assert isinstance(tbl1.col2.dtype, dtypes.String)
+        assert isinstance(tbl1.col1.dtype(), dtypes.Int)
+        assert isinstance(tbl1.col2.dtype(), dtypes.String)
 
-        assert isinstance(tbl2.col1.dtype, dtypes.Int)
-        assert isinstance(tbl2.col2.dtype, dtypes.Int)
-        assert isinstance(tbl2.col3.dtype, dtypes.Float)
+        assert isinstance(tbl2.col1.dtype(), dtypes.Int)
+        assert isinstance(tbl2.col2.dtype(), dtypes.Int)
+        assert isinstance(tbl2.col3.dtype(), dtypes.Float)
 
     def test_build_query(self, tbl1):
         assert (tbl1 >> build_query()) is None

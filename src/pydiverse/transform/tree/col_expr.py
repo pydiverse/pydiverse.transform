@@ -41,9 +41,11 @@ class ColExpr:
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
-    def dtype(self) -> Dtype: ...
+    def dtype(self) -> Dtype:
+        return self._dtype
 
-    def ftype(self, agg_is_window: bool) -> Ftype: ...
+    def ftype(self, agg_is_window: bool) -> Ftype:
+        return self._ftype
 
     def map(
         self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr = None
@@ -75,10 +77,12 @@ class Col(ColExpr):
         self,
         name: str,
         table: TableExpr,
-    ) -> Col:
+    ):
         self.name = name
         self.table = table
-        self._dtype, self._ftype = table.schema[name]
+        if (dftype := table._schema.get(name)) is None:
+            raise ValueError(f"column `{name}` does not exist in table `{table.name}`")
+        self._dtype, self._ftype = dftype
 
     def __repr__(self) -> str:
         return (
@@ -157,6 +161,19 @@ class ColFn(ColExpr):
             for key, arr in self.context_kwargs.items()
         }
         return g(new_fn)
+
+    def dtype(self) -> Dtype:
+        if self._dtype is not None:
+            return self._dtype
+
+        # TODO: create a backend agnostic registry
+        from pydiverse.transform.backend.polars import PolarsImpl
+
+        self._dtype = PolarsImpl.registry.get_impl(
+            self.name, [arg.dtype() for arg in self.args]
+        ).return_type
+
+        return self._dtype
 
     def ftype(self, agg_is_window: bool):
         """
@@ -433,135 +450,6 @@ def update_partition_by_kwarg(expr: ColExpr, group_by: list[Col | ColName]) -> N
 
     else:
         assert isinstance(expr, (Col, ColName, LiteralCol))
-
-
-def get_needed_cols(expr: ColExpr | Order) -> set[tuple[TableExpr, str]]:
-    if isinstance(expr, Order):
-        return get_needed_cols(expr.order_by)
-
-    if isinstance(expr, Col):
-        return set({(expr.table, expr.name)})
-
-    elif isinstance(expr, ColFn):
-        needed_cols = set()
-        for val in itertools.chain(expr.args, *expr.context_kwargs.values()):
-            needed_cols |= get_needed_cols(val)
-        return needed_cols
-
-    elif isinstance(expr, CaseExpr):
-        needed_cols = get_needed_cols(expr.default_val)
-        for cond, val in expr.cases:
-            needed_cols |= get_needed_cols(cond)
-            needed_cols |= get_needed_cols(val)
-        return needed_cols
-
-    return set()
-
-
-def propagate_names(
-    expr: ColExpr | Order, col_to_name: dict[tuple[TableExpr, str], str]
-) -> ColExpr | Order:
-    if isinstance(expr, Order):
-        return Order(
-            propagate_names(expr.order_by, col_to_name),
-            expr.descending,
-            expr.nulls_last,
-        )
-
-    if isinstance(expr, Col):
-        return ColName(col_to_name[(expr.table, expr.name)])
-
-    elif isinstance(expr, ColFn):
-        return ColFn(
-            expr.name,
-            *[propagate_names(arg, col_to_name) for arg in expr.args],
-            **{
-                key: [propagate_names(v, col_to_name) for v in arr]
-                for key, arr in expr.context_kwargs.items()
-            },
-        )
-
-    elif isinstance(expr, CaseExpr):
-        return CaseExpr(
-            [
-                (propagate_names(cond, col_to_name), propagate_names(val, col_to_name))
-                for cond, val in expr.cases
-            ],
-            propagate_names(expr.default_val, col_to_name),
-        )
-
-    return expr
-
-
-def propagate_types(
-    expr: ColExpr,
-    dtype_map: dict[str, Dtype],
-    ftype_map: dict[str, Ftype],
-    agg_is_window: bool,
-) -> ColExpr:
-    assert not isinstance(expr, Col)
-    if isinstance(expr, Order):
-        return Order(
-            propagate_types(expr.order_by, dtype_map, ftype_map, agg_is_window),
-            expr.descending,
-            expr.nulls_last,
-        )
-
-    elif isinstance(expr, ColName):
-        return ColName(expr.name, dtype_map[expr.name], ftype_map[expr.name])
-
-    elif isinstance(expr, ColFn):
-        typed_fn = ColFn(
-            expr.name,
-            *(
-                propagate_types(arg, dtype_map, ftype_map, agg_is_window)
-                for arg in expr.args
-            ),
-            **{
-                key: [
-                    propagate_types(val, dtype_map, ftype_map, agg_is_window)
-                    for val in arr
-                ]
-                for key, arr in expr.context_kwargs.items()
-            },
-        )
-
-        # TODO: create a backend agnostic registry
-        from pydiverse.transform.backend.polars import PolarsImpl
-
-        impl = PolarsImpl.registry.get_impl(
-            expr.name, [arg.dtype for arg in typed_fn.args]
-        )
-        typed_fn.dtype = impl.return_type
-        typed_fn.get_ftype(agg_is_window)
-        return typed_fn
-
-    elif isinstance(expr, CaseExpr):
-        typed_cases: list[tuple[ColExpr, ColExpr]] = []
-        for cond, val in expr.cases:
-            typed_cases.append(
-                (
-                    propagate_types(cond, dtype_map, ftype_map, agg_is_window),
-                    propagate_types(val, dtype_map, ftype_map, agg_is_window),
-                )
-            )
-            # TODO: error message, check that the value types of all cases and the
-            # default match
-            assert isinstance(typed_cases[-1][0].dtype, dtypes.Bool)
-
-        typed_case = CaseExpr(
-            typed_cases,
-            propagate_types(expr.default_val, dtype_map, ftype_map, agg_is_window),
-        )
-        typed_case.get_dtype()
-        typed_case.get_ftype()
-
-        return typed_case
-
-    elif isinstance(expr, LiteralCol):
-        return expr  # TODO: can literal columns even occur here?
-
-    raise AssertionError
 
 
 def clone(

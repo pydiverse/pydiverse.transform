@@ -62,29 +62,18 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
 def set_nulls_position_table(expr: TableExpr):
     if isinstance(expr, verbs.Verb):
         set_nulls_position_table(expr.table)
-        for col in expr.iter_col_roots():
-            set_nulls_position_col(col)
+
+        for node in expr.iter_col_nodes():
+            if isinstance(node, ColFn) and (
+                arrange := node.context_kwargs.get("arrange")
+            ):
+                node.context_kwargs["arrange"] = convert_order_list(arrange)
 
         if isinstance(expr, verbs.Arrange):
             expr.order_by = convert_order_list(expr.order_by)
 
-    elif isinstance(expr, verbs.Join):
-        set_nulls_position_table(expr.table)
-        set_nulls_position_table(expr.right)
-
-
-def set_nulls_position_col(expr: ColExpr):
-    if isinstance(expr, ColFn):
-        for arg in expr.args:
-            set_nulls_position_col(arg)
-        if arr := expr.context_kwargs.get("arrange"):
-            expr.context_kwargs["arrange"] = convert_order_list(arr)
-
-    elif isinstance(expr, CaseExpr):
-        set_nulls_position_col(expr.default_val)
-        for cond, val in expr.cases:
-            set_nulls_position_col(cond)
-            set_nulls_position_col(val)
+        if isinstance(expr, verbs.Join):
+            set_nulls_position_table(expr.right)
 
 
 # Boolean / Bit Conversion

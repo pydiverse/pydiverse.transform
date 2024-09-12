@@ -4,6 +4,7 @@ import copy
 from collections.abc import Iterable
 from html import escape
 
+from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree.col_expr import (
     Col,
     ColName,
@@ -42,22 +43,10 @@ class Table(TableExpr):
             raise AssertionError
 
         self.name = name
-        self.schema = self._impl.schema()
-
-    def __getitem__(self, key: str) -> Col:
-        if not isinstance(key, str):
-            raise TypeError(
-                f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
-                f"str, got {type(key)} instead."
-            )
-        col = super().__getitem__(key)
-        col.dtype = self.schema[key]
-        return col
-
-    def __getattr__(self, name: str) -> Col:
-        col = super().__getattr__(name)
-        col.dtype = self.schema[name]
-        return col
+        self._schema = {
+            name: (dtype, Ftype.EWISE) for name, dtype in self._impl.schema().items()
+        }
+        self._group_by = []
 
     def __iter__(self) -> Iterable[Col]:
         return iter(self.cols())
