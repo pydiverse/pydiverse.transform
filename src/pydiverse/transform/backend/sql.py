@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import functools
 import inspect
@@ -77,8 +78,8 @@ class SqlImpl(TableImpl):
     @classmethod
     def build_select(cls, expr: TableExpr) -> sqa.Select:
         create_aliases(expr, {})
-        table, query, _ = cls.compile_table_expr(expr, set())
-        return compile_query(table, query)
+        table, query, sqa_col = cls.compile_table_expr(expr, set())
+        return cls.compile_query(table, query, sqa_col)
 
     @classmethod
     def export(cls, expr: TableExpr, target: Target) -> Any:
@@ -104,9 +105,9 @@ class SqlImpl(TableImpl):
     def compile_order(
         cls,
         order: Order,
-        name_to_sqa_col: dict[str, sqa.ColumnElement],
+        sqa_col: dict[str, sqa.ColumnElement],
     ) -> sqa.UnaryExpression:
-        order_expr = cls.compile_col_expr(order.order_by, name_to_sqa_col)
+        order_expr = cls.compile_col_expr(order.order_by, sqa_col)
         order_expr = order_expr.desc() if order.descending else order_expr.asc()
         if order.nulls_last is not None:
             order_expr = (
@@ -118,38 +119,41 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_col_expr(
-        cls,
-        expr: ColExpr,
+        cls, expr: ColExpr, sqa_col: dict[str, sqa.ColumnElement]
     ) -> sqa.ColumnElement:
-        if isinstance(expr, Col):
-            return expr._sqa_col
+        assert not isinstance(expr, Col)
+
+        if isinstance(expr, ColName):
+            return sqa_col[expr.name]
 
         elif isinstance(expr, ColFn):
             args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(arg) for arg in expr.args
+                cls.compile_col_expr(arg, sqa_col) for arg in expr.args
             ]
             impl = cls.registry.get_impl(
-                expr.name, tuple(arg.dtype for arg in expr.args)
+                expr.name, tuple(arg.dtype() for arg in expr.args)
             )
 
             partition_by = expr.context_kwargs.get("partition_by")
             if partition_by is not None:
                 partition_by = sqa.sql.expression.ClauseList(
-                    *(cls.compile_col_expr(col) for col in partition_by)
+                    *(cls.compile_col_expr(col, sqa_col) for col in partition_by)
                 )
 
             arrange = expr.context_kwargs.get("arrange")
 
             if arrange:
                 order_by = sqa.sql.expression.ClauseList(
-                    *(cls.compile_order(order) for order in arrange)
+                    *(cls.compile_order(order, sqa_col) for order in arrange)
                 )
             else:
                 order_by = None
 
             filter_cond = expr.context_kwargs.get("filter")
             if filter_cond:
-                filter_cond = [cls.compile_col_expr(fil) for fil in filter_cond]
+                filter_cond = [
+                    cls.compile_col_expr(fil, sqa_col) for fil in filter_cond
+                ]
                 raise NotImplementedError
 
             # we need this since some backends cannot do `any` / `all` as a window
@@ -169,16 +173,58 @@ class SqlImpl(TableImpl):
         elif isinstance(expr, CaseExpr):
             return sqa.case(
                 *(
-                    (cls.compile_col_expr(cond), cls.compile_col_expr(val))
+                    (
+                        cls.compile_col_expr(cond, sqa_col),
+                        cls.compile_col_expr(val, sqa_col),
+                    )
                     for cond, val in expr.cases
                 ),
-                else_=cls.compile_col_expr(expr.default_val),
+                else_=cls.compile_col_expr(expr.default_val, sqa_col),
             )
 
         elif isinstance(expr, LiteralCol):
             return expr.val
 
         raise AssertionError
+
+    @classmethod
+    def compile_query(
+        cls, table: sqa.Table, query: Query, sqa_col: dict[str, sqa.ColumnElement]
+    ) -> sqa.sql.Select:
+        sel = table.select().select_from(table)
+
+        for j in query.join:
+            sel = sel.join(
+                j.right,
+                onclause=cls.compile_col_expr(j.on, sqa_col),
+                isouter=j.how != "inner",
+                full=j.how == "outer",
+            )
+
+        if query.where:
+            sel = sel.where(
+                *(cls.compile_col_expr(cond, sqa_col) for cond in query.where)
+            )
+
+        if query.group_by:
+            sel = sel.group_by(*(sqa_col[col_name] for col_name in query.group_by))
+
+        if query.having:
+            sel = sel.having(*(sqa_col[col_name] for col_name in query.group_by))
+
+        if query.limit is not None:
+            sel = sel.limit(query.limit).offset(query.offset)
+
+        sel = sel.with_only_columns(
+            *(sqa_col[col_name].label(col_name) for col_name in query.select)
+        )
+
+        if query.order_by:
+            sel = sel.order_by(
+                *(cls.compile_order(ord, sqa_col) for ord in query.order_by)
+            )
+
+        return sel
 
     # the compilation function only deals with one subquery. It assumes that any col
     # it uses that is created by a subquery has the string name given to it in the
@@ -187,104 +233,96 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_table_expr(
-        cls, expr: TableExpr
+        cls, expr: TableExpr, needed_cols: set[str]
     ) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
         if isinstance(expr, verbs.Verb):
-            table, query, name_to_sqa_col = cls.compile_table_expr(expr.table)
+            for node in expr.iter_col_nodes():
+                if isinstance(node, ColName):
+                    needed_cols.add(node.name)
 
-        if isinstance(expr, verbs.Select):
-            query.select = [
-                (cls.compile_col_expr(col, name_to_sqa_col), col.name)
-                for col in expr.selected
-            ]
+            table, query, sqa_col = cls.compile_table_expr(expr.table, needed_cols)
 
-        elif isinstance(expr, verbs.Drop):
-            query.select = [
-                (col, name)
-                for col, name in query.select
-                if name not in set({col.name for col in expr.dropped})
-            ]
-
-        elif isinstance(expr, verbs.Rename):
-            name_to_sqa_col = {
-                (expr.name_map[name] if name in expr.name_map else name): col
-                for name, col in name_to_sqa_col.items()
-            }
-            query.select = [
-                (col, expr.name_map[name] if name in expr.name_map else name)
-                for col, name in query.select
-            ]
-
-        elif isinstance(expr, verbs.Mutate):
-            if any(
-                node.ftype == Ftype.WINDOW
-                for node in expr.iter_col_roots()
-                if isinstance(node, ColName)
-            ):
-                table, query, name_to_sqa_col = build_subquery(table, query)
-
-            compiled_values = [
-                cls.compile_col_expr(val, name_to_sqa_col) for val in expr.values
-            ]
-            query.select.extend(
-                [(val, name) for val, name in zip(compiled_values, expr.names)]
-            )
-
-            name_to_sqa_col.update(
-                {name: val for name, val in zip(expr.names, compiled_values)}
-            )
-
-        elif isinstance(expr, verbs.Filter):
-            if query.limit is not None or any(
-                node.ftype == Ftype.WINDOW
-                for node in expr.iter_col_roots()
-                if isinstance(node, ColName)
-            ):
-                table, query, name_to_sqa_col = build_subquery(table, query)
-
-            if query.group_by:
-                query.having.extend(
-                    cls.compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
+        # check if a subquery is required
+        if (
+            (
+                isinstance(
+                    expr,
+                    (
+                        verbs.Filter,
+                        verbs.Summarise,
+                        verbs.Arrange,
+                        verbs.GroupBy,
+                        verbs.Join,
+                    ),
                 )
-            else:
-                query.where.extend(
-                    cls.compile_col_expr(fil, name_to_sqa_col) for fil in expr.filters
-                )
-
-        elif isinstance(expr, verbs.Arrange):
-            if query.limit is not None:
-                table, query, name_to_sqa_col = build_subquery(table, query)
-
-            query.order_by = [
-                cls.compile_order(ord, name_to_sqa_col) for ord in expr.order_by
-            ] + query.order_by
-
-        elif isinstance(expr, verbs.Summarise):
-            if (
-                (bool(query.group_by) and query.group_by != query.partition_by)
-                or query.limit is not None
-                or any(
-                    node.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
+                and query.limit is not None
+            )
+            or (
+                isinstance(expr, (verbs.Mutate, verbs.Filter))
+                and any(
+                    node.ftype == Ftype.WINDOW
                     for node in expr.iter_col_roots()
                     if isinstance(node, ColName)
                 )
-            ):
-                table, query, name_to_sqa_col = build_subquery(table, query)
+            )
+            or (
+                isinstance(expr, verbs.Summarise)
+                and (
+                    (bool(query.group_by) and query.group_by != query.partition_by)
+                    or any(
+                        node.ftype == Ftype.WINDOW
+                        for node in expr.iter_col_roots()
+                        if isinstance(node, ColName)
+                    )
+                )
+            )
+        ):
+            query.select = list(needed_cols)
+            table, query = cls.build_subquery(table, query, sqa_col)
 
+        if isinstance(expr, verbs.Select):
+            query.select = [col.name for col in expr.selected]
+
+        elif isinstance(expr, verbs.Drop):
+            query.select = [
+                col_name
+                for col_name in query.select
+                if col_name not in set(col.name for col in expr.dropped)
+            ]
+
+        elif isinstance(expr, verbs.Rename):
+            for name, replacement in expr.name_map.items():
+                if replacement in needed_cols:
+                    needed_cols.remove(replacement)
+                    needed_cols.add(name)
+
+            sqa_col = {
+                (expr.name_map[name] if name in expr.name_map else name): val
+                for name, val in sqa_col.items()
+            }
+
+        elif isinstance(expr, verbs.Mutate):
+            for name, val in zip(expr.names, expr.values):
+                sqa_col[name] = cls.compile_col_expr(val, sqa_col)
+            query.select.extend(expr.names)
+
+        elif isinstance(expr, verbs.Filter):
             if query.group_by:
-                assert query.group_by == query.partition_by
+                query.having.extend(expr.filters)
+            else:
+                query.where.extend(expr.filters)
+
+        elif isinstance(expr, verbs.Arrange):
+            query.order_by = expr.order_by + query.order_by
+
+        elif isinstance(expr, verbs.Summarise):
+            for name, val in zip(expr.names, expr.values):
+                sqa_col[name] = cls.compile_col_expr(val, sqa_col)
+
             query.group_by = query.partition_by
             query.partition_by = []
             query.order_by = []
-            compiled_values = [
-                cls.compile_col_expr(val, name_to_sqa_col) for val in expr.values
-            ]
-            query.select = [
-                (val, name) for val, name in zip(compiled_values, expr.names)
-            ]
-            name_to_sqa_col.update(
-                {name: val for name, val in zip(expr.names, compiled_values)}
-            )
+            query.select = copy.copy(expr.names)
 
         elif isinstance(expr, verbs.SliceHead):
             if query.limit is None:
@@ -295,40 +333,24 @@ class SqlImpl(TableImpl):
                 query.offset += expr.offset
 
         elif isinstance(expr, verbs.GroupBy):
-            if query.limit is not None:
-                table, query, name_to_sqa_col = build_subquery(table, query)
-
-            compiled_group_by = [
-                cls.compile_col_expr(col, name_to_sqa_col) for col in expr.group_by
-            ]
             if expr.add:
-                query.partition_by += compiled_group_by
+                query.partition_by += [col.name for col in expr.group_by]
             else:
-                query.partition_by = compiled_group_by
+                query.partition_by = [col.name for col in expr.group_by]
 
         elif isinstance(expr, verbs.Ungroup):
             assert not (query.partition_by and query.group_by)
             query.partition_by = []
 
         elif isinstance(expr, verbs.Join):
-            table, query, name_to_sqa_col = cls.compile_table_expr(expr.table)
-            right_table, right_query, right_name_to_sqa_col = cls.compile_table_expr(
-                expr.right
+            right_table, right_query, right_sqa_col = cls.compile_table_expr(
+                expr.right, needed_cols
             )
 
-            if query.limit is not None:
-                table, query, name_to_sqa_col = build_subquery(table, query)
+            for name, val in right_sqa_col.items():
+                sqa_col[name + expr.suffix] = val
 
-            name_to_sqa_col.update(
-                {
-                    name + expr.suffix: col_elem
-                    for name, col_elem in right_name_to_sqa_col.items()
-                }
-            )
-
-            j = SqlJoin(
-                right_table, cls.compile_col_expr(expr.on, name_to_sqa_col), expr.how
-            )
+            j = SqlJoin(right_table, expr.on, expr.how)
 
             if expr.how == "inner":
                 query.where.extend(right_query.where)
@@ -338,35 +360,45 @@ class SqlImpl(TableImpl):
                 if query.where or right_query.where:
                     raise ValueError("invalid filter before outer join")
 
-            query.select.extend(
-                (col, name + expr.suffix) for col, name in right_query.select
-            )
+            query.select.extend(name + expr.suffix for name in right_query.select)
             query.join.append(j)
 
         elif isinstance(expr, Table):
-            return (
-                expr._impl.table,
-                Query(
-                    [(col, col.name) for col in expr._impl.table.columns],
-                ),
-                {col.name: col for col in expr._impl.table.columns},
-            )
+            table = expr._impl.table
+            query = Query([col.name for col in expr._impl.table.columns])
+            sqa_col = {col.name: col for col in expr._impl.table.columns}
 
-        for col in expr._needed_cols:
-            col._sqa_col = name_to_sqa_col[col.name]
+        return table, query, sqa_col
 
-        return table, query, name_to_sqa_col
+    # TODO: do we want `alias` to automatically create a subquery? or add a flag to the
+    # node that a subquery would be allowed? or special verb to mark subquery?
+    @classmethod
+    def build_subquery(
+        cls, table: sqa.Table, query: Query, sqa_col: dict[str, sqa.ColumnElement]
+    ) -> tuple[sqa.Table, Query]:
+        table = cls.compile_query(table, query, sqa_col).subquery()
+
+        query.select = [col.name for col in table.columns]
+        query.join = []
+        query.group_by = []
+        query.where = []
+        query.having = []
+        query.order_by = []
+        query.limit = None
+        query.offset = None
+
+        return table, query
 
 
 @dataclasses.dataclass(slots=True)
 class Query:
-    select: list[tuple[sqa.ColumnElement, str]]
+    select: list[str]
     join: list[SqlJoin] = dataclasses.field(default_factory=list)
-    group_by: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
-    partition_by: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
-    where: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
-    having: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
-    order_by: list[sqa.UnaryExpression] = dataclasses.field(default_factory=list)
+    group_by: list[str] = dataclasses.field(default_factory=list)
+    partition_by: list[str] = dataclasses.field(default_factory=list)
+    where: list[ColExpr] = dataclasses.field(default_factory=list)
+    having: list[ColExpr] = dataclasses.field(default_factory=list)
+    order_by: list[Order] = dataclasses.field(default_factory=list)
     limit: int | None = None
     offset: int | None = None
 
@@ -374,63 +406,8 @@ class Query:
 @dataclasses.dataclass(slots=True)
 class SqlJoin:
     right: sqa.Subquery
-    on: sqa.ColumnElement
-    how: str
-
-
-def compile_query(table: sqa.Table, query: Query) -> sqa.sql.Select:
-    sel = table.select().select_from(table)
-
-    for j in query.join:
-        sel = sel.join(
-            j.right,
-            onclause=j.on,
-            isouter=j.how != "inner",
-            full=j.how == "outer",
-        )
-
-    if query.where:
-        sel = sel.where(*query.where)
-
-    if query.group_by:
-        sel = sel.group_by(*query.group_by)
-
-    if query.having:
-        sel = sel.having(*query.having)
-
-    if query.limit is not None:
-        sel = sel.limit(query.limit).offset(query.offset)
-
-    sel = sel.with_only_columns(
-        *(sqa.label(col_name, col) for col, col_name in query.select)
-    )
-
-    if query.order_by:
-        sel = sel.order_by(*query.order_by)
-
-    return sel
-
-
-# TODO: do we want `alias` to automatically create a subquery? or add a flag to the node
-# that a subquery would be allowed? or special verb to mark subquery?
-def build_subquery(
-    table: sqa.Table,
-    query: Query,
-    needed_cols: set[str],
-) -> tuple[sqa.Table, Query, dict[str, sqa.ColumnElement]]:
-    query.select = [(col, name) for col, name in query.select if name in needed_cols]
-    table = compile_query(table, query).subquery()
-
-    query.select = [(col, col.name) for col in table.columns]
-    query.join = []
-    query.group_by = []
-    query.where = []
-    query.having = []
-    query.order_by = []
-    query.limit = None
-    query.offset = None
-
-    return table, query, {col.name: col for col in table.columns}
+    on: ColExpr
+    how: verbs.JoinHow
 
 
 # Gives any leaf a unique alias to allow self-joins. We do this here to not force

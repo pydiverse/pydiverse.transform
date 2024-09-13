@@ -94,7 +94,7 @@ def convert_col_bool_bit(
         )
 
     elif isinstance(expr, ColName):
-        if isinstance(expr.dtype, dtypes.Bool):
+        if isinstance(expr.dtype(), dtypes.Bool):
             return ColFn("__eq__", expr, LiteralCol(1), dtype=dtypes.Bool())
         return expr
 
@@ -114,7 +114,7 @@ def convert_col_bool_bit(
         }
 
         impl = MsSqlImpl.registry.get_impl(
-            expr.name, tuple(arg.dtype for arg in expr.args)
+            expr.name, tuple(arg.dtype() for arg in expr.args)
         )
 
         if isinstance(impl.return_type, dtypes.Bool):
