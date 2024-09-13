@@ -52,6 +52,9 @@ __all__ = [
 def alias(expr: TableExpr, new_name: str | None = None):
     if new_name is None:
         new_name = expr.name
+    # TableExpr.clone relies on the tables in a tree to be unique (it does not keep a
+    # memo like __deepcopy__)
+    tree.preprocessing.check_duplicate_tables(expr)
     new_expr, _ = expr.clone()
     new_expr.name = new_name
     return new_expr
@@ -63,7 +66,6 @@ def collect(expr: TableExpr): ...
 
 @builtin_verb()
 def export(expr: TableExpr, target: Target):
-    expr, _ = expr.clone()
     SourceBackend: type[TableImpl] = get_backend(expr)
     tree.preprocess(expr)
     return SourceBackend.export(expr, target)
