@@ -102,5 +102,4 @@ class Table(TableExpr):
     def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
         cloned = copy.copy(self)
         cloned._impl = cloned._impl.clone()
-        cloned._needed_cols = copy.copy(cloned._needed_cols)
         return cloned, {self: cloned}

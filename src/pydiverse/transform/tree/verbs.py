@@ -47,7 +47,6 @@ class Verb(TableExpr):
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
         cloned.table = table
-        cloned._needed_cols = copy.copy(self._needed_cols)
         cloned.map_col_roots(lambda c: col_expr.clone(c, table_map))
         cloned._group_by = [col_expr.clone(col, table_map) for col in cloned._group_by]
         table_map[self] = cloned

@@ -6,7 +6,7 @@ from pydiverse.transform.tree.dtypes import Dtype
 
 
 class TableExpr:
-    __slots__ = ["name", "_schema", "_group_by", "_needed_cols"]
+    __slots__ = ["name", "_schema", "_group_by"]
 
     def __init__(
         self,
@@ -17,9 +17,6 @@ class TableExpr:
         self.name = name
         self._schema = _schema
         self._group_by = _group_by
-        self._needed_cols: list[col_expr.Col] = []
-
-    __slots__ = ["name", "_schema", "_group_by", "_needed_cols"]
 
     def __getitem__(self, key: str) -> col_expr.Col:
         if not isinstance(key, str):

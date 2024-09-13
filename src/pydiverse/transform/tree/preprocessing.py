@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import verbs
-from pydiverse.transform.tree.col_expr import Col, ColFn
+from pydiverse.transform.tree.col_expr import Col, ColFn, ColName
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -40,6 +40,10 @@ def rename_overwritten_cols(expr: TableExpr):
                     {name: f"{name}_{str(hash(expr))}" for name in overwritten},
                 )
 
+                for node in expr.iter_col_nodes():
+                    if isinstance(node, ColName) and node.name in expr.table.name_map:
+                        node.name = expr.table.name_map[node.name]
+
                 expr.table = verbs.Drop(
                     expr.table,
                     [Col(name, expr.table) for name in expr.table.name_map.values()],
@@ -52,15 +56,41 @@ def rename_overwritten_cols(expr: TableExpr):
         assert isinstance(expr, Table)
 
 
-def propagate_needed_cols(expr: TableExpr):
+def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName]:
     if isinstance(expr, verbs.Verb):
-        propagate_needed_cols(expr.table)
-        if isinstance(expr, verbs.Join):
-            propagate_needed_cols(expr.right)
-
         for node in expr.iter_col_nodes():
             if isinstance(node, Col):
-                node.table._needed_cols.append(node)
+                needed_cols.add(node)
 
-    else:
-        assert isinstance(expr, Table)
+        col_to_name = propagate_names(expr.table, needed_cols)
+
+        if isinstance(expr, verbs.Join):
+            col_to_name_right = propagate_names(expr.right, needed_cols)
+            col_to_name |= {
+                key: ColName(col.name + expr.suffix, col.dtype(), col.ftype())
+                for key, col in col_to_name_right.items()
+            }
+
+        expr.map_col_nodes(
+            lambda node: col_to_name[node] if isinstance(node, Col) else node
+        )
+
+        if isinstance(expr, verbs.Rename):
+            col_to_name = {
+                key: (
+                    ColName(expr.name_map[col.name], col.dtype(), col.ftype())
+                    if col.name in expr.name_map
+                    else col
+                )
+                for key, col in col_to_name.items()
+            }
+
+    elif isinstance(expr, Table):
+        col_to_name = dict()
+
+    # TODO: use dict[dict] for needed_cols for better efficiency
+    for col in needed_cols:
+        if col.table is expr:
+            col_to_name[col] = ColName(col.name, col.dtype(), col.ftype())
+
+    return col_to_name
