@@ -416,10 +416,10 @@ class SqlJoin:
 # valid.
 def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str, int]:
     if isinstance(expr, verbs.Verb):
-        return create_aliases(expr.table, num_occurences)
+        num_occurences = create_aliases(expr.table, num_occurences)
 
-    elif isinstance(expr, verbs.Join):
-        return create_aliases(expr.right, create_aliases(expr.table, num_occurences))
+        if isinstance(expr, verbs.Join):
+            num_occurences = create_aliases(expr.right, num_occurences)
 
     elif isinstance(expr, Table):
         if cnt := num_occurences.get(expr._impl.table.name):
@@ -427,27 +427,25 @@ def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str,
         else:
             cnt = 0
         num_occurences[expr._impl.table.name] = cnt + 1
-        return num_occurences
 
     else:
         raise AssertionError
+
+    return num_occurences
 
 
 def get_engine(expr: TableExpr) -> sqa.Engine:
     if isinstance(expr, verbs.Verb):
         engine = get_engine(expr.table)
 
-    elif isinstance(expr, verbs.Join):
-        engine = get_engine(expr.table)
-        right_engine = get_engine(expr.right)
-        if engine != right_engine:
-            raise NotImplementedError  # TODO: find some good error for this
-
-    elif isinstance(expr, Table):
-        engine = expr._impl.engine
+        if isinstance(expr, verbs.Join):
+            right_engine = get_engine(expr.right)
+            if engine != right_engine:
+                raise NotImplementedError  # TODO: find some good error for this
 
     else:
-        raise AssertionError
+        assert isinstance(expr, Table)
+        engine = expr._impl.engine
 
     return engine
 

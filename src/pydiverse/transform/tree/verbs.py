@@ -7,7 +7,6 @@ from typing import Literal
 
 from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.tree import col_expr
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
 from pydiverse.transform.tree.table_expr import TableExpr
 
@@ -47,15 +46,24 @@ class Verb(TableExpr):
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
         cloned.table = table
-        cloned.map_col_roots(lambda c: col_expr.clone(c, table_map))
-        cloned._group_by = [col_expr.clone(col, table_map) for col in cloned._group_by]
+        cloned.map_col_nodes(
+            lambda node: Col(node.name, table_map[node.table])
+            if isinstance(node, Col)
+            else copy.copy(node)
+        )
+        cloned._group_by = [
+            Col(col.name, table_map[col.table])
+            if isinstance(col, Col)
+            else copy.copy(col)
+            for col in cloned._group_by
+        ]
         table_map[self] = cloned
         return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Select(Verb):
-    selected: list[Col]
+    selected: list[Col | ColName]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.selected
@@ -66,7 +74,7 @@ class Select(Verb):
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Drop(Verb):
-    dropped: list[Col]
+    dropped: list[Col | ColName]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.dropped
@@ -93,9 +101,8 @@ class Rename(Verb):
         self._schema = new_schema
 
     def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Rename(table, copy.copy(self.name_map))
-        table_map[self] = cloned
+        cloned, table_map = Verb.clone(self)
+        cloned.name_map = copy.copy(self.name_map)
         return cloned, table_map
 
 
@@ -117,13 +124,8 @@ class Mutate(Verb):
         self.values = [g(c) for c in self.values]
 
     def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Mutate(
-            table,
-            copy.copy(self.names),
-            [col_expr.clone(val, table_map) for val in self.values],
-        )
-        table_map[self] = cloned
+        cloned, table_map = Verb.clone(self)
+        cloned.names = copy.copy(self.names)
         return cloned, table_map
 
 
@@ -166,13 +168,8 @@ class Summarise(Verb):
         self.values = [g(c) for c in self.values]
 
     def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Summarise(
-            table,
-            copy.copy(self.names),
-            [col_expr.clone(val, table_map) for val in self.values],
-        )
-        table_map[self] = cloned
+        cloned, table_map = Verb.clone(self)
+        cloned.names = copy.copy(self.names)
         return cloned, table_map
 
 
@@ -203,7 +200,7 @@ class SliceHead(Verb):
 
 @dataclasses.dataclass(eq=False, slots=True)
 class GroupBy(Verb):
-    group_by: list[Col]
+    group_by: list[Col | ColName]
     add: bool
 
     def __post_init__(self):
@@ -261,16 +258,20 @@ class Join(Verb):
         self.on = g(self.on)
 
     def clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
-        left, left_map = self.table.clone()
+        table, table_map = self.table.clone()
         right, right_map = self.right.clone()
-        left_map.update(right_map)
+        table_map.update(right_map)
         cloned = Join(
-            left,
+            table,
             right,
-            col_expr.clone(self.on, left_map),
+            self.on.map_nodes(
+                lambda node: Col(node.name, table_map[node.table])
+                if isinstance(node, Col)
+                else copy.copy(node)
+            ),
             self.how,
             self.validate,
             self.suffix,
         )
-        left_map[self] = cloned
-        return cloned, left_map
+        table_map[self] = cloned
+        return cloned, table_map
