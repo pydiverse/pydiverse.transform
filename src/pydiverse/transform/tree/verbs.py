@@ -115,7 +115,7 @@ class Mutate(Verb):
         Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
-            self._schema[name] = val.dtype(), val.ftype(False)
+            self._schema[name] = val.dtype(), val.ftype(agg_is_window=False)
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -149,10 +149,10 @@ class Summarise(Verb):
         Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
-            self._schema[name] = val.dtype(), val.ftype(True)
+            self._schema[name] = val.dtype(), val.ftype(agg_is_window=True)
 
         for node in self.iter_col_nodes():
-            if node.ftype == Ftype.WINDOW:
+            if node.ftype(agg_is_window=True) == Ftype.WINDOW:
                 # TODO: traverse thet expression and find the name of the window fn. It
                 # does not matter if this means traversing the whole tree since we're
                 # stopping execution anyway.

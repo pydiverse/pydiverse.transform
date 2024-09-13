@@ -67,7 +67,9 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
         if isinstance(expr, verbs.Join):
             col_to_name_right = propagate_names(expr.right, needed_cols)
             col_to_name |= {
-                key: ColName(col.name + expr.suffix, col.dtype(), col.ftype(False))
+                key: ColName(
+                    col.name + expr.suffix, col.dtype(), col.ftype(agg_is_window=False)
+                )
                 for key, col in col_to_name_right.items()
             }
 
@@ -78,7 +80,11 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
         if isinstance(expr, verbs.Rename):
             col_to_name = {
                 key: (
-                    ColName(expr.name_map[col.name], col.dtype(), col.ftype(False))
+                    ColName(
+                        expr.name_map[col.name],
+                        col.dtype(),
+                        col.ftype(agg_is_window=False),
+                    )
                     if col.name in expr.name_map
                     else col
                 )
@@ -92,7 +98,9 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
     for col in needed_cols:
         if col.table is expr:
             col_to_name[col] = ColName(
-                col.name, col.dtype(), col.ftype(not isinstance(expr, verbs.Summarise))
+                col.name,
+                col.dtype(),
+                col.ftype(agg_is_window=not isinstance(expr, verbs.Summarise)),
             )
 
     return col_to_name

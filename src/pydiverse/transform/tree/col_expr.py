@@ -44,7 +44,7 @@ class ColExpr:
     def dtype(self) -> Dtype:
         return self._dtype
 
-    def ftype(self, agg_is_window: bool) -> Ftype:
+    def ftype(self, *, agg_is_window: bool) -> Ftype:
         return self._ftype
 
     def map(
@@ -178,7 +178,7 @@ class ColFn(ColExpr):
 
         return self._dtype
 
-    def ftype(self, agg_is_window: bool):
+    def ftype(self, *, agg_is_window: bool):
         """
         Determine the ftype based on a function implementation and the arguments.
 
@@ -190,6 +190,8 @@ class ColFn(ColExpr):
         function raises an Exception.
         """
 
+        # TODO: This causes wrong results if ftype is called once with
+        # agg_is_window=True and then with agg_is_window=False.
         if self._ftype is not None:
             return self._ftype
 
@@ -197,7 +199,7 @@ class ColFn(ColExpr):
 
         op = PolarsImpl.registry.get_op(self.name)
 
-        ftypes = [arg.ftype(agg_is_window) for arg in self.args]
+        ftypes = [arg.ftype(agg_is_window=agg_is_window) for arg in self.args]
         if op.ftype == Ftype.AGGREGATE and agg_is_window:
             op_ftype = Ftype.WINDOW
         else:
@@ -275,6 +277,10 @@ class CaseExpr(ColExpr):
         default_val: ColExpr | None = None,
     ):
         self.cases = list(cases)
+
+        # We distinguish `None` and `LiteralCol(None)` as a `default_val`. The first one
+        # signals that the user has not yet set a default value, the second one
+        # indicates that the user set `None` as a default value.
         self.default_val = default_val
         super().__init__()
 
@@ -290,7 +296,8 @@ class CaseExpr(ColExpr):
     def iter_nodes(self) -> Iterable[ColExpr]:
         for expr in itertools.chain.from_iterable(self.cases):
             yield from expr.iter_nodes()
-        yield from self.default_val.iter_nodes()
+        if self.default_val is not None:
+            yield from self.default_val.iter_nodes()
         yield self
 
     def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
@@ -298,7 +305,9 @@ class CaseExpr(ColExpr):
         new_case_expr.cases = [
             (cond.map_nodes(g), val.map_nodes(g)) for cond, val in self.cases
         ]
-        new_case_expr.default_val = self.default_val.map_nodes(g)
+        new_case_expr.default_val = (
+            self.default_val.map_nodes(g) if self.default_val is not None else None
+        )
         return g(new_case_expr)
 
     def dtype(self):
@@ -322,7 +331,7 @@ class CaseExpr(ColExpr):
                     f"{cond.dtype()} but all conditions must be boolean"
                 )
 
-    def ftype(self, agg_is_window: bool):
+    def ftype(self, *, agg_is_window: bool):
         if self._ftype is not None:
             return self._ftype
 
@@ -332,7 +341,7 @@ class CaseExpr(ColExpr):
 
         for _, val in self.cases:
             if not val.dtype().const:
-                val_ftypes.add(val.ftype(agg_is_window))
+                val_ftypes.add(val.ftype(agg_is_window=agg_is_window))
 
         if len(val_ftypes) == 0:
             self._ftype = Ftype.EWISE
@@ -348,7 +357,7 @@ class CaseExpr(ColExpr):
                 )
             )
 
-        return self.ftype
+        return self._ftype
 
     def when(self, condition: ColExpr) -> WhenClause:
         if self.default_val is not None:

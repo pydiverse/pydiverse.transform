@@ -178,7 +178,11 @@ class SqlImpl(TableImpl):
                     )
                     for cond, val in expr.cases
                 ),
-                else_=cls.compile_col_expr(expr.default_val, sqa_col),
+                else_=(
+                    cls.compile_col_expr(expr.default_val, sqa_col)
+                    if expr.default_val is not None
+                    else None
+                ),
             )
 
         elif isinstance(expr, LiteralCol):
@@ -251,7 +255,7 @@ class SqlImpl(TableImpl):
             or (
                 isinstance(expr, (verbs.Mutate, verbs.Filter))
                 and any(
-                    node.ftype == Ftype.WINDOW
+                    node.ftype(agg_is_window=False) == Ftype.WINDOW
                     for node in expr.iter_col_roots()
                     if isinstance(node, ColName)
                 )
@@ -261,7 +265,7 @@ class SqlImpl(TableImpl):
                 and (
                     (bool(query.group_by) and query.group_by != query.partition_by)
                     or any(
-                        node.ftype == Ftype.WINDOW
+                        node.ftype(agg_is_window=True) == Ftype.WINDOW
                         for node in expr.iter_col_roots()
                         if isinstance(node, ColName)
                     )
@@ -304,7 +308,7 @@ class SqlImpl(TableImpl):
             for name, val in zip(expr.names, expr.values):
                 compiled = cls.compile_col_expr(val, sqa_col)
                 sqa_col[name] = compiled
-                query.select.append(compiled.label(name))
+                query.select.append(sqa.label(name, compiled))
 
         elif isinstance(expr, verbs.Filter):
             if query.group_by:
@@ -326,7 +330,7 @@ class SqlImpl(TableImpl):
             for name, val in zip(expr.names, expr.values):
                 compiled = cls.compile_col_expr(val, sqa_col)
                 sqa_col[name] = compiled
-                query.select.append(compiled.label(name))
+                query.select.append(sqa.label(name, compiled))
 
             query.group_by = query.partition_by
             query.partition_by = []

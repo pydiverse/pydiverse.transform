@@ -166,7 +166,9 @@ def compile_col_expr(expr: ColExpr) -> pl.Expr:
         compiled = pl  # to initialize the when/then-chain
         for cond, val in expr.cases:
             compiled = compiled.when(compile_col_expr(cond)).then(compile_col_expr(val))
-        return compiled.otherwise(compile_col_expr(expr.default_val))
+        if expr.default_val is not None:
+            compiled = compiled.otherwise(compile_col_expr(expr.default_val))
+        return compiled
 
     elif isinstance(expr, LiteralCol):
         if isinstance(expr.dtype(), dtypes.String):
