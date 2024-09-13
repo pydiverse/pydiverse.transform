@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.errors import DataTypeError, FunctionTypeError
+from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.pipe.verbs import (
     arrange,
     filter,
@@ -153,7 +153,7 @@ def test_not_summarising(df4):
 
 
 def test_none(df4):
-    assert_result_equal(df4, lambda t: t >> summarise(x=None), exception=DataTypeError)
+    assert_result_equal(df4, lambda t: t >> summarise(x=None))
 
 
 # TODO: Implement more test cases for summarise verb
@@ -167,7 +167,7 @@ def test_op_min(df4):
         df4,
         lambda t: t
         >> group_by(t.col1)
-        >> summarise(**{c._.name + "_min": c.min() for c in t}),
+        >> summarise(**{c.name + "_min": c.min() for c in t}),
     )
 
 
@@ -176,7 +176,7 @@ def test_op_max(df4):
         df4,
         lambda t: t
         >> group_by(t.col1)
-        >> summarise(**{c._.name + "_max": c.max() for c in t}),
+        >> summarise(**{c.name + "_max": c.max() for c in t}),
     )
 
 

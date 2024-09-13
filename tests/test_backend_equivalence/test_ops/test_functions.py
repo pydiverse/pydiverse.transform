@@ -10,7 +10,7 @@ from tests.util import assert_result_equal
 def test_count(df4):
     assert_result_equal(
         df4,
-        lambda t: t >> mutate(**{col._.name + "_count": pdt.count(col) for col in t}),
+        lambda t: t >> mutate(**{col.name + "_count": pdt.count(col) for col in t}),
     )
 
 
