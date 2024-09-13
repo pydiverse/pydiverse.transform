@@ -44,7 +44,7 @@ class ColExpr:
     def dtype(self) -> Dtype:
         return self._dtype
 
-    def ftype(self, agg_is_window: bool = False) -> Ftype:
+    def ftype(self, agg_is_window: bool) -> Ftype:
         return self._ftype
 
     def map(
@@ -178,7 +178,7 @@ class ColFn(ColExpr):
 
         return self._dtype
 
-    def ftype(self, agg_is_window: bool = False):
+    def ftype(self, agg_is_window: bool):
         """
         Determine the ftype based on a function implementation and the arguments.
 
@@ -322,7 +322,7 @@ class CaseExpr(ColExpr):
                     f"{cond.dtype()} but all conditions must be boolean"
                 )
 
-    def ftype(self, agg_is_window: bool = False):
+    def ftype(self, agg_is_window: bool):
         if self._ftype is not None:
             return self._ftype
 
@@ -332,7 +332,7 @@ class CaseExpr(ColExpr):
 
         for _, val in self.cases:
             if not val.dtype().const:
-                val_ftypes.add(val.ftype())
+                val_ftypes.add(val.ftype(agg_is_window))
 
         if len(val_ftypes) == 0:
             self._ftype = Ftype.EWISE

@@ -149,7 +149,7 @@ class Summarise(Verb):
         Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
-            self._schema[name] = val.dtype(), val.ftype(False)
+            self._schema[name] = val.dtype(), val.ftype(True)
 
         for node in self.iter_col_nodes():
             if node.ftype == Ftype.WINDOW:
