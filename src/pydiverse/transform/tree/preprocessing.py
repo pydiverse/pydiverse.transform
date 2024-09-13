@@ -46,7 +46,7 @@ def rename_overwritten_cols(expr: TableExpr):
 
                 expr.table = verbs.Drop(
                     expr.table,
-                    [Col(name, expr.table) for name in expr.table.name_map.values()],
+                    [ColName(name) for name in expr.table.name_map.values()],
                 )
 
         if isinstance(expr, verbs.Join):

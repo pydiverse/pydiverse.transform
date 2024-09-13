@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import dataclasses
 import functools
 import inspect
@@ -78,8 +77,8 @@ class SqlImpl(TableImpl):
     @classmethod
     def build_select(cls, expr: TableExpr) -> sqa.Select:
         create_aliases(expr, {})
-        table, query, sqa_col = cls.compile_table_expr(expr, set())
-        return cls.compile_query(table, query, sqa_col)
+        table, query, _ = cls.compile_table_expr(expr, set())
+        return cls.compile_query(table, query)
 
     @classmethod
     def export(cls, expr: TableExpr, target: Target) -> Any:
@@ -188,41 +187,33 @@ class SqlImpl(TableImpl):
         raise AssertionError
 
     @classmethod
-    def compile_query(
-        cls, table: sqa.Table, query: Query, sqa_col: dict[str, sqa.ColumnElement]
-    ) -> sqa.sql.Select:
+    def compile_query(cls, table: sqa.Table, query: Query) -> sqa.sql.Select:
         sel = table.select().select_from(table)
 
         for j in query.join:
             sel = sel.join(
                 j.right,
-                onclause=cls.compile_col_expr(j.on, sqa_col),
+                onclause=j.on,
                 isouter=j.how != "inner",
                 full=j.how == "outer",
             )
 
         if query.where:
-            sel = sel.where(
-                *(cls.compile_col_expr(cond, sqa_col) for cond in query.where)
-            )
+            sel = sel.where(*query.where)
 
         if query.group_by:
-            sel = sel.group_by(*(sqa_col[col_name] for col_name in query.group_by))
+            sel = sel.group_by(*query.group_by)
 
         if query.having:
-            sel = sel.having(*(sqa_col[col_name] for col_name in query.group_by))
+            sel = sel.having(*query.having)
 
         if query.limit is not None:
             sel = sel.limit(query.limit).offset(query.offset)
 
-        sel = sel.with_only_columns(
-            *(sqa_col[col_name].label(col_name) for col_name in query.select)
-        )
+        sel = sel.with_only_columns(*query.select)
 
         if query.order_by:
-            sel = sel.order_by(
-                *(cls.compile_order(ord, sqa_col) for ord in query.order_by)
-            )
+            sel = sel.order_by(*query.order_by)
 
         return sel
 
@@ -277,17 +268,20 @@ class SqlImpl(TableImpl):
                 )
             )
         ):
-            query.select = list(needed_cols)
-            table, query = cls.build_subquery(table, query, sqa_col)
+            query.select = [lb for lb in query.select if lb.name in needed_cols]
+            table, query = cls.build_subquery(table, query)
 
         if isinstance(expr, verbs.Select):
-            query.select = [col.name for col in expr.selected]
+            query.select = [
+                sqa.label(col.name, cls.compile_col_expr(col, sqa_col))
+                for col in expr.selected
+            ]
 
         elif isinstance(expr, verbs.Drop):
             query.select = [
-                col_name
-                for col_name in query.select
-                if col_name not in set(col.name for col in expr.dropped)
+                lb
+                for lb in query.select
+                if lb.name not in set(col.name for col in expr.dropped)
             ]
 
         elif isinstance(expr, verbs.Rename):
@@ -296,6 +290,11 @@ class SqlImpl(TableImpl):
                     needed_cols.remove(replacement)
                     needed_cols.add(name)
 
+            query.select = [
+                (lb.label(expr.name_map[lb.name]) if lb.name in expr.name_map else lb)
+                for lb in query.select
+            ]
+
             sqa_col = {
                 (expr.name_map[name] if name in expr.name_map else name): val
                 for name, val in sqa_col.items()
@@ -303,26 +302,35 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.Mutate):
             for name, val in zip(expr.names, expr.values):
-                sqa_col[name] = cls.compile_col_expr(val, sqa_col)
-            query.select.extend(expr.names)
+                compiled = cls.compile_col_expr(val, sqa_col)
+                sqa_col[name] = compiled
+                query.select.append(compiled.label(name))
 
         elif isinstance(expr, verbs.Filter):
             if query.group_by:
-                query.having.extend(expr.filters)
+                query.having.extend(
+                    cls.compile_col_expr(fil, sqa_col) for fil in expr.filters
+                )
             else:
-                query.where.extend(expr.filters)
+                query.where.extend(
+                    cls.compile_col_expr(fil, sqa_col) for fil in expr.filters
+                )
 
         elif isinstance(expr, verbs.Arrange):
-            query.order_by = expr.order_by + query.order_by
+            query.order_by = [
+                cls.compile_order(ord, sqa_col) for ord in expr.order_by
+            ] + query.order_by
 
         elif isinstance(expr, verbs.Summarise):
+            query.select.clear()
             for name, val in zip(expr.names, expr.values):
-                sqa_col[name] = cls.compile_col_expr(val, sqa_col)
+                compiled = cls.compile_col_expr(val, sqa_col)
+                sqa_col[name] = compiled
+                query.select.append(compiled.label(name))
 
             query.group_by = query.partition_by
             query.partition_by = []
-            query.order_by = []
-            query.select = copy.copy(expr.names)
+            query.order_by.clear()
 
         elif isinstance(expr, verbs.SliceHead):
             if query.limit is None:
@@ -334,13 +342,17 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, verbs.GroupBy):
             if expr.add:
-                query.partition_by += [col.name for col in expr.group_by]
+                query.partition_by += [
+                    cls.compile_col_expr(col, sqa_col) for col in expr.group_by
+                ]
             else:
-                query.partition_by = [col.name for col in expr.group_by]
+                query.partition_by = [
+                    cls.compile_col_expr(col, sqa_col) for col in expr.group_by
+                ]
 
         elif isinstance(expr, verbs.Ungroup):
             assert not (query.partition_by and query.group_by)
-            query.partition_by = []
+            query.partition_by.clear()
 
         elif isinstance(expr, verbs.Join):
             right_table, right_query, right_sqa_col = cls.compile_table_expr(
@@ -350,7 +362,7 @@ class SqlImpl(TableImpl):
             for name, val in right_sqa_col.items():
                 sqa_col[name + expr.suffix] = val
 
-            j = SqlJoin(right_table, expr.on, expr.how)
+            j = SqlJoin(right_table, cls.compile_col_expr(expr.on, sqa_col), expr.how)
 
             if expr.how == "inner":
                 query.where.extend(right_query.where)
@@ -360,12 +372,14 @@ class SqlImpl(TableImpl):
                 if query.where or right_query.where:
                     raise ValueError("invalid filter before outer join")
 
-            query.select.extend(name + expr.suffix for name in right_query.select)
+            query.select.extend(
+                col.label(col.name + expr.suffix) for col in right_query.select
+            )
             query.join.append(j)
 
         elif isinstance(expr, Table):
             table = expr._impl.table
-            query = Query([col.name for col in expr._impl.table.columns])
+            query = Query([col.label(col.name) for col in expr._impl.table.columns])
             sqa_col = {col.name: col for col in expr._impl.table.columns}
 
         return table, query, sqa_col
@@ -373,10 +387,8 @@ class SqlImpl(TableImpl):
     # TODO: do we want `alias` to automatically create a subquery? or add a flag to the
     # node that a subquery would be allowed? or special verb to mark subquery?
     @classmethod
-    def build_subquery(
-        cls, table: sqa.Table, query: Query, sqa_col: dict[str, sqa.ColumnElement]
-    ) -> tuple[sqa.Table, Query]:
-        table = cls.compile_query(table, query, sqa_col).subquery()
+    def build_subquery(cls, table: sqa.Table, query: Query) -> tuple[sqa.Table, Query]:
+        table = cls.compile_query(table, query).subquery()
 
         query.select = [col.name for col in table.columns]
         query.join = []
@@ -392,13 +404,13 @@ class SqlImpl(TableImpl):
 
 @dataclasses.dataclass(slots=True)
 class Query:
-    select: list[str]
+    select: list[sqa.Label]
     join: list[SqlJoin] = dataclasses.field(default_factory=list)
-    group_by: list[str] = dataclasses.field(default_factory=list)
-    partition_by: list[str] = dataclasses.field(default_factory=list)
-    where: list[ColExpr] = dataclasses.field(default_factory=list)
-    having: list[ColExpr] = dataclasses.field(default_factory=list)
-    order_by: list[Order] = dataclasses.field(default_factory=list)
+    group_by: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    partition_by: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    where: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    having: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
+    order_by: list[sqa.UnaryExpression] = dataclasses.field(default_factory=list)
     limit: int | None = None
     offset: int | None = None
 
