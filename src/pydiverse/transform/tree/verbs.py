@@ -149,10 +149,10 @@ class Summarise(Verb):
         Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
-            self._schema[name] = val.dtype(), val.ftype(agg_is_window=True)
+            self._schema[name] = val.dtype(), val.ftype(agg_is_window=False)
 
         for node in self.iter_col_nodes():
-            if node.ftype(agg_is_window=True) == Ftype.WINDOW:
+            if node.ftype(agg_is_window=False) == Ftype.WINDOW:
                 # TODO: traverse thet expression and find the name of the window fn. It
                 # does not matter if this means traversing the whole tree since we're
                 # stopping execution anyway.

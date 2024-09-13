@@ -34,20 +34,20 @@ def test_mutate_case_ewise(df4):
 
 
 def test_mutate_case_window(df4):
-    # assert_result_equal(
-    #     df4,
-    #     lambda t: t
-    #     >> mutate(
-    #         x=pdt.when(C.col1.max() == 1)
-    #         .then(1)
-    #         .when(C.col1.max() == 2)
-    #         .then(2)
-    #         .when(C.col1.max() == 3)
-    #         .then(3)
-    #         .when(C.col1.max() == 4)
-    #         .then(4)
-    #     ),
-    # )
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            x=pdt.when(C.col1.max() == 1)
+            .then(1)
+            .when(C.col1.max() == 2)
+            .then(2)
+            .when(C.col1.max() == 3)
+            .then(3)
+            .when(C.col1.max() == 4)
+            .then(4)
+        ),
+    )
 
     assert_result_equal(
         df4,
@@ -106,7 +106,6 @@ def test_summarise_case(df4):
 
 
 def test_invalid_value_dtype(df4):
-    # Incompatible types String and Float
     assert_result_equal(
         df4,
         lambda t: t

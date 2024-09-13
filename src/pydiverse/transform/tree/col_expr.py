@@ -23,6 +23,10 @@ class ColExpr:
     __contains__ = None
     __iter__ = None
 
+    def __init__(self, _dtype: Dtype | None = None, _ftype: Ftype | None = None):
+        self._dtype = _dtype
+        self._ftype = _ftype
+
     def __getattr__(self, name: str) -> FnAttr:
         if name.startswith("_") and name.endswith("_"):
             # that hasattr works correctly
@@ -60,7 +64,7 @@ class ColExpr:
                 )
                 for key, val in mapping.items()
             ),
-            default,
+            wrap_literal(default),
         )
 
     # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
@@ -82,7 +86,7 @@ class Col(ColExpr):
         self.table = table
         if (dftype := table._schema.get(name)) is None:
             raise ValueError(f"column `{name}` does not exist in table `{table.name}`")
-        self._dtype, self._ftype = dftype
+        super().__init__(*dftype)
 
     def __repr__(self) -> str:
         return (
@@ -110,8 +114,7 @@ class ColName(ColExpr):
         self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None
     ):
         self.name = name
-        self._dtype = dtype
-        self._ftype = ftype
+        super().__init__(dtype, ftype)
 
     def __repr__(self) -> str:
         return (
@@ -123,9 +126,9 @@ class ColName(ColExpr):
 class LiteralCol(ColExpr):
     def __init__(self, val: Any):
         self.val = val
-        self._dtype = python_type_to_pdt(type(val))
-        self._dtype.const = True
-        self._ftype = Ftype.EWISE
+        dtype = python_type_to_pdt(type(val))
+        dtype.const = True
+        super().__init__(dtype, Ftype.EWISE)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.val} ({self.dtype()})>"
@@ -142,8 +145,7 @@ class ColFn(ColExpr):
                 for expr in arrange
             ]
 
-        self._dtype = None
-        self._ftype = None
+        super().__init__()
 
     def __repr__(self) -> str:
         args = [repr(e) for e in self.args] + [
@@ -180,14 +182,14 @@ class ColFn(ColExpr):
 
     def ftype(self, *, agg_is_window: bool):
         """
-        Determine the ftype based on a function implementation and the arguments.
+        Determine the ftype based on the arguments.
 
             e(e) -> e       a(e) -> a       w(e) -> w
             e(a) -> a       a(a) -> Err     w(a) -> w
             e(w) -> w       a(w) -> Err     w(w) -> Err
 
-        If the implementation ftype is incompatible with the arguments, this
-        function raises an Exception.
+        If the operator ftype is incompatible with the arguments, this function raises
+        an Exception.
         """
 
         # TODO: This causes wrong results if ftype is called once with
@@ -315,19 +317,17 @@ class CaseExpr(ColExpr):
             return self._dtype
 
         try:
-            self._dtype = dtypes.promote_dtypes(
-                [
-                    self.default_val.dtype().without_modifiers(),
-                    *(val.dtype().without_modifiers() for _, val in self.cases),
-                ]
-            )
+            val_types = [val.dtype().without_modifiers() for _, val in self.cases]
+            if self.default_val is not None:
+                val_types.append(self.default_val.dtype().without_modifiers())
+            self._dtype = dtypes.promote_dtypes(val_types)
         except Exception as e:
             raise DataTypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
             if not isinstance(cond.dtype(), Bool):
                 raise DataTypeError(
-                    "invalid case expression: condition {cond} has type "
+                    f"invalid case expression: condition {cond} has type "
                     f"{cond.dtype()} but all conditions must be boolean"
                 )
 
@@ -337,7 +337,7 @@ class CaseExpr(ColExpr):
 
         val_ftypes = set()
         if self.default_val is not None and not self.default_val.dtype().const:
-            val_ftypes.add(self.default_val._ftype)
+            val_ftypes.add(self.default_val.ftype(agg_is_window=agg_is_window))
 
         for _, val in self.cases:
             if not val.dtype().const:
@@ -361,12 +361,12 @@ class CaseExpr(ColExpr):
 
     def when(self, condition: ColExpr) -> WhenClause:
         if self.default_val is not None:
-            raise TypeError("cannot call `when` on a case expression after `otherwise`")
+            raise TypeError("cannot call `when` on a closed case expression after")
         return WhenClause(self.cases, wrap_literal(condition))
 
     def otherwise(self, value: ColExpr) -> CaseExpr:
         if self.default_val is not None:
-            raise TypeError("cannot call `otherwise` twice on a case expression")
+            raise TypeError("default value is already set on this case expression")
         return CaseExpr(self.cases, wrap_literal(value))
 
 
