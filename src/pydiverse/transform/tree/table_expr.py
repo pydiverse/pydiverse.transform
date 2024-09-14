@@ -12,7 +12,7 @@ class TableExpr:
         self,
         name: str,
         _schema: dict[str, tuple[Dtype, Ftype]],
-        _partition_by: list[col_expr.Col],
+        _partition_by: list[col_expr.Col | col_expr.ColName],
     ):
         self.name = name
         self._schema = _schema

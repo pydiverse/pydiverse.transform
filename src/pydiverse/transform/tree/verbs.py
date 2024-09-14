@@ -218,7 +218,7 @@ class GroupBy(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
         if self.add:
-            self._partition_by += self.group_by
+            self._partition_by = self._partition_by + self.group_by
         else:
             self._partition_by = self.group_by
 
@@ -273,6 +273,7 @@ class Join(Verb):
         table, table_map = self.table.clone()
         right, right_map = self.right.clone()
         table_map.update(right_map)
+
         cloned = Join(
             table,
             right,
@@ -285,5 +286,8 @@ class Join(Verb):
             self.validate,
             self.suffix,
         )
+
+        cloned._partition_by = []
         table_map[self] = cloned
+
         return cloned, table_map

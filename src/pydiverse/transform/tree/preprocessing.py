@@ -64,6 +64,11 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
             if isinstance(node, Col):
                 needed_cols.add(node)
 
+        # in summarise, the grouping columns are added to the table, so we need to
+        # resolve them
+        if isinstance(expr, verbs.Summarise):
+            needed_cols.update(expr.table._partition_by)
+
         col_to_name = propagate_names(expr.table, needed_cols)
 
         if isinstance(expr, verbs.Join):
@@ -74,18 +79,21 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
 
         def replace_cols(node: ColExpr) -> ColExpr:
             if isinstance(node, Col):
-                if (replacement := col_to_name[node]) is None:
+                if (replacement := col_to_name.get(node)) is None:
                     raise ValueError(
-                        f"invalid usage of column `{node}` in an expression not "
-                        f"derived from the table `{node.table}`"
+                        f"invalid usage of column `{repr(node)}` in an expression not "
+                        f"derived from the table `{node.table.name}`"
                     )
                 return replacement
             return node
 
         expr.map_col_nodes(replace_cols)
-        expr._partition_by = [pb.map_nodes(replace_cols) for pb in expr._partition_by]
+        if isinstance(expr, verbs.Summarise):
+            expr.table._partition_by = [
+                pb.map_nodes(replace_cols) for pb in expr.table._partition_by
+            ]
 
-        if isinstance(expr, verbs.Rename):
+        elif isinstance(expr, verbs.Rename):
             col_to_name.update(
                 {
                     col: ColName(

@@ -243,14 +243,15 @@ def compile_table_expr(
             for name, value in zip(expr.names, expr.values)
         }
 
+        select = expr.names
+
         if expr.table._partition_by:
             df = df.group_by(
                 *(compile_col_expr(pb) for pb in expr.table._partition_by)
             ).agg(**aggregations)
+            select.extend(pb.name for pb in expr.table._partition_by)
         else:
             df = df.select(**aggregations)
-
-        select = expr.names
 
     elif isinstance(expr, verbs.SliceHead):
         df = df.slice(expr.offset, expr.n)
@@ -274,7 +275,7 @@ def compile_table_expr(
             coalesce=False,
         )
 
-        select += [col_name + expr.suffix for col_name in right_select]
+        select.extend(col_name + expr.suffix for col_name in right_select)
 
     elif isinstance(expr, Table):
         assert isinstance(expr._impl, PolarsImpl)
