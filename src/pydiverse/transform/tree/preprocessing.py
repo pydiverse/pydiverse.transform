@@ -9,18 +9,20 @@ from pydiverse.transform.tree.table_expr import TableExpr
 
 # returns the list of cols the table is currently grouped by
 def update_partition_by_kwarg(expr: TableExpr):
-    if isinstance(expr, verbs.Verb) and not isinstance(expr, verbs.Summarise):
+    if isinstance(expr, verbs.Verb):
         update_partition_by_kwarg(expr.table)
-        for node in expr.iter_col_nodes():
-            if isinstance(node, ColFn):
-                from pydiverse.transform.backend.polars import PolarsImpl
 
-                impl = PolarsImpl.registry.get_op(node.name)
-                if (
-                    impl.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
-                    and "partition_by" not in node.context_kwargs
-                ):
-                    node.context_kwargs["partition_by"] = expr._group_by
+        if not isinstance(expr, verbs.Summarise):
+            for node in expr.iter_col_nodes():
+                if isinstance(node, ColFn):
+                    from pydiverse.transform.backend.polars import PolarsImpl
+
+                    impl = PolarsImpl.registry.get_op(node.name)
+                    if (
+                        impl.ftype in (Ftype.WINDOW, Ftype.AGGREGATE)
+                        and "partition_by" not in node.context_kwargs
+                    ):
+                        node.context_kwargs["partition_by"] = expr.table._partition_by
 
         if isinstance(expr, verbs.Join):
             update_partition_by_kwarg(expr.right)
@@ -66,12 +68,9 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
 
         if isinstance(expr, verbs.Join):
             col_to_name_right = propagate_names(expr.right, needed_cols)
-            col_to_name |= {
-                key: ColName(
-                    col.name + expr.suffix, col.dtype(), col.ftype(agg_is_window=False)
-                )
-                for key, col in col_to_name_right.items()
-            }
+            for _, col in col_to_name_right.items():
+                col.name += expr.suffix
+            col_to_name |= col_to_name_right
 
         def replace_cols(node: ColExpr) -> ColExpr:
             if isinstance(node, Col):
@@ -84,20 +83,12 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
             return node
 
         expr.map_col_nodes(replace_cols)
+        expr._partition_by = [pb.map_nodes(replace_cols) for pb in expr._partition_by]
 
         if isinstance(expr, verbs.Rename):
-            col_to_name = {
-                key: (
-                    ColName(
-                        expr.name_map[col.name],
-                        col.dtype(),
-                        col.ftype(agg_is_window=False),
-                    )
-                    if col.name in expr.name_map
-                    else col
-                )
-                for key, col in col_to_name.items()
-            }
+            for _, col in col_to_name.items():
+                if col.name in expr.name_map:
+                    col.name = expr.name_map[col.name]
 
     elif isinstance(expr, Table):
         col_to_name = dict()

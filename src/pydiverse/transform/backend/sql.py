@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
+import itertools
 import operator
 from typing import Any
 
@@ -255,7 +256,7 @@ class SqlImpl(TableImpl):
             or (
                 isinstance(expr, (verbs.Mutate, verbs.Filter))
                 and any(
-                    node.ftype(agg_is_window=False) == Ftype.WINDOW
+                    node.ftype(agg_is_window=True) == Ftype.WINDOW
                     for node in expr.iter_col_roots()
                     if isinstance(node, ColName)
                 )
@@ -265,17 +266,43 @@ class SqlImpl(TableImpl):
                 and (
                     (bool(query.group_by) and query.group_by != query.partition_by)
                     or any(
-                        node.ftype(agg_is_window=True) == Ftype.WINDOW
-                        for node in expr.iter_col_roots()
+                        (
+                            node.ftype(agg_is_window=False)
+                            in (Ftype.WINDOW, Ftype.AGGREGATE)
+                        )
+                        for node in expr.iter_col_nodes()
                         if isinstance(node, ColName)
                     )
                 )
             )
         ):
+            # we need to preserve the partition_by-state
+            needed_cols.update(
+                itertools.chain.from_iterable(
+                    (node.name for node in pb.iter_nodes() if isinstance(node, ColName))
+                    for pb in expr.table._partition_by
+                )
+            )
+
             query.select = [lb for lb in query.select if lb.name in needed_cols]
-            table, query = cls.build_subquery(table, query)
-            for col in table.columns:
-                sqa_col[col.name] = col
+
+            table = cls.compile_query(table, query).subquery()
+            new_sqa_col = {col.name: col for col in table.columns}
+
+            # rewire column references to the subquery
+            query.select = [sqa.label(col.name, col) for col in table.columns]
+            query.partition_by = [
+                cls.compile_col_expr(pb, new_sqa_col) for pb in expr.table._partition_by
+            ]
+            query.join.clear()
+            query.group_by.clear()
+            query.where.clear()
+            query.having.clear()
+            query.order_by.clear()
+            query.limit = None
+            query.offset = None
+
+            sqa_col.update(new_sqa_col)
 
         if isinstance(expr, verbs.Select):
             query.select = [
@@ -394,17 +421,6 @@ class SqlImpl(TableImpl):
     # node that a subquery would be allowed? or special verb to mark subquery?
     @classmethod
     def build_subquery(cls, table: sqa.Table, query: Query) -> tuple[sqa.Table, Query]:
-        table = cls.compile_query(table, query).subquery()
-
-        query.select = [sqa.label(col.name, col) for col in table.columns]
-        query.join = []
-        query.group_by = []
-        query.where = []
-        query.having = []
-        query.order_by = []
-        query.limit = None
-        query.offset = None
-
         return table, query
 
 

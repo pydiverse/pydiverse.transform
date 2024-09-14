@@ -6,17 +6,17 @@ from pydiverse.transform.tree.dtypes import Dtype
 
 
 class TableExpr:
-    __slots__ = ["name", "_schema", "_group_by"]
+    __slots__ = ["name", "_schema", "_partition_by"]
 
     def __init__(
         self,
         name: str,
         _schema: dict[str, tuple[Dtype, Ftype]],
-        _group_by: list[col_expr.Col],
+        _partition_by: list[col_expr.Col],
     ):
         self.name = name
         self._schema = _schema
-        self._group_by = _group_by
+        self._partition_by = _partition_by
 
     def __getitem__(self, key: str) -> col_expr.Col:
         if not isinstance(key, str):

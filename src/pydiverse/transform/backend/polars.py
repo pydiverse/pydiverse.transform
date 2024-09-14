@@ -243,10 +243,10 @@ def compile_table_expr(
             for name, value in zip(expr.names, expr.values)
         }
 
-        if expr._group_by:
-            df = df.group_by(*(pl.col(col.name) for col in expr._group_by)).agg(
-                **aggregations
-            )
+        if expr.table._partition_by:
+            df = df.group_by(
+                *(compile_col_expr(pb) for pb in expr.table._partition_by)
+            ).agg(**aggregations)
         else:
             df = df.select(**aggregations)
 

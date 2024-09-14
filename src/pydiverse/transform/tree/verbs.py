@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order
+from pydiverse.transform.tree.col_expr import Col, ColExpr, ColFn, ColName, Order
 from pydiverse.transform.tree.table_expr import TableExpr
 
 JoinHow = Literal["inner", "left", "outer"]
@@ -22,7 +22,7 @@ class Verb(TableExpr):
     def __post_init__(self):
         # propagate the table name and schema up the tree
         TableExpr.__init__(
-            self, self.table.name, self.table._schema, self.table._group_by
+            self, self.table.name, self.table._schema, self.table._partition_by
         )
         for node in self.iter_col_nodes():
             if isinstance(node, ColName):
@@ -51,11 +51,11 @@ class Verb(TableExpr):
             else copy.copy(node)
         )
 
-        cloned._group_by = [
+        cloned._partition_by = [
             Col(col.name, table_map[col.table])
             if isinstance(col, Col)
             else copy.copy(col)
-            for col in cloned._group_by
+            for col in cloned._partition_by
         ]
 
         table_map[self] = cloned
@@ -116,7 +116,7 @@ class Mutate(Verb):
         Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
-            self._schema[name] = val.dtype(), val.ftype(agg_is_window=False)
+            self._schema[name] = val.dtype(), val.ftype(agg_is_window=True)
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -149,17 +149,28 @@ class Summarise(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
         self._schema = copy.copy(self._schema)
+        self._partition_by = []
         for name, val in zip(self.names, self.values):
             self._schema[name] = val.dtype(), val.ftype(agg_is_window=False)
 
         for node in self.iter_col_nodes():
-            if node.ftype(agg_is_window=False) == Ftype.WINDOW:
-                # TODO: traverse thet expression and find the name of the window fn. It
-                # does not matter if this means traversing the whole tree since we're
-                # stopping execution anyway.
+            if (
+                isinstance(node, ColFn)
+                and node.ftype(agg_is_window=False) == Ftype.WINDOW
+            ):
                 raise FunctionTypeError(
-                    f"forbidden window function in expression `{node}` in "
-                    "`summarise`"
+                    f"forbidden window function `{node.name}` in `summarise`"
+                )
+
+        for name, val in zip(self.names, self.values):
+            if not any(
+                isinstance(node, ColFn)
+                and node.ftype(agg_is_window=False) == Ftype.AGGREGATE
+                for node in val.iter_nodes()
+            ):
+                raise FunctionTypeError(
+                    f"expression of new column `{name}` in `summarise` does not "
+                    "contain an aggregation function."
                 )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -195,7 +206,7 @@ class SliceHead(Verb):
 
     def __post_init__(self):
         Verb.__post_init__(self)
-        if self._group_by:
+        if self._partition_by:
             raise ValueError("cannot apply `slice_head` to a grouped table")
 
 
@@ -207,9 +218,9 @@ class GroupBy(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
         if self.add:
-            self._group_by += self.group_by
+            self._partition_by += self.group_by
         else:
-            self._group_by = self.group_by
+            self._partition_by = self.group_by
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
@@ -222,7 +233,7 @@ class GroupBy(Verb):
 class Ungroup(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
-        self._group_by = []
+        self._partition_by = []
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -235,9 +246,9 @@ class Join(Verb):
     suffix: str
 
     def __post_init__(self):
-        if self.table._group_by:
+        if self.table._partition_by:
             raise ValueError(f"cannot join grouped table `{self.table.name}`")
-        elif self.right._group_by:
+        elif self.right._partition_by:
             raise ValueError(f"cannot join grouped table `{self.right.name}`")
         TableExpr.__init__(
             self,

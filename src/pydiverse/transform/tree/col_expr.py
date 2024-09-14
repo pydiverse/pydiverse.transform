@@ -217,40 +217,49 @@ class ColFn(ColExpr):
         op = PolarsImpl.registry.get_op(self.name)
 
         ftypes = [arg.ftype(agg_is_window=agg_is_window) for arg in self.args]
-        if op.ftype == Ftype.AGGREGATE and agg_is_window:
-            op_ftype = Ftype.WINDOW
-        else:
-            op_ftype = op.ftype
+        actual_ftype = (
+            Ftype.WINDOW if op.ftype == Ftype.AGGREGATE and agg_is_window else op.ftype
+        )
 
-        if op_ftype == Ftype.EWISE:
+        if actual_ftype == Ftype.EWISE:
+            # this assert is ok since window functions in `summarise` are already kicked
+            # out by the `Summarise` constructor.
+            assert not (Ftype.WINDOW in ftypes and Ftype.AGGREGATE in ftypes)
+
             if Ftype.WINDOW in ftypes:
                 self._ftype = Ftype.WINDOW
             elif Ftype.AGGREGATE in ftypes:
                 self._ftype = Ftype.AGGREGATE
             else:
-                self._ftype = op_ftype
-
-        elif op_ftype == Ftype.AGGREGATE:
-            if Ftype.WINDOW in ftypes:
-                raise FunctionTypeError(
-                    "cannot nest a window function inside an aggregate function"
-                    f" ({op.name})."
-                )
-
-            if Ftype.AGGREGATE in ftypes:
-                raise FunctionTypeError(
-                    "cannot nest an aggregate function inside an aggregate function"
-                    f" ({op.name})."
-                )
-            self._ftype = op_ftype
+                self._ftype = actual_ftype
 
         else:
-            if Ftype.WINDOW in ftypes:
-                raise FunctionTypeError(
-                    "cannot nest a window function inside a window function"
-                    f" ({op.name})."
-                )
-            self._ftype = op_ftype
+            self._ftype = actual_ftype
+
+            # kick out nested window / aggregation functions
+            for node in self.iter_nodes():
+                if (
+                    node is not self
+                    and isinstance(node, ColFn)
+                    and (
+                        (node_ftype := node.ftype(agg_is_window=agg_is_window))
+                        in (
+                            Ftype.AGGREGATE,
+                            Ftype.WINDOW,
+                        )
+                    )
+                ):
+                    assert isinstance(self, ColFn)
+                    ftype_string = {
+                        Ftype.AGGREGATE: "aggregation",
+                        Ftype.WINDOW: "window",
+                    }
+                    raise FunctionTypeError(
+                        f"{ftype_string[node_ftype]} function `{node.name}` nested "
+                        f"inside {ftype_string[self._ftype]} function `{self.name}`.\n"
+                        "hint: There may be at most one window / aggregation function "
+                        "in a column expression on any path from the root to a leaf."
+                    )
 
         return self._ftype
 
