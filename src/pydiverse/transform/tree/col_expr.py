@@ -77,6 +77,8 @@ class ColExpr:
 
 
 class Col(ColExpr):
+    __slots__ = ["name", "table"]
+
     def __init__(
         self,
         name: str,
@@ -110,6 +112,8 @@ class Col(ColExpr):
 
 
 class ColName(ColExpr):
+    __slots__ = ["name"]
+
     def __init__(
         self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None
     ):
@@ -122,8 +126,17 @@ class ColName(ColExpr):
             f"{f" ({self.dtype()})" if self.dtype() else ""}>"
         )
 
+    def resolve_type(self, table: TableExpr):
+        if (dftype := table._schema.get(self.name)) is None:
+            raise ValueError(
+                f"column `{self.name}` does not exist in table `{table.name}`"
+            )
+        self._dtype, self._ftype = dftype
+
 
 class LiteralCol(ColExpr):
+    __slots__ = ["val"]
+
     def __init__(self, val: Any):
         self.val = val
         dtype = python_type_to_pdt(type(val))
@@ -135,6 +148,8 @@ class LiteralCol(ColExpr):
 
 
 class ColFn(ColExpr):
+    __slots__ = ["name", "args", "context_kwargs"]
+
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
         self.args = list(args)
@@ -240,7 +255,7 @@ class ColFn(ColExpr):
         return self._ftype
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class FnAttr:
     name: str
     arg: ColExpr
@@ -260,10 +275,10 @@ class FnAttr:
         return f"<{self.__class__.__name__} {self.name}({self.arg})>"
 
 
+@dataclasses.dataclass(slots=True)
 class WhenClause:
-    def __init__(self, cases: list[tuple[ColExpr, ColExpr]], cond: ColExpr):
-        self.cases = cases
-        self.cond = cond
+    cases: list[tuple[ColExpr, ColExpr]]
+    cond: ColExpr
 
     def then(self, value: ColExpr) -> CaseExpr:
         return CaseExpr((*self.cases, (self.cond, wrap_literal(value))))

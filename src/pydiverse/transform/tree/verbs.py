@@ -20,15 +20,13 @@ class Verb(TableExpr):
     table: TableExpr
 
     def __post_init__(self):
-        # propagates the table name and schema up the tree
+        # propagate the table name and schema up the tree
         TableExpr.__init__(
             self, self.table.name, self.table._schema, self.table._group_by
         )
-        self.map_col_nodes(
-            lambda expr: expr
-            if not isinstance(expr, ColName)
-            else Col(expr.name, self.table)
-        )
+        for node in self.iter_col_nodes():
+            if isinstance(node, ColName):
+                node.resolve_type(self.table)
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
@@ -46,17 +44,20 @@ class Verb(TableExpr):
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
         cloned.table = table
+
         cloned.map_col_nodes(
             lambda node: Col(node.name, table_map[node.table])
             if isinstance(node, Col)
             else copy.copy(node)
         )
+
         cloned._group_by = [
             Col(col.name, table_map[col.table])
             if isinstance(col, Col)
             else copy.copy(col)
             for col in cloned._group_by
         ]
+
         table_map[self] = cloned
         return cloned, table_map
 

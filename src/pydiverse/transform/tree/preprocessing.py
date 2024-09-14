@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import verbs
-from pydiverse.transform.tree.col_expr import Col, ColFn, ColName
+from pydiverse.transform.tree.col_expr import Col, ColExpr, ColFn, ColName
 from pydiverse.transform.tree.table_expr import TableExpr
 
 
@@ -73,9 +73,17 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
                 for key, col in col_to_name_right.items()
             }
 
-        expr.map_col_nodes(
-            lambda node: col_to_name[node] if isinstance(node, Col) else node
-        )
+        def replace_cols(node: ColExpr) -> ColExpr:
+            if isinstance(node, Col):
+                if (replacement := col_to_name[node]) is None:
+                    raise ValueError(
+                        f"invalid usage of column `{node}` in an expression not "
+                        f"derived from the table `{node.table}`"
+                    )
+                return replacement
+            return node
+
+        expr.map_col_nodes(replace_cols)
 
         if isinstance(expr, verbs.Rename):
             col_to_name = {
@@ -119,6 +127,8 @@ def check_duplicate_tables(expr: TableExpr) -> set[TableExpr]:
                     "apply `>> alias()` to one of them before the join."
                 )
 
+            if len(right_tables) > len(tables):
+                tables, right_tables = right_tables, tables
             tables |= right_tables
 
         return tables
