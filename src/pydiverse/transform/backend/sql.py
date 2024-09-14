@@ -274,6 +274,8 @@ class SqlImpl(TableImpl):
         ):
             query.select = [lb for lb in query.select if lb.name in needed_cols]
             table, query = cls.build_subquery(table, query)
+            for col in table.columns:
+                sqa_col[col.name] = col
 
         if isinstance(expr, verbs.Select):
             query.select = [
@@ -394,7 +396,7 @@ class SqlImpl(TableImpl):
     def build_subquery(cls, table: sqa.Table, query: Query) -> tuple[sqa.Table, Query]:
         table = cls.compile_query(table, query).subquery()
 
-        query.select = [col.name for col in table.columns]
+        query.select = [sqa.label(col.name, col) for col in table.columns]
         query.join = []
         query.group_by = []
         query.where = []
@@ -422,7 +424,7 @@ class Query:
 @dataclasses.dataclass(slots=True)
 class SqlJoin:
     right: sqa.Subquery
-    on: ColExpr
+    on: sqa.ColumnElement
     how: verbs.JoinHow
 
 
