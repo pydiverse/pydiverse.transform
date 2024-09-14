@@ -86,9 +86,15 @@ def propagate_names(expr: TableExpr, needed_cols: set[Col]) -> dict[Col, ColName
         expr._partition_by = [pb.map_nodes(replace_cols) for pb in expr._partition_by]
 
         if isinstance(expr, verbs.Rename):
-            for _, col in col_to_name.items():
-                if col.name in expr.name_map:
-                    col.name = expr.name_map[col.name]
+            col_to_name.update(
+                {
+                    col: ColName(
+                        expr.name_map[col_name.name], col_name._dtype, col_name._ftype
+                    )
+                    for col, col_name in col_to_name.items()
+                    if col_name.name in expr.name_map
+                }
+            )
 
     elif isinstance(expr, Table):
         col_to_name = dict()
