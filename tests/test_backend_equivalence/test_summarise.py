@@ -200,3 +200,16 @@ def test_op_all(df4):
         df4,
         lambda t: t >> group_by(t.col1) >> mutate(all=(C.col2 != C.col3).all()),
     )
+
+
+def test_group_cols_in_agg(df3):
+    assert_result_equal(
+        df3,
+        lambda t: t >> group_by(t.col1, t.col2) >> summarise(u=t.col1 + t.col2),
+    )
+
+    assert_result_equal(
+        df3,
+        lambda t: t >> group_by(t.col1, t.col2) >> summarise(u=t.col1 + t.col3),
+        exception=FunctionTypeError,
+    )

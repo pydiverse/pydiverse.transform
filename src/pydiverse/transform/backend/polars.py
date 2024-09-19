@@ -256,10 +256,26 @@ def compile_table_expr(
         )
 
     elif isinstance(expr, verbs.Summarise):
-        aggregations = {
-            name: compile_col_expr(value, name_in_df)
-            for name, value in zip(expr.names, expr.values)
-        }
+        # We support usage of aggregated columns in expressions in summarise, but polars
+        # creates arrays when doing that. Thus we unwrap the arrays when necessary.
+        def has_path_to_leaf_without_agg(expr: ColExpr):
+            if isinstance(expr, Col):
+                return True
+            if (
+                isinstance(expr, ColFn)
+                and PolarsImpl.registry.get_op(expr.name).ftype == Ftype.AGGREGATE
+            ):
+                return False
+            return any(
+                has_path_to_leaf_without_agg(child) for child in expr.iter_children()
+            )
+
+        aggregations = {}
+        for name, val in zip(expr.names, expr.values):
+            compiled = compile_col_expr(val, name_in_df)
+            if has_path_to_leaf_without_agg(val):
+                compiled = compiled.first()
+            aggregations[name] = compiled
 
         if expr.table._partition_by:
             df = df.group_by(
