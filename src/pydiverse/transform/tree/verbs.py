@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import uuid
 from collections.abc import Callable, Iterable
 from typing import Literal
 
@@ -22,11 +23,19 @@ class Verb(TableExpr):
     def __post_init__(self):
         # propagate the table name and schema up the tree
         TableExpr.__init__(
-            self, self.table.name, self.table._schema, self.table._partition_by
+            self,
+            self.table.name,
+            self.table._schema,
+            self.table._select,
+            self.table._partition_by,
+            self.table._name_to_uuid,
         )
-        for node in self.iter_col_nodes():
-            if isinstance(node, ColName):
-                node.resolve_type(self.table)
+
+        self.map_col_nodes(
+            lambda node: node
+            if not isinstance(node, ColName)
+            else Col(node.name, self.table)
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
@@ -43,7 +52,6 @@ class Verb(TableExpr):
     def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table.clone()
         cloned = copy.copy(self)
-        cloned.table = table
 
         cloned.map_col_nodes(
             lambda node: Col(node.name, table_map[node.table])
@@ -51,12 +59,9 @@ class Verb(TableExpr):
             else copy.copy(node)
         )
 
-        cloned._partition_by = [
-            Col(col.name, table_map[col.table])
-            if isinstance(col, Col)
-            else copy.copy(col)
-            for col in cloned._partition_by
-        ]
+        cloned = self.__class__(
+            table, *(getattr(cloned, attr) for attr in cloned.__slots__)
+        )
 
         table_map[self] = cloned
         return cloned, table_map
@@ -66,22 +71,54 @@ class Verb(TableExpr):
 class Select(Verb):
     selected: list[Col | ColName]
 
+    def __post_init__(self):
+        Verb.__post_init__(self)
+        self._select = [
+            uid
+            for uid in self._select
+            if uid in set({col.uuid for col in self.selected})
+        ]
+
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.selected
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.selected = [g(c) for c in self.selected]
 
+    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        cloned = Select(
+            table, [Col(col.name, table_map[col.table]) for col in self.selected]
+        )
+        table_map[self] = cloned
+        return cloned, table_map
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Drop(Verb):
     dropped: list[Col | ColName]
+
+    def __post_init__(self):
+        Verb.__post_init__(self)
+        self._select = {
+            uid
+            for uid in self._select
+            if uid not in set({col.uuid for col in self.dropped})
+        }
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.dropped
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.dropped = [g(c) for c in self.dropped]
+
+    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table.clone()
+        cloned = Drop(
+            table, [Col(col.name, table_map[col.table]) for col in self.dropped]
+        )
+        table_map[self] = cloned
+        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -91,14 +128,17 @@ class Rename(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
         new_schema = copy.copy(self._schema)
+
         for name, _ in self.name_map.items():
             if name not in self._schema:
                 raise ValueError(f"no column with name `{name}` in table `{self.name}`")
             del new_schema[name]
+
         for name, replacement in self.name_map.items():
             if replacement in new_schema:
                 raise ValueError(f"duplicate column name `{replacement}`")
             new_schema[replacement] = self._schema[name]
+
         self._schema = new_schema
 
     def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
@@ -114,9 +154,24 @@ class Mutate(Verb):
 
     def __post_init__(self):
         Verb.__post_init__(self)
+
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
             self._schema[name] = val.dtype(), val.ftype(agg_is_window=True)
+
+        overwritten = {
+            self._name_to_uuid[name]
+            for name in self.names
+            if name in self._name_to_uuid
+        }
+        self._select = [uid for uid in self._select if uid not in overwritten]
+
+        uuids = [uuid.uuid1() for _ in self.names]
+        self._name_to_uuid = self._name_to_uuid | {
+            name: uid for name, uid in zip(self.names, uuids)
+        }
+
+        self._select = self._select + uuids
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -148,8 +203,15 @@ class Summarise(Verb):
 
     def __post_init__(self):
         Verb.__post_init__(self)
-        self._schema = copy.copy(self._schema)
+
+        uuids = [uuid.uuid1() for _ in self.names]
+        self._select = self._partition_by + uuids
+        self._name_to_uuid = self._name_to_uuid | {
+            name: uid for name, uid in zip(self.names, uuids)
+        }
         self._partition_by = []
+
+        self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
             self._schema[name] = val.dtype(), val.ftype(agg_is_window=False)
 
@@ -217,10 +279,11 @@ class GroupBy(Verb):
 
     def __post_init__(self):
         Verb.__post_init__(self)
+        group_by_uuids = [col.uuid for col in self.group_by]
         if self.add:
-            self._partition_by = self._partition_by + self.group_by
+            self._partition_by = self._partition_by + group_by_uuids
         else:
-            self._partition_by = self.group_by
+            self._partition_by = group_by_uuids
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
@@ -250,13 +313,21 @@ class Join(Verb):
             raise ValueError(f"cannot join grouped table `{self.table.name}`")
         elif self.right._partition_by:
             raise ValueError(f"cannot join grouped table `{self.right.name}`")
+
         TableExpr.__init__(
             self,
             self.table.name,
             self.table._schema
             | {name + self.suffix: val for name, val in self.right._schema.items()},
+            self.table._select + self.right._select,
             [],
+            self.table._name_to_uuid
+            | {
+                name + self.suffix: uid
+                for name, uid in self.right._name_to_uuid.items()
+            },
         )
+
         self.map_col_nodes(
             lambda expr: expr
             if not isinstance(expr, ColName)
@@ -287,7 +358,5 @@ class Join(Verb):
             self.suffix,
         )
 
-        cloned._partition_by = []
         table_map[self] = cloned
-
         return cloned, table_map

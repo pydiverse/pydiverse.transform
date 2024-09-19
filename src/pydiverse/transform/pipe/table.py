@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import copy
+import uuid
 from collections.abc import Iterable
 from html import escape
 
@@ -42,10 +42,15 @@ class Table(TableExpr):
         if self._impl is None:
             raise AssertionError
 
+        schema = self._impl.schema()
+        uuids = [uuid.uuid1() for _ in schema.keys()]
+
         super().__init__(
             name,
-            {name: (dtype, Ftype.EWISE) for name, dtype in self._impl.schema().items()},
+            {name: (dtype, Ftype.EWISE) for name, dtype in schema.items()},
+            uuids,
             [],
+            {name: uid for name, uid in zip(schema.keys(), uuids)},
         )
 
     def __iter__(self) -> Iterable[Col]:
@@ -100,6 +105,5 @@ class Table(TableExpr):
         return self._impl.col_names()
 
     def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
-        cloned = copy.copy(self)
-        cloned._impl = cloned._impl.clone()
+        cloned = Table(self._impl.clone(), name=self.name)
         return cloned, {self: cloned}

@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
-import itertools
 import operator
 from typing import Any
 
@@ -289,13 +288,13 @@ class SqlImpl(TableImpl):
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
             orig_select = query.select
-            if last_select is not None:
-                query.select = [
-                    sqa.label(name, sqa_col[name])
-                    for name in itertools.chain(needed_cols, last_select)
-                ]
-            else:
-                query.select = [sqa.label(name, val) for name, val in sqa_col.items()]
+            if last_select is None:
+                last_select = set(expr._schema.keys())
+            query.select = [
+                sqa.label(name, sqa_col[name])
+                for name in needed_cols | last_select
+                if name in sqa_col
+            ]
 
             table = cls.compile_query(table, query).subquery()
             new_sqa_col = {col.name: col for col in table.columns}

@@ -77,7 +77,7 @@ class ColExpr:
 
 
 class Col(ColExpr):
-    __slots__ = ["name", "table"]
+    __slots__ = ["name", "table", "uuid"]
 
     def __init__(
         self,
@@ -89,6 +89,7 @@ class Col(ColExpr):
         if (dftype := table._schema.get(name)) is None:
             raise ValueError(f"column `{name}` does not exist in table `{table.name}`")
         super().__init__(*dftype)
+        self.uuid = self.table._name_to_uuid[self.name]
 
     def __repr__(self) -> str:
         return (
@@ -109,6 +110,9 @@ class Col(ColExpr):
                 + f"\ncould evaluate {repr(self)} due to"
                 + f"{e.__class__.__name__}: {str(e)}"
             )
+
+    def __hash__(self) -> int:
+        return hash(self.uuid)
 
 
 class ColName(ColExpr):
@@ -242,7 +246,7 @@ class ColFn(ColExpr):
                     node is not self
                     and isinstance(node, ColFn)
                     and (
-                        (node_ftype := node.ftype(agg_is_window=agg_is_window))
+                        (desc_ftype := PolarsImpl.registry.get_op(node.name).ftype)
                         in (
                             Ftype.AGGREGATE,
                             Ftype.WINDOW,
@@ -255,7 +259,7 @@ class ColFn(ColExpr):
                         Ftype.WINDOW: "window",
                     }
                     raise FunctionTypeError(
-                        f"{ftype_string[node_ftype]} function `{node.name}` nested "
+                        f"{ftype_string[desc_ftype]} function `{node.name}` nested "
                         f"inside {ftype_string[self._ftype]} function `{self.name}`.\n"
                         "hint: There may be at most one window / aggregation function "
                         "in a column expression on any path from the root to a leaf."

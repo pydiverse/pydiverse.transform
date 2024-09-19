@@ -1,22 +1,37 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import col_expr
 from pydiverse.transform.tree.dtypes import Dtype
 
 
 class TableExpr:
-    __slots__ = ["name", "_schema", "_partition_by"]
+    __slots__ = [
+        "name",
+        "_schema",
+        "_select",
+        "_partition_by",
+        "_name_to_uuid",
+    ]
+    # _schema stores the data / function types of all columns in the current C-space
+    # (i.e. the ones accessible via `C.`). _select stores the columns that are actually
+    # in the table (i.e. the ones accessible via `table.` and that are exported).
 
     def __init__(
         self,
         name: str,
         _schema: dict[str, tuple[Dtype, Ftype]],
-        _partition_by: list[col_expr.Col | col_expr.ColName],
+        _select: list[UUID],
+        _partition_by: list[UUID],
+        _name_to_uuid: dict[str, UUID],
     ):
         self.name = name
         self._schema = _schema
+        self._select = _select
         self._partition_by = _partition_by
+        self._name_to_uuid = _name_to_uuid
 
     def __getitem__(self, key: str) -> col_expr.Col:
         if not isinstance(key, str):
@@ -41,6 +56,10 @@ class TableExpr:
         return id(self)
 
     def schema(self):
-        return {name: val[0] for name, val in self._schema}
+        return {
+            name: val[0]
+            for name, val in self._schema.items()
+            if name in set(self._select)
+        }
 
     def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]: ...
