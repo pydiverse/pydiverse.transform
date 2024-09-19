@@ -36,7 +36,7 @@ class PolarsImpl(TableImpl):
     @staticmethod
     def export(expr: TableExpr, target: Target) -> Any:
         lf, name_in_df = compile_table_expr(expr)
-        lf = lf.select(name_in_df[uid] for uid in expr._select)
+        lf = lf.select(name_in_df[col.uuid] for col in expr._select)
         if isinstance(target, Polars):
             return lf.collect() if target.lazy and isinstance(lf, pl.LazyFrame) else lf
 
@@ -70,49 +70,39 @@ def merge_desc_nulls_last(
 
 
 def compile_order(
-    order: Order, name_in_df: dict[UUID, str], group_by: list[UUID]
+    order: Order, name_in_df: dict[UUID, str]
 ) -> tuple[pl.Expr, bool, bool]:
     return (
-        compile_col_expr(order.order_by, name_in_df, group_by),
+        compile_col_expr(order.order_by, name_in_df),
         order.descending,
         order.nulls_last,
     )
 
 
-def compile_col_expr(
-    expr: ColExpr, name_in_df: dict[UUID, str], group_by: list[UUID]
-) -> pl.Expr:
+def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
     if isinstance(expr, Col):
         return pl.col(name_in_df[expr.uuid])
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.registry.get_op(expr.name)
-        args: list[pl.Expr] = [
-            compile_col_expr(arg, name_in_df, group_by) for arg in expr.args
-        ]
+        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
         impl = PolarsImpl.registry.get_impl(
             expr.name,
             tuple(arg.dtype() for arg in expr.args),
         )
 
         if (partition_by := expr.context_kwargs.get("partition_by")) is not None:
-            partition_by = [
-                compile_col_expr(pb, name_in_df, group_by) for pb in partition_by
-            ]
-        elif impl.operator.ftype in (Ftype.WINDOW, Ftype.AGGREGATE):
-            partition_by = [pl.col(name_in_df[gb]) for gb in group_by]
+            partition_by = [compile_col_expr(pb, name_in_df) for pb in partition_by]
 
         arrange = expr.context_kwargs.get("arrange")
         if arrange:
             order_by, descending, nulls_last = zip(
-                *[compile_order(order, name_in_df, group_by) for order in arrange]
+                *[compile_order(order, name_in_df) for order in arrange]
             )
 
         filter_cond = expr.context_kwargs.get("filter")
         if filter_cond:
-            filter_cond = [
-                compile_col_expr(cond, name_in_df, group_by) for cond in filter_cond
-            ]
+            filter_cond = [compile_col_expr(cond, name_in_df) for cond in filter_cond]
 
         # The following `if` block is absolutely unecessary and just an optimization.
         # Otherwise, `over` would be used for sorting, but we cannot pass descending /
@@ -175,12 +165,12 @@ def compile_col_expr(
         assert len(expr.cases) >= 1
         compiled = pl  # to initialize the when/then-chain
         for cond, val in expr.cases:
-            compiled = compiled.when(compile_col_expr(cond, name_in_df, group_by)).then(
-                compile_col_expr(val, name_in_df, group_by)
+            compiled = compiled.when(compile_col_expr(cond, name_in_df)).then(
+                compile_col_expr(val, name_in_df)
             )
         if expr.default_val is not None:
             compiled = compiled.otherwise(
-                compile_col_expr(expr.default_val, name_in_df, group_by)
+                compile_col_expr(expr.default_val, name_in_df)
             )
         return compiled
 
@@ -194,18 +184,18 @@ def compile_col_expr(
 
 
 def compile_join_cond(
-    expr: ColExpr, name_in_df: dict[UUID, str], group_by: list[UUID]
+    expr: ColExpr, name_in_df: dict[UUID, str]
 ) -> list[tuple[pl.Expr, pl.Expr]]:
     if isinstance(expr, ColFn):
         if expr.name == "__and__":
-            return compile_join_cond(
-                expr.args[0], name_in_df, group_by
-            ) + compile_join_cond(expr.args[1], name_in_df)
+            return compile_join_cond(expr.args[0], name_in_df) + compile_join_cond(
+                expr.args[1], name_in_df
+            )
         if expr.name == "__eq__":
             return [
                 (
-                    compile_col_expr(expr.args[0], name_in_df, group_by),
-                    compile_col_expr(expr.args[1], name_in_df, group_by),
+                    compile_col_expr(expr.args[0], name_in_df),
+                    compile_col_expr(expr.args[1], name_in_df),
                 )
             ]
 
@@ -225,7 +215,7 @@ def compile_table_expr(
         if overwritten:
             # We append the UUID of overwritten columns to their name.
             name_map = {
-                name: f"{name}_{str(hex(expr._name_to_uuid[name].int))}"
+                name: f"{name}_{str(hex(expr._name_to_uuid[name].int))[2:]}"
                 for name in overwritten
             }
             name_in_df = {
@@ -244,7 +234,7 @@ def compile_table_expr(
     elif isinstance(expr, verbs.Mutate):
         df = df.with_columns(
             **{
-                name: compile_col_expr(value, name_in_df, expr.table._partition_by)
+                name: compile_col_expr(value, name_in_df)
                 for name, value in zip(expr.names, expr.values)
             }
         )
@@ -252,19 +242,11 @@ def compile_table_expr(
 
     elif isinstance(expr, verbs.Filter):
         if expr.filters:
-            df = df.filter(
-                [
-                    compile_col_expr(fil, name_in_df, expr.table._partition_by)
-                    for fil in expr.filters
-                ]
-            )
+            df = df.filter([compile_col_expr(fil, name_in_df) for fil in expr.filters])
 
     elif isinstance(expr, verbs.Arrange):
         order_by, descending, nulls_last = zip(
-            *[
-                compile_order(order, name_in_df, expr.table._partition_by)
-                for order in expr.order_by
-            ]
+            *[compile_order(order, name_in_df) for order in expr.order_by]
         )
         df = df.sort(
             order_by,
@@ -275,14 +257,14 @@ def compile_table_expr(
 
     elif isinstance(expr, verbs.Summarise):
         aggregations = {
-            name: compile_col_expr(value, name_in_df, [])
+            name: compile_col_expr(value, name_in_df)
             for name, value in zip(expr.names, expr.values)
         }
 
         if expr.table._partition_by:
-            df = df.group_by(*(name_in_df[pb] for pb in expr.table._partition_by)).agg(
-                **aggregations
-            )
+            df = df.group_by(
+                *(name_in_df[col.uuid] for col in expr.table._partition_by)
+            ).agg(**aggregations)
         else:
             df = df.select(**aggregations)
 
@@ -296,9 +278,7 @@ def compile_table_expr(
         name_in_df.update(
             {uid: name + expr.suffix for uid, name in right_name_in_df.items()}
         )
-        left_on, right_on = zip(
-            *compile_join_cond(expr.on, name_in_df, expr.table._partition_by)
-        )
+        left_on, right_on = zip(*compile_join_cond(expr.on, name_in_df))
 
         df = df.join(
             right_df.rename({name: name + expr.suffix for name in right_df.columns}),

@@ -23,8 +23,8 @@ class TableExpr:
         self,
         name: str,
         _schema: dict[str, tuple[Dtype, Ftype]],
-        _select: list[UUID],
-        _partition_by: list[UUID],
+        _select: list[col_expr.Col],
+        _partition_by: list[col_expr.Col],
         _name_to_uuid: dict[str, UUID],
     ):
         self.name = name

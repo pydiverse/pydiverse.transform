@@ -43,15 +43,16 @@ class Table(TableExpr):
             raise AssertionError
 
         schema = self._impl.schema()
-        uuids = [uuid.uuid1() for _ in schema.keys()]
 
         super().__init__(
             name,
             {name: (dtype, Ftype.EWISE) for name, dtype in schema.items()},
-            uuids,
             [],
-            {name: uid for name, uid in zip(schema.keys(), uuids)},
+            [],
+            {name: uuid.uuid1() for name in schema.keys()},
         )
+
+        self._select = [Col(name, self) for name in schema.keys()]
 
     def __iter__(self) -> Iterable[Col]:
         return iter(self.cols())

@@ -31,11 +31,28 @@ class Verb(TableExpr):
             self.table._name_to_uuid,
         )
 
+        # resolve C columns
         self.map_col_nodes(
             lambda node: node
             if not isinstance(node, ColName)
             else Col(node.name, self.table)
         )
+
+        # TODO: backend agnostic registry
+        from pydiverse.transform.backend.polars import PolarsImpl
+
+        # update partition_by kwarg in aggregate functions
+        if not isinstance(self, Summarise):
+            for node in self.iter_col_nodes():
+                if (
+                    isinstance(node, ColFn)
+                    and "partition_by" not in node.context_kwargs
+                    and (
+                        PolarsImpl.registry.get_op(node.name).ftype
+                        in (Ftype.WINDOW, Ftype.AGGREGATE)
+                    )
+                ):
+                    node.context_kwargs["partition_by"] = self._partition_by
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
@@ -59,6 +76,7 @@ class Verb(TableExpr):
             else copy.copy(node)
         )
 
+        # necessary to make the magic in __post_init__ happen
         cloned = self.__class__(
             table, *(getattr(cloned, attr) for attr in cloned.__slots__)
         )
@@ -74,9 +92,9 @@ class Select(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
         self._select = [
-            uid
-            for uid in self._select
-            if uid in set({col.uuid for col in self.selected})
+            col
+            for col in self._select
+            if col.uuid in set({col.uuid for col in self.selected})
         ]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -101,9 +119,9 @@ class Drop(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
         self._select = {
-            uid
-            for uid in self._select
-            if uid not in set({col.uuid for col in self.dropped})
+            col
+            for col in self._select
+            if col.uuid not in set({col.uuid for col in self.dropped})
         }
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -164,14 +182,13 @@ class Mutate(Verb):
             for name in self.names
             if name in self._name_to_uuid
         }
-        self._select = [uid for uid in self._select if uid not in overwritten]
+        self._select = [col for col in self._select if col.uuid not in overwritten]
 
-        uuids = [uuid.uuid1() for _ in self.names]
         self._name_to_uuid = self._name_to_uuid | {
-            name: uid for name, uid in zip(self.names, uuids)
+            name: uuid.uuid1() for name in self.names
         }
 
-        self._select = self._select + uuids
+        self._select = self._select + [Col(name, self) for name in self.names]
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -204,16 +221,15 @@ class Summarise(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
 
-        uuids = [uuid.uuid1() for _ in self.names]
-        self._select = self._partition_by + uuids
         self._name_to_uuid = self._name_to_uuid | {
-            name: uid for name, uid in zip(self.names, uuids)
+            name: uuid.uuid1() for name in self.names
         }
-        self._partition_by = []
-
         self._schema = copy.copy(self._schema)
         for name, val in zip(self.names, self.values):
             self._schema[name] = val.dtype(), val.ftype(agg_is_window=False)
+
+        self._select = self._partition_by + [Col(name, self) for name in self.names]
+        self._partition_by = []
 
         for node in self.iter_col_nodes():
             if (
@@ -279,11 +295,10 @@ class GroupBy(Verb):
 
     def __post_init__(self):
         Verb.__post_init__(self)
-        group_by_uuids = [col.uuid for col in self.group_by]
         if self.add:
-            self._partition_by = self._partition_by + group_by_uuids
+            self._partition_by = self._partition_by + self.group_by
         else:
-            self._partition_by = group_by_uuids
+            self._partition_by = self.group_by
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
