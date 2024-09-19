@@ -19,9 +19,6 @@ class AlignmentError(Exception):
     """
 
 
-# WARNINGS
-
-
 class NonStandardBehaviourWarning(UserWarning):
     """
     Category for when a specific backend deviates from

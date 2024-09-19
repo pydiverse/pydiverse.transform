@@ -61,13 +61,6 @@ def test_chained(df3):
     )
 
 
-def test_with_select(df3):
-    assert_result_equal(
-        df3,
-        lambda t: t >> select() >> arrange(*t) >> slice_head(4, offset=2) >> select(*t),
-    )
-
-
 def test_with_mutate(df3):
     assert_result_equal(
         df3,

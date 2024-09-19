@@ -6,7 +6,7 @@ import functools
 import html
 import itertools
 import operator
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable
 from typing import Any
 
 from pydiverse.transform.errors import DataTypeError, FunctionTypeError
@@ -162,7 +162,10 @@ class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
         self.args = list(args)
-        self.context_kwargs = kwargs
+        self.context_kwargs = {
+            key: [val] if not isinstance(val, Iterable) else list(val)
+            for key, val in kwargs.items()
+        }
         if arrange := self.context_kwargs.get("arrange"):
             self.context_kwargs["arrange"] = [
                 Order.from_col_expr(expr) if isinstance(expr, ColExpr) else expr
@@ -183,6 +186,7 @@ class ColFn(ColExpr):
     def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         new_fn = copy.copy(self)
         new_fn.args = [arg.map_nodes(g) for arg in self.args]
+
         new_fn.context_kwargs = {
             key: [val.map_nodes(g) for val in arr]
             for key, arr in self.context_kwargs.items()
@@ -458,5 +462,7 @@ def wrap_literal(expr: Any) -> Any:
         return {key: wrap_literal(val) for key, val in expr.items()}
     elif isinstance(expr, (list, tuple)):
         return expr.__class__(wrap_literal(elem) for elem in expr)
+    elif isinstance(expr, Generator):
+        return (wrap_literal(elem) for elem in expr)
     else:
         return LiteralCol(expr)

@@ -43,8 +43,8 @@ def test_partition_by_argument(df3):
         df3,
         lambda t: t
         >> mutate(
-            u=t.col1.min(partition_by=[t.col3]),
-            v=t.col4.sum(partition_by=[t.col2]),
+            u=t.col1.min(partition_by=t.col3),
+            v=t.col4.sum(partition_by=t.col2),
             w=f.rank(arrange=[-t.col5, t.col4], partition_by=[t.col2]),
             x=f.row_number(
                 arrange=[t.col4.nulls_last()], partition_by=[t.col1, t.col2]
