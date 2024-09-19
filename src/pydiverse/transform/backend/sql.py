@@ -279,9 +279,14 @@ class SqlImpl(TableImpl):
                 )
             )
         ):
-            # TODO: do we want `alias` to automatically create a subquery? or add a flag
-            # to the node that a subquery would be allowed? or special verb to mark
-            # subquery?
+            if needed_cols.keys().isdisjoint(sqa_col.keys()):
+                # We cannot select zero columns from a subquery. This happens when the
+                # user only 0-ary functions after the subquery, e.g. `count`.
+                needed_cols[next(iter(sqa_col.keys()))] = 1
+
+            # TODO: do we want `alias` to automatically create a subquery? or add a
+            # flag to the node that a subquery would be allowed? or special verb to
+            # mark subquery?
 
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
