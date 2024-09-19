@@ -228,7 +228,7 @@ def compile_table_expr(
         df = df.rename(expr.name_map)
         name_in_df = {
             uid: (expr.name_map[name] if name in expr.name_map else name)
-            for uid, name in expr.name_map.items()
+            for uid, name in name_in_df.items()
         }
 
     elif isinstance(expr, verbs.Mutate):

@@ -90,8 +90,6 @@ def show_query(expr: TableExpr):
 
 @builtin_verb()
 def select(expr: TableExpr, *args: Col | ColName):
-    if len(args) == 1 and args[0] is Ellipsis:
-        args = [ColName(name) for name in expr._schema.keys()]
     return Select(expr, list(args))
 
 

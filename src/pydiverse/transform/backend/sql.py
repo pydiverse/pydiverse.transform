@@ -79,7 +79,7 @@ class SqlImpl(TableImpl):
     def build_select(cls, expr: TableExpr) -> sqa.Select:
         create_aliases(expr, {})
         table, query, sqa_col = cls.compile_table_expr(
-            expr, {col.uuid for col in expr._select}
+            expr, {col.uuid: 1 for col in expr._select}
         )
         return cls.compile_query(
             table, query, (sqa_col[col.uuid] for col in expr._select)
@@ -226,12 +226,18 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_table_expr(
-        cls, expr: TableExpr, needed_cols: set[UUID]
+        cls, expr: TableExpr, needed_cols: dict[UUID, int]
     ) -> tuple[sqa.Table, Query, dict[UUID, sqa.Label]]:
         if isinstance(expr, verbs.Verb):
+            # store a counter how often each UUID is referenced by ancestors. This
+            # allows to only select necessary columns in a subquery.
             for node in expr.iter_col_nodes():
                 if isinstance(node, Col):
-                    needed_cols.add(node.uuid)
+                    cnt = needed_cols.get(node.uuid)
+                    if cnt is None:
+                        needed_cols[node.uuid] = 1
+                    else:
+                        needed_cols[node.uuid] = cnt + 1
 
             table, query, sqa_col = cls.compile_table_expr(expr.table, needed_cols)
 
@@ -280,12 +286,23 @@ class SqlImpl(TableImpl):
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
             table = cls.compile_query(
-                table, query, (sqa_col[uid] for uid in needed_cols)
+                table,
+                query,
+                (sqa_col[uid] for uid in needed_cols.keys() if uid in sqa_col),
             ).subquery()
             sqa_col.update(
-                {uid: table.columns.get(sqa_col[uid].name) for uid in needed_cols}
+                {
+                    uid: table.columns.get(sqa_col[uid].name)
+                    for uid in needed_cols.keys()
+                    if uid in sqa_col
+                }
+            )
+            # rewire col refs to the subquery
+            query = Query(
+                partition_by=[table.columns.get(col.name) for col in query.partition_by]
             )
 
+        if isinstance(expr, verbs.Rename):
             sqa_col = {
                 uid: (
                     sqa.label(expr.name_map[lb.name], lb)
@@ -387,6 +404,16 @@ class SqlImpl(TableImpl):
                 expr._name_to_uuid[col.name]: sqa.label(col.name, col)
                 for col in expr._impl.table.columns
             }
+
+        if isinstance(expr, verbs.Verb):
+            # decrease counters (`needed_cols` is not copied)
+            for node in expr.iter_col_nodes():
+                if isinstance(node, Col):
+                    cnt = needed_cols.get(node.uuid)
+                    if cnt == 1:
+                        del needed_cols[node.uuid]
+                    else:
+                        needed_cols[node.uuid] = cnt - 1
 
         return table, query, sqa_col
 

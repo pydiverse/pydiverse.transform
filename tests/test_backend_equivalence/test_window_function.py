@@ -252,6 +252,18 @@ def test_complex(df3):
         >> arrange(C.span),
     )
 
+    assert_result_equal(
+        df3,
+        lambda t: t
+        >> group_by(t.col1, t.col2)
+        >> summarise(mean3=t.col3.mean(), u=t.col4.max())
+        >> group_by(C.u)
+        >> mutate(minM3=C.mean3.min(), maxM3=C.mean3.max())
+        >> mutate(span=C.maxM3 - C.minM3)
+        >> filter(C.span < 3)
+        >> arrange(C.span),
+    )
+
 
 def test_nested_bool(df4):
     assert_result_equal(
