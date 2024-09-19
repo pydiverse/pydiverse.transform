@@ -67,9 +67,14 @@ class ColExpr:
             wrap_literal(default),
         )
 
+    def iter_children(self) -> Iterable[ColExpr]:
+        return iter(())
+
     # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
     # and `Order` expressions are not yielded.
     def iter_nodes(self) -> Iterable[ColExpr]:
+        for node in self.iter_children():
+            yield from node.iter_nodes()
         yield self
 
     def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
@@ -172,10 +177,8 @@ class ColFn(ColExpr):
         ]
         return f'{self.name}({", ".join(args)})'
 
-    def iter_nodes(self) -> Iterable[ColExpr]:
-        for val in itertools.chain(self.args, *self.context_kwargs.values()):
-            yield from val.iter_nodes()
-        yield self
+    def iter_children(self) -> Iterable[ColExpr]:
+        yield from itertools.chain(self.args, *self.context_kwargs.values())
 
     def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         new_fn = copy.copy(self)
@@ -323,12 +326,10 @@ class CaseExpr(ColExpr):
             + f"default={self.default_val}>"
         )
 
-    def iter_nodes(self) -> Iterable[ColExpr]:
-        for expr in itertools.chain.from_iterable(self.cases):
-            yield from expr.iter_nodes()
+    def iter_children(self) -> Iterable[ColExpr]:
+        yield from itertools.chain.from_iterable(self.cases)
         if self.default_val is not None:
-            yield from self.default_val.iter_nodes()
-        yield self
+            yield self.default_val
 
     def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         new_case_expr = copy.copy(self)

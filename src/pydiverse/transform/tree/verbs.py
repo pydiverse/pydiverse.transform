@@ -221,6 +221,33 @@ class Summarise(Verb):
     def __post_init__(self):
         Verb.__post_init__(self)
 
+        partition_by_uuids = {col.uuid for col in self._partition_by}
+
+        def check_summarise_col_expr(node: ColExpr, agg_fn_above: bool):
+            if (
+                isinstance(node, Col)
+                and node.uuid not in partition_by_uuids
+                and not agg_fn_above
+            ):
+                raise FunctionTypeError(
+                    f"column `{node}` is neither aggregated nor part of the grouping "
+                    "columns."
+                )
+
+            elif isinstance(node, ColFn):
+                if node.ftype(agg_is_window=False) == Ftype.WINDOW:
+                    raise FunctionTypeError(
+                        f"forbidden window function `{node.name}` in `summarise`"
+                    )
+                elif node.ftype(agg_is_window=False) == Ftype.AGGREGATE:
+                    agg_fn_above = True
+
+            for child in node.iter_children():
+                check_summarise_col_expr(child, agg_fn_above)
+
+        for root in self.iter_col_roots():
+            check_summarise_col_expr(root, False)
+
         self._name_to_uuid = self._name_to_uuid | {
             name: uuid.uuid1() for name in self.names
         }
@@ -230,26 +257,6 @@ class Summarise(Verb):
 
         self._select = self._partition_by + [Col(name, self) for name in self.names]
         self._partition_by = []
-
-        for node in self.iter_col_nodes():
-            if (
-                isinstance(node, ColFn)
-                and node.ftype(agg_is_window=False) == Ftype.WINDOW
-            ):
-                raise FunctionTypeError(
-                    f"forbidden window function `{node.name}` in `summarise`"
-                )
-
-        for name, val in zip(self.names, self.values):
-            if not any(
-                isinstance(node, ColFn)
-                and node.ftype(agg_is_window=False) == Ftype.AGGREGATE
-                for node in val.iter_nodes()
-            ):
-                raise FunctionTypeError(
-                    f"expression of new column `{name}` in `summarise` does not "
-                    "contain an aggregation function."
-                )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
