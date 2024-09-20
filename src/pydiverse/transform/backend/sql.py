@@ -149,13 +149,6 @@ class SqlImpl(TableImpl):
             else:
                 order_by = None
 
-            filters = expr.context_kwargs.get("filter")
-            if filters:
-                filters = cls.compile_col_expr(
-                    functools.reduce(operator.and_, filters), sqa_col
-                )
-                args = [sqa.case((filters, arg)) for arg in args]
-
             # we need this since some backends cannot do `any` / `all` as a window
             # function, so we need to emulate it via `max` / `min`.
             if (partition_by is not None or order_by is not None) and (

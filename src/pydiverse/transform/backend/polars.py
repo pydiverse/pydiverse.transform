@@ -100,10 +100,6 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
                 *[compile_order(order, name_in_df) for order in arrange]
             )
 
-        filters = expr.context_kwargs.get("filter")
-        if filters:
-            filters = (compile_col_expr(cond, name_in_df) for cond in filters)
-
         # The following `if` block is absolutely unecessary and just an optimization.
         # Otherwise, `over` would be used for sorting, but we cannot pass descending /
         # nulls_last there and the required workaround is probably slower than polars`s
@@ -123,13 +119,6 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             assert len(expr.args) == 0
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
-
-        if filters:
-            # Filtering needs to be done before applying the operator.
-            args = [
-                arg.filter(*filters) if isinstance(arg, pl.Expr) else arg
-                for arg in args
-            ]
 
         value: pl.Expr = impl(*args)
 

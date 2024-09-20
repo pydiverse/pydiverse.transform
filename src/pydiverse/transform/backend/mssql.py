@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 from typing import Any
 
 import sqlalchemy as sqa
@@ -8,13 +9,12 @@ import sqlalchemy as sqa
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
-from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Col,
     ColExpr,
     ColFn,
-    ColName,
     LiteralCol,
     Order,
 )
@@ -27,11 +27,36 @@ class MsSqlImpl(SqlImpl):
 
     @classmethod
     def build_select(cls, expr: TableExpr) -> Any:
-        convert_table_bool_bit(expr)
-        set_nulls_position_table(expr)
+        # boolean / bit conversion
+        for table_expr in expr._iter_descendants():
+            if isinstance(table_expr, verbs.Verb):
+                table_expr._map_col_roots(
+                    functools.partial(
+                        convert_bool_bit,
+                        wants_bool_as_bit=not isinstance(
+                            table_expr, (verbs.Filter, verbs.Join)
+                        ),
+                    )
+                )
+
+        # workaround for correct nulls_first / nulls_last behaviour on MSSQL
+        for table_expr in expr._iter_descendants():
+            if isinstance(expr, verbs.Arrange):
+                expr.order_by = convert_order_list(expr.order_by)
+            if isinstance(table_expr, verbs.Verb):
+                for node in table_expr._iter_col_nodes():
+                    if isinstance(node, ColFn) and (
+                        arrange := node.context_kwargs.get("arrange")
+                    ):
+                        node.context_kwargs["arrange"] = convert_order_list(arrange)
+
         sql.create_aliases(expr, {})
-        table, query, _ = cls.compile_table_expr(expr)
-        return sql.compile_query(table, query)
+        table, query, sqa_col = cls.compile_table_expr(
+            expr, {col.uuid: 1 for col in expr._select}
+        )
+        return cls.compile_query(
+            table, query, (sqa_col[col.uuid] for col in expr._select)
+        )
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
@@ -43,7 +68,9 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
         if ord.nulls_last is True and not ord.descending:
             new_list.append(
                 Order(
-                    CaseExpr([(ord.order_by.is_null(), 1)], 0),
+                    CaseExpr(
+                        [(ord.order_by.is_null(), LiteralCol(True))], LiteralCol(0)
+                    ),
                     False,
                     None,
                 )
@@ -51,7 +78,9 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
         elif ord.nulls_last is False and ord.descending:
             new_list.append(
                 Order(
-                    CaseExpr([(ord.order_by.is_null(), 0)], 1),
+                    CaseExpr(
+                        [(ord.order_by.is_null(), LiteralCol(False))], LiteralCol(1)
+                    ),
                     True,
                     None,
                 )
@@ -59,43 +88,22 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
     return new_list
 
 
-def set_nulls_position_table(expr: TableExpr):
-    if isinstance(expr, verbs.Verb):
-        set_nulls_position_table(expr.table)
-
-        for node in expr.iter_col_nodes():
-            if isinstance(node, ColFn) and (
-                arrange := node.context_kwargs.get("arrange")
-            ):
-                node.context_kwargs["arrange"] = convert_order_list(arrange)
-
-        if isinstance(expr, verbs.Arrange):
-            expr.order_by = convert_order_list(expr.order_by)
-
-        if isinstance(expr, verbs.Join):
-            set_nulls_position_table(expr.right)
+# MSSQL doesn't have a boolean type. This means that expressions that return a boolean
+# (e.g. ==, !=, >) can't be used in other expressions without casting to the BIT type.
+# Conversely, after casting to BIT, we sometimes may need to convert back to booleans.
 
 
-# Boolean / Bit Conversion
-#
-# MSSQL doesn't have a boolean type. This means that expressions that
-# return a boolean (e.g. ==, !=, >) can't be used in other expressions
-# without casting to the BIT type.
-# Conversely, after casting to BIT, we sometimes may need to convert
-# back to booleans.
-
-
-def convert_col_bool_bit(
-    expr: ColExpr | Order, wants_bool_as_bit: bool
-) -> ColExpr | Order:
+def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr | Order:
     if isinstance(expr, Order):
         return Order(
-            convert_col_bool_bit(expr.order_by), expr.descending, expr.nulls_last
+            convert_bool_bit(expr.order_by, wants_bool_as_bit),
+            expr.descending,
+            expr.nulls_last,
         )
 
-    elif isinstance(expr, ColName):
+    elif isinstance(expr, Col):
         if isinstance(expr.dtype(), dtypes.Bool):
-            return ColFn("__eq__", expr, LiteralCol(1), dtype=dtypes.Bool())
+            return ColFn("__eq__", expr, LiteralCol(True))
         return expr
 
     elif isinstance(expr, ColFn):
@@ -106,11 +114,11 @@ def convert_col_bool_bit(
 
         converted = copy.copy(expr)
         converted.args = [
-            convert_col_bool_bit(arg, wants_bool_as_bit_input) for arg in expr.args
+            convert_bool_bit(arg, wants_bool_as_bit_input) for arg in expr.args
         ]
         converted.context_kwargs = {
-            key: [convert_col_bool_bit(val, wants_bool_as_bit) for val in arr]
-            for key, arr in expr.context_kwargs
+            key: [convert_bool_bit(val, wants_bool_as_bit) for val in arr]
+            for key, arr in expr.context_kwargs.items()
         }
 
         impl = MsSqlImpl.registry.get_impl(
@@ -122,48 +130,32 @@ def convert_col_bool_bit(
 
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr(
-                    [(converted, 1), (~converted, 0)],
+                    [(converted, LiteralCol(True)), (~converted, LiteralCol(False))],
                     None,
                 )
             elif not wants_bool_as_bit and returns_bool_as_bit:
-                return ColFn("__eq__", converted, LiteralCol(1), dtype=dtypes.Bool())
+                return ColFn("__eq__", converted, LiteralCol(True))
 
         return converted
 
     elif isinstance(expr, CaseExpr):
         converted = copy.copy(expr)
         converted.cases = [
-            (
-                convert_col_bool_bit(cond, False),
-                convert_col_bool_bit(val, True),
-            )
+            (convert_bool_bit(cond, False), convert_bool_bit(val, True))
             for cond, val in expr.cases
         ]
-        converted.default_val = convert_col_bool_bit(
-            expr.default_val, wants_bool_as_bit
+        converted.default_val = (
+            None
+            if expr.default_val is None
+            else convert_bool_bit(expr.default_val, wants_bool_as_bit)
         )
+
         return converted
 
     elif isinstance(expr, LiteralCol):
         return expr
 
     raise AssertionError
-
-
-def convert_table_bool_bit(expr: TableExpr):
-    if isinstance(expr, verbs.Verb):
-        convert_table_bool_bit(expr.table)
-        expr.map_col_roots(
-            lambda col: convert_col_bool_bit(col, not isinstance(expr, verbs.Filter))
-        )
-
-    elif isinstance(expr, verbs.Join):
-        convert_table_bool_bit(expr.table)
-        convert_table_bool_bit(expr.right)
-        expr.on = convert_col_bool_bit(expr.on, False)
-
-    else:
-        assert isinstance(expr, Table)
 
 
 with MsSqlImpl.op(ops.Equal()) as op:

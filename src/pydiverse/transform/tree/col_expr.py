@@ -166,11 +166,25 @@ class ColFn(ColExpr):
             key: [val] if not isinstance(val, Iterable) else list(val)
             for key, val in kwargs.items()
         }
+
         if arrange := self.context_kwargs.get("arrange"):
             self.context_kwargs["arrange"] = [
                 Order.from_col_expr(expr) if isinstance(expr, ColExpr) else expr
                 for expr in arrange
             ]
+
+        if filters := self.context_kwargs.get("filter"):
+            # TODO: check that this is an aggregation and there is only one argu
+            assert len(args) == 1
+            self.args[0] = CaseExpr(
+                [
+                    (
+                        functools.reduce(operator.and_, (cond for cond in filters)),
+                        self.args[0],
+                    )
+                ]
+            )
+            del self.context_kwargs["filter"]
 
         super().__init__()
 
