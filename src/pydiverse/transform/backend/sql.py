@@ -231,7 +231,7 @@ class SqlImpl(TableImpl):
         if isinstance(expr, verbs.Verb):
             # store a counter how often each UUID is referenced by ancestors. This
             # allows to only select necessary columns in a subquery.
-            for node in expr.iter_col_nodes():
+            for node in expr._iter_col_nodes():
                 if isinstance(node, Col):
                     cnt = needed_cols.get(node.uuid)
                     if cnt is None:
@@ -260,7 +260,7 @@ class SqlImpl(TableImpl):
                 isinstance(expr, (verbs.Mutate, verbs.Filter))
                 and any(
                     node.ftype(agg_is_window=True) == Ftype.WINDOW
-                    for node in expr.iter_col_nodes()
+                    for node in expr._iter_col_nodes()
                     if isinstance(node, Col)
                 )
             )
@@ -273,7 +273,7 @@ class SqlImpl(TableImpl):
                             node.ftype(agg_is_window=False)
                             in (Ftype.WINDOW, Ftype.AGGREGATE)
                         )
-                        for node in expr.iter_col_nodes()
+                        for node in expr._iter_col_nodes()
                         if isinstance(node, Col)
                     )
                 )
@@ -412,7 +412,7 @@ class SqlImpl(TableImpl):
 
         if isinstance(expr, verbs.Verb):
             # decrease counters (`needed_cols` is not copied)
-            for node in expr.iter_col_nodes():
+            for node in expr._iter_col_nodes():
                 if isinstance(node, Col):
                     cnt = needed_cols.get(node.uuid)
                     if cnt == 1:

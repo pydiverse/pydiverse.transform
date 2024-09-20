@@ -72,12 +72,12 @@ class ColExpr:
 
     # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
     # and `Order` expressions are not yielded.
-    def iter_nodes(self) -> Iterable[ColExpr]:
+    def iter_descendants(self) -> Iterable[ColExpr]:
         for node in self.iter_children():
-            yield from node.iter_nodes()
+            yield from node.iter_descendants()
         yield self
 
-    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
 
 
@@ -183,12 +183,12 @@ class ColFn(ColExpr):
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
 
-    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         new_fn = copy.copy(self)
-        new_fn.args = [arg.map_nodes(g) for arg in self.args]
+        new_fn.args = [arg.map_descendants(g) for arg in self.args]
 
         new_fn.context_kwargs = {
-            key: [val.map_nodes(g) for val in arr]
+            key: [val.map_descendants(g) for val in arr]
             for key, arr in self.context_kwargs.items()
         }
         return g(new_fn)
@@ -248,7 +248,7 @@ class ColFn(ColExpr):
             self._ftype = actual_ftype
 
             # kick out nested window / aggregation functions
-            for node in self.iter_nodes():
+            for node in self.iter_descendants():
                 if (
                     node is not self
                     and isinstance(node, ColFn)
@@ -335,13 +335,16 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             yield self.default_val
 
-    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         new_case_expr = copy.copy(self)
         new_case_expr.cases = [
-            (cond.map_nodes(g), val.map_nodes(g)) for cond, val in self.cases
+            (cond.map_descendants(g), val.map_descendants(g))
+            for cond, val in self.cases
         ]
         new_case_expr.default_val = (
-            self.default_val.map_nodes(g) if self.default_val is not None else None
+            self.default_val.map_descendants(g)
+            if self.default_val is not None
+            else None
         )
         return g(new_case_expr)
 
@@ -363,6 +366,8 @@ class CaseExpr(ColExpr):
                     f"invalid case expression: condition {cond} has type "
                     f"{cond.dtype()} but all conditions must be boolean"
                 )
+
+        return self._dtype
 
     def ftype(self, *, agg_is_window: bool):
         if self._ftype is not None:
@@ -434,11 +439,11 @@ class Order:
             nulls_last = False
         return Order(expr, descending, nulls_last)
 
-    def iter_nodes(self) -> Iterable[ColExpr]:
-        yield from self.order_by.iter_nodes()
+    def iter_descendants(self) -> Iterable[ColExpr]:
+        yield from self.order_by.iter_descendants()
 
-    def map_nodes(self, g: Callable[[ColExpr], ColExpr]) -> Order:
-        return Order(self.order_by.map_nodes(g), self.descending, self.nulls_last)
+    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> Order:
+        return Order(self.order_by.map_descendants(g), self.descending, self.nulls_last)
 
 
 # Add all supported dunder methods to `ColExpr`. This has to be done, because Python

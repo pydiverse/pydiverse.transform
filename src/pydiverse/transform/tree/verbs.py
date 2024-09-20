@@ -32,7 +32,7 @@ class Verb(TableExpr):
         )
 
         # resolve C columns
-        self.map_col_nodes(
+        self._map_col_nodes(
             lambda node: node
             if not isinstance(node, ColName)
             else Col(node.name, self.table)
@@ -43,7 +43,7 @@ class Verb(TableExpr):
 
         # update partition_by kwarg in aggregate functions
         if not isinstance(self, Summarise):
-            for node in self.iter_col_nodes():
+            for node in self._iter_col_nodes():
                 if (
                     isinstance(node, ColFn)
                     and "partition_by" not in node.context_kwargs
@@ -54,23 +54,11 @@ class Verb(TableExpr):
                 ):
                     node.context_kwargs["partition_by"] = self._partition_by
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
-        return iter(())
-
-    def iter_col_nodes(self) -> Iterable[ColExpr]:
-        for col in self.iter_col_roots():
-            yield from col.iter_nodes()
-
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
-
-    def map_col_nodes(self, g: Callable[[ColExpr], ColExpr]):
-        self.map_col_roots(lambda root: root.map_nodes(g))
-
     def _clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
         table, table_map = self.table._clone()
         cloned = copy.copy(self)
 
-        cloned.map_col_nodes(
+        cloned._map_col_nodes(
             lambda node: Col(node.name, table_map[node.table])
             if isinstance(node, Col)
             else copy.copy(node)
@@ -83,6 +71,22 @@ class Verb(TableExpr):
 
         table_map[self] = cloned
         return cloned, table_map
+
+    def _iter_descendants(self) -> Iterable[TableExpr]:
+        yield from self.table._iter_descendants()
+        yield self
+
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
+        return iter(())
+
+    def _iter_col_nodes(self) -> Iterable[ColExpr]:
+        for col in self._iter_col_roots():
+            yield from col.iter_descendants()
+
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
+
+    def _map_col_nodes(self, g: Callable[[ColExpr], ColExpr]):
+        self._map_col_roots(lambda root: root.map_descendants(g))
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -97,10 +101,10 @@ class Select(Verb):
             if col.uuid in set({col.uuid for col in self.selected})
         ]
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.selected
 
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.selected = [g(c) for c in self.selected]
 
 
@@ -116,10 +120,10 @@ class Drop(Verb):
             if col.uuid not in set({col.uuid for col in self.dropped})
         }
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.dropped
 
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.dropped = [g(c) for c in self.dropped]
 
 
@@ -169,10 +173,10 @@ class Mutate(Verb):
 
         self._select = self._select + [Col(name, self) for name in self.names]
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
 
@@ -180,10 +184,10 @@ class Mutate(Verb):
 class Filter(Verb):
     filters: list[ColExpr]
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.filters
 
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.filters = [g(c) for c in self.filters]
 
 
@@ -219,7 +223,7 @@ class Summarise(Verb):
             for child in node.iter_children():
                 check_summarise_col_expr(child, agg_fn_above)
 
-        for root in self.iter_col_roots():
+        for root in self._iter_col_roots():
             check_summarise_col_expr(root, False)
 
         self._name_to_uuid = self._name_to_uuid | {
@@ -232,10 +236,10 @@ class Summarise(Verb):
         self._select = self._partition_by + [Col(name, self) for name in self.names]
         self._partition_by = []
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
 
 
@@ -243,10 +247,10 @@ class Summarise(Verb):
 class Arrange(Verb):
     order_by: list[Order]
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
 
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.order_by = [
             Order(g(ord.order_by), ord.descending, ord.nulls_last)
             for ord in self.order_by
@@ -276,10 +280,10 @@ class GroupBy(Verb):
         else:
             self._partition_by = self.group_by
 
-    def iter_col_roots(self) -> Iterable[ColExpr]:
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
 
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.group_by = [g(c) for c in self.group_by]
 
 
@@ -319,17 +323,11 @@ class Join(Verb):
             },
         )
 
-        self.map_col_nodes(
+        self._map_col_nodes(
             lambda expr: expr
             if not isinstance(expr, ColName)
             else Col(expr.name, self.table)
         )
-
-    def iter_col_roots(self) -> Iterable[ColExpr]:
-        yield self.on
-
-    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.on = g(self.on)
 
     def _clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
         table, table_map = self.table._clone()
@@ -339,7 +337,7 @@ class Join(Verb):
         cloned = Join(
             table,
             right,
-            self.on.map_nodes(
+            self.on.map_descendants(
                 lambda node: Col(node.name, table_map[node.table])
                 if isinstance(node, Col)
                 else copy.copy(node)
@@ -351,3 +349,14 @@ class Join(Verb):
 
         table_map[self] = cloned
         return cloned, table_map
+
+    def _iter_descendants(self) -> Iterable[TableExpr]:
+        yield from self.table._iter_descendants()
+        yield from self.right._iter_descendants()
+        yield self
+
+    def _iter_col_roots(self) -> Iterable[ColExpr]:
+        yield self.on
+
+    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.on = g(self.on)

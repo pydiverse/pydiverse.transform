@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from html import escape
 
 from pydiverse.transform.ops.core import Ftype
@@ -92,3 +93,6 @@ class Table(TableExpr):
     def _clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
         cloned = Table(self._impl.clone(), name=self.name)
         return cloned, {self: cloned}
+
+    def _iter_descendants(self) -> Iterable[TableExpr]:
+        yield self

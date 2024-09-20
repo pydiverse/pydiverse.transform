@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from uuid import UUID
 
 from pydiverse.transform.ops.core import Ftype
@@ -72,3 +73,5 @@ class TableExpr:
         return self._schema[col_name][0]
 
     def _clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]: ...
+
+    def _iter_descendants(self) -> Iterable[TableExpr]: ...
