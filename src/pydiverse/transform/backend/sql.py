@@ -813,7 +813,7 @@ with SqlImpl.op(ops.Any()) as op:
 
     @op.auto
     def _any(x, *, _window_partition_by=None, _window_order_by=None):
-        return sqa.func.coalesce(sqa.func.max(x), sqa.false())
+        return sqa.func.coalesce(sqa.func.max(x), sqa.null())
 
     @op.auto(variant="window")
     def _any(x, *, partition_by=None, order_by=None):
@@ -822,7 +822,7 @@ with SqlImpl.op(ops.Any()) as op:
                 partition_by=partition_by,
                 order_by=order_by,
             ),
-            sqa.false(),
+            sqa.null(),
         )
 
 
@@ -830,7 +830,7 @@ with SqlImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
-        return sqa.func.coalesce(sqa.func.min(x), sqa.false())
+        return sqa.func.coalesce(sqa.func.min(x), sqa.null())
 
     @op.auto(variant="window")
     def _all(x, *, partition_by=None, order_by=None):
@@ -839,7 +839,7 @@ with SqlImpl.op(ops.All()) as op:
                 partition_by=partition_by,
                 order_by=order_by,
             ),
-            sqa.false(),
+            sqa.null(),
         )
 
 
