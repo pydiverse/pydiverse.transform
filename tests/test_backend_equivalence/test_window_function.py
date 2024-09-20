@@ -7,6 +7,7 @@ from pydiverse.transform.pipe.verbs import (
     arrange,
     filter,
     group_by,
+    join,
     mutate,
     select,
     summarise,
@@ -38,7 +39,7 @@ def test_simple_grouped(df3):
     )
 
 
-def test_partition_by_argument(df3):
+def test_partition_by_argument(df3, df4):
     assert_result_equal(
         df3,
         lambda t: t
@@ -50,6 +51,14 @@ def test_partition_by_argument(df3):
                 arrange=[t.col4.nulls_last()], partition_by=[t.col1, t.col2]
             ),
         ),
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda t, u: t
+        >> join(u, t.col1 == u.col3, how="left")
+        >> group_by(t.col2)
+        >> mutate(y=(u.col3 + t.col1).max(partition_by=(col for col in t.cols()))),
     )
 
     assert_result_equal(
