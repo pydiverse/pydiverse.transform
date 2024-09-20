@@ -85,7 +85,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.registry.get_op(expr.name)
-        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
+        args: list[pl.Expr] = (compile_col_expr(arg, name_in_df) for arg in expr.args)
         impl = PolarsImpl.registry.get_impl(
             expr.name,
             tuple(arg.dtype() for arg in expr.args),
@@ -100,9 +100,9 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
                 *[compile_order(order, name_in_df) for order in arrange]
             )
 
-        filter_cond = expr.context_kwargs.get("filter")
-        if filter_cond:
-            filter_cond = [compile_col_expr(cond, name_in_df) for cond in filter_cond]
+        filters = expr.context_kwargs.get("filter")
+        if filters:
+            filters = (compile_col_expr(cond, name_in_df) for cond in filters)
 
         # The following `if` block is absolutely unecessary and just an optimization.
         # Otherwise, `over` would be used for sorting, but we cannot pass descending /
@@ -112,26 +112,35 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             # order the args. if the table is grouped by group_by or
             # partition_by=, the groups will be sorted via over(order_by=)
             # anyways so it need not be done here.
-            args = [
+            args = (
                 arg.sort_by(by=order_by, descending=descending, nulls_last=nulls_last)
                 if isinstance(arg, pl.Expr)
                 else arg
                 for arg in args
-            ]
-
-        if filter_cond:
-            # filtering needs to be done before applying the operator.
-            args = [
-                arg.filter(filter_cond) if isinstance(arg, pl.Expr) else arg
-                for arg in args
-            ]
+            )
 
         if op.name in ("rank", "dense_rank"):
-            assert len(args) == 0
+            assert len(expr.args) == 0
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
 
-        value: pl.Expr = impl(*args)
+        if filters:
+            # Filtering needs to be done before applying the operator. In `sum` / `any`
+            # aggregation over an empty column, polars puts a (sensible) default value
+            # (e.g. 0, False), but we want to put Null in this case to let the user
+            # decide about the default value via `fill_null` if he likes to set one.
+
+            assert all(arg.dtype().const for arg in expr.args[1:])
+            main_arg = next(args).filter(*filters)
+
+            value = (
+                pl.when(main_arg.count() == 0)
+                .then(None)
+                .otherwise(impl(main_arg, *args))
+            )
+
+        else:
+            value: pl.Expr = impl(*args)
 
         if partition_by:
             # when doing sort_by -> over in polars, for whatever reason the

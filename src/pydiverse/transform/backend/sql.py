@@ -149,12 +149,12 @@ class SqlImpl(TableImpl):
             else:
                 order_by = None
 
-            filter_cond = expr.context_kwargs.get("filter")
-            if filter_cond:
-                filter_cond = [
-                    cls.compile_col_expr(fil, sqa_col) for fil in filter_cond
-                ]
-                raise NotImplementedError
+            filters = expr.context_kwargs.get("filter")
+            if filters:
+                filters = cls.compile_col_expr(
+                    functools.reduce(operator.and_, filters), sqa_col
+                )
+                args = [sqa.case((filters, arg)) for arg in args]
 
             # we need this since some backends cannot do `any` / `all` as a window
             # function, so we need to emulate it via `max` / `min`.
