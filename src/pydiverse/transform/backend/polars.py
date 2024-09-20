@@ -85,7 +85,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.registry.get_op(expr.name)
-        args: list[pl.Expr] = (compile_col_expr(arg, name_in_df) for arg in expr.args)
+        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
         impl = PolarsImpl.registry.get_impl(
             expr.name,
             tuple(arg.dtype() for arg in expr.args),
@@ -112,12 +112,12 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             # order the args. if the table is grouped by group_by or
             # partition_by=, the groups will be sorted via over(order_by=)
             # anyways so it need not be done here.
-            args = (
+            args = [
                 arg.sort_by(by=order_by, descending=descending, nulls_last=nulls_last)
                 if isinstance(arg, pl.Expr)
                 else arg
                 for arg in args
-            )
+            ]
 
         if op.name in ("rank", "dense_rank"):
             assert len(expr.args) == 0
@@ -125,22 +125,24 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             arrange = None
 
         if filters:
-            # Filtering needs to be done before applying the operator. In `sum` / `any`
-            # aggregation over an empty column, polars puts a (sensible) default value
-            # (e.g. 0, False), but we want to put Null in this case to let the user
-            # decide about the default value via `fill_null` if he likes to set one.
+            # Filtering needs to be done before applying the operator.
+            args = [
+                arg.filter(*filters) if isinstance(arg, pl.Expr) else arg
+                for arg in args
+            ]
 
+        value: pl.Expr = impl(*args)
+
+        # TODO: currently, count is the only aggregation function where we don't want
+        # to return null for cols containing only null values. If this happens for more
+        # aggregation functions, make this configurable in e.g. the operator spec.
+        if op.ftype == Ftype.AGGREGATE and op.name != "count":
+            # In `sum` / `any` and other aggregation functions, polars puts a
+            # default value (e.g. 0, False) for empty columns, but we want to put
+            # Null in this case to let the user decide about the default value via
+            # `fill_null` if he likes to set one.
             assert all(arg.dtype().const for arg in expr.args[1:])
-            main_arg = next(args).filter(*filters)
-
-            value = (
-                pl.when(main_arg.count() == 0)
-                .then(None)
-                .otherwise(impl(main_arg, *args))
-            )
-
-        else:
-            value: pl.Expr = impl(*args)
+            value = pl.when(args[0].count() == 0).then(None).otherwise(value)
 
         if partition_by:
             # when doing sort_by -> over in polars, for whatever reason the
