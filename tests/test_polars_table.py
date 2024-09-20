@@ -371,7 +371,8 @@ class TestPolarsLazyImpl:
     def test_window_functions(self, tbl3):
         # Everything else should stay the same
         assert_equal(
-            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3), df3
+            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3.cols()),
+            df3,
         )
 
         assert_equal(

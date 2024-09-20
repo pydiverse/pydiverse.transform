@@ -55,11 +55,20 @@ class TableExpr:
     def __hash__(self):
         return id(self)
 
-    def schema(self):
+    def cols(self) -> list[col_expr.Col]:
+        return [col_expr.Col(name, self) for name in self._schema.keys()]
+
+    def col_names(self) -> list[str]:
+        return list(self._schema.keys())
+
+    def schema(self) -> dict[str, Dtype]:
         return {
             name: val[0]
             for name, val in self._schema.items()
             if name in set(self._select)
         }
+
+    def col_type(self, col_name: str) -> Dtype:
+        return self._schema[col_name][0]
 
     def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]: ...

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable
 from html import escape
 
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree.col_expr import (
     Col,
-    ColName,
 )
 from pydiverse.transform.tree.table_expr import TableExpr
 
@@ -54,14 +52,6 @@ class Table(TableExpr):
 
         self._select = [Col(name, self) for name in schema.keys()]
 
-    def __iter__(self) -> Iterable[Col]:
-        return iter(self.cols())
-
-    def __contains__(self, item: str | Col | ColName):
-        if isinstance(item, (Col, ColName)):
-            item = item.name
-        return item in self.col_names()
-
     def __str__(self):
         try:
             from pydiverse.transform.backend.targets import Polars
@@ -98,12 +88,6 @@ class Table(TableExpr):
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
-
-    def cols(self) -> list[Col]:
-        return [Col(name, self) for name in self._impl.col_names()]
-
-    def col_names(self) -> list[str]:
-        return self._impl.col_names()
 
     def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
         cloned = Table(self._impl.clone(), name=self.name)
