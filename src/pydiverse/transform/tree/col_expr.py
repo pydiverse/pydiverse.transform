@@ -422,11 +422,11 @@ class CaseExpr(ColExpr):
         return CaseExpr(self.cases, wrap_literal(value))
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class Order:
     order_by: ColExpr
-    descending: bool
-    nulls_last: bool
+    descending: bool = False
+    nulls_last: bool | None = None
 
     # the given `expr` may contain nulls_last markers or `-` (descending markers). the
     # order_by of the Order does not contain these special functions and can thus be
