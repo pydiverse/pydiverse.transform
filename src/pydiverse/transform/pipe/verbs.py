@@ -52,10 +52,10 @@ __all__ = [
 def alias(expr: TableExpr, new_name: str | None = None):
     if new_name is None:
         new_name = expr.name
-    # TableExpr.clone relies on the tables in a tree to be unique (it does not keep a
+    # TableExpr._clone relies on the tables in a tree to be unique (it does not keep a
     # memo like __deepcopy__)
     tree.preprocessing.check_duplicate_tables(expr)
-    new_expr, _ = expr.clone()
+    new_expr, _ = expr._clone()
     new_expr.name = new_name
     return new_expr
 

@@ -89,6 +89,6 @@ class Table(TableExpr):
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
-    def clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
+    def _clone(self) -> tuple[TableExpr, dict[TableExpr, TableExpr]]:
         cloned = Table(self._impl.clone(), name=self.name)
         return cloned, {self: cloned}

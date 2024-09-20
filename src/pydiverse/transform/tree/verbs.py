@@ -66,8 +66,8 @@ class Verb(TableExpr):
     def map_col_nodes(self, g: Callable[[ColExpr], ColExpr]):
         self.map_col_roots(lambda root: root.map_nodes(g))
 
-    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
+    def _clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table._clone()
         cloned = copy.copy(self)
 
         cloned.map_col_nodes(
@@ -103,14 +103,6 @@ class Select(Verb):
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.selected = [g(c) for c in self.selected]
 
-    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Select(
-            table, [Col(col.name, table_map[col.table]) for col in self.selected]
-        )
-        table_map[self] = cloned
-        return cloned, table_map
-
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Drop(Verb):
@@ -129,14 +121,6 @@ class Drop(Verb):
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.dropped = [g(c) for c in self.dropped]
-
-    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        cloned = Drop(
-            table, [Col(col.name, table_map[col.table]) for col in self.dropped]
-        )
-        table_map[self] = cloned
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -158,11 +142,6 @@ class Rename(Verb):
             new_schema[replacement] = self._schema[name]
 
         self._schema = new_schema
-
-    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        cloned, table_map = Verb.clone(self)
-        cloned.name_map = copy.copy(self.name_map)
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -195,11 +174,6 @@ class Mutate(Verb):
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
-
-    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        cloned, table_map = Verb.clone(self)
-        cloned.names = copy.copy(self.names)
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -263,11 +237,6 @@ class Summarise(Verb):
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.values = [g(c) for c in self.values]
-
-    def clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        cloned, table_map = Verb.clone(self)
-        cloned.names = copy.copy(self.names)
-        return cloned, table_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -362,9 +331,9 @@ class Join(Verb):
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.on = g(self.on)
 
-    def clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table.clone()
-        right, right_map = self.right.clone()
+    def _clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
+        table, table_map = self.table._clone()
+        right, right_map = self.right._clone()
         table_map.update(right_map)
 
         cloned = Join(
