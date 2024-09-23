@@ -14,7 +14,6 @@ from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.dtypes import Bool, Dtype, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
-from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class ColExpr:
@@ -87,7 +86,7 @@ class Col(ColExpr):
     def __init__(
         self,
         name: str,
-        table: TableExpr,
+        table,
     ):
         self.name = name
         self.table = table
@@ -134,13 +133,6 @@ class ColName(ColExpr):
             f"<{self.__class__.__name__} C.{self.name}"
             f"{f" ({self.dtype()})" if self.dtype() else ""}>"
         )
-
-    def resolve_type(self, table: TableExpr):
-        if (dftype := table._schema.get(self.name)) is None:
-            raise ValueError(
-                f"column `{self.name}` does not exist in table `{table.name}`"
-            )
-        self._dtype, self._ftype = dftype
 
 
 class LiteralCol(ColExpr):

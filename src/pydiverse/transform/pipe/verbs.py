@@ -3,11 +3,11 @@ from __future__ import annotations
 import functools
 from typing import Literal
 
-from pydiverse.transform import tree
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Target
 from pydiverse.transform.pipe.pipeable import builtin_verb
 from pydiverse.transform.pipe.table import Table
+from pydiverse.transform.tree import verbs
 from pydiverse.transform.tree.col_expr import Col, ColExpr, ColName, Order, wrap_literal
 from pydiverse.transform.tree.verbs import (
     Arrange,
@@ -54,7 +54,7 @@ def alias(expr: TableExpr, new_name: str | None = None):
         new_name = expr.name
     # TableExpr._clone relies on the tables in a tree to be unique (it does not keep a
     # memo like __deepcopy__)
-    tree.preprocessing.check_duplicate_tables(expr)
+    check_table_references(expr)
     new_expr, _ = expr._clone()
     new_expr.name = new_name
     return new_expr
@@ -66,17 +66,17 @@ def collect(expr: TableExpr): ...
 
 @builtin_verb()
 def export(expr: TableExpr, target: Target):
+    check_table_references(expr)
     expr, _ = expr._clone()
     SourceBackend: type[TableImpl] = get_backend(expr)
-    tree.preprocess(expr)
     return SourceBackend.export(expr, target)
 
 
 @builtin_verb()
 def build_query(expr: TableExpr) -> str:
+    check_table_references(expr)
     expr, _ = expr._clone()
     SourceBackend: type[TableImpl] = get_backend(expr)
-    tree.preprocess(expr)
     return SourceBackend.build_query(expr)
 
 
@@ -173,6 +173,40 @@ def summarise(expr: TableExpr, **kwargs: ColExpr):
 @builtin_verb()
 def slice_head(expr: TableExpr, n: int, *, offset: int = 0):
     return SliceHead(expr, n, offset)
+
+
+# checks whether there are duplicate tables and whether all cols used in expressions
+# have are from descendants
+def check_table_references(expr: TableExpr) -> set[TableExpr]:
+    if isinstance(expr, verbs.Verb):
+        tables = check_table_references(expr.table)
+
+        if isinstance(expr, verbs.Join):
+            right_tables = check_table_references(expr.right)
+            if intersection := tables & right_tables:
+                raise ValueError(
+                    f"table `{list(intersection)[0]}` occurs twice in the table "
+                    "tree.\nhint: To join two tables derived from a common table, "
+                    "apply `>> alias()` to one of them before the join."
+                )
+
+            if len(right_tables) > len(tables):
+                tables, right_tables = right_tables, tables
+            tables |= right_tables
+
+        for col in expr._iter_col_nodes():
+            if isinstance(col, Col) and col.table not in tables:
+                raise ValueError(
+                    f"table `{col.table}` referenced via column `{col}` cannot be "
+                    "used at this point. It The current table is not derived "
+                    "from it."
+                )
+
+        tables.add(expr)
+        return tables
+
+    else:
+        return {expr}
 
 
 def get_backend(expr: TableExpr) -> type[TableImpl]:

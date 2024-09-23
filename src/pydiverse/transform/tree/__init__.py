@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from . import preprocessing
+from .col_expr import Col
 from .table_expr import TableExpr
 
-__all__ = ["preprocess", "TableExpr"]
-
-
-def preprocess(expr: TableExpr) -> TableExpr:
-    preprocessing.check_duplicate_tables(expr)
+__all__ = ["TableExpr", "Col"]
