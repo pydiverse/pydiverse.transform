@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import sqlalchemy as sa
+import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.sql import SqlImpl
@@ -16,9 +16,9 @@ with SqliteImpl.op(ops.Round()) as op:
     @op.auto
     def _round(x, decimals=0):
         if decimals >= 0:
-            return sa.func.ROUND(x, decimals, type_=x.type)
+            return sqa.func.ROUND(x, decimals, type_=x.type)
         # For some reason SQLite doesn't like negative decimals values
-        return sa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
+        return sqa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
 
 
 with SqliteImpl.op(ops.StrStartsWith()) as op:
@@ -64,9 +64,9 @@ with SqliteImpl.op(ops.DtMillisecond()) as op:
         warn_non_standard(
             "SQLite returns rounded milliseconds",
         )
-        _1000 = sa.literal_column("1000")
-        frac_seconds = sa.cast(sa.func.STRFTIME("%f", x), sa.Numeric())
-        return sa.cast((frac_seconds * _1000) % _1000, sa.Integer())
+        _1000 = sqa.literal_column("1000")
+        frac_seconds = sqa.cast(sqa.func.STRFTIME("%f", x), sqa.Numeric())
+        return sqa.cast((frac_seconds * _1000) % _1000, sqa.Integer())
 
 
 with SqliteImpl.op(ops.Greatest()) as op:
@@ -83,7 +83,7 @@ with SqliteImpl.op(ops.Greatest()) as op:
         right = _greatest(*x[mid:])
 
         # TODO: Determine return type
-        return sa.func.coalesce(sa.func.MAX(left, right), left, right)
+        return sqa.func.coalesce(sqa.func.MAX(left, right), left, right)
 
 
 with SqliteImpl.op(ops.Least()) as op:
@@ -100,4 +100,4 @@ with SqliteImpl.op(ops.Least()) as op:
         right = _least(*x[mid:])
 
         # TODO: Determine return type
-        return sa.func.coalesce(sa.func.MIN(left, right), left, right)
+        return sqa.func.coalesce(sqa.func.MIN(left, right), left, right)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import polars as pl
 import pytest
-import sqlalchemy as sa
+import sqlalchemy as sqa
 
 from pydiverse.transform import C
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy
@@ -64,10 +64,10 @@ df_right = pl.DataFrame(
 
 @pytest.fixture
 def engine():
-    engine = sa.create_engine("sqlite:///:memory:")
-    # engine = sa.create_engine("postgresql://sa:Pydiverse23@127.0.0.1:6543")
-    # engine = sa.create_engine(
-    #     "mssql+pyodbc://sa:PydiQuant27@127.0.0.1:1433"
+    engine = sqa.create_engine("sqlite:///:memory:")
+    # engine = sqa.create_engine("postgresql://sqa:Pydiverse23@127.0.0.1:6543")
+    # engine = sqa.create_engine(
+    #     "mssql+pyodbc://sqa:PydiQuant27@127.0.0.1:1433"
     #     "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
     # )
 
