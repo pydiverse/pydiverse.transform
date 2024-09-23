@@ -235,7 +235,7 @@ class OperatorRegistry:
         # If operation hasn't been defined in this registry, go to the parent
         # registry and check if it has been defined there.
         if self.super_registry is None or not self.check_super.get(name, True):
-            raise ValueError(f"No implementation for operator '{name}' found")
+            raise ValueError(f"no implementation for operator `{name}` found")
         return self.super_registry.get_op(name)
 
     def add_impl(
@@ -247,8 +247,8 @@ class OperatorRegistry:
     ):
         if operator not in self.registered_ops:
             raise ValueError(
-                f"Operator {operator} ({operator.name}) hasn't been registered in this"
-                f" operator registry '{self.name}'"
+                f"operator `{operator}` ({operator.name}) hasn't been registered in the"
+                f" operator registry `{self.name}` yet"
             )
 
         signature = OperatorSignature.parse(signature)
@@ -264,13 +264,13 @@ class OperatorRegistry:
 
     def get_impl(self, name, args_signature) -> TypedOperatorImpl:
         if name not in self.ALL_REGISTERED_OPS:
-            raise ValueError(f"No operator named '{name}'.")
+            raise ValueError(f"operator named `{name}` does not exist")
 
         for dtype in args_signature:
             if not isinstance(dtype, dtypes.Dtype):
                 raise TypeError(
-                    "Expected elements of `args_signature` to be of type DType,"
-                    f" but found element of type {type(dtype).__name__} instead."
+                    "expected elements of `args_signature` to be of type Dtype, "
+                    f"found element of type {type(dtype).__name__} instead"
                 )
 
         if store := self.implementations.get(name):
@@ -281,8 +281,8 @@ class OperatorRegistry:
         # registry and check if it has been defined there.
         if self.super_registry is None or not self.check_super.get(name, True):
             raise ValueError(
-                f"No implementation for operator '{name}' found that matches signature"
-                f" '{args_signature}'."
+                f"invalid usage of operator `{name}` with arguments of type "
+                f"`{args_signature}`"
             )
         return self.super_registry.get_impl(name, args_signature)
 

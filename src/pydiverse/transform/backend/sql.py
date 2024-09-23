@@ -13,6 +13,7 @@ import polars as pl
 import sqlalchemy as sqa
 
 from pydiverse.transform import ops
+from pydiverse.transform.backend.polars import pdt_type_to_polars
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform.ops.core import Ftype
@@ -94,7 +95,14 @@ class SqlImpl(TableImpl):
             with engine.connect() as conn:
                 # TODO: Provide schema_overrides to not get u32 and other unwanted
                 # integer / float types
-                return pl.read_database(sel, connection=conn)
+                return pl.read_database(
+                    sel,
+                    connection=conn,
+                    schema_overrides={
+                        col.name: pdt_type_to_polars(col.dtype())
+                        for col in expr._select
+                    },
+                )
 
         raise NotImplementedError
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 import polars as pl
 import pytest
@@ -94,6 +94,28 @@ dataframes = {
                 datetime(2004, 12, 31, 23, 59, 59, 456_789),
                 datetime(1970, 1, 1),
             ],
+            "cdate": [
+                date(2017, 3, 2),
+                date(1998, 1, 12),
+                date(1999, 12, 31),
+                date(2024, 9, 23),
+                date(2018, 8, 13),
+                None,
+                date(2010, 5, 1),
+                date(2016, 2, 27),
+                date(2000, 1, 1),
+            ],
+            # "cdur": [
+            #     None,
+            #     timedelta(1, 4, 2, 5),
+            #     timedelta(0, 11, 14, 10000),
+            #     timedelta(12, 2, 3),
+            #     timedelta(4, 3, 1, 2, 3, 4),
+            #     timedelta(0, 0, 0, 0, 1),
+            #     timedelta(0, 1, 0, 1, 0, 1),
+            #     None,
+            #     timedelta(),
+            # ],
         }
     ),
 }
