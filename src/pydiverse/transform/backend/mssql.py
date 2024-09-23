@@ -60,7 +60,7 @@ class MsSqlImpl(SqlImpl):
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
-    new_list = []
+    new_list: list[Order] = []
     for ord in order_list:
         # is True / is False are important here since we don't want to do this costly
         # workaround if nulls_last is None (i.e. the user doesn't care)
@@ -97,7 +97,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         )
 
     elif isinstance(expr, Col):
-        if isinstance(expr.dtype(), dtypes.Bool):
+        if not wants_bool_as_bit and isinstance(expr.dtype(), dtypes.Bool):
             return ColFn("__eq__", expr, LiteralCol(True))
         return expr
 

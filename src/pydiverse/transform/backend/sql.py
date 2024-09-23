@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
+import itertools
 import operator
 from collections.abc import Iterable
 from typing import Any
@@ -144,7 +145,11 @@ class SqlImpl(TableImpl):
 
             if arrange:
                 order_by = sqa.sql.expression.ClauseList(
-                    *(cls.compile_order(order, sqa_col) for order in arrange)
+                    *(
+                        dedup_order_by(
+                            cls.compile_order(order, sqa_col) for order in arrange
+                        )
+                    )
                 )
             else:
                 order_by = None
@@ -290,7 +295,9 @@ class SqlImpl(TableImpl):
             ).subquery()
             sqa_col.update(
                 {
-                    uid: table.columns.get(sqa_col[uid].name)
+                    uid: sqa.label(
+                        sqa_col[uid].name, table.columns.get(sqa_col[uid].name)
+                    )
                     for uid in needed_cols.keys()
                     if uid in sqa_col
                 }
@@ -327,9 +334,12 @@ class SqlImpl(TableImpl):
                 )
 
         elif isinstance(expr, verbs.Arrange):
-            query.order_by = [
-                cls.compile_order(ord, sqa_col) for ord in expr.order_by
-            ] + query.order_by
+            query.order_by = dedup_order_by(
+                itertools.chain(
+                    (cls.compile_order(ord, sqa_col) for ord in expr.order_by),
+                    query.order_by,
+                )
+            )
 
         elif isinstance(expr, verbs.Summarise):
             query.group_by.extend(query.partition_by)
@@ -433,6 +443,24 @@ class SqlJoin:
     right: sqa.Subquery
     on: sqa.ColumnElement
     how: verbs.JoinHow
+
+
+# MSSQL complains about duplicates in ORDER BY.
+def dedup_order_by(
+    order_by: Iterable[sqa.UnaryExpression],
+) -> list[sqa.UnaryExpression]:
+    new_order_by: list[sqa.UnaryExpression] = []
+    occurred: set[sqa.ColumnElement] = set()
+
+    for ord in order_by:
+        peeled = ord
+        while isinstance(peeled, sqa.UnaryExpression) and peeled.modifier is not None:
+            peeled = peeled.element
+        if peeled not in occurred:
+            new_order_by.append(ord)
+            occurred.add(peeled)
+
+    return new_order_by
 
 
 # Gives any leaf a unique alias to allow self-joins. We do this here to not force
