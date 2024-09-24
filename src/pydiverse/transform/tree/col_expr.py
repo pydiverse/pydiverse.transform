@@ -96,10 +96,7 @@ class Col(ColExpr):
         self.uuid = self.table._name_to_uuid[self.name]
 
     def __repr__(self) -> str:
-        return (
-            f"<{self.__class__.__name__} {self.table.name}.{self.name}"
-            f"({self.dtype()})>"
-        )
+        return f"<{self.table.name}.{self.name}" f"({self.dtype()})>"
 
     def __str__(self) -> str:
         try:
@@ -129,10 +126,7 @@ class ColName(ColExpr):
         super().__init__(dtype, ftype)
 
     def __repr__(self) -> str:
-        return (
-            f"<{self.__class__.__name__} C.{self.name}"
-            f"{f" ({self.dtype()})" if self.dtype() else ""}>"
-        )
+        return f"<C.{self.name}" f"{f" ({self.dtype()})" if self.dtype() else ""}>"
 
 
 class LiteralCol(ColExpr):
@@ -145,7 +139,7 @@ class LiteralCol(ColExpr):
         super().__init__(dtype, Ftype.EWISE)
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} {self.val} ({self.dtype()})>"
+        return f"<{self.val} ({self.dtype()})>"
 
 
 class ColFn(ColExpr):
@@ -166,8 +160,13 @@ class ColFn(ColExpr):
             ]
 
         if filters := self.context_kwargs.get("filter"):
-            # TODO: check that this is an aggregation and there is only one argu
-            assert len(args) == 1
+            if len(self.args) == 0:
+                assert self.name == "count"
+                self.args = [LiteralCol(0)]
+
+            # TODO: check that this is an aggregation
+
+            assert len(self.args) == 1
             self.args[0] = CaseExpr(
                 [
                     (
@@ -329,7 +328,7 @@ class CaseExpr(ColExpr):
 
     def __repr__(self) -> str:
         return (
-            f"<{self.__class__.__name__}"
+            "<case "
             + functools.reduce(
                 operator.add, (f"{cond} -> {val}, " for cond, val in self.cases), ""
             )
@@ -396,7 +395,7 @@ class CaseExpr(ColExpr):
         else:
             # AGGREGATE and EWISE are incompatible
             raise FunctionTypeError(
-                "Incompatible function types found in case statement: " ", ".join(
+                "incompatible function types found in case statement: " ", ".join(
                     val_ftypes
                 )
             )

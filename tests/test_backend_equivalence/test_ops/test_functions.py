@@ -3,6 +3,7 @@ from __future__ import annotations
 import pydiverse.transform as pdt
 from pydiverse.transform import C
 from pydiverse.transform.pipe.verbs import mutate
+from pydiverse.transform.tree.col_expr import LiteralCol
 from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
@@ -11,7 +12,9 @@ def test_count(df4):
     assert_result_equal(
         df4,
         lambda t: t
-        >> mutate(**{col.name + "_count": pdt.count(col) for col in t.cols()}),
+        >> mutate(**{col.name + "_count": pdt.count(col) for col in t.cols()})
+        >> mutate(o=LiteralCol(0).count(filter=t.col3 == 2))
+        >> mutate(u=pdt.count(), v=pdt.count(filter=t.col4 > 0)),
     )
 
 
