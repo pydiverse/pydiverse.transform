@@ -235,10 +235,7 @@ with MsSqlImpl.op(ops.StrLen()) as op:
 
     @op.auto
     def _str_length(x):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when computing string length",
-        )
-        return sqa.func.LENGTH(x, type_=sqa.Integer())
+        return sqa.func.LENGTH(x + "a", type_=sqa.Integer()) - 1
 
 
 with MsSqlImpl.op(ops.StrReplaceAll()) as op:
