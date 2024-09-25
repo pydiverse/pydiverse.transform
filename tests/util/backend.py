@@ -84,9 +84,7 @@ def mssql_table(df: pl.DataFrame, name: str):
         df,
         name,
         url,
-        dtypes_map={
-            pl.Datetime(): DATETIME2(),
-        },
+        dtypes_map={pl.Datetime(): DATETIME2()},
     )
 
 

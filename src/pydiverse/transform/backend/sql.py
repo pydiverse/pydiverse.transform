@@ -17,8 +17,8 @@ from pydiverse.transform.backend.polars import pdt_type_to_polars
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
+from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
     Col,
@@ -28,7 +28,6 @@ from pydiverse.transform.tree.col_expr import (
     Order,
 )
 from pydiverse.transform.tree.dtypes import Dtype
-from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class SqlImpl(TableImpl):
@@ -50,15 +49,27 @@ class SqlImpl(TableImpl):
 
         return super().__new__(SqlImpl.Dialects[dialect])
 
-    def __init__(self, table: str | sqa.Engine, conf: SqlAlchemy):
+    def __init__(self, table: str | sqa.Table, conf: SqlAlchemy, name: str | None):
         assert type(self) is not SqlImpl
+
         self.engine = (
             conf.engine
             if isinstance(conf.engine, sqa.Engine)
             else sqa.create_engine(conf.engine)
         )
-        self.table = sqa.Table(
-            table, sqa.MetaData(), schema=conf.schema, autoload_with=self.engine
+        if isinstance(table, str):
+            self.table = sqa.Table(
+                table, sqa.MetaData(), schema=conf.schema, autoload_with=self.engine
+            )
+        else:
+            self.table = table
+
+        if name is None:
+            name = self.table.name
+
+        super().__init__(
+            name,
+            {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns},
         )
 
     def __init_subclass__(cls, **kwargs):
@@ -71,45 +82,44 @@ class SqlImpl(TableImpl):
     def schema(self) -> dict[str, Dtype]:
         return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
 
-    def clone(self) -> SqlImpl:
-        cloned = object.__new__(self.__class__)
-        cloned.engine = self.engine
-        cloned.table = self.table
-        return cloned
-
-    @classmethod
-    def build_select(cls, expr: TableExpr) -> sqa.Select:
-        create_aliases(expr, {})
-        table, query, sqa_col = cls.compile_table_expr(
-            expr, {col.uuid: 1 for col in expr._select}
-        )
-        return cls.compile_query(
-            table, query, (sqa_col[col.uuid] for col in expr._select)
+    def _clone(self) -> tuple[SqlImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        cloned = self.__class__(self.table, SqlAlchemy(self.engine), self.name)
+        return (
+            cloned,
+            {self: cloned},
+            {
+                self.cols[name]._uuid: cloned.cols[name]._uuid
+                for name in self.cols.keys()
+            },
         )
 
     @classmethod
-    def export(cls, expr: TableExpr, target: Target) -> Any:
-        sel = cls.build_select(expr)
-        engine = get_engine(expr)
+    def build_select(cls, nd: AstNode, final_select: list[Col]) -> sqa.Select:
+        create_aliases(nd, {})
+        nd, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
+        return cls.compile_query(nd, query)
+
+    @classmethod
+    def export(cls, nd: AstNode, target: Target, final_select: list[Col]) -> Any:
+        sel = cls.build_select(nd, final_select)
+        engine = get_engine(nd)
         if isinstance(target, Polars):
             with engine.connect() as conn:
-                # TODO: Provide schema_overrides to not get u32 and other unwanted
-                # integer / float types
                 return pl.read_database(
                     sel,
                     connection=conn,
                     schema_overrides={
-                        col.name: pdt_type_to_polars(col.dtype())
-                        for col in expr._select
+                        sql_col.name: pdt_type_to_polars(col.dtype())
+                        for sql_col, col in zip(sel.columns.values(), final_select)
                     },
                 )
 
         raise NotImplementedError
 
     @classmethod
-    def build_query(cls, expr: TableExpr) -> str | None:
-        sel = cls.build_select(expr)
-        engine = get_engine(expr)
+    def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None:
+        sel = cls.build_select(nd, final_select)
+        engine = get_engine(nd)
         return str(
             sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
         )
@@ -133,7 +143,7 @@ class SqlImpl(TableImpl):
         cls, expr: ColExpr, sqa_col: dict[str, sqa.Label]
     ) -> sqa.ColumnElement:
         if isinstance(expr, Col):
-            return sqa_col[expr.uuid]
+            return sqa_col[expr._uuid]
 
         elif isinstance(expr, ColFn):
             args: list[sqa.ColumnElement] = [
@@ -198,9 +208,7 @@ class SqlImpl(TableImpl):
         raise AssertionError
 
     @classmethod
-    def compile_query(
-        cls, table: sqa.Table, query: Query, select: Iterable[sqa.Label]
-    ) -> sqa.sql.Select:
+    def compile_query(cls, table: sqa.Table, query: Query) -> sqa.sql.Select:
         sel = table.select().select_from(table)
 
         for j in query.join:
@@ -226,32 +234,32 @@ class SqlImpl(TableImpl):
         if query.order_by:
             sel = sel.order_by(*query.order_by)
 
-        sel = sel.with_only_columns(*select)
+        sel = sel.with_only_columns(*query.select)
 
         return sel
 
     @classmethod
-    def compile_table_expr(
-        cls, expr: TableExpr, needed_cols: dict[UUID, int]
+    def compile_ast(
+        cls, nd: AstNode, needed_cols: dict[UUID, int]
     ) -> tuple[sqa.Table, Query, dict[UUID, sqa.Label]]:
-        if isinstance(expr, verbs.Verb):
+        if isinstance(nd, verbs.Verb):
             # store a counter how often each UUID is referenced by ancestors. This
             # allows to only select necessary columns in a subquery.
-            for node in expr._iter_col_nodes():
+            for node in nd.iter_col_nodes():
                 if isinstance(node, Col):
-                    cnt = needed_cols.get(node.uuid)
+                    cnt = needed_cols.get(node._uuid)
                     if cnt is None:
-                        needed_cols[node.uuid] = 1
+                        needed_cols[node._uuid] = 1
                     else:
-                        needed_cols[node.uuid] = cnt + 1
+                        needed_cols[node._uuid] = cnt + 1
 
-            table, query, sqa_col = cls.compile_table_expr(expr.table, needed_cols)
+            table, query, sqa_col = cls.compile_ast(nd.child, needed_cols)
 
         # check if a subquery is required
         if (
             (
                 isinstance(
-                    expr,
+                    nd,
                     (
                         verbs.Filter,
                         verbs.Summarise,
@@ -263,23 +271,26 @@ class SqlImpl(TableImpl):
                 and query.limit is not None
             )
             or (
-                isinstance(expr, (verbs.Mutate, verbs.Filter))
+                isinstance(nd, (verbs.Mutate, verbs.Filter))
                 and any(
                     node.ftype(agg_is_window=True) == Ftype.WINDOW
-                    for node in expr._iter_col_nodes()
+                    for node in nd.iter_col_nodes()
                     if isinstance(node, Col)
                 )
             )
             or (
-                isinstance(expr, verbs.Summarise)
+                isinstance(nd, verbs.Summarise)
                 and (
-                    (bool(query.group_by) and set(query.group_by) != query.partition_by)
+                    (
+                        bool(query.group_by)
+                        and set(query.group_by) != set(query.partition_by)
+                    )
                     or any(
                         (
                             node.ftype(agg_is_window=False)
                             in (Ftype.WINDOW, Ftype.AGGREGATE)
                         )
-                        for node in expr._iter_col_nodes()
+                        for node in nd.iter_col_nodes()
                         if isinstance(node, Col)
                     )
                 )
@@ -296,11 +307,11 @@ class SqlImpl(TableImpl):
 
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
-            table = cls.compile_query(
-                table,
-                query,
-                (sqa_col[uid] for uid in needed_cols.keys() if uid in sqa_col),
-            ).subquery()
+            orig_select = query.select
+            query.select = [
+                sqa_col[uid] for uid in needed_cols.keys() if uid in sqa_col
+            ]
+            table = cls.compile_query(table, query).subquery()
             sqa_col.update(
                 {
                     uid: sqa.label(
@@ -310,135 +321,157 @@ class SqlImpl(TableImpl):
                     if uid in sqa_col
                 }
             )
+
             # rewire col refs to the subquery
             query = Query(
-                partition_by=[table.columns.get(col.name) for col in query.partition_by]
+                [
+                    sqa.Label(lb.name, col)
+                    for lb in orig_select
+                    if (col := table.columns.get(lb.name)) is not None
+                ],
+                partition_by=[
+                    sqa.Label(lb.name, col)
+                    for lb in query.partition_by
+                    if (col := table.columns.get(lb.name)) is not None
+                ],
             )
 
-        if isinstance(expr, verbs.Rename):
+        if isinstance(nd, (verbs.Mutate, verbs.Summarise)):
+            query.select = [lb for lb in query.select if lb.name not in set(nd.names)]
+
+        if isinstance(nd, verbs.Select):
+            query.select = [sqa_col[col._uuid] for col in nd.select]
+
+        elif isinstance(nd, verbs.Rename):
             sqa_col = {
                 uid: (
-                    sqa.label(expr.name_map[lb.name], lb)
-                    if lb.name in expr.name_map
+                    sqa.label(nd.name_map[lb.name], lb)
+                    if lb.name in nd.name_map
                     else lb
                 )
                 for uid, lb in sqa_col.items()
             }
 
-        elif isinstance(expr, verbs.Mutate):
-            for name, val in zip(expr.names, expr.values):
-                sqa_col[expr._name_to_uuid[name]] = sqa.label(
-                    name, cls.compile_col_expr(val, sqa_col)
-                )
+            query.select, query.partition_by, query.group_by = (
+                [
+                    sqa.label(nd.name_map[lb.name], lb)
+                    if lb.name in nd.name_map
+                    else lb
+                    for lb in label_arr
+                ]
+                for label_arr in (query.select, query.partition_by, query.group_by)
+            )
 
-        elif isinstance(expr, verbs.Filter):
+        elif isinstance(nd, verbs.Mutate):
+            for name, val, uid in zip(nd.names, nd.values, nd.uuids):
+                sqa_col[uid] = sqa.label(name, cls.compile_col_expr(val, sqa_col))
+                query.select.append(sqa_col[uid])
+
+        elif isinstance(nd, verbs.Filter):
             if query.group_by:
                 query.having.extend(
-                    cls.compile_col_expr(fil, sqa_col) for fil in expr.filters
+                    cls.compile_col_expr(fil, sqa_col) for fil in nd.filters
                 )
             else:
                 query.where.extend(
-                    cls.compile_col_expr(fil, sqa_col) for fil in expr.filters
+                    cls.compile_col_expr(fil, sqa_col) for fil in nd.filters
                 )
 
-        elif isinstance(expr, verbs.Arrange):
+        elif isinstance(nd, verbs.Arrange):
             query.order_by = dedup_order_by(
                 itertools.chain(
-                    (cls.compile_order(ord, sqa_col) for ord in expr.order_by),
+                    (cls.compile_order(ord, sqa_col) for ord in nd.order_by),
                     query.order_by,
                 )
             )
 
-        elif isinstance(expr, verbs.Summarise):
+        elif isinstance(nd, verbs.Summarise):
             query.group_by.extend(query.partition_by)
 
-            for name, val in zip(expr.names, expr.values):
-                sqa_col[expr._name_to_uuid[name]] = sqa.Label(
-                    name, cls.compile_col_expr(val, sqa_col)
-                )
+            for name, val, uid in zip(nd.names, nd.values, nd.uuids):
+                sqa_col[uid] = sqa.Label(name, cls.compile_col_expr(val, sqa_col))
 
+            query.select = query.partition_by + [sqa_col[uid] for uid in nd.uuids]
             query.partition_by = []
             query.order_by.clear()
 
-        elif isinstance(expr, verbs.SliceHead):
+        elif isinstance(nd, verbs.SliceHead):
             if query.limit is None:
-                query.limit = expr.n
-                query.offset = expr.offset
+                query.limit = nd.n
+                query.offset = nd.offset
             else:
-                query.limit = min(abs(query.limit - expr.offset), expr.n)
-                query.offset += expr.offset
+                query.limit = min(abs(query.limit - nd.offset), nd.n)
+                query.offset += nd.offset
 
-        elif isinstance(expr, verbs.GroupBy):
-            compiled_group_by = (
-                sqa.label(
-                    col.name,
-                    cls.compile_col_expr(col, sqa_col),
-                )
-                for col in expr.group_by
-            )
-            if expr.add:
+        elif isinstance(nd, verbs.GroupBy):
+            compiled_group_by = (sqa_col[col._uuid] for col in nd.group_by)
+            if nd.add:
                 query.partition_by.extend(compiled_group_by)
             else:
                 query.partition_by = list(compiled_group_by)
 
-        elif isinstance(expr, verbs.Ungroup):
+        elif isinstance(nd, verbs.Ungroup):
             assert not (query.partition_by and query.group_by)
             query.partition_by.clear()
 
-        elif isinstance(expr, verbs.Join):
-            right_table, right_query, right_sqa_col = cls.compile_table_expr(
-                expr.right, needed_cols
+        elif isinstance(nd, verbs.Join):
+            right_table, right_query, right_sqa_col = cls.compile_ast(
+                nd.right, needed_cols
             )
 
             sqa_col.update(
                 {
-                    uid: sqa.label(lb.name + expr.suffix, lb)
+                    uid: sqa.label(lb.name + nd.suffix, lb)
                     for uid, lb in right_sqa_col.items()
                 }
             )
 
             j = SqlJoin(
                 right_table,
-                cls.compile_col_expr(expr.on, sqa_col),
-                expr.how,
+                cls.compile_col_expr(nd.on, sqa_col),
+                nd.how,
             )
 
-            if expr.how == "inner":
+            if nd.how == "inner":
                 query.where.extend(right_query.where)
-            elif expr.how == "left":
+            elif nd.how == "left":
                 j.on = functools.reduce(operator.and_, (j.on, *right_query.where))
-            elif expr.how == "outer":
+            elif nd.how == "outer":
                 if query.where or right_query.where:
                     raise ValueError("invalid filter before outer join")
 
             query.join.append(j)
+            query.select += [
+                sqa.Label(lb.name + nd.suffix, lb) for lb in right_query.select
+            ]
 
-        elif isinstance(expr, Table):
-            table = expr._impl.table
-            query = Query()
+        elif isinstance(nd, SqlImpl):
+            table = nd.table
+            query = Query([sqa.Label(col.name, col) for col in nd.table.columns])
             sqa_col = {
-                expr._name_to_uuid[col.name]: sqa.label(col.name, col)
-                for col in expr._impl.table.columns
+                col._uuid: sqa.label(col.name, nd.table.columns[col.name])
+                for col in nd.cols.values()
             }
 
-        if isinstance(expr, verbs.Verb):
+        if isinstance(nd, verbs.Verb):
             # decrease counters (`needed_cols` is not copied)
-            for node in expr._iter_col_nodes():
+            for node in nd.iter_col_nodes():
                 if isinstance(node, Col):
-                    cnt = needed_cols.get(node.uuid)
+                    cnt = needed_cols.get(node._uuid)
                     if cnt == 1:
-                        del needed_cols[node.uuid]
+                        del needed_cols[node._uuid]
                     else:
-                        needed_cols[node.uuid] = cnt - 1
+                        needed_cols[node._uuid] = cnt - 1
 
         return table, query, sqa_col
 
 
 @dataclasses.dataclass(slots=True)
 class Query:
+    select: list[sqa.Label]
     join: list[SqlJoin] = dataclasses.field(default_factory=list)
-    group_by: list[sqa.Label] = dataclasses.field(default_factory=list)
     partition_by: list[sqa.Label] = dataclasses.field(default_factory=list)
+    group_by: list[sqa.Label] = dataclasses.field(default_factory=list)
     where: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
     having: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
     order_by: list[sqa.UnaryExpression] = dataclasses.field(default_factory=list)
@@ -475,19 +508,19 @@ def dedup_order_by(
 # the user to come up with dummy names that are not required later anymore. It has
 # to be done before a join so that all column references in the join subtrees remain
 # valid.
-def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str, int]:
-    if isinstance(expr, verbs.Verb):
-        num_occurences = create_aliases(expr.table, num_occurences)
+def create_aliases(nd: AstNode, num_occurences: dict[str, int]) -> dict[str, int]:
+    if isinstance(nd, verbs.Verb):
+        num_occurences = create_aliases(nd.child, num_occurences)
 
-        if isinstance(expr, verbs.Join):
-            num_occurences = create_aliases(expr.right, num_occurences)
+        if isinstance(nd, verbs.Join):
+            num_occurences = create_aliases(nd.right, num_occurences)
 
-    elif isinstance(expr, Table):
-        if cnt := num_occurences.get(expr._impl.table.name):
-            expr._impl.table = expr._impl.table.alias(f"{expr._impl.table.name}_{cnt}")
+    elif isinstance(nd, SqlImpl):
+        if cnt := num_occurences.get(nd.table.name):
+            nd.table = nd.table.alias(f"{nd.table.name}_{cnt}")
         else:
             cnt = 0
-        num_occurences[expr._impl.table.name] = cnt + 1
+        num_occurences[nd.table.name] = cnt + 1
 
     else:
         raise AssertionError
@@ -495,18 +528,18 @@ def create_aliases(expr: TableExpr, num_occurences: dict[str, int]) -> dict[str,
     return num_occurences
 
 
-def get_engine(expr: TableExpr) -> sqa.Engine:
-    if isinstance(expr, verbs.Verb):
-        engine = get_engine(expr.table)
+def get_engine(nd: AstNode) -> sqa.Engine:
+    if isinstance(nd, verbs.Verb):
+        engine = get_engine(nd.child)
 
-        if isinstance(expr, verbs.Join):
-            right_engine = get_engine(expr.right)
+        if isinstance(nd, verbs.Join):
+            right_engine = get_engine(nd.right)
             if engine != right_engine:
                 raise NotImplementedError  # TODO: find some good error for this
 
     else:
-        assert isinstance(expr, Table)
-        engine = expr._impl.engine
+        assert isinstance(nd, SqlImpl)
+        engine = nd.engine
 
     return engine
 

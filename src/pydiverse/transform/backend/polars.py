@@ -11,8 +11,8 @@ from pydiverse.transform import ops
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
+from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
     Col,
@@ -21,36 +21,40 @@ from pydiverse.transform.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform.tree.table_expr import TableExpr
 
 
 class PolarsImpl(TableImpl):
-    def __init__(self, df: pl.DataFrame | pl.LazyFrame):
+    def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
         self.df = df
-        # if isinstance(df, pl.LazyFrame) else df.lazy()
+        super().__init__(
+            name,
+            {
+                name: polars_type_to_pdt(dtype)
+                for name, dtype in df.collect_schema().items()
+            },
+        )
 
     @staticmethod
-    def build_query(expr: TableExpr) -> str | None:
+    def build_query(nd: AstNode, final_select: list[Col]) -> None:
         return None
 
     @staticmethod
-    def export(expr: TableExpr, target: Target) -> Any:
-        lf, name_in_df = compile_table_expr(expr)
-        lf = lf.select(name_in_df[col.uuid] for col in expr._select)
+    def export(nd: AstNode, target: Target, final_select: list[Col]) -> Any:
+        lf, _, select, _ = compile_ast(nd)
+        lf = lf.select(select)
         if isinstance(target, Polars):
             return lf.collect() if target.lazy and isinstance(lf, pl.LazyFrame) else lf
 
-    def col_names(self) -> list[str]:
-        return self.df.columns
-
-    def schema(self) -> dict[str, dtypes.Dtype]:
-        return {
-            name: polars_type_to_pdt(dtype)
-            for name, dtype in self.df.collect_schema().items()
-        }
-
-    def clone(self) -> PolarsImpl:
-        return PolarsImpl(self.df.clone())
+    def _clone(self) -> tuple[PolarsImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        cloned = PolarsImpl(self.name, self.df.clone())
+        return (
+            cloned,
+            {self: cloned},
+            {
+                self.cols[name]._uuid: cloned.cols[name]._uuid
+                for name in self.cols.keys()
+            },
+        )
 
 
 # merges descending and null_last markers into the ordering expression
@@ -81,7 +85,7 @@ def compile_order(
 
 def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
     if isinstance(expr, Col):
-        return pl.col(name_in_df[expr.uuid])
+        return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.registry.get_op(expr.name)
@@ -202,51 +206,56 @@ def compile_join_cond(
     raise AssertionError()
 
 
-# returns the compiled LazyFrame, the list of selected cols (selection on the frame
-# must happen at the end since we need to store intermediate columns)
-def compile_table_expr(
-    expr: TableExpr,
-) -> tuple[pl.LazyFrame, dict[UUID, str]]:
-    if isinstance(expr, verbs.Verb):
-        df, name_in_df = compile_table_expr(expr.table)
+def compile_ast(
+    nd: AstNode,
+) -> tuple[pl.LazyFrame, dict[UUID, str], list[str], list[UUID]]:
+    if isinstance(nd, verbs.Verb):
+        df, name_in_df, select, partition_by = compile_ast(nd.child)
 
-    if isinstance(expr, (verbs.Mutate, verbs.Summarise)):
-        overwritten = set(name for name in expr.names if name in expr.table._schema)
+    if isinstance(nd, (verbs.Mutate, verbs.Summarise)):
+        overwritten = set(name for name in nd.names if name in set(select))
         if overwritten:
-            # We append the UUID of overwritten columns to their name.
-            name_map = {
-                name: f"{name}_{str(hex(expr._name_to_uuid[name].int))[2:]}"
-                for name in overwritten
-            }
+            # We rename overwritten cols to some unique dummy name
+            name_map = {name: f"{name}_{str(hex(id(nd)))[2:]}" for name in overwritten}
             name_in_df = {
                 uid: (name_map[name] if name in name_map else name)
                 for uid, name in name_in_df.items()
             }
             df = df.rename(name_map)
 
-    if isinstance(expr, verbs.Rename):
-        df = df.rename(expr.name_map)
+        select = [col_name for col_name in select if col_name not in overwritten]
+
+    if isinstance(nd, verbs.Select):
+        select = [name_in_df[col._uuid] for col in nd.select]
+
+    elif isinstance(nd, verbs.Rename):
+        df = df.rename(nd.name_map)
         name_in_df = {
-            uid: (expr.name_map[name] if name in expr.name_map else name)
+            uid: (nd.name_map[name] if name in nd.name_map else name)
             for uid, name in name_in_df.items()
         }
+        select = [
+            nd.name_map[col_name] if col_name in nd.name_map else col_name
+            for col_name in select
+        ]
 
-    elif isinstance(expr, verbs.Mutate):
+    elif isinstance(nd, verbs.Mutate):
         df = df.with_columns(
             **{
                 name: compile_col_expr(value, name_in_df)
-                for name, value in zip(expr.names, expr.values)
+                for name, value in zip(nd.names, nd.values)
             }
         )
-        name_in_df.update({expr._name_to_uuid[name]: name for name in expr.names})
 
-    elif isinstance(expr, verbs.Filter):
-        if expr.filters:
-            df = df.filter([compile_col_expr(fil, name_in_df) for fil in expr.filters])
+        name_in_df.update({uid: name for uid, name in zip(nd.uuids, nd.names)})
+        select += nd.names
 
-    elif isinstance(expr, verbs.Arrange):
+    elif isinstance(nd, verbs.Filter):
+        df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.filters])
+
+    elif isinstance(nd, verbs.Arrange):
         order_by, descending, nulls_last = zip(
-            *[compile_order(order, name_in_df) for order in expr.order_by]
+            *[compile_order(order, name_in_df) for order in nd.order_by]
         )
         df = df.sort(
             order_by,
@@ -255,7 +264,7 @@ def compile_table_expr(
             maintain_order=True,
         )
 
-    elif isinstance(expr, verbs.Summarise):
+    elif isinstance(nd, verbs.Summarise):
         # We support usage of aggregated columns in expressions in summarise, but polars
         # creates arrays when doing that. Thus we unwrap the arrays when necessary.
         def has_path_to_leaf_without_agg(expr: ColExpr):
@@ -271,46 +280,59 @@ def compile_table_expr(
             )
 
         aggregations = {}
-        for name, val in zip(expr.names, expr.values):
+        for name, val in zip(nd.names, nd.values):
             compiled = compile_col_expr(val, name_in_df)
             if has_path_to_leaf_without_agg(val):
                 compiled = compiled.first()
             aggregations[name] = compiled
 
-        if expr.table._partition_by:
-            df = df.group_by(
-                *(name_in_df[col.uuid] for col in expr.table._partition_by)
-            ).agg(**aggregations)
+        if partition_by:
+            df = df.group_by(*(name_in_df[uid] for uid in partition_by)).agg(
+                **aggregations
+            )
         else:
             df = df.select(**aggregations)
 
-        name_in_df.update({expr._name_to_uuid[name]: name for name in expr.names})
+        name_in_df.update({uid: name for name, uid in zip(nd.names, nd.uuids)})
+        select = [*(name_in_df[uid] for uid in partition_by), *nd.names]
+        partition_by = []
 
-    elif isinstance(expr, verbs.SliceHead):
-        df = df.slice(expr.offset, expr.n)
+    elif isinstance(nd, verbs.SliceHead):
+        df = df.slice(nd.offset, nd.n)
 
-    elif isinstance(expr, verbs.Join):
-        right_df, right_name_in_df = compile_table_expr(expr.right)
+    elif isinstance(nd, verbs.GroupBy):
+        new_group_by = [col._uuid for col in nd.group_by]
+        partition_by = partition_by + new_group_by if nd.add else new_group_by
+
+    elif isinstance(nd, verbs.Ungroup):
+        partition_by = []
+
+    elif isinstance(nd, verbs.Join):
+        right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
         name_in_df.update(
-            {uid: name + expr.suffix for uid, name in right_name_in_df.items()}
+            {uid: name + nd.suffix for uid, name in right_name_in_df.items()}
         )
-        left_on, right_on = zip(*compile_join_cond(expr.on, name_in_df))
+        left_on, right_on = zip(*compile_join_cond(nd.on, name_in_df))
+
+        assert len(partition_by) == 0
+        select += [col_name + nd.suffix for col_name in right_select]
 
         df = df.join(
-            right_df.rename({name: name + expr.suffix for name in right_df.columns}),
+            right_df.rename({name: name + nd.suffix for name in right_df.columns}),
             left_on=left_on,
             right_on=right_on,
-            how=expr.how,
-            validate=expr.validate,
+            how=nd.how,
+            validate=nd.validate,
             coalesce=False,
         )
 
-    elif isinstance(expr, Table):
-        assert isinstance(expr._impl, PolarsImpl)
-        df = expr._impl.df
-        name_in_df = {uid: name for name, uid in expr._name_to_uuid.items()}
+    elif isinstance(nd, PolarsImpl):
+        df = nd.df
+        name_in_df = {col._uuid: col.name for col in nd.cols.values()}
+        select = list(nd.cols.keys())
+        partition_by = []
 
-    return df, name_in_df
+    return df, name_in_df, select, partition_by
 
 
 def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:

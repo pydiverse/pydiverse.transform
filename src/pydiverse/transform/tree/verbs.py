@@ -5,11 +5,10 @@ import dataclasses
 import uuid
 from collections.abc import Callable, Iterable
 from typing import Literal
+from uuid import UUID
 
-from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.tree.col_expr import Col, ColExpr, ColFn, ColName, Order
-from pydiverse.transform.tree.table_expr import TableExpr
+from pydiverse.transform.tree.ast import AstNode
+from pydiverse.transform.tree.col_expr import Col, ColExpr, Order
 
 JoinHow = Literal["inner", "left", "outer"]
 
@@ -17,240 +16,135 @@ JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Verb(TableExpr):
-    table: TableExpr
+class Verb(AstNode):
+    child: AstNode
 
     def __post_init__(self):
-        # propagate the table name and schema up the tree
-        TableExpr.__init__(
-            self,
-            self.table.name,
-            self.table._schema,
-            self.table._select,
-            self.table._partition_by,
-            self.table._name_to_uuid,
-        )
+        self.name = self.child.name
 
-        # resolve C columns
-        self._map_col_nodes(
-            lambda node: node
-            if not isinstance(node, ColName)
-            else Col(node.name, self.table)
-        )
-
-        # TODO: backend agnostic registry
-        from pydiverse.transform.backend.polars import PolarsImpl
-
-        # update partition_by kwarg in aggregate functions
-        if not isinstance(self, Summarise):
-            for node in self._iter_col_nodes():
-                if (
-                    isinstance(node, ColFn)
-                    and "partition_by" not in node.context_kwargs
-                    and (
-                        PolarsImpl.registry.get_op(node.name).ftype
-                        in (Ftype.WINDOW, Ftype.AGGREGATE)
-                    )
-                ):
-                    node.context_kwargs["partition_by"] = self._partition_by
-
-    def _clone(self) -> tuple[Verb, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table._clone()
+    def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        child, nd_map, uuid_map = self.child._clone()
         cloned = copy.copy(self)
+        cloned.child = child
 
-        cloned._map_col_nodes(
-            lambda node: Col(node.name, table_map[node.table])
-            if isinstance(node, Col)
-            else copy.copy(node)
+        cloned.map_col_nodes(
+            lambda col: Col(
+                col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+            )
+            if isinstance(col, Col)
+            else copy.copy(col)
         )
+        nd_map[self] = cloned
 
-        # necessary to make the magic in __post_init__ happen
-        cloned = self.__class__(
-            table, *(getattr(cloned, attr) for attr in cloned.__slots__)
-        )
+        return cloned, nd_map, uuid_map
 
-        table_map[self] = cloned
-        return cloned, table_map
-
-    def _iter_descendants(self) -> Iterable[TableExpr]:
-        yield from self.table._iter_descendants()
+    def iter_subtree(self) -> Iterable[AstNode]:
+        yield from self.child.iter_subtree()
         yield self
 
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
 
-    def _iter_col_nodes(self) -> Iterable[ColExpr]:
-        for col in self._iter_col_roots():
-            yield from col.iter_descendants()
+    def iter_col_nodes(self) -> Iterable[ColExpr]:
+        for col in self.iter_col_roots():
+            yield from col.iter_subtree()
 
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
 
-    def _map_col_nodes(self, g: Callable[[ColExpr], ColExpr]):
-        self._map_col_roots(lambda root: root.map_descendants(g))
+    def map_col_nodes(self, g: Callable[[ColExpr], ColExpr]):
+        self.map_col_roots(lambda root: root.map_subtree(g))
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Select(Verb):
-    selected: list[Col | ColName]
+    select: list[Col]
 
-    def __post_init__(self):
-        Verb.__post_init__(self)
-        self._select = [
-            col
-            for col in self._select
-            if col.uuid in set({col.uuid for col in self.selected})
-        ]
+    def iter_col_roots(self) -> Iterable[ColExpr]:
+        yield from self.select
 
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
-        yield from self.selected
-
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.selected = [g(c) for c in self.selected]
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.select = [g(col) for col in self.select]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Drop(Verb):
-    dropped: list[Col | ColName]
+    drop: list[Col]
 
-    def __post_init__(self):
-        Verb.__post_init__(self)
-        self._select = {
-            col
-            for col in self._select
-            if col.uuid not in set({col.uuid for col in self.dropped})
-        }
+    def iter_col_roots(self) -> Iterable[ColExpr]:
+        yield from self.drop
 
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
-        yield from self.dropped
-
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.dropped = [g(c) for c in self.dropped]
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.drop = [g(col) for col in self.drop]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Rename(Verb):
     name_map: dict[str, str]
 
-    def __post_init__(self):
-        Verb.__post_init__(self)
-        new_schema = copy.copy(self._schema)
-
-        for name, _ in self.name_map.items():
-            if name not in self._schema:
-                raise ValueError(f"no column with name `{name}` in table `{self.name}`")
-            del new_schema[name]
-
-        for name, replacement in self.name_map.items():
-            if replacement in new_schema:
-                raise ValueError(f"duplicate column name `{replacement}`")
-            new_schema[replacement] = self._schema[name]
-
-        self._schema = new_schema
-
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Mutate(Verb):
     names: list[str]
     values: list[ColExpr]
+    uuids: list[UUID]
 
-    def __post_init__(self):
-        Verb.__post_init__(self)
-
-        self._schema = copy.copy(self._schema)
-        for name, val in zip(self.names, self.values):
-            self._schema[name] = val.dtype(), val.ftype(agg_is_window=True)
-
-        overwritten = {
-            self._name_to_uuid[name]
-            for name in self.names
-            if name in self._name_to_uuid
-        }
-        self._select = [col for col in self._select if col.uuid not in overwritten]
-
-        self._name_to_uuid = self._name_to_uuid | {
-            name: uuid.uuid1() for name in self.names
-        }
-
-        self._select = self._select + [Col(name, self) for name in self.names]
-
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.values = [g(c) for c in self.values]
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.values = [g(val) for val in self.values]
+
+    def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        cloned, nd_map, uuid_map = Verb._clone(self)
+        assert isinstance(cloned, Mutate)
+        cloned.uuids = [uuid.uuid1() for _ in self.names]
+        uuid_map.update(
+            {old_uid: new_uid for old_uid, new_uid in zip(self.uuids, cloned.uuids)}
+        )
+        return cloned, nd_map, uuid_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Filter(Verb):
     filters: list[ColExpr]
 
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.filters
 
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.filters = [g(c) for c in self.filters]
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.filters = [g(predicate) for predicate in self.filters]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Summarise(Verb):
     names: list[str]
     values: list[ColExpr]
+    uuids: list[UUID]
 
-    def __post_init__(self):
-        Verb.__post_init__(self)
-
-        partition_by_uuids = {col.uuid for col in self._partition_by}
-
-        def check_summarise_col_expr(node: ColExpr, agg_fn_above: bool):
-            if (
-                isinstance(node, Col)
-                and node.uuid not in partition_by_uuids
-                and not agg_fn_above
-            ):
-                raise FunctionTypeError(
-                    f"column `{node}` is neither aggregated nor part of the grouping "
-                    "columns."
-                )
-
-            elif isinstance(node, ColFn):
-                if node.ftype(agg_is_window=False) == Ftype.WINDOW:
-                    raise FunctionTypeError(
-                        f"forbidden window function `{node.name}` in `summarise`"
-                    )
-                elif node.ftype(agg_is_window=False) == Ftype.AGGREGATE:
-                    agg_fn_above = True
-
-            for child in node.iter_children():
-                check_summarise_col_expr(child, agg_fn_above)
-
-        for root in self._iter_col_roots():
-            check_summarise_col_expr(root, False)
-
-        self._name_to_uuid = self._name_to_uuid | {
-            name: uuid.uuid1() for name in self.names
-        }
-        self._schema = copy.copy(self._schema)
-        for name, val in zip(self.names, self.values):
-            self._schema[name] = val.dtype(), val.ftype(agg_is_window=False)
-
-        self._select = self._partition_by + [Col(name, self) for name in self.names]
-        self._partition_by = []
-
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
 
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.values = [g(c) for c in self.values]
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.values = [g(val) for val in self.values]
+
+    def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        cloned, nd_map, uuid_map = Verb._clone(self)
+        assert isinstance(cloned, Summarise)
+        cloned.uuids = [uuid.uuid1() for _ in self.names]
+        uuid_map.update(
+            {old_uid: new_uid for old_uid, new_uid in zip(self.uuids, cloned.uuids)}
+        )
+        return cloned, nd_map, uuid_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Arrange(Verb):
     order_by: list[Order]
 
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
 
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.order_by = [
             Order(g(ord.order_by), ord.descending, ord.nulls_last)
             for ord in self.order_by
@@ -262,101 +156,58 @@ class SliceHead(Verb):
     n: int
     offset: int
 
-    def __post_init__(self):
-        Verb.__post_init__(self)
-        if self._partition_by:
-            raise ValueError("cannot apply `slice_head` to a grouped table")
-
 
 @dataclasses.dataclass(eq=False, slots=True)
 class GroupBy(Verb):
-    group_by: list[Col | ColName]
+    group_by: list[Col]
     add: bool
 
-    def __post_init__(self):
-        Verb.__post_init__(self)
-        if self.add:
-            self._partition_by = self._partition_by + self.group_by
-        else:
-            self._partition_by = self.group_by
-
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
 
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.group_by = [g(c) for c in self.group_by]
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        self.group_by = [g(col) for col in self.group_by]
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Ungroup(Verb):
-    def __post_init__(self):
-        Verb.__post_init__(self)
-        self._partition_by = []
+class Ungroup(Verb): ...
 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Join(Verb):
-    table: TableExpr
-    right: TableExpr
+    right: AstNode
     on: ColExpr
     how: JoinHow
     validate: JoinValidate
     suffix: str
 
-    def __post_init__(self):
-        if self.table._partition_by:
-            raise ValueError(f"cannot join grouped table `{self.table.name}`")
-        elif self.right._partition_by:
-            raise ValueError(f"cannot join grouped table `{self.right.name}`")
+    def _clone(self) -> tuple[Join, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        child, nd_map, uuid_map = self.child._clone()
+        right_child, right_nd_map, right_uuid_map = self.right._clone()
+        nd_map.update(right_nd_map)
+        uuid_map.update(right_uuid_map)
 
-        TableExpr.__init__(
-            self,
-            self.table.name,
-            self.table._schema
-            | {name + self.suffix: val for name, val in self.right._schema.items()},
-            self.table._select + self.right._select,
-            [],
-            self.table._name_to_uuid
-            | {
-                name + self.suffix: uid
-                for name, uid in self.right._name_to_uuid.items()
-            },
+        cloned = copy.copy(self)
+        cloned.child = child
+        cloned.right = right_child
+        cloned.on = self.on.map_subtree(
+            lambda col: Col(
+                col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+            )
+            if isinstance(col, Col)
+            else copy.copy(col)
         )
 
-        self._map_col_nodes(
-            lambda expr: expr
-            if not isinstance(expr, ColName)
-            else Col(expr.name, self.table)
-        )
+        nd_map[self] = cloned
+        return cloned, nd_map, uuid_map
 
-    def _clone(self) -> tuple[Join, dict[TableExpr, TableExpr]]:
-        table, table_map = self.table._clone()
-        right, right_map = self.right._clone()
-        table_map.update(right_map)
-
-        cloned = Join(
-            table,
-            right,
-            self.on.map_descendants(
-                lambda node: Col(node.name, table_map[node.table])
-                if isinstance(node, Col)
-                else copy.copy(node)
-            ),
-            self.how,
-            self.validate,
-            self.suffix,
-        )
-
-        table_map[self] = cloned
-        return cloned, table_map
-
-    def _iter_descendants(self) -> Iterable[TableExpr]:
-        yield from self.table._iter_descendants()
-        yield from self.right._iter_descendants()
+    def iter_subtree(self) -> Iterable[AstNode]:
+        yield from self.child.iter_subtree()
+        yield from self.right.iter_subtree()
         yield self
 
-    def _iter_col_roots(self) -> Iterable[ColExpr]:
+    def iter_col_roots(self) -> Iterable[ColExpr]:
         yield self.on
 
-    def _map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.on = g(self.on)

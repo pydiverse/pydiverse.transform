@@ -282,7 +282,7 @@ class OperatorRegistry:
         if self.super_registry is None or not self.check_super.get(name, True):
             raise ValueError(
                 f"invalid usage of operator `{name}` with arguments of type "
-                f"`{args_signature}`"
+                f"{args_signature}"
             )
         return self.super_registry.get_impl(name, args_signature)
 

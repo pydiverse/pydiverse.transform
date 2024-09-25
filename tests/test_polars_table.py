@@ -343,7 +343,7 @@ class TestPolarsLazyImpl:
 
     def test_alias(self, tbl1, tbl2):
         x = tbl2 >> alias("x")
-        assert x.name == "x"
+        assert x._ast.name == "x"
 
         # Check that applying alias doesn't change the output
         a = (
@@ -371,7 +371,7 @@ class TestPolarsLazyImpl:
     def test_window_functions(self, tbl3):
         # Everything else should stay the same
         assert_equal(
-            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3.cols()),
+            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3),
             df3,
         )
 
@@ -409,9 +409,7 @@ class TestPolarsLazyImpl:
                 >> alias()
                 >> filter((offset < C._n) & (C._n <= (n + offset)))
             )
-            return t >> select(
-                *[C[col.name] for col in table.cols() if col.name != "_n"]
-            )
+            return t >> select(*[C[col.name] for col in table if col.name != "_n"])
 
         assert_equal(
             tbl3 >> slice_head(6),

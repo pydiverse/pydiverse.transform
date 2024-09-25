@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .col_expr import Col
-from .table_expr import TableExpr
+from . import col_expr
+from .ast import AstNode
 
-__all__ = ["TableExpr", "Col"]
+__all__ = ["AstNode", "Col", "col_expr"]

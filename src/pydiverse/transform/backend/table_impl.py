@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import uuid
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.targets import Target
+from pydiverse.transform.ops.core import Ftype
+from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     Col,
     LiteralCol,
@@ -13,18 +17,24 @@ from pydiverse.transform.tree.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
 )
-from pydiverse.transform.tree.table_expr import TableExpr
 
 if TYPE_CHECKING:
     from pydiverse.transform.ops import Operator
 
 
-class TableImpl:
+class TableImpl(AstNode):
     """
     Base class from which all table backend implementations are derived from.
     """
 
     registry = OperatorRegistry("TableImpl")
+
+    def __init__(self, name: str, schema: dict[str, Dtype]):
+        self.name = name
+        self.cols = {
+            name: Col(name, self, uuid.uuid1(), dtype, Ftype.EWISE)
+            for name, dtype in schema.items()
+        }
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -39,17 +49,14 @@ class TableImpl:
                 break
         cls.registry = OperatorRegistry(cls.__name__, super_reg)
 
-    @staticmethod
-    def build_query(expr: TableExpr) -> str | None: ...
+    def iter_subtree(self) -> Iterable[AstNode]:
+        yield self
 
     @staticmethod
-    def export(expr: TableExpr, target: Target) -> Any: ...
+    def build_query(nd: AstNode, final_select: list[Col]) -> str | None: ...
 
-    def col_names(self) -> list[str]: ...
-
-    def schema(self) -> dict[str, Dtype]: ...
-
-    def clone(self) -> TableImpl: ...
+    @staticmethod
+    def export(nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
 
     def is_aligned_with(self, col: Col | LiteralCol) -> bool:
         """Determine if a column is aligned with the table.

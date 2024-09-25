@@ -12,7 +12,7 @@ def test_count(df4):
     assert_result_equal(
         df4,
         lambda t: t
-        >> mutate(**{col.name + "_count": pdt.count(col) for col in t.cols()})
+        >> mutate(**{col.name + "_count": pdt.count(col) for col in t})
         >> mutate(o=LiteralCol(0).count(filter=t.col3 == 2))
         >> mutate(u=pdt.count(), v=pdt.count(filter=t.col4 > 0)),
     )

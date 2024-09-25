@@ -281,7 +281,7 @@ class TestSqlTable:
 
     def test_alias(self, tbl1, tbl2):
         x = tbl2 >> alias("x")
-        assert x.name == "x"
+        assert x._ast.name == "x"
 
         # Check that applying alias doesn't change the output
         a = (

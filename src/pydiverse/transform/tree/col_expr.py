@@ -8,10 +8,12 @@ import itertools
 import operator
 from collections.abc import Callable, Generator, Iterable
 from typing import Any
+from uuid import UUID
 
 from pydiverse.transform.errors import DataTypeError, FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes
+from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.dtypes import Bool, Dtype, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 
@@ -71,32 +73,28 @@ class ColExpr:
 
     # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
     # and `Order` expressions are not yielded.
-    def iter_descendants(self) -> Iterable[ColExpr]:
+    def iter_subtree(self) -> Iterable[ColExpr]:
         for node in self.iter_children():
-            yield from node.iter_descendants()
+            yield from node.iter_subtree()
         yield self
 
-    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
 
 
 class Col(ColExpr):
-    __slots__ = ["name", "table", "uuid"]
+    __slots__ = ["name", "_ast", "_uuid"]
 
     def __init__(
-        self,
-        name: str,
-        table,
+        self, name: str, _ast: AstNode, _uuid: UUID, _dtype: Dtype, _ftype: Ftype
     ):
         self.name = name
-        self.table = table
-        if (dftype := table._schema.get(name)) is None:
-            raise ValueError(f"column `{name}` does not exist in table `{table.name}`")
-        super().__init__(*dftype)
-        self.uuid = self.table._name_to_uuid[self.name]
+        self._ast = _ast
+        self._uuid = _uuid
+        super().__init__(_dtype, _ftype)
 
     def __repr__(self) -> str:
-        return f"<{self.table.name}.{self.name}" f"({self.dtype()})>"
+        return f"<{self._ast.name}.{self.name}" f"({self.dtype()})>"
 
     def __str__(self) -> str:
         try:
@@ -188,12 +186,12 @@ class ColFn(ColExpr):
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
 
-    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         new_fn = copy.copy(self)
-        new_fn.args = [arg.map_descendants(g) for arg in self.args]
+        new_fn.args = [arg.map_subtree(g) for arg in self.args]
 
         new_fn.context_kwargs = {
-            key: [val.map_descendants(g) for val in arr]
+            key: [val.map_subtree(g) for val in arr]
             for key, arr in self.context_kwargs.items()
         }
         return g(new_fn)
@@ -253,7 +251,7 @@ class ColFn(ColExpr):
             self._ftype = actual_ftype
 
             # kick out nested window / aggregation functions
-            for node in self.iter_descendants():
+            for node in self.iter_subtree():
                 if (
                     node is not self
                     and isinstance(node, ColFn)
@@ -340,16 +338,13 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             yield self.default_val
 
-    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         new_case_expr = copy.copy(self)
         new_case_expr.cases = [
-            (cond.map_descendants(g), val.map_descendants(g))
-            for cond, val in self.cases
+            (cond.map_subtree(g), val.map_subtree(g)) for cond, val in self.cases
         ]
         new_case_expr.default_val = (
-            self.default_val.map_descendants(g)
-            if self.default_val is not None
-            else None
+            self.default_val.map_subtree(g) if self.default_val is not None else None
         )
         return g(new_case_expr)
 
@@ -444,11 +439,11 @@ class Order:
             nulls_last = False
         return Order(expr, descending, nulls_last)
 
-    def iter_descendants(self) -> Iterable[ColExpr]:
-        yield from self.order_by.iter_descendants()
+    def iter_subtree(self) -> Iterable[ColExpr]:
+        yield from self.order_by.iter_subtree()
 
-    def map_descendants(self, g: Callable[[ColExpr], ColExpr]) -> Order:
-        return Order(self.order_by.map_descendants(g), self.descending, self.nulls_last)
+    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> Order:
+        return Order(self.order_by.map_subtree(g), self.descending, self.nulls_last)
 
 
 # Add all supported dunder methods to `ColExpr`. This has to be done, because Python

@@ -10,6 +10,7 @@ from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
 from pydiverse.transform.tree import dtypes, verbs
+from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
     Col,
@@ -18,7 +19,6 @@ from pydiverse.transform.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform.tree.table_expr import TableExpr
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
@@ -26,37 +26,33 @@ class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
 
     @classmethod
-    def build_select(cls, expr: TableExpr) -> Any:
+    def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
         # boolean / bit conversion
-        for table_expr in expr._iter_descendants():
-            if isinstance(table_expr, verbs.Verb):
-                table_expr._map_col_roots(
+        for desc in nd.iter_subtree():
+            if isinstance(desc, verbs.Verb):
+                desc.map_col_roots(
                     functools.partial(
                         convert_bool_bit,
                         wants_bool_as_bit=not isinstance(
-                            table_expr, (verbs.Filter, verbs.Join)
+                            desc, (verbs.Filter, verbs.Join)
                         ),
                     )
                 )
 
         # workaround for correct nulls_first / nulls_last behaviour on MSSQL
-        for table_expr in expr._iter_descendants():
-            if isinstance(table_expr, verbs.Arrange):
-                table_expr.order_by = convert_order_list(table_expr.order_by)
-            if isinstance(table_expr, verbs.Verb):
-                for node in table_expr._iter_col_nodes():
+        for desc in nd.iter_subtree():
+            if isinstance(desc, verbs.Arrange):
+                desc.order_by = convert_order_list(desc.order_by)
+            if isinstance(desc, verbs.Verb):
+                for node in desc.iter_col_nodes():
                     if isinstance(node, ColFn) and (
                         arrange := node.context_kwargs.get("arrange")
                     ):
                         node.context_kwargs["arrange"] = convert_order_list(arrange)
 
-        sql.create_aliases(expr, {})
-        table, query, sqa_col = cls.compile_table_expr(
-            expr, {col.uuid: 1 for col in expr._select}
-        )
-        return cls.compile_query(
-            table, query, (sqa_col[col.uuid] for col in expr._select)
-        )
+        sql.create_aliases(nd, {})
+        table, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
+        return cls.compile_query(table, query)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
