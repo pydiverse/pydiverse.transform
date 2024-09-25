@@ -72,6 +72,10 @@ class Table:
             )
         return col
 
+    def __setstate__(self, d):  # to avoid very annoying AttributeErrors
+        for slot, val in d[1].items():
+            setattr(self, slot, val)
+
     def __iter__(self) -> Iterable[ColExpr]:
         cols = list(self._cache.cols.values())
         yield from cols

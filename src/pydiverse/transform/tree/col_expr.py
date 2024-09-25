@@ -40,6 +40,10 @@ class ColExpr:
             "converted to a boolean or used with the and, or, not keywords"
         )
 
+    def __setstate__(self, d):  # to avoid very annoying AttributeErrors
+        for slot, val in d[1].items():
+            setattr(self, slot, val)
+
     def _repr_html_(self) -> str:
         return f"<pre>{html.escape(repr(self))}</pre>"
 
@@ -311,6 +315,8 @@ class WhenClause:
 
 
 class CaseExpr(ColExpr):
+    __slots__ = ["cases", "default_val"]
+
     def __init__(
         self,
         cases: Iterable[tuple[ColExpr, ColExpr]],
