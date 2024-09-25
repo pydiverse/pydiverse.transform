@@ -13,6 +13,7 @@ dataframes = {
         {
             "col1": [1, 2, 3, 4],
             "col2": ["a", "baa", "c", "d"],
+            "cnull": [None, 2, None, None],
         }
     ),
     "df2": pl.DataFrame(
