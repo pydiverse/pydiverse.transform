@@ -184,7 +184,7 @@ def mutate(table: Table, **kwargs: ColExpr):
     }
     new._cache.select = [
         col for col in table._cache.select if col.name not in overwritten
-    ] + [new[name] for name in new._ast.names]
+    ] + [new._cache.cols[name] for name in new._ast.names]
 
     return new
 
@@ -290,7 +290,7 @@ def summarise(table: Table, **kwargs: ColExpr):
     }
 
     new._cache.select = table._cache.partition_by + [
-        new[name] for name in new._ast.names
+        new._cache.cols[name] for name in new._ast.names
     ]
     new._cache.partition_by = []
 

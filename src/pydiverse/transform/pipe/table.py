@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 from collections.abc import Iterable
 from html import escape
@@ -77,8 +78,11 @@ class Table:
             setattr(self, slot, val)
 
     def __iter__(self) -> Iterable[ColExpr]:
-        cols = list(self._cache.cols.values())
+        cols = copy.copy(self._cache.select)
         yield from cols
+
+    def __len__(self) -> int:
+        return len(self._cache.select)
 
     def __str__(self):
         try:
