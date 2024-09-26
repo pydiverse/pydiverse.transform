@@ -10,7 +10,7 @@ from collections.abc import Callable, Generator, Iterable
 from typing import Any
 from uuid import UUID
 
-from pydiverse.transform.errors import DataTypeError, FunctionTypeError
+from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.ast import AstNode
@@ -180,6 +180,9 @@ class ColFn(ColExpr):
             del self.context_kwargs["filter"]
 
         super().__init__()
+        # try to eagerly resolve the types to get a nicer stack trace on type errors
+        self.dtype()
+        self.ftype()
 
     def __repr__(self) -> str:
         args = [repr(e) for e in self.args] + [
@@ -204,13 +207,13 @@ class ColFn(ColExpr):
         if self._dtype is not None:
             return self._dtype
 
-        # TODO: create a backend agnostic registry
-        from pydiverse.transform.backend.polars import PolarsImpl
+        arg_dtypes = [arg.dtype() for arg in self.args]
+        if None in arg_dtypes:
+            return None
 
-        self._dtype = PolarsImpl.registry.get_impl(
-            self.name, [arg.dtype() for arg in self.args]
-        ).return_type
+        from pydiverse.transform.backend import PolarsImpl
 
+        self._dtype = PolarsImpl.registry.get_impl(self.name, arg_dtypes).return_type
         return self._dtype
 
     def ftype(self, *, agg_is_window: bool):
@@ -230,11 +233,14 @@ class ColFn(ColExpr):
         if self._ftype is not None:
             return self._ftype
 
+        ftypes = [arg.ftype(agg_is_window=agg_is_window) for arg in self.args]
+        if None in ftypes:
+            return None
+
         from pydiverse.transform.backend.polars import PolarsImpl
 
         op = PolarsImpl.registry.get_op(self.name)
 
-        ftypes = [arg.ftype(agg_is_window=agg_is_window) for arg in self.args]
         actual_ftype = (
             Ftype.WINDOW if op.ftype == Ftype.AGGREGATE and agg_is_window else op.ftype
         )
@@ -329,6 +335,8 @@ class CaseExpr(ColExpr):
         # indicates that the user set `None` as a default value.
         self.default_val = default_val
         super().__init__()
+        self.dtype()
+        self.ftype()
 
     def __repr__(self) -> str:
         return (
@@ -359,16 +367,22 @@ class CaseExpr(ColExpr):
             return self._dtype
 
         try:
-            val_types = [val.dtype().without_modifiers() for _, val in self.cases]
+            val_types = [val.dtype() for _, val in self.cases]
             if self.default_val is not None:
                 val_types.append(self.default_val.dtype().without_modifiers())
-            self._dtype = dtypes.promote_dtypes(val_types)
+
+            if None in val_types:
+                return None
+
+            self._dtype = dtypes.promote_dtypes(
+                dtype.without_modifiers for dtype in val_types
+            )
         except Exception as e:
-            raise DataTypeError(f"invalid case expression: {e}") from e
+            raise TypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
-            if not isinstance(cond.dtype(), Bool):
-                raise DataTypeError(
+            if cond.dtype() is not None and not isinstance(cond.dtype(), Bool):
+                raise TypeError(
                     f"invalid case expression: condition {cond} has type "
                     f"{cond.dtype()} but all conditions must be boolean"
                 )
@@ -384,8 +398,11 @@ class CaseExpr(ColExpr):
             val_ftypes.add(self.default_val.ftype(agg_is_window=agg_is_window))
 
         for _, val in self.cases:
-            if not val.dtype().const:
+            if val.dtype() is not None and not val.dtype().const:
                 val_ftypes.add(val.ftype(agg_is_window=agg_is_window))
+
+        if None in val_ftypes:
+            return None
 
         if len(val_ftypes) == 0:
             self._ftype = Ftype.EWISE
