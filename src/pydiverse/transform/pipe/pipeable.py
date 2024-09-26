@@ -51,25 +51,22 @@ class inverse_partial(partial):
         return self.func(*args, *self.args, **keywords)
 
 
-def verb(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        def f(*args, **kwargs):
-            return func(*args, **kwargs)
+# TODO: validate that the first arg is a table here
 
-        f = inverse_partial(f, *args, **kwargs)  # Bind arguments
-        return Pipeable(f)
+
+def verb(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        return Pipeable(inverse_partial(fn, *args, **kwargs))
 
     return wrapper
 
 
 def builtin_verb(backends=None):
-    def decorator(func):
-        @wraps(func)
+    def decorator(fn):
+        @wraps(fn)
         def wrapper(*args, **kwargs):
-            f = func
-            f = inverse_partial(f, *args, **kwargs)  # Bind arguments
-            return Pipeable(f)  # Make pipeable
+            return Pipeable(inverse_partial(fn, *args, **kwargs))
 
         return wrapper
 
