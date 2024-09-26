@@ -43,7 +43,10 @@ class PolarsImpl(TableImpl):
         lf, _, select, _ = compile_ast(nd)
         lf = lf.select(select)
         if isinstance(target, Polars):
-            return lf.collect() if target.lazy and isinstance(lf, pl.LazyFrame) else lf
+            if not target.lazy:
+                lf = lf.collect()
+            lf.name = nd.name
+            return lf
 
     def _clone(self) -> tuple[PolarsImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned = PolarsImpl(self.name, self.df.clone())

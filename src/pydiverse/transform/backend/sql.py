@@ -105,7 +105,7 @@ class SqlImpl(TableImpl):
         engine = get_engine(nd)
         if isinstance(target, Polars):
             with engine.connect() as conn:
-                return pl.read_database(
+                df = pl.read_database(
                     sel,
                     connection=conn,
                     schema_overrides={
@@ -113,6 +113,8 @@ class SqlImpl(TableImpl):
                         for sql_col, col in zip(sel.columns.values(), final_select)
                     },
                 )
+                df.name = nd.name
+                return df
 
         raise NotImplementedError
 
