@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.col_expr import (
     ColExpr,
     ColFn,
@@ -17,6 +18,12 @@ def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
 
 
 def when(condition: ColExpr) -> WhenClause:
+    if condition.dtype() is not None and not isinstance(condition.dtype(), dtypes.Bool):
+        raise TypeError(
+            "argument for `when` must be of boolean type, but has type "
+            f"`{condition.dtype()}`"
+        )
+
     return WhenClause([], wrap_literal(condition))
 
 

@@ -14,7 +14,7 @@ from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.dtypes import Bool, Dtype, python_type_to_pdt
+from pydiverse.transform.tree.dtypes import Dtype, python_type_to_pdt
 from pydiverse.transform.tree.registry import OperatorRegistry
 
 
@@ -381,10 +381,10 @@ class CaseExpr(ColExpr):
             raise TypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
-            if cond.dtype() is not None and not isinstance(cond.dtype(), Bool):
+            if cond.dtype() is not None and not isinstance(cond.dtype(), dtypes.Bool):
                 raise TypeError(
-                    f"invalid case expression: condition {cond} has type "
-                    f"{cond.dtype()} but all conditions must be boolean"
+                    f"argument `{cond}` for `when` must be of boolean type, but has "
+                    f"type `{cond.dtype()}`"
                 )
 
         return self._dtype
@@ -423,6 +423,15 @@ class CaseExpr(ColExpr):
     def when(self, condition: ColExpr) -> WhenClause:
         if self.default_val is not None:
             raise TypeError("cannot call `when` on a closed case expression after")
+
+        if condition.dtype() is not None and not isinstance(
+            condition.dtype(), dtypes.Bool
+        ):
+            raise TypeError(
+                "argument for `when` must be of boolean type, but has type "
+                f"`{condition.dtype()}`"
+            )
+
         return WhenClause(self.cases, wrap_literal(condition))
 
     def otherwise(self, value: ColExpr) -> CaseExpr:
