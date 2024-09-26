@@ -10,7 +10,6 @@ from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     Col,
-    LiteralCol,
 )
 from pydiverse.transform.tree.dtypes import Dtype
 from pydiverse.transform.tree.registry import (
@@ -57,15 +56,6 @@ class TableImpl(AstNode):
 
     @staticmethod
     def export(nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
-
-    def is_aligned_with(self, col: Col | LiteralCol) -> bool:
-        """Determine if a column is aligned with the table.
-
-        :param col: The column or literal colum against which alignment
-            should be checked.
-        :return: A boolean indicating if `col` is aligned with self.
-        """
-        raise NotImplementedError
 
     @classmethod
     def _html_repr_expr(cls, expr):

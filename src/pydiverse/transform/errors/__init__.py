@@ -13,12 +13,6 @@ class FunctionTypeError(Exception):
     """
 
 
-class AlignmentError(Exception):
-    """
-    Raised when something isn't aligned.
-    """
-
-
 class NonStandardBehaviourWarning(UserWarning):
     """
     Category for when a specific backend deviates from

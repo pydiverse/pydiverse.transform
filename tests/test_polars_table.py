@@ -6,13 +6,11 @@ import polars as pl
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.errors import AlignmentError
 from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.pipeable import verb
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.pipe.verbs import *
 from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.alignment import aligned, eval_aligned
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(
@@ -550,70 +548,6 @@ class TestPolarsLazyImpl:
                 ).alias("w"),
             ),
         )
-
-
-class TestPolarsAligned:
-    def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):
-        # No exception with correct length
-        eval_aligned(tbl_left.a + tbl_left.a)
-        eval_aligned(tbl_left.a + tbl_right.b)
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl1.col1 + tbl3.col1)
-
-        # Test aggregate functions still work
-        eval_aligned(tbl1.col1 + tbl3.col1.mean())
-
-        # Test that `with_` argument gets enforced
-        eval_aligned(tbl1.col1 + tbl1.col1, with_=tbl1)
-        eval_aligned(tbl_left.a * 2, with_=tbl_left)
-        eval_aligned(tbl_left.a * 2, with_=tbl_right)  # Same length
-        eval_aligned(
-            tbl1.col1.mean(), with_=tbl_left
-        )  # Aggregate is aligned with everything
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl3.col1 * 2, with_=tbl1)
-
-    def test_aligned_decorator(self, tbl1, tbl3, tbl_left, tbl_right):
-        @aligned(with_="a")
-        def f(a, b):
-            return a + b
-
-        f(tbl3.col1, tbl3.col2)
-        f(tbl_left.a, tbl_right.b)
-
-        with pytest.raises(AlignmentError):
-            f(tbl1.col1, tbl3.col1)
-
-        # Bad Alignment of return type
-        @aligned(with_="a")
-        def f(a, b):
-            return a.mean() + b
-
-        with pytest.raises(AlignmentError):
-            f(tbl1.col1, tbl3.col1)
-
-        # Invalid with_ argument
-        with pytest.raises(ValueError):
-            aligned(with_="x")(lambda a: 0)
-
-    def test_col_addition(self, tbl_left, tbl_right):
-        @aligned(with_="a")
-        def f(a, b):
-            return a + b
-
-        assert_equal(
-            tbl_left >> mutate(x=f(tbl_left.a, tbl_right.b)) >> select(C.x),
-            pl.DataFrame({"x": (df_left.get_column("a") + df_right.get_column("b"))}),
-        )
-
-        with pytest.raises(AlignmentError):
-            f(tbl_left.a, (tbl_right >> filter(C.b == 2)).b)
-
-        with pytest.raises(AlignmentError):
-            x = f(tbl_left.a, tbl_right.b)
-            tbl_left >> filter(C.a <= 3) >> mutate(x=x)
 
 
 class TestPrintAndRepr:
