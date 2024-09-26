@@ -44,7 +44,7 @@ def test_mutate(df3, df4):
         lambda t, u: t
         >> group_by(t.col1, t.col2)
         >> mutate(col1=t.col1 * t.col2)
-        >> arrange(-t.col3.nulls_last())
+        >> arrange(t.col3.descending().nulls_last())
         >> ungroup()
         >> left_join(u, t.col2 == u.col2)
         >> mutate(

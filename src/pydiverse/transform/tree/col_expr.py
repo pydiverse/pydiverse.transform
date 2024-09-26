@@ -444,29 +444,36 @@ class Order:
     descending: bool = False
     nulls_last: bool | None = None
 
-    # the given `expr` may contain nulls_last markers or `-` (descending markers). the
+    # The given `expr` may contain nulls_last markers or descending markers. The
     # order_by of the Order does not contain these special functions and can thus be
     # translated normally.
     @staticmethod
     def from_col_expr(expr: ColExpr) -> Order:
-        descending = False
+        descending = None
         nulls_last = None
         while isinstance(expr, ColFn):
-            if expr.name == "__neg__":
-                descending = not descending
-            elif nulls_last is None:
+            if descending is None:
+                if expr.name == "descending":
+                    descending = True
+                elif expr.name == "ascending":
+                    descending = False
+
+            if nulls_last is None:
                 if expr.name == "nulls_last":
                     nulls_last = True
                 elif expr.name == "nulls_first":
                     nulls_last = False
-            if expr.name in ("__neg__", "__pos__", "nulls_last", "nulls_first"):
+
+            if expr.name in ("descending", "ascending", "nulls_last", "nulls_first"):
                 assert len(expr.args) == 1
                 assert len(expr.context_kwargs) == 0
                 expr = expr.args[0]
             else:
                 break
-        if nulls_last is None:
-            nulls_last = False
+
+        if descending is None:
+            descending = False
+
         return Order(expr, descending, nulls_last)
 
     def iter_subtree(self) -> Iterable[ColExpr]:

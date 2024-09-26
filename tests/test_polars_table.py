@@ -265,8 +265,8 @@ class TestPolarsLazyImpl:
             tbl4
             >> arrange(
                 tbl4.col1.nulls_first(),
-                -tbl4.col2.nulls_first(),
-                -tbl4.col5.nulls_first(),
+                tbl4.col2.nulls_first().descending(),
+                tbl4.col5.nulls_first().descending(),
             ),
             df4.sort(
                 ["col1", "col2", "col5"],
@@ -279,8 +279,8 @@ class TestPolarsLazyImpl:
             tbl4
             >> arrange(
                 tbl4.col1.nulls_last(),
-                -tbl4.col2.nulls_last(),
-                -tbl4.col5.nulls_last(),
+                tbl4.col2.descending().nulls_last(),
+                tbl4.col5.descending().nulls_last(),
             ),
             df4.sort(
                 ["col1", "col2", "col5"],

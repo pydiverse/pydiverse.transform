@@ -21,7 +21,12 @@ def test_count(df4):
 def test_row_number(df4):
     assert_result_equal(
         df4,
-        lambda t: t >> mutate(row_number=pdt.row_number(arrange=[-C.col1, C.col5])),
+        lambda t: t
+        >> mutate(
+            row_number=pdt.row_number(
+                arrange=[C.col1.descending().nulls_first(), C.col5.nulls_last()]
+            )
+        ),
     )
 
 

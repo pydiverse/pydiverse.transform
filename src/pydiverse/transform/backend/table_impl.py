@@ -74,14 +74,28 @@ with TableImpl.op(ops.NullsFirst()) as op:
 
     @op.auto
     def _nulls_first(_):
-        raise RuntimeError("This is just a marker that never should get called")
+        raise AssertionError
 
 
 with TableImpl.op(ops.NullsLast()) as op:
 
     @op.auto
     def _nulls_last(_):
-        raise RuntimeError("This is just a marker that never should get called")
+        raise AssertionError
+
+
+with TableImpl.op(ops.Ascending()) as op:
+
+    @op.auto
+    def _ascending(_):
+        raise AssertionError
+
+
+with TableImpl.op(ops.Descending()) as op:
+
+    @op.auto
+    def _descending(_):
+        raise AssertionError
 
 
 with TableImpl.op(ops.Add()) as op:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform.errors import DataTypeError, FunctionTypeError
+from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.pipe.verbs import (
     group_by,
     mutate,
@@ -53,11 +53,17 @@ def test_mutate_case_window(df4):
         df4,
         lambda t: t
         >> mutate(
-            u=C.col1.shift(1, 1729, arrange=[-t.col3, t.col4]),
-            x=C.col1.shift(1, 0, arrange=[C.col4]).map(
+            u=C.col1.shift(
+                1, 1729, arrange=[t.col3.descending().nulls_last(), t.col4.nulls_last()]
+            ),
+            x=C.col1.shift(1, 0, arrange=[C.col4.nulls_first()]).map(
                 {
-                    1: C.col2.shift(1, -1, arrange=[C.col2, C.col4]),
-                    2: C.col3.shift(2, -2, arrange=[C.col3, C.col4]),
+                    1: C.col2.shift(
+                        1, -1, arrange=[C.col2.nulls_last(), C.col4.nulls_first()]
+                    ),
+                    2: C.col3.shift(
+                        2, -2, arrange=[C.col3.nulls_last(), C.col4.nulls_last()]
+                    ),
                 }
             ),
         ),
@@ -68,14 +74,14 @@ def test_mutate_case_window(df4):
         df4,
         lambda t: t
         >> mutate(
-            x=C.col1.shift(1, 0, arrange=[C.col4])
+            x=C.col1.shift(1, 0, arrange=[C.col4.nulls_last()])
             .map(
                 {
                     1: 2,
                     2: 3,
                 }
             )
-            .shift(1, -1, arrange=[-C.col4])
+            .shift(1, -1, arrange=[C.col4.descending().nulls_first()])
         ),
         may_throw=True,
     )
@@ -117,7 +123,7 @@ def test_invalid_value_dtype(df4):
                 }
             )
         ),
-        exception=DataTypeError,
+        exception=TypeError,
     )
 
 
