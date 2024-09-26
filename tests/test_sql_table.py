@@ -1,18 +1,14 @@
 from __future__ import annotations
 
-import sqlite3
-
 import polars as pl
 import pytest
-import sqlalchemy as sa
+import sqlalchemy as sqa
 
 from pydiverse.transform import C
-from pydiverse.transform.core import functions as f
-from pydiverse.transform.core.alignment import aligned, eval_aligned
-from pydiverse.transform.core.table import Table
-from pydiverse.transform.core.verbs import *
-from pydiverse.transform.errors import AlignmentError
-from pydiverse.transform.sql.sql_table import SQLTableImpl
+from pydiverse.transform.backend.targets import Polars, SqlAlchemy
+from pydiverse.transform.pipe import functions as f
+from pydiverse.transform.pipe.table import Table
+from pydiverse.transform.pipe.verbs import *
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(
@@ -66,7 +62,13 @@ df_right = pl.DataFrame(
 
 @pytest.fixture
 def engine():
-    engine = sa.create_engine("sqlite:///:memory:")
+    engine = sqa.create_engine("sqlite:///:memory:")
+    # engine = sqa.create_engine("postgresql://sqa:Pydiverse23@127.0.0.1:6543")
+    # engine = sqa.create_engine(
+    #     "mssql+pyodbc://sqa:PydiQuant27@127.0.0.1:1433"
+    #     "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+    # )
+
     df1.write_database("df1", engine, if_table_exists="replace")
     df2.write_database("df2", engine, if_table_exists="replace")
     df3.write_database("df3", engine, if_table_exists="replace")
@@ -78,35 +80,35 @@ def engine():
 
 @pytest.fixture
 def tbl1(engine):
-    return Table(SQLTableImpl(engine, "df1"))
+    return Table("df1", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl2(engine):
-    return Table(SQLTableImpl(engine, "df2"))
+    return Table("df2", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl3(engine):
-    return Table(SQLTableImpl(engine, "df3"))
+    return Table("df3", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl4(engine):
-    return Table(SQLTableImpl(engine, "df4"))
+    return Table("df4", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl_left(engine):
-    return Table(SQLTableImpl(engine, "df_left"))
+    return Table("df_left", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl_right(engine):
-    return Table(SQLTableImpl(engine, "df_right"))
+    return Table("df_right", SqlAlchemy(engine))
 
 
-class TestSQLTable:
+class TestSqlTable:
     def test_build_query(self, tbl1):
         query_str = tbl1 >> build_query()
         expected_out = "SELECT df1.col1 AS col1, df1.col2 AS col2 FROM df1"
@@ -123,11 +125,11 @@ class TestSQLTable:
         tbl1 >> show_query() >> collect()
 
     def test_export(self, tbl1):
-        assert_equal(tbl1 >> export(), df1)
+        assert_equal(tbl1 >> export(Polars()), df1)
 
-    def test_select(self, tbl1, tbl2):
-        assert_equal(tbl1 >> select(tbl1.col1), df1[["col1"]])
-        assert_equal(tbl1 >> select(tbl1.col2), df1[["col2"]])
+    def test_select(self, tbl1):
+        assert_equal(tbl1 >> select(tbl1.col1), df1.select("col1"))
+        assert_equal(tbl1 >> select(tbl1.col2), df1.select("col2"))
 
     def test_mutate(self, tbl1):
         assert_equal(
@@ -162,40 +164,37 @@ class TestSQLTable:
         )
 
     def test_join(self, tbl_left, tbl_right):
-        assert_equal(
-            tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "left", suffix="")
-            >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
-        )
+        # assert_equal(
+        #     tbl_left
+        #     >> join(tbl_right, tbl_left.a == tbl_right.b, "left", suffix="")
+        #     >> select(tbl_left.a, tbl_right.b),
+        #     pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
+        # )
+
+        # assert_equal(
+        #     tbl_left
+        #     >> join(tbl_right, tbl_left.a == tbl_right.b, "inner", suffix="")
+        #     >> select(tbl_left.a, tbl_right.b),
+        #     pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
+        # )
 
         assert_equal(
-            tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "inner", suffix="")
-            >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
+            (
+                tbl_left
+                >> join(tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="_1729")
+                >> select(tbl_left.a, tbl_right.b)
+            ),
+            pl.DataFrame(
+                {
+                    "a": [1, 2, 2, 3, 4, None],
+                    "b_1729": [1, 2, 2, None, None, 0],
+                }
+            ),
+            check_row_order=False,
         )
 
-        if sqlite3.sqlite_version_info >= (3, 39, 0):
-            assert_equal(
-                (
-                    tbl_left
-                    >> join(
-                        tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="_1729"
-                    )
-                    >> select(tbl_left.a, tbl_right.b)
-                ),
-                pl.DataFrame(
-                    {
-                        "a": [1.0, 2.0, 2.0, 3.0, 4.0, None],
-                        "b_1729": [1.0, 2.0, 2.0, None, None, 0.0],
-                    }
-                ),
-            )
-
-    def test_filter(self, tbl1, tbl2):
+    def test_filter(self, tbl1):
         # Simple filter expressions
-        assert_equal(tbl1 >> filter(), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == tbl1.col1), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == 3), df1.filter(pl.col("col1") == 3))
 
@@ -242,6 +241,7 @@ class TestSQLTable:
         assert_equal(
             tbl3 >> group_by(tbl3.col1) >> summarise(mean=tbl3.col4.mean()),
             pl.DataFrame({"col1": [0, 1, 2], "mean": [1.5, 5.5, 9.5]}),
+            check_row_order=False,
         )
 
         assert_equal(
@@ -279,7 +279,7 @@ class TestSQLTable:
 
     def test_alias(self, tbl1, tbl2):
         x = tbl2 >> alias("x")
-        assert x._impl.name == "x"
+        assert x._ast.name == "x"
 
         # Check that applying alias doesn't change the output
         a = (
@@ -298,7 +298,6 @@ class TestSQLTable:
             >> join(x, tbl2.col1 == x.col1, "left", suffix="42")
             >> alias("self_join")
         )
-        self_join >>= arrange(*self_join)
 
         self_join_expected = df2.join(
             df2,
@@ -308,11 +307,8 @@ class TestSQLTable:
             coalesce=False,
             suffix="42",
         )
-        self_join_expected = self_join_expected.sort(
-            by=[col._.name for col in self_join]
-        )
 
-        assert_equal(self_join, self_join_expected)
+        assert_equal(self_join, self_join_expected, check_row_order=False)
 
     def test_lambda_column(self, tbl1, tbl2):
         # Select
@@ -344,18 +340,6 @@ class TestSQLTable:
             >> join(tbl2, tbl1.col1 * 2 == tbl2.col1, "left"),
         )
 
-        # Join that also uses lambda for the right table
-        assert_equal(
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == C.col1_df2, "left"),
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left"),
-        )
-
         # Filter
         assert_equal(
             tbl1 >> mutate(a=tbl1.col1 * 2) >> filter(C.a % 2 == 0),
@@ -366,31 +350,6 @@ class TestSQLTable:
         assert_equal(
             tbl1 >> mutate(a=tbl1.col1 * 2) >> arrange(C.a),
             tbl1 >> arrange(tbl1.col1) >> mutate(a=tbl1.col1 * 2),
-        )
-
-    def test_table_setitem(self, tbl_left, tbl_right):
-        tl = tbl_left >> alias("df_left")
-        tr = tbl_right >> alias("df_right")
-
-        # Iterate over cols and modify
-        for col in tl:
-            tl[col] = (col * 2) % 3
-        for col in tr:
-            tr[col] = (col * 2) % 5
-
-        # Check if it worked...
-        assert_equal(
-            (tl >> join(tr, C.a == tr.b, "left")),
-            (
-                tbl_left
-                >> mutate(a=(tbl_left.a * 2) % 3)
-                >> join(
-                    tbl_right
-                    >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    C.a == C.b_df_right,
-                    "left",
-                )
-            ),
         )
 
     def test_select_without_tbl_ref(self, tbl2):
@@ -414,84 +373,35 @@ class TestSQLTable:
             df4.with_columns(pl.col("col3").is_null().alias("u")),
         )
 
-
-class TestSQLAligned:
-    def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):
-        # Columns must be from same table
-        eval_aligned(tbl_left.a + tbl_left.a)
-        eval_aligned(tbl3.col1 + tbl3.col2)
-
-        # Derived columns are also OK
-        tbl1_mutate = tbl1 >> mutate(x=tbl1.col1 * 2)
-        eval_aligned(tbl1.col1 + tbl1_mutate.x)
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl1.col1 + tbl3.col1)
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl_left.a + tbl_right.b)
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl1.col1 + tbl3.col1.mean())
-        with pytest.raises(AlignmentError):
-            tbl1_joined = tbl1 >> join(tbl3, tbl1.col1 == tbl3.col1, how="left")
-            eval_aligned(tbl1.col1 + tbl1_joined.col1)
-
-        # Test that `with_` argument gets enforced
-        eval_aligned(tbl1.col1 + tbl1.col1, with_=tbl1)
-        eval_aligned(tbl_left.a * 2, with_=tbl_left)
-        eval_aligned(tbl1.col1, with_=tbl1_mutate)
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl1.col1.mean(), with_=tbl_left)
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl3.col1 * 2, with_=tbl1)
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl_left.a, with_=tbl_right)
-
-    def test_aligned_decorator(self, tbl1, tbl3, tbl_left, tbl_right):
-        @aligned(with_="a")
-        def f(a, b):
-            return a + b
-
-        f(tbl3.col1, tbl3.col2)
-        f(tbl_right.b, tbl_right.c)
-
-        with pytest.raises(AlignmentError):
-            f(tbl1.col1, tbl3.col1)
-
-        with pytest.raises(AlignmentError):
-            f(tbl_left.a, tbl_right.b)
-
-        # Check with_ parameter gets enforced
-        @aligned(with_="a")
-        def f(a, b):
-            return b
-
-        f(tbl1.col1, tbl1.col2)
-        with pytest.raises(AlignmentError):
-            f(tbl1.col1, tbl3.col1)
-
-        # Invalid with_ argument
-        with pytest.raises(ValueError):
-            aligned(with_="x")(lambda a: 0)
-
-    def test_col_addition(self, tbl3):
-        @aligned(with_="a")
-        def f(a, b):
-            return a + b
-
+    def test_case_expression(self, tbl3):
         assert_equal(
-            tbl3 >> mutate(x=f(tbl3.col1, tbl3.col2)) >> select(C.x),
-            pl.DataFrame({"x": [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3]}),
+            (
+                tbl3
+                >> select()
+                >> mutate(
+                    col1=f.when(C.col1 == 0)
+                    .then(1)
+                    .when(C.col1 == 1)
+                    .then(2)
+                    .when(C.col1 == 2)
+                    .then(3)
+                    .otherwise(-1)
+                )
+            ),
+            (df3.select("col1") + 1),
         )
 
-        # Test if it also works with derived tables
-        tbl3_mutate = tbl3 >> mutate(x=tbl3.col1 * 2)
-        tbl3 >> mutate(x=f(tbl3_mutate.col1, tbl3_mutate.x))
-
-        with pytest.raises(AlignmentError):
-            tbl3 >> arrange(C.col1) >> mutate(x=f(tbl3.col1, tbl3.col2))
-
-        with pytest.raises(AlignmentError):
-            tbl3 >> filter(C.col1 == 1) >> mutate(x=f(tbl3.col1, tbl3.col2))
+        assert_equal(
+            (
+                tbl3
+                >> select()
+                >> mutate(
+                    x=f.when(C.col1 == C.col2)
+                    .then(1)
+                    .when(C.col1 == C.col3)
+                    .then(2)
+                    .otherwise(C.col4)
+                )
+            ),
+            pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
+        )

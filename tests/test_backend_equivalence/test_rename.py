@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe.verbs import (
     rename,
 )
 from tests.util import assert_result_equal
 
 
 def test_noop(df3):
-    assert_result_equal(df3, lambda t: t >> rename({}))
+    assert_result_equal(
+        df3, lambda t: t >> rename({}), may_throw=True, exception=TypeError
+    )
     assert_result_equal(df3, lambda t: t >> rename({"col1": "col1"}))
 
 

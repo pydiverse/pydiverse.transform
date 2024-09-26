@@ -5,10 +5,10 @@ from collections import ChainMap
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pydiverse.transform.core.registry import OperatorSignature
+    from pydiverse.transform.tree.registry import OperatorSignature
 
 __all__ = [
-    "OPType",
+    "Ftype",
     "Operator",
     "OperatorExtension",
     "Arity",
@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 
-class OPType(enum.IntEnum):
+class Ftype(enum.IntEnum):
     EWISE = 1
     AGGREGATE = 2
     WINDOW = 3
@@ -55,7 +55,7 @@ class Operator:
     """
 
     name: str = NotImplemented
-    ftype: OPType = NotImplemented
+    ftype: Ftype = NotImplemented
     signatures: list[str] = None
     context_kwargs: set[str] = None
 
@@ -134,21 +134,21 @@ class Binary(Arity):
 
 
 class ElementWise(Operator):
-    ftype = OPType.EWISE
+    ftype = Ftype.EWISE
 
 
 class Aggregate(Operator):
-    ftype = OPType.AGGREGATE
+    ftype = Ftype.AGGREGATE
     context_kwargs = {
-        "partition_by",  # list[Column, LambdaColumn]
+        "partition_by",  # list[Col]
         "filter",  # SymbolicExpression (NOT a list)
     }
 
 
 class Window(Operator):
-    ftype = OPType.WINDOW
+    ftype = Ftype.WINDOW
     context_kwargs = {
-        "arrange",  # list[Column | LambdaColumn]
+        "arrange",  # list[Col]
         "partition_by",
     }
 

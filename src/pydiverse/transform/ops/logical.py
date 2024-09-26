@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform.core import dtypes
 from pydiverse.transform.ops.core import Binary, ElementWise, Operator, Unary
+from pydiverse.transform.tree import dtypes
 
 __all__ = [
     "Equal",
@@ -95,7 +95,7 @@ class IsIn(ElementWise, Logical):
     name = "isin"
     signatures = [
         # TODO: A signature like "T, const list[const T] -> bool" would be better
-        "T, const T... -> bool",
+        "T, T... -> bool",
     ]
 
 

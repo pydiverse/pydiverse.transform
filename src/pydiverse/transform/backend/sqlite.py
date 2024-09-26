@@ -1,27 +1,27 @@
 from __future__ import annotations
 
-import sqlalchemy as sa
+import sqlalchemy as sqa
 
 from pydiverse.transform import ops
-from pydiverse.transform.sql.sql_table import SQLTableImpl
+from pydiverse.transform.backend.sql import SqlImpl
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
-class SQLiteTableImpl(SQLTableImpl):
-    _dialect_name = "sqlite"
+class SqliteImpl(SqlImpl):
+    dialect_name = "sqlite"
 
 
-with SQLiteTableImpl.op(ops.Round()) as op:
+with SqliteImpl.op(ops.Round()) as op:
 
     @op.auto
     def _round(x, decimals=0):
         if decimals >= 0:
-            return sa.func.ROUND(x, decimals, type_=x.type)
+            return sqa.func.ROUND(x, decimals, type_=x.type)
         # For some reason SQLite doesn't like negative decimals values
-        return sa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
+        return sqa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
 
 
-with SQLiteTableImpl.op(ops.StrStartsWith()) as op:
+with SqliteImpl.op(ops.StrStartsWith()) as op:
 
     @op.auto
     def _startswith(x, y):
@@ -33,7 +33,7 @@ with SQLiteTableImpl.op(ops.StrStartsWith()) as op:
         return x.startswith(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.StrEndsWith()) as op:
+with SqliteImpl.op(ops.StrEndsWith()) as op:
 
     @op.auto
     def _endswith(x, y):
@@ -45,7 +45,7 @@ with SQLiteTableImpl.op(ops.StrEndsWith()) as op:
         return x.endswith(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.StrContains()) as op:
+with SqliteImpl.op(ops.StrContains()) as op:
 
     @op.auto
     def _contains(x, y):
@@ -57,19 +57,19 @@ with SQLiteTableImpl.op(ops.StrContains()) as op:
         return x.contains(y, autoescape=True)
 
 
-with SQLiteTableImpl.op(ops.DtMillisecond()) as op:
+with SqliteImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _millisecond(x):
         warn_non_standard(
             "SQLite returns rounded milliseconds",
         )
-        _1000 = sa.literal_column("1000")
-        frac_seconds = sa.cast(sa.func.STRFTIME("%f", x), sa.Numeric())
-        return sa.cast((frac_seconds * _1000) % _1000, sa.Integer())
+        _1000 = sqa.literal_column("1000")
+        frac_seconds = sqa.cast(sqa.func.STRFTIME("%f", x), sqa.Numeric())
+        return sqa.cast((frac_seconds * _1000) % _1000, sqa.Integer())
 
 
-with SQLiteTableImpl.op(ops.Greatest()) as op:
+with SqliteImpl.op(ops.Greatest()) as op:
 
     @op.auto
     def _greatest(*x):
@@ -83,10 +83,10 @@ with SQLiteTableImpl.op(ops.Greatest()) as op:
         right = _greatest(*x[mid:])
 
         # TODO: Determine return type
-        return sa.func.coalesce(sa.func.MAX(left, right), left, right)
+        return sqa.func.coalesce(sqa.func.MAX(left, right), left, right)
 
 
-with SQLiteTableImpl.op(ops.Least()) as op:
+with SqliteImpl.op(ops.Least()) as op:
 
     @op.auto
     def _least(*x):
@@ -100,4 +100,4 @@ with SQLiteTableImpl.op(ops.Least()) as op:
         right = _least(*x[mid:])
 
         # TODO: Determine return type
-        return sa.func.coalesce(sa.func.MIN(left, right), left, right)
+        return sqa.func.coalesce(sqa.func.MIN(left, right), left, right)

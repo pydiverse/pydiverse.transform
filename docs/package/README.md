@@ -23,7 +23,7 @@ from pydiverse.transform.lazy import SQLTableImpl
 from pydiverse.transform.eager import PandasTableImpl
 from pydiverse.transform.core.verbs import *
 import pandas as pd
-import sqlalchemy as sa
+import sqlalchemy as sqa
 
 
 def main():
@@ -52,7 +52,7 @@ def main():
     print("\nPandas based result:")
     print(out1)
 
-    engine = sa.create_engine("sqlite:///:memory:")
+    engine = sqa.create_engine("sqlite:///:memory:")
     dfA.to_sql("dfA", engine, index=False, if_exists="replace")
     dfB.to_sql("dfB", engine, index=False, if_exists="replace")
     input1 = Table(SQLTableImpl(engine, "dfA"))

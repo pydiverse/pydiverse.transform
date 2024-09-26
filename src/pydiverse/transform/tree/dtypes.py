@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import datetime
 from abc import ABC, abstractmethod
+from types import NoneType
 
 from pydiverse.transform._typing import T
-from pydiverse.transform.errors import ExpressionTypeError
+from pydiverse.transform.errors import DataTypeError
 
 
-class DType(ABC):
+class Dtype(ABC):
     def __init__(self, *, const: bool = False, vararg: bool = False):
         self.const = const
         self.vararg = vararg
@@ -44,7 +46,7 @@ class DType(ABC):
         """Returns a copy of `self` with all modifiers removed"""
         return type(self)()
 
-    def same_kind(self, other: DType) -> bool:
+    def same_kind(self, other: Dtype) -> bool:
         """Check if `other` is of the same type as self.
 
         More specifically, `other` must be a stricter subtype of `self`.
@@ -62,14 +64,14 @@ class DType(ABC):
 
         return True
 
-    def can_promote_to(self, other: DType) -> bool:
+    def can_promote_to(self, other: Dtype) -> bool:
         return other.same_kind(self)
 
 
-class Int(DType):
+class Int(Dtype):
     name = "int"
 
-    def can_promote_to(self, other: DType) -> bool:
+    def can_promote_to(self, other: Dtype) -> bool:
         if super().can_promote_to(other):
             return True
 
@@ -83,31 +85,31 @@ class Int(DType):
         return False
 
 
-class Float(DType):
+class Float(Dtype):
     name = "float"
 
 
-class String(DType):
+class String(Dtype):
     name = "str"
 
 
-class Bool(DType):
+class Bool(Dtype):
     name = "bool"
 
 
-class DateTime(DType):
+class DateTime(Dtype):
     name = "datetime"
 
 
-class Date(DType):
+class Date(Dtype):
     name = "date"
 
 
-class Duration(DType):
+class Duration(Dtype):
     name = "duration"
 
 
-class Template(DType):
+class Template(Dtype):
     name = None
 
     def __init__(self, name, **kwargs):
@@ -117,13 +119,13 @@ class Template(DType):
     def without_modifiers(self: T) -> T:
         return type(self)(self.name)
 
-    def same_kind(self, other: DType) -> bool:
+    def same_kind(self, other: Dtype) -> bool:
         if not super().same_kind(other):
             return False
 
         return self.name == other.name
 
-    def modifiers_compatible(self, other: DType) -> bool:
+    def modifiers_compatible(self, other: Dtype) -> bool:
         """
         Check if another dtype object is compatible with the modifiers of the template.
         """
@@ -132,13 +134,34 @@ class Template(DType):
         return True
 
 
-class NoneDType(DType):
+class NoneDtype(Dtype):
     """DType used to represent the `None` value."""
 
     name = "none"
 
 
-def dtype_from_string(t: str) -> DType:
+def python_type_to_pdt(t: type) -> Dtype:
+    if t is int:
+        return Int()
+    elif t is float:
+        return Float()
+    elif t is bool:
+        return Bool()
+    elif t is str:
+        return String()
+    elif t is datetime.datetime:
+        return DateTime()
+    elif t is datetime.date:
+        return Date()
+    elif t is datetime.timedelta:
+        return Duration()
+    elif t is NoneType:
+        return NoneDtype()
+
+    raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
+
+
+def dtype_from_string(t: str) -> Dtype:
     parts = [part for part in t.split(" ") if part]
 
     is_const = False
@@ -182,20 +205,20 @@ def dtype_from_string(t: str) -> DType:
     if base_type == "duration":
         return Duration(const=is_const, vararg=is_vararg)
     if base_type == "none":
-        return NoneDType(const=is_const, vararg=is_vararg)
+        return NoneDtype(const=is_const, vararg=is_vararg)
 
     raise ValueError(f"Unknown type '{base_type}'")
 
 
-def promote_dtypes(dtypes: list[DType]) -> DType:
+def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
     if len(dtypes) == 0:
-        raise ValueError("Expected non empty list of dtypes")
+        raise ValueError("expected non empty list of dtypes")
 
     promoted = dtypes[0]
     for dtype in dtypes[1:]:
-        if isinstance(dtype, NoneDType):
+        if isinstance(dtype, NoneDtype):
             continue
-        if isinstance(promoted, NoneDType):
+        if isinstance(promoted, NoneDtype):
             promoted = dtype
             continue
 
@@ -205,6 +228,6 @@ def promote_dtypes(dtypes: list[DType]) -> DType:
             promoted = dtype
             continue
 
-        raise ExpressionTypeError(f"Incompatible types {dtype} and {promoted}.")
+        raise DataTypeError(f"incompatible types {dtype} and {promoted}")
 
     return promoted

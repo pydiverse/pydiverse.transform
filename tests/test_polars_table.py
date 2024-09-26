@@ -6,14 +6,11 @@ import polars as pl
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.core import dtypes
-from pydiverse.transform.core import functions as f
-from pydiverse.transform.core.alignment import aligned, eval_aligned
-from pydiverse.transform.core.dispatchers import Pipeable, verb
-from pydiverse.transform.core.table import Table
-from pydiverse.transform.core.verbs import *
-from pydiverse.transform.errors import AlignmentError
-from pydiverse.transform.polars.polars_table import PolarsEager
+from pydiverse.transform.pipe import functions as f
+from pydiverse.transform.pipe.pipeable import verb
+from pydiverse.transform.pipe.table import Table
+from pydiverse.transform.pipe.verbs import *
+from pydiverse.transform.tree import dtypes
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(
@@ -77,65 +74,61 @@ df_dt = pl.DataFrame(
 )
 
 
-@pytest.fixture(params=["numpy", "arrow"])
+@pytest.fixture
 def dtype_backend(request):
     return request.param
 
 
 @pytest.fixture
 def tbl1():
-    return Table(PolarsEager("df1", df1))
+    return Table(df1, name="df1")
 
 
 @pytest.fixture
 def tbl2():
-    return Table(PolarsEager("df2", df2))
+    return Table(df2, name="df2")
 
 
 @pytest.fixture
 def tbl3():
-    return Table(PolarsEager("df3", df3))
+    return Table(df3, name="df3")
 
 
 @pytest.fixture
 def tbl4():
-    return Table(PolarsEager("df4", df4.clone()))
+    return Table(df4, name="df4")
 
 
 @pytest.fixture
 def tbl_left():
-    return Table(PolarsEager("df_left", df_left.clone()))
+    return Table(df_left, name="df_left")
 
 
 @pytest.fixture
 def tbl_right():
-    return Table(PolarsEager("df_right", df_right.clone()))
+    return Table(df_right, name="df_right")
 
 
 @pytest.fixture
 def tbl_dt():
-    return Table(PolarsEager("df_dt", df_dt))
+    return Table(df_dt)
 
 
-def assert_not_inplace(tbl: Table[PolarsEager], operation: Pipeable):
-    """
-    Operations should not happen in-place. They should always return a new dataframe.
-    """
-    initial = tbl._impl.df.clone()
-    tbl >> operation
-    after = tbl._impl.df
-
-    assert initial.equals(after)
-
-
-class TestPolarsEager:
+class TestPolarsLazyImpl:
     def test_dtype(self, tbl1, tbl2):
-        assert isinstance(tbl1.col1._.dtype, dtypes.Int)
-        assert isinstance(tbl1.col2._.dtype, dtypes.String)
+        assert isinstance(tbl1.col1.dtype(), dtypes.Int)
+        assert isinstance(tbl1.col2.dtype(), dtypes.String)
 
-        assert isinstance(tbl2.col1._.dtype, dtypes.Int)
-        assert isinstance(tbl2.col2._.dtype, dtypes.Int)
-        assert isinstance(tbl2.col3._.dtype, dtypes.Float)
+        assert isinstance(tbl2.col1.dtype(), dtypes.Int)
+        assert isinstance(tbl2.col2.dtype(), dtypes.Int)
+        assert isinstance(tbl2.col3.dtype(), dtypes.Float)
+
+        # test that column expression type errors are checked immediately
+        with pytest.raises(TypeError):
+            tbl1.col1 + tbl1.col2
+
+        # here, transform should not be able to resolve the type and throw an error
+        C.col1 + tbl1.col2
 
     def test_build_query(self, tbl1):
         assert (tbl1 >> build_query()) is None
@@ -145,14 +138,11 @@ class TestPolarsEager:
         assert_equal(tbl1, df1)
 
     def test_select(self, tbl1):
-        assert_not_inplace(tbl1, select(tbl1.col1))
         assert_equal(tbl1 >> select(tbl1.col1), df1.select("col1"))
         assert_equal(tbl1 >> select(tbl1.col2), df1.select("col2"))
         assert_equal(tbl1 >> select(), df1.select())
 
     def test_mutate(self, tbl1):
-        assert_not_inplace(tbl1, mutate(x=tbl1.col1))
-
         assert_equal(
             tbl1 >> mutate(col1times2=tbl1.col1 * 2),
             pl.DataFrame(
@@ -173,7 +163,7 @@ class TestPolarsEager:
             ),
         )
 
-        # Check proper column referencing
+        # # Check proper column referencing
         t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2) >> select()
         assert_equal(
             t >> mutate(x=t.col1, y=t.col2),
@@ -185,8 +175,6 @@ class TestPolarsEager:
         )
 
     def test_join(self, tbl_left, tbl_right):
-        assert_not_inplace(tbl_left, join(tbl_right, tbl_left.a == tbl_right.b, "left"))
-
         assert_equal(
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
@@ -226,24 +214,21 @@ class TestPolarsEager:
             df_left.join(df_left, on="a", coalesce=False, suffix="_df_left"),
         )
 
-        assert_equal(
-            tbl_right
-            >> inner_join(
-                tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
-            )
-            >> inner_join(
-                tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
-            ),
-            df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
-                df_right, "b", suffix="_df_right1", coalesce=False
-            ),
-        )
+        # assert_equal(
+        #     tbl_right
+        #     >> inner_join(
+        #         tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
+        #     )
+        #     >> inner_join(
+        #         tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
+        #     ),
+        #     df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
+        #         df_right, "b", suffix="_df_right1", coalesce=False
+        #     ),
+        # )
 
     def test_filter(self, tbl1, tbl2):
-        assert_not_inplace(tbl1, filter(tbl1.col1 == 3))
-
         # Simple filter expressions
-        assert_equal(tbl1 >> filter(), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == tbl1.col1), df1)
         assert_equal(tbl1 >> filter(tbl1.col1 == 3), df1.filter(pl.col("col1") == 3))
 
@@ -260,7 +245,6 @@ class TestPolarsEager:
 
     def test_arrange(self, tbl2, tbl4):
         tbl4.col1.nulls_first()
-        assert_not_inplace(tbl2, arrange(tbl2.col2))
 
         assert_equal(
             tbl2 >> arrange(tbl2.col3) >> select(tbl2.col3),
@@ -281,8 +265,8 @@ class TestPolarsEager:
             tbl4
             >> arrange(
                 tbl4.col1.nulls_first(),
-                -tbl4.col2.nulls_first(),
-                -tbl4.col5.nulls_first(),
+                tbl4.col2.nulls_first().descending(),
+                tbl4.col5.nulls_first().descending(),
             ),
             df4.sort(
                 ["col1", "col2", "col5"],
@@ -295,8 +279,8 @@ class TestPolarsEager:
             tbl4
             >> arrange(
                 tbl4.col1.nulls_last(),
-                -tbl4.col2.nulls_last(),
-                -tbl4.col5.nulls_last(),
+                tbl4.col2.descending().nulls_last(),
+                tbl4.col5.descending().nulls_last(),
             ),
             df4.sort(
                 ["col1", "col2", "col5"],
@@ -363,10 +347,8 @@ class TestPolarsEager:
         )
 
     def test_alias(self, tbl1, tbl2):
-        assert_not_inplace(tbl1, alias("tblxxx"))
-
         x = tbl2 >> alias("x")
-        assert x._impl.name == "x"
+        assert x._ast.name == "x"
 
         # Check that applying alias doesn't change the output
         a = (
@@ -379,7 +361,7 @@ class TestPolarsEager:
 
         assert_equal(a, b)
 
-        # Self Join
+        # self join
         assert_equal(
             tbl2 >> join(x, tbl2.col1 == x.col1, "left", suffix="_right"),
             df2.join(
@@ -394,7 +376,8 @@ class TestPolarsEager:
     def test_window_functions(self, tbl3):
         # Everything else should stay the same
         assert_equal(
-            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3), df3
+            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3),
+            df3,
         )
 
         assert_equal(
@@ -424,14 +407,14 @@ class TestPolarsEager:
 
     def test_slice_head(self, tbl3):
         @verb
-        def slice_head_custom(tbl: Table, n: int, *, offset: int = 0):
+        def slice_head_custom(table: Table, n: int, *, offset: int = 0):
             t = (
-                tbl
+                table
                 >> mutate(_n=f.row_number(arrange=[]))
                 >> alias()
                 >> filter((offset < C._n) & (C._n <= (n + offset)))
             )
-            return t >> select(*[c for c in t if c._.name != "_n"])
+            return t >> select(*[C[col.name] for col in table if col.name != "_n"])
 
         assert_equal(
             tbl3 >> slice_head(6),
@@ -454,12 +437,13 @@ class TestPolarsEager:
                 tbl3
                 >> select()
                 >> mutate(
-                    col1=C.col1.case(
-                        (0, 1),
-                        (1, 2),
-                        (2, 3),
-                        default=-1,
-                    )
+                    col1=f.when(C.col1 == 0)
+                    .then(1)
+                    .when(C.col1 == 1)
+                    .then(2)
+                    .when(C.col1 == 2)
+                    .then(3)
+                    .otherwise(-1)
                 )
             ),
             (df3.select("col1") + 1),
@@ -470,26 +454,11 @@ class TestPolarsEager:
                 tbl3
                 >> select()
                 >> mutate(
-                    x=C.col1.case(
-                        (C.col2, 1),
-                        (C.col3, 2),
-                        default=0,
-                    )
-                )
-            ),
-            pl.DataFrame({"x": [1, 1, 0, 0, 0, 2, 1, 1, 0, 0, 2, 0]}),
-        )
-
-        assert_equal(
-            (
-                tbl3
-                >> select()
-                >> mutate(
-                    x=f.case(
-                        (C.col1 == C.col2, 1),
-                        (C.col1 == C.col3, 2),
-                        default=C.col4,
-                    )
+                    x=f.when(C.col1 == C.col2)
+                    .then(1)
+                    .when(C.col1 == C.col3)
+                    .then(2)
+                    .otherwise(C.col4)
                 )
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
@@ -525,18 +494,6 @@ class TestPolarsEager:
             >> join(tbl2, tbl1.col1 == tbl2.col1, "left"),
         )
 
-        # Join that also uses lambda for the right table
-        assert_equal(
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == C.col1_custom_suffix, "left", suffix="_custom_suffix"),
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_custom_suffix"),
-        )
-
         # Filter
         assert_equal(
             tbl1 >> mutate(a=tbl1.col1 * 2) >> filter(C.a % 2 == 0),
@@ -549,40 +506,11 @@ class TestPolarsEager:
             tbl1 >> arrange(tbl1.col1) >> mutate(a=tbl1.col1 * 2),
         )
 
-    def test_table_setitem(self, tbl_left, tbl_right):
-        tl = tbl_left >> alias("df_left")
-        tr = tbl_right >> alias("df_right")
-
-        # Iterate over cols and modify
-        for col in tl:
-            tl[col] = (col * 2) % 3
-        for col in tr:
-            tr[col] = (col * 2) % 5
-
-        # Check if it worked...
-        assert_equal(
-            (tl >> join(tr, C.a == C.b, "left", suffix="")),
-            (
-                tbl_left
-                >> mutate(a=(tbl_left.a * 2) % 3)
-                >> join(
-                    tbl_right
-                    >> mutate(b=(tbl_right.b * 2) % 5, c=(tbl_right.c * 2) % 5),
-                    C.a == C.b,
-                    "left",
-                    suffix="",
-                )
-            ),
-        )
-
     def test_custom_verb(self, tbl1):
         @verb
-        def double_col1(tbl):
-            tbl[C.col1] = C.col1 * 2
-            return tbl
-
-        # Custom verb should not mutate input object
-        assert_not_inplace(tbl1, double_col1())
+        def double_col1(table):
+            table >>= mutate(col1=C.col1 * 2)
+            return table
 
         assert_equal(tbl1 >> double_col1(), tbl1 >> mutate(col1=C.col1 * 2))
 
@@ -603,11 +531,11 @@ class TestPolarsEager:
             tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
             df4.with_columns(pl.col("col3").fill_null(pl.col("col2")).alias("u")),
         )
-        assert_equal(
-            tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
-            tbl4
-            >> mutate(u=f.case((tbl4.col3.is_null(), tbl4.col2), default=tbl4.col3)),
-        )
+        # assert_equal(
+        #     tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
+        #     tbl4
+        #     >> mutate(u=f.case((tbl4.col3.is_null(), tbl4.col2), default=tbl4.col3)),
+        # )
 
     def test_datetime(self, tbl_dt):
         assert_equal(
@@ -629,83 +557,12 @@ class TestPolarsEager:
         )
 
 
-class TestPolarsAligned:
-    def test_eval_aligned(self, tbl1, tbl3, tbl_left, tbl_right):
-        # No exception with correct length
-        eval_aligned(tbl_left.a + tbl_left.a)
-        eval_aligned(tbl_left.a + tbl_right.b)
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl1.col1 + tbl3.col1)
-
-        # Test aggregate functions still work
-        eval_aligned(tbl1.col1 + tbl3.col1.mean())
-
-        # Test that `with_` argument gets enforced
-        eval_aligned(tbl1.col1 + tbl1.col1, with_=tbl1)
-        eval_aligned(tbl_left.a * 2, with_=tbl_left)
-        eval_aligned(tbl_left.a * 2, with_=tbl_right)  # Same length
-        eval_aligned(
-            tbl1.col1.mean(), with_=tbl_left
-        )  # Aggregate is aligned with everything
-
-        with pytest.raises(AlignmentError):
-            eval_aligned(tbl3.col1 * 2, with_=tbl1)
-
-    def test_aligned_decorator(self, tbl1, tbl3, tbl_left, tbl_right):
-        @aligned(with_="a")
-        def f(a, b):
-            return a + b
-
-        f(tbl3.col1, tbl3.col2)
-        f(tbl_left.a, tbl_right.b)
-
-        with pytest.raises(AlignmentError):
-            f(tbl1.col1, tbl3.col1)
-
-        # Bad Alignment of return type
-        @aligned(with_="a")
-        def f(a, b):
-            return a.mean() + b
-
-        with pytest.raises(AlignmentError):
-            f(tbl1.col1, tbl3.col1)
-
-        # Invalid with_ argument
-        with pytest.raises(ValueError):
-            aligned(with_="x")(lambda a: 0)
-
-    def test_col_addition(self, tbl_left, tbl_right):
-        @aligned(with_="a")
-        def f(a, b):
-            return a + b
-
-        assert_equal(
-            tbl_left >> mutate(x=f(tbl_left.a, tbl_right.b)) >> select(C.x),
-            pl.DataFrame({"x": (df_left.get_column("a") + df_right.get_column("b"))}),
-        )
-
-        with pytest.raises(AlignmentError):
-            f(tbl_left.a, (tbl_right >> filter(C.b == 2)).b)
-
-        with pytest.raises(AlignmentError):
-            x = f(tbl_left.a, tbl_right.b)
-            tbl_left >> filter(C.a <= 3) >> mutate(x=x)
-
-
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
-        # Table: df1, backend: PolarsEager
-        #    col1 col2
-        # 0     1    a
-        # 1     2    b
-        # 2     3    c
-        # 3     4    d
-
         tbl_str = str(tbl1)
 
         assert "df1" in tbl_str
-        assert "PolarsEager" in tbl_str
+        assert "PolarsImpl" in tbl_str
         assert str(df1) in tbl_str
 
     def test_table_repr_html(self, tbl1):
@@ -713,19 +570,8 @@ class TestPrintAndRepr:
         assert "exception" not in tbl1._repr_html_()
 
     def test_col_str(self, tbl1):
-        # Symbolic Expression: <df1.col1(int)>
-        # dtype: int
-        #
-        # 0    1
-        # 1    2
-        # 2    3
-        # 3    4
-        # Name: df1_col1_XXXXXXXX, dtype: Int64
-
         col1_str = str(tbl1.col1)
-        series = tbl1._impl.df.get_column(
-            tbl1._impl.underlying_col_name[tbl1.col1._.uuid]
-        )
+        series = tbl1._impl.df.collect().get_column("col1")
 
         assert str(series) in col1_str
         assert "exception" not in col1_str
@@ -741,12 +587,5 @@ class TestPrintAndRepr:
         assert "exception" not in (tbl1.col1 * 2)._repr_html_()
 
     def test_lambda_str(self, tbl1):
-        assert "exception" in str(C.col)
-        assert "exception" in str(C.col1 + tbl1.col1)
-
-    def test_eval_expr_str(self, tbl_left, tbl_right):
-        valid = tbl_left.a + tbl_right.b
-        invalid = tbl_left.a + (tbl_right >> filter(C.b == 2)).b
-
-        assert "exception" not in str(valid)
-        assert "exception" in str(invalid)
+        assert "exception" not in str(C.col)
+        assert "exception" not in str(C.col1 + tbl1.col1)

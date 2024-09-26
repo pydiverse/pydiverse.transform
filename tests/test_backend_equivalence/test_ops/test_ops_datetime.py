@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from pydiverse.transform import C
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe.verbs import (
     filter,
     mutate,
 )
@@ -65,6 +65,7 @@ def test_year(df_datetime):
         >> mutate(
             x=C.col1.dt.year(),
             y=C.col2.dt.year(),
+            z=t.cdate.dt.year(),
         ),
     )
 
@@ -76,6 +77,7 @@ def test_month(df_datetime):
         >> mutate(
             x=C.col1.dt.month(),
             y=C.col2.dt.month(),
+            z=t.cdate.dt.month(),
         ),
     )
 
@@ -83,11 +85,7 @@ def test_month(df_datetime):
 def test_day(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.day(),
-            y=C.col2.dt.day(),
-        ),
+        lambda t: t >> mutate(x=C.col1.dt.day(), y=C.col2.dt.day(), z=t.cdate.dt.day()),
     )
 
 
@@ -99,6 +97,12 @@ def test_hour(df_datetime):
             x=C.col1.dt.hour(),
             y=C.col2.dt.hour(),
         ),
+    )
+
+    assert_result_equal(
+        df_datetime,
+        lambda t: t >> mutate(z=t.cdate.dt.hour()),
+        exception=ValueError,
     )
 
 
@@ -155,3 +159,11 @@ def test_day_of_year(df_datetime):
             y=C.col2.dt.day_of_year(),
         ),
     )
+
+
+def test_duration_add(df_datetime):
+    assert_result_equal(df_datetime, lambda t: t >> mutate(z=t.cdur + t.cdur))
+
+
+def test_dt_subtract(df_datetime):
+    assert_result_equal(df_datetime, lambda t: t >> mutate(z=t.col1 - t.col2))

@@ -3,18 +3,11 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.core import AbstractTableImpl, Table, dtypes
-from pydiverse.transform.core.dispatchers import (
-    col_to_table,
+from pydiverse.transform.pipe.pipeable import (
     inverse_partial,
-    unwrap_tables,
     verb,
-    wrap_tables,
 )
-from pydiverse.transform.core.expressions import Column, SymbolicExpression
-from pydiverse.transform.core.expressions.translator import TypedValue
-from pydiverse.transform.core.util import bidict, ordered_set, sign_peeler
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe.verbs import (
     arrange,
     collect,
     filter,
@@ -23,16 +16,6 @@ from pydiverse.transform.core.verbs import (
     rename,
     select,
 )
-
-
-@pytest.fixture
-def tbl1():
-    return Table(MockTableImpl("mock1", ["col1", "col2"]))
-
-
-@pytest.fixture
-def tbl2():
-    return Table(MockTableImpl("mock2", ["col1", "col2", "col3"]))
 
 
 class TestTable:
@@ -44,16 +27,11 @@ class TestTable:
             _ = tbl1.colXXX
 
     def test_getitem(self, tbl1):
-        assert tbl1.col1._ == tbl1["col1"]._
-        assert tbl1.col2._ == tbl1["col2"]._
+        assert tbl1.col1 == tbl1["col1"]
+        assert tbl1.col2 == tbl1["col2"]
 
-        assert tbl1.col2._ == tbl1[tbl1.col2]._
-        assert tbl1.col2._ == tbl1[C.col2]._
-
-    def test_setitem(self, tbl1):
-        tbl1["col1"] = 1
-        tbl1[tbl1.col1] = 1
-        tbl1[C.col1] = 1
+        assert tbl1.col2 == tbl1[tbl1.col2]
+        assert tbl1.col2 == tbl1[C.col2]
 
     def test_iter(self, tbl1, tbl2):
         assert len(list(tbl1)) == len(list(tbl1._impl.selected_cols()))
@@ -115,51 +93,6 @@ class TestDispatchers:
 
         assert 5 >> subtract(3) == 2
         assert 5 >> add_10 >> subtract(5) == 10
-
-    def test_col_to_table(self, tbl1):
-        assert col_to_table(15) == 15
-        assert col_to_table(tbl1) == tbl1
-
-        c1_tbl = col_to_table(tbl1.col1._)
-        assert isinstance(c1_tbl, AbstractTableImpl)
-        assert c1_tbl.available_cols == {tbl1.col1._.uuid}
-        assert list(c1_tbl.named_cols.fwd) == ["col1"]
-
-    def test_unwrap_tables(self):
-        impl_1 = MockTableImpl("impl_1", dict())
-        impl_2 = MockTableImpl("impl_2", dict())
-        tbl_1 = Table(impl_1)
-        tbl_2 = Table(impl_2)
-
-        assert unwrap_tables(15) == 15
-        assert unwrap_tables(impl_1) == impl_1
-        assert unwrap_tables(tbl_1) == impl_1
-
-        assert unwrap_tables([tbl_1]) == [impl_1]
-        assert unwrap_tables([[tbl_1], tbl_2]) == [[impl_1], impl_2]
-
-        assert unwrap_tables((tbl_1, tbl_2)) == (impl_1, impl_2)
-        assert unwrap_tables((tbl_1, (tbl_2, 15))) == (impl_1, (impl_2, 15))
-
-        assert unwrap_tables({tbl_1: tbl_1, 15: (15, tbl_2)}) == {
-            tbl_1: impl_1,
-            15: (15, impl_2),
-        }
-
-    def test_wrap_tables(self):
-        impl_1 = MockTableImpl("impl_1", dict())
-        impl_2 = MockTableImpl("impl_2", dict())
-        tbl_1 = Table(impl_1)
-        tbl_2 = Table(impl_2)
-
-        assert wrap_tables(15) == 15
-        assert wrap_tables(tbl_1) == tbl_1
-        assert wrap_tables(impl_1) == tbl_1
-
-        assert wrap_tables([impl_1]) == [tbl_1]
-        assert wrap_tables([impl_1, [impl_2]]) == [tbl_1, [tbl_2]]
-
-        assert wrap_tables((impl_1,)) == (tbl_1,)
 
 
 class TestBuiltinVerbs:
@@ -352,114 +285,3 @@ class TestBuiltinVerbs:
             tbl1 >> arrange(tbl2.col1)
         with pytest.raises(ValueError):
             tbl1 >> arrange(tbl1.col1, -tbl2.col1)
-
-    def test_col_pipeable(self, tbl1, tbl2):
-        result = tbl1.col1 >> mutate(x=tbl1.col1 * 2)
-
-        assert result._impl.selects == ordered_set(["col1", "x"])
-        assert list(result._impl.named_cols.fwd) == ["col1", "x"]
-
-        with pytest.raises(TypeError):
-            (tbl1.col1 + 2) >> mutate(x=1)
-
-
-class TestDataStructures:
-    def test_bidict(self):
-        d = bidict({"a": 1, "b": 2, "c": 3})
-
-        assert len(d) == 3
-        assert tuple(d.fwd.keys()) == ("a", "b", "c")
-        assert tuple(d.fwd.values()) == (1, 2, 3)
-
-        assert tuple(d.fwd.keys()) == tuple(d.bwd.values())
-        assert tuple(d.bwd.keys()) == tuple(d.fwd.values())
-
-        d.fwd["d"] = 4
-        d.bwd[4] = "x"
-
-        assert tuple(d.fwd.keys()) == ("a", "b", "c", "x")
-        assert tuple(d.fwd.values()) == (1, 2, 3, 4)
-        assert tuple(d.fwd.keys()) == tuple(d.bwd.values())
-        assert tuple(d.bwd.keys()) == tuple(d.fwd.values())
-
-        assert "x" in d.fwd
-        assert "d" not in d.fwd
-
-        d.clear()
-
-        assert len(d) == 0
-        assert len(d.fwd.items()) == len(d.fwd) == 0
-        assert len(d.bwd.items()) == len(d.bwd) == 0
-
-        with pytest.raises(ValueError):
-            bidict({"a": 1, "b": 1})
-
-    def test_ordered_set(self):
-        s = ordered_set([0, 1, 2])
-        assert list(s) == [0, 1, 2]
-
-        s.add(1)  # Already in set -> Noop
-        assert list(s) == [0, 1, 2]
-        s.add(3)  # Not in set -> add to the end
-        assert list(s) == [0, 1, 2, 3]
-
-        s.remove(1)
-        assert list(s) == [0, 2, 3]
-        s.add(1)
-        assert list(s) == [0, 2, 3, 1]
-
-        assert 1 in s
-        assert 4 not in s
-        assert len(s) == 4
-
-        s.clear()
-        assert len(s) == 0
-        assert list(s) == []
-
-        # Set Operations
-
-        s1 = ordered_set([0, 1, 2, 3])
-        s2 = ordered_set([5, 4, 3, 2])
-
-        assert not s1.isdisjoint(s2)
-        assert list(s1 | s2) == [0, 1, 2, 3, 5, 4]
-        assert list(s1 ^ s2) == [0, 1, 5, 4]
-        assert list(s1 & s2) == [3, 2]
-        assert list(s1 - s2) == [0, 1]
-
-        # Pop order
-
-        s = ordered_set([0, 1, 2, 3])
-        assert s.pop() == 0
-        assert s.pop() == 1
-        assert s.pop_back() == 3
-        assert s.pop_back() == 2
-
-
-class TestUtil:
-    def test_sign_peeler(self):
-        x = object()
-        sx = SymbolicExpression(x)
-        assert sign_peeler(sx._) == (x, True)
-        assert sign_peeler((+sx)._) == (x, True)
-        assert sign_peeler((-sx)._) == (x, False)
-        assert sign_peeler((--sx)._) == (x, True)  # noqa: B002
-        assert sign_peeler((--+sx)._) == (x, True)  # noqa: B002
-        assert sign_peeler((-++--sx)._) == (x, False)  # noqa: B002
-
-
-class MockTableImpl(AbstractTableImpl):
-    def __init__(self, name, col_names):
-        super().__init__(
-            name, {name: Column(name, self, dtypes.Int()) for name in col_names}
-        )
-
-    def resolve_lambda_cols(self, expr):
-        return expr
-
-    def collect(self):
-        return list(self.selects)
-
-    class ExpressionCompiler(AbstractTableImpl.ExpressionCompiler):
-        def _translate(self, expr, **kwargs):
-            return TypedValue(None, dtypes.Int())

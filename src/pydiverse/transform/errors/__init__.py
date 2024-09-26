@@ -1,37 +1,16 @@
 from __future__ import annotations
 
 
-class OperatorNotSupportedError(Exception):
-    """
-    Exception raised when a specific operation is not supported by a backend.
-    """
-
-
-class ExpressionError(Exception):
-    """
-    Generic exception related to an invalid expression.
-    """
-
-
-class ExpressionTypeError(ExpressionError):
+class DataTypeError(Exception):
     """
     Exception related to invalid types in an expression
     """
 
 
-class FunctionTypeError(ExpressionError):
+class FunctionTypeError(Exception):
     """
     Exception related to function type
     """
-
-
-class AlignmentError(Exception):
-    """
-    Raised when something isn't aligned.
-    """
-
-
-# WARNINGS
 
 
 class NonStandardBehaviourWarning(UserWarning):

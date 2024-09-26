@@ -1,16 +1,25 @@
 from __future__ import annotations
 
-from pydiverse.transform.core import functions
-from pydiverse.transform.core.alignment import aligned, eval_aligned
-from pydiverse.transform.core.dispatchers import verb
-from pydiverse.transform.core.expressions.lambda_getter import C
-from pydiverse.transform.core.table import Table
+from pydiverse.transform.backend.targets import DuckDb, Polars, SqlAlchemy
+from pydiverse.transform.pipe.c import C
+from pydiverse.transform.pipe.functions import (
+    count,
+    dense_rank,
+    max,
+    min,
+    rank,
+    row_number,
+    when,
+)
+from pydiverse.transform.pipe.pipeable import verb
+from pydiverse.transform.pipe.table import Table
 
 __all__ = [
+    "Polars",
+    "SqlAlchemy",
+    "DuckDb",
     "Table",
     "aligned",
-    "eval_aligned",
-    "functions",
     "verb",
     "C",
 ]

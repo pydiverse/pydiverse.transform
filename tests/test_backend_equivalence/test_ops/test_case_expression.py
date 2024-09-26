@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform import functions as f
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform.pipe.verbs import (
     group_by,
     mutate,
     summarise,
 )
-from pydiverse.transform.errors import ExpressionTypeError, FunctionTypeError
 from tests.util import assert_result_equal
 
 
@@ -16,16 +16,7 @@ def test_mutate_case_ewise(df4):
         df4,
         lambda t: t
         >> mutate(
-            x=C.col1.case(
-                (0, 1),
-                (1, 2),
-                (2, 2),
-            ),
-            y=C.col1.case(
-                (0, 0),
-                (1, None),
-                default=10.5,
-            ),
+            x=C.col1.map({0: 1, (1, 2): 2}), y=C.col1.map({0: 0, 1: None}, default=10.4)
         ),
     )
 
@@ -33,11 +24,11 @@ def test_mutate_case_ewise(df4):
         df4,
         lambda t: t
         >> mutate(
-            x=f.case(
-                (C.col1 == C.col2, 1),
-                (C.col2 == C.col3, 2),
-                default=(C.col1 + C.col2),
-            )
+            x=pdt.when(C.col1 == C.col2)
+            .then(1)
+            .when(C.col2 == C.col3)
+            .then(2)
+            .otherwise(C.col1 + C.col2),
         ),
     )
 
@@ -47,12 +38,14 @@ def test_mutate_case_window(df4):
         df4,
         lambda t: t
         >> mutate(
-            x=f.case(
-                (C.col1.max() == 1, 1),
-                (C.col1.max() == 2, 2),
-                (C.col1.max() == 3, 3),
-                (C.col1.max() == 4, 4),
-            )
+            x=pdt.when(C.col1.max() == 1)
+            .then(1)
+            .when(C.col1.max() == 2)
+            .then(2)
+            .when(C.col1.max() == 3)
+            .then(3)
+            .when(C.col1.max() == 4)
+            .then(4)
         ),
     )
 
@@ -60,10 +53,18 @@ def test_mutate_case_window(df4):
         df4,
         lambda t: t
         >> mutate(
-            u=C.col1.shift(1, 1729, arrange=[-t.col3, t.col4]),
-            x=C.col1.shift(1, 0, arrange=[C.col4]).case(
-                (1, C.col2.shift(1, -1, arrange=[C.col2, C.col4])),
-                (2, C.col3.shift(2, -2, arrange=[C.col3, C.col4])),
+            u=C.col1.shift(
+                1, 1729, arrange=[t.col3.descending().nulls_last(), t.col4.nulls_last()]
+            ),
+            x=C.col1.shift(1, 0, arrange=[C.col4.nulls_first()]).map(
+                {
+                    1: C.col2.shift(
+                        1, -1, arrange=[C.col2.nulls_last(), C.col4.nulls_first()]
+                    ),
+                    2: C.col3.shift(
+                        2, -2, arrange=[C.col3.nulls_last(), C.col4.nulls_last()]
+                    ),
+                }
             ),
         ),
     )
@@ -73,12 +74,14 @@ def test_mutate_case_window(df4):
         df4,
         lambda t: t
         >> mutate(
-            x=C.col1.shift(1, 0, arrange=[C.col4])
-            .case(
-                (1, 2),
-                (2, 3),
+            x=C.col1.shift(1, 0, arrange=[C.col4.nulls_last()])
+            .map(
+                {
+                    1: 2,
+                    2: 3,
+                }
             )
-            .shift(1, -1, arrange=[-C.col4])
+            .shift(1, -1, arrange=[C.col4.descending().nulls_first()])
         ),
         may_throw=True,
     )
@@ -92,46 +95,35 @@ def test_summarise_case(df4):
             C.col1,
         )
         >> summarise(
-            x=C.col2.max().case(
-                (0, C.col1.min()),  # Int
-                (1, C.col2.mean() + 0.5),  # Float
-                (2, 2),  # ftype=EWISE
+            x=C.col2.max().map(
+                {
+                    0: C.col1.min(),
+                    1: C.col2.mean() + 0.5,
+                    2: 2,
+                }
             ),
-            y=f.case(
-                (C.col2.max() > 2, 1),
-                (C.col2.max() < 2, C.col2.min()),
-                default=C.col3.mean(),
-            ),
+            y=pdt.when(C.col2.max() > 2)
+            .then(1)
+            .when(C.col2.max() < 2)
+            .then(C.col2.min())
+            .otherwise(C.col3.mean()),
         ),
     )
 
 
 def test_invalid_value_dtype(df4):
-    # Incompatible types String and Float
     assert_result_equal(
         df4,
         lambda t: t
         >> mutate(
-            x=C.col1.case(
-                (0, "a"),
-                (1, 1.1),
+            x=C.col1.map(
+                {
+                    0: "a",
+                    1: 1.1,
+                }
             )
         ),
-        exception=ExpressionTypeError,
-    )
-
-
-def test_invalid_result_dtype(df4):
-    # Invalid result type: none
-    assert_result_equal(
-        df4,
-        lambda t: t
-        >> mutate(
-            x=f.case(
-                default=None,
-            )
-        ),
-        exception=ExpressionTypeError,
+        exception=TypeError,
     )
 
 
@@ -140,8 +132,10 @@ def test_invalid_ftype(df1):
         df1,
         lambda t: t
         >> summarise(
-            x=f.rank(arrange=[C.col1]).case(
-                (1, C.col1.max()),
+            x=pdt.rank(arrange=[C.col1]).map(
+                {
+                    1: C.col1.max(),
+                },
                 default=None,
             )
         ),
@@ -152,10 +146,7 @@ def test_invalid_ftype(df1):
         df1,
         lambda t: t
         >> summarise(
-            x=f.case(
-                (f.rank(arrange=[C.col1]) == 1, 1),
-                default=None,
-            )
+            x=pdt.when(pdt.rank(arrange=[C.col1]) == 1).then(1).otherwise(None)
         ),
         exception=FunctionTypeError,
     )

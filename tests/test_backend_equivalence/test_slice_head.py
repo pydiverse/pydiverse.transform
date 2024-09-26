@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.core import functions as f
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe import functions as f
+from pydiverse.transform.pipe.verbs import (
     arrange,
     filter,
     group_by,
@@ -12,7 +12,7 @@ from pydiverse.transform.core.verbs import (
     slice_head,
     summarise,
 )
-from tests.util import assert_result_equal, full_sort
+from tests.util import assert_result_equal
 
 
 def test_simple(df3):
@@ -61,13 +61,6 @@ def test_chained(df3):
     )
 
 
-def test_with_select(df3):
-    assert_result_equal(
-        df3,
-        lambda t: t >> select() >> arrange(*t) >> slice_head(4, offset=2) >> select(*t),
-    )
-
-
 def test_with_mutate(df3):
     assert_result_equal(
         df3,
@@ -83,18 +76,17 @@ def test_with_join(df1, df2):
     assert_result_equal(
         (df1, df2),
         lambda t, u: t
-        >> full_sort()
         >> arrange(*t)
         >> slice_head(3)
-        >> left_join(u, t.col1 == u.col1)
-        >> full_sort(),
+        >> left_join(u, t.col1 == u.col1),
+        check_row_order=False,
     )
 
     assert_result_equal(
         (df1, df2),
         lambda t, u: t
-        >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1)
-        >> full_sort(),
+        >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1),
+        check_row_order=False,
         exception=ValueError,
         may_throw=True,
     )

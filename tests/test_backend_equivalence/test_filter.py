@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe.verbs import (
     filter,
     mutate,
 )
@@ -9,7 +9,9 @@ from tests.util import assert_result_equal
 
 
 def test_noop(df2):
-    assert_result_equal(df2, lambda t: t >> filter())
+    assert_result_equal(
+        df2, lambda t: t >> filter(), may_throw=True, exception=TypeError
+    )
     assert_result_equal(df2, lambda t: t >> filter(t.col1 == t.col1))
 
 
@@ -44,8 +46,16 @@ def test_filter_isin(df4):
         lambda t: t
         >> filter(
             C.col1.isin(0, 2),
+            C.col2.isin(0, t.col1 * t.col2),
         ),
     )
+
+    assert_result_equal(
+        df4,
+        lambda t: t >> filter((-(t.col4 // 2 - 1)).isin(1, 4, t.col1 + t.col2)),
+    )
+
+    assert_result_equal(df4, lambda t: t >> filter(t.col1.isin(None)))
 
     assert_result_equal(
         df4,

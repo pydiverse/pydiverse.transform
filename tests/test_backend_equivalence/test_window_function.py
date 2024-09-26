@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.core import functions as f
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform.pipe import functions as f
+from pydiverse.transform.pipe.verbs import (
     arrange,
     filter,
     group_by,
+    join,
     mutate,
     select,
     summarise,
     ungroup,
 )
-from pydiverse.transform.errors import FunctionTypeError
-from tests.util import assert_result_equal, full_sort
+from tests.util import assert_result_equal
 
 
 def test_simple_ungrouped(df3):
@@ -38,18 +39,29 @@ def test_simple_grouped(df3):
     )
 
 
-def test_partition_by_argument(df3):
+def test_partition_by_argument(df3, df4):
     assert_result_equal(
         df3,
         lambda t: t
         >> mutate(
-            u=t.col1.min(partition_by=[t.col3]),
-            v=t.col4.sum(partition_by=[t.col2]),
-            w=f.rank(arrange=[-t.col5, t.col4], partition_by=[t.col2]),
+            u=t.col1.min(partition_by=t.col3),
+            v=t.col4.sum(partition_by=t.col2),
+            w=f.rank(
+                arrange=[t.col5.descending().nulls_last(), t.col4.nulls_first()],
+                partition_by=[t.col2],
+            ),
             x=f.row_number(
                 arrange=[t.col4.nulls_last()], partition_by=[t.col1, t.col2]
             ),
         ),
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda t, u: t
+        >> join(u, t.col1 == u.col3, how="left")
+        >> group_by(t.col2)
+        >> mutate(y=(u.col3 + t.col1).max(partition_by=(col for col in t))),
     )
 
     assert_result_equal(
@@ -203,7 +215,6 @@ def test_arrange_argument(df3):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(x=C.col4.shift(1, arrange=[-C.col3]))
-        >> full_sort()
         >> select(C.x),
     )
 
@@ -212,25 +223,18 @@ def test_arrange_argument(df3):
         lambda t: t
         >> group_by(t.col2)
         >> mutate(x=f.row_number(arrange=[-C.col4]))
-        >> full_sort()
         >> select(C.x),
     )
 
     # Ungrouped
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=C.col4.shift(1, arrange=[-C.col3]))
-        >> full_sort()
-        >> select(C.x),
+        lambda t: t >> mutate(x=C.col4.shift(1, arrange=[-C.col3])) >> select(C.x),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=f.row_number(arrange=[-C.col4]))
-        >> full_sort()
-        >> select(C.x),
+        lambda t: t >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(C.x),
     )
 
 
@@ -260,6 +264,18 @@ def test_complex(df3):
         >> arrange(C.span),
     )
 
+    assert_result_equal(
+        df3,
+        lambda t: t
+        >> group_by(t.col1, t.col2)
+        >> summarise(mean3=t.col3.mean(), u=t.col4.max())
+        >> group_by(C.u)
+        >> mutate(minM3=C.mean3.min(), maxM3=C.mean3.max())
+        >> mutate(span=C.maxM3 - C.minM3)
+        >> filter(C.span < 3)
+        >> arrange(C.span),
+    )
+
 
 def test_nested_bool(df4):
     assert_result_equal(
@@ -268,8 +284,8 @@ def test_nested_bool(df4):
         >> group_by(t.col1)
         >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= C.col4)
         >> mutate(
-            xshift=C.x.shift(1, arrange=[t.col4]),
-            yshift=C.y.shift(-1, arrange=[t.col4]),
+            xshift=C.x.shift(1, arrange=[t.col4.nulls_last()]),
+            yshift=C.y.shift(-1, arrange=[t.col4.nulls_first()]),
         )
         >> mutate(xAndY=C.x & C.y, xAndYshifted=C.xshift & C.yshift),
     )
@@ -284,10 +300,10 @@ def test_op_shift(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            shift1=t.col2.shift(1, arrange=[t.col4]),
-            shift2=t.col4.shift(-2, 0, arrange=[t.col4]),
-            shift3=t.col4.shift(0, arrange=[t.col4]),
-            u=C.col1.shift(1, 0, arrange=[t.col4]),
+            shift1=t.col2.shift(1, arrange=[t.col4.nulls_first()]),
+            shift2=t.col4.shift(-2, 0, arrange=[t.col4.nulls_last()]),
+            shift3=t.col4.shift(0, arrange=[t.col4.nulls_first()]),
+            u=C.col1.shift(1, 0, arrange=[t.col4.nulls_last()]),
         ),
     )
 
@@ -295,8 +311,8 @@ def test_op_shift(df4):
         df4,
         lambda t: t
         >> mutate(
-            u=t.col1.shift(1, 0, arrange=[t.col2, t.col4]),
-            v=t.col1.shift(2, 1, arrange=[-t.col4.nulls_first()]),
+            u=t.col1.shift(1, 0, arrange=[t.col2.nulls_last(), t.col4.nulls_first()]),
+            v=t.col1.shift(2, 1, arrange=[t.col4.descending().nulls_first()]),
         ),
     )
 
@@ -307,8 +323,10 @@ def test_op_row_number(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            row_number1=f.row_number(arrange=[-C.col4.nulls_last()]),
-            row_number2=f.row_number(arrange=[C.col2, C.col3, t.col4]),
+            row_number1=f.row_number(arrange=[C.col4.descending().nulls_last()]),
+            row_number2=f.row_number(
+                arrange=[C.col2.nulls_last(), C.col3.nulls_first(), t.col4.nulls_last()]
+            ),
         ),
     )
 
@@ -316,8 +334,10 @@ def test_op_row_number(df4):
         df4,
         lambda t: t
         >> mutate(
-            u=f.row_number(arrange=[-C.col4.nulls_last()]),
-            v=f.row_number(arrange=[-t.col3, t.col4]),
+            u=f.row_number(arrange=[C.col4.descending().nulls_last()]),
+            v=f.row_number(
+                arrange=[t.col3.descending().nulls_first(), t.col4.nulls_first()]
+            ),
         ),
     )
 
@@ -328,12 +348,12 @@ def test_op_rank(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            rank1=f.rank(arrange=[t.col1]),
-            rank2=f.rank(arrange=[t.col2]),
+            rank1=f.rank(arrange=[t.col1.nulls_last()]),
+            rank2=f.rank(arrange=[t.col2.nulls_first()]),
             rank3=f.rank(arrange=[t.col2.nulls_last()]),
             rank4=f.rank(arrange=[t.col5.nulls_first()]),
-            rank5=f.rank(arrange=[-t.col5.nulls_first()]),
-            rank_expr=f.rank(arrange=[t.col3 - t.col2]),
+            rank5=f.rank(arrange=[t.col5.descending().nulls_first()]),
+            rank_expr=f.rank(arrange=[(t.col3 - t.col2).nulls_last()]),
         ),
     )
 
@@ -345,13 +365,15 @@ def test_op_dense_rank(df3):
         >> group_by(t.col1)
         >> mutate(
             rank1=f.dense_rank(arrange=[t.col5.nulls_first()]),
-            rank2=f.dense_rank(arrange=[t.col2]),
+            rank2=f.dense_rank(arrange=[t.col2.nulls_last()]),
             rank3=f.dense_rank(arrange=[t.col2.nulls_last()]),
         )
-        >> ungroup(),
-        # TODO: activate these once SQL partition_by= is implemented
-        # >> mutate(
-        #    rank4=f.dense_rank(arrange=[t.col4.nulls_first()], partition_by=[t.col2]),
-        #    rank5=f.dense_rank(arrange=[-t.col5.nulls_first()], partition_by=[t.col2]),
-        # ),
+        >> ungroup()
+        >> mutate(
+            rank4=f.dense_rank(arrange=[t.col4.nulls_first()], partition_by=[t.col2]),
+            rank5=f.dense_rank(
+                arrange=[t.col5.descending().nulls_first()],
+                partition_by=[t.col2],
+            ),
+        ),
     )

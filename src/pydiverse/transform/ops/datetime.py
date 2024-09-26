@@ -30,18 +30,18 @@ class DtExtract(ElementWise, Unary):
 
 
 class DateExtract(ElementWise, Unary):
-    signatures = ["date -> int"]
+    signatures = ["datetime -> int", "date -> int"]
 
 
-class DtYear(DtExtract, DateExtract):
+class DtYear(DateExtract):
     name = "dt.year"
 
 
-class DtMonth(DtExtract, DateExtract):
+class DtMonth(DateExtract):
     name = "dt.month"
 
 
-class DtDay(DtExtract, DateExtract):
+class DtDay(DateExtract):
     name = "dt.day"
 
 
@@ -61,11 +61,11 @@ class DtMillisecond(DtExtract):
     name = "dt.millisecond"
 
 
-class DtDayOfWeek(DtExtract, DateExtract):
+class DtDayOfWeek(DateExtract):
     name = "dt.day_of_week"
 
 
-class DtDayOfYear(DtExtract, DateExtract):
+class DtDayOfYear(DateExtract):
     name = "dt.day_of_year"
 
 

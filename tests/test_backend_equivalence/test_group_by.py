@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.core import functions
-from pydiverse.transform.core.verbs import (
+from pydiverse.transform.pipe import functions
+from pydiverse.transform.pipe.verbs import (
     arrange,
     filter,
     group_by,
@@ -14,7 +14,7 @@ from pydiverse.transform.core.verbs import (
     select,
     ungroup,
 )
-from tests.util import assert_result_equal, full_sort
+from tests.util import assert_result_equal
 
 
 def test_ungroup(df3):
@@ -44,7 +44,7 @@ def test_mutate(df3, df4):
         lambda t, u: t
         >> group_by(t.col1, t.col2)
         >> mutate(col1=t.col1 * t.col2)
-        >> arrange(-t.col3.nulls_last())
+        >> arrange(t.col3.descending().nulls_last())
         >> ungroup()
         >> left_join(u, t.col2 == u.col2)
         >> mutate(
@@ -83,8 +83,8 @@ def test_ungrouped_join(df1, df3, how):
         lambda t, u: t
         >> group_by(t.col1)
         >> ungroup()
-        >> join(u, t.col1 == u.col1, how=how)
-        >> full_sort(),
+        >> join(u, t.col1 == u.col1, how=how),
+        check_row_order=False,
     )
 
 
