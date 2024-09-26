@@ -43,7 +43,7 @@ class PolarsImpl(TableImpl):
         lf, _, select, _ = compile_ast(nd)
         lf = lf.select(select)
         if isinstance(target, Polars):
-            if not target.lazy:
+            if not target.lazy and isinstance(lf, pl.LazyFrame):
                 lf = lf.collect()
             lf.name = nd.name
             return lf
@@ -82,7 +82,7 @@ def compile_order(
     return (
         compile_col_expr(order.order_by, name_in_df),
         order.descending,
-        order.nulls_last,
+        order.nulls_last if order.nulls_last is not None else False,
     )
 
 

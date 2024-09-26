@@ -367,13 +367,13 @@ class CaseExpr(ColExpr):
         try:
             val_types = [val.dtype() for _, val in self.cases]
             if self.default_val is not None:
-                val_types.append(self.default_val.dtype().without_modifiers())
+                val_types.append(self.default_val.dtype())
 
             if None in val_types:
                 return None
 
             self._dtype = dtypes.promote_dtypes(
-                dtype.without_modifiers for dtype in val_types
+                [dtype.without_modifiers() for dtype in val_types]
             )
         except Exception as e:
             raise TypeError(f"invalid case expression: {e}") from e
