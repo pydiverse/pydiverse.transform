@@ -123,6 +123,13 @@ class TestPolarsLazyImpl:
         assert isinstance(tbl2.col2.dtype(), dtypes.Int)
         assert isinstance(tbl2.col3.dtype(), dtypes.Float)
 
+        # test that column expression type errors are checked immediately
+        with pytest.raises(TypeError):
+            tbl1.col1 + tbl1.col2
+
+        # here, transform should not be able to resolve the type and throw an error
+        C.col1 + tbl1.col2
+
     def test_build_query(self, tbl1):
         assert (tbl1 >> build_query()) is None
 

@@ -182,7 +182,6 @@ class ColFn(ColExpr):
         super().__init__()
         # try to eagerly resolve the types to get a nicer stack trace on type errors
         self.dtype()
-        self.ftype()
 
     def __repr__(self) -> str:
         args = [repr(e) for e in self.args] + [
@@ -336,7 +335,6 @@ class CaseExpr(ColExpr):
         self.default_val = default_val
         super().__init__()
         self.dtype()
-        self.ftype()
 
     def __repr__(self) -> str:
         return (

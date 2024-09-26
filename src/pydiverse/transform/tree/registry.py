@@ -280,7 +280,7 @@ class OperatorRegistry:
         # If operation hasn't been defined in this registry, go to the parent
         # registry and check if it has been defined there.
         if self.super_registry is None or not self.check_super.get(name, True):
-            raise ValueError(
+            raise TypeError(
                 f"invalid usage of operator `{name}` with arguments of type "
                 f"{args_signature}"
             )
