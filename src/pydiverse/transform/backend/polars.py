@@ -709,3 +709,10 @@ with PolarsImpl.op(ops.Least()) as op:
     @op.auto
     def _least(*x):
         return pl.min_horizontal(*x)
+
+
+with PolarsImpl.op(ops.Round()) as op:
+
+    @op.auto
+    def _round(x, digits=0):
+        return x.round(digits)
