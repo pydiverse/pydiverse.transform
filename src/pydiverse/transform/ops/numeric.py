@@ -94,6 +94,7 @@ class Pow(ElementWise, Binary):
     signatures = [
         "int, int -> float64",
         "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -117,6 +118,7 @@ class Neg(ElementWise, Unary):
     signatures = [
         "int -> int",
         "float64 -> float64",
+        "decimal -> decimal",
     ]
 
 
@@ -125,6 +127,7 @@ class Pos(ElementWise, Unary):
     signatures = [
         "int -> int",
         "float64 -> float64",
+        "decimal -> decimal",
     ]
 
 
@@ -133,6 +136,7 @@ class Abs(ElementWise, Unary):
     signatures = [
         "int -> int",
         "float64 -> float64",
+        "decimal -> decimal",
     ]
 
 
@@ -143,6 +147,8 @@ class Round(ElementWise):
         "int, const int -> int",
         "float64 -> float64",
         "float64, const int -> float64",
+        "decimal -> decimal",
+        "decimal, const int -> decimal",
     ]
 
 
