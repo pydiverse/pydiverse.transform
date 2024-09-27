@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import datetime
-from types import NoneType
 from typing import Any
 from uuid import UUID
 
@@ -340,7 +338,9 @@ def compile_ast(
 
 def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     if t.is_float():
-        return dtypes.Float()
+        return dtypes.Float64()
+    elif t.is_decimal():
+        return dtypes.Decimal()
     elif t.is_integer():
         return dtypes.Int()
     elif isinstance(t, pl.Boolean):
@@ -360,8 +360,10 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
 
 
 def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
-    if isinstance(t, dtypes.Float):
+    if isinstance(t, dtypes.Float64):
         return pl.Float64()
+    elif isinstance(t, dtypes.Decimal):
+        return pl.Decimal()
     elif isinstance(t, dtypes.Int):
         return pl.Int64()
     elif isinstance(t, dtypes.Bool):
@@ -378,27 +380,6 @@ def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
         return pl.Null()
 
     raise AssertionError
-
-
-def python_type_to_polars(t: type) -> pl.DataType:
-    if t is int:
-        return pl.Int64()
-    elif t is float:
-        return pl.Float64()
-    elif t is bool:
-        return pl.Boolean()
-    elif t is str:
-        return pl.String()
-    elif t is datetime.datetime:
-        return pl.Datetime()
-    elif t is datetime.date:
-        return pl.Date()
-    elif t is datetime.timedelta:
-        return pl.Duration()
-    elif t is NoneType:
-        return pl.Null()
-
-    raise TypeError(f"python builtin type {t} is not supported by pydiverse.transform")
 
 
 with PolarsImpl.op(ops.Mean()) as op:
@@ -716,3 +697,17 @@ with PolarsImpl.op(ops.Round()) as op:
     @op.auto
     def _round(x, digits=0):
         return x.round(digits)
+
+
+with PolarsImpl.op(ops.Exp()) as op:
+
+    @op.auto
+    def _exp(x):
+        return x.exp()
+
+
+with PolarsImpl.op(ops.Log()) as op:
+
+    @op.auto
+    def _log(x):
+        return x.log()

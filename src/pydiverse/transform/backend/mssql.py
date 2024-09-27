@@ -21,6 +21,11 @@ from pydiverse.transform.tree.col_expr import (
 )
 from pydiverse.transform.util.warnings import warn_non_standard
 
+MSSQL_INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Float()) / sqa.literal(
+    "0.0", type_=sqa.Float()
+)
+MSSQL_NAN = MSSQL_INF + (-MSSQL_INF)
+
 
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
@@ -289,3 +294,16 @@ with MsSqlImpl.op(ops.Mean()) as op:
     @op.auto
     def _mean(x):
         return sqa.func.AVG(sqa.cast(x, sqa.Double()), type_=sqa.Double())
+
+
+with MsSqlImpl.op(ops.Log()) as op:
+
+    @op.auto
+    def _log(x):
+        # TODO: we still need to handle inf / -inf / nan
+        return sqa.case(
+            (x > 0, sqa.func.log(x)),
+            (x < 0, MSSQL_NAN),
+            (x.is_(sqa.null()), None),
+            else_=-MSSQL_INF,
+        )

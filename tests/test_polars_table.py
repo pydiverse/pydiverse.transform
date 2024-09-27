@@ -121,7 +121,7 @@ class TestPolarsLazyImpl:
 
         assert isinstance(tbl2.col1.dtype(), dtypes.Int)
         assert isinstance(tbl2.col2.dtype(), dtypes.Int)
-        assert isinstance(tbl2.col3.dtype(), dtypes.Float)
+        assert isinstance(tbl2.col3.dtype(), dtypes.Float64)
 
         # test that column expression type errors are checked immediately
         with pytest.raises(TypeError):

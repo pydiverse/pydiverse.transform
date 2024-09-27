@@ -21,6 +21,8 @@ __all__ = [
     "Pos",
     "Abs",
     "Round",
+    "Exp",
+    "Log",
 ]
 
 
@@ -144,3 +146,13 @@ class Round(ElementWise):
         "float -> float",
         "float, const int -> float",
     ]
+
+
+class Log(ElementWise):
+    name = "log"
+    signatures = ["float -> float"]
+
+
+class Exp(Log):
+    name = "exp"
+    signatures = ["float -> float"]

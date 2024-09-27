@@ -76,7 +76,7 @@ class Int(Dtype):
             return True
 
         # int can be promoted to float
-        if Float().same_kind(other):
+        if Float64().same_kind(other):
             if other.const and not self.const:
                 return False
 
@@ -85,8 +85,12 @@ class Int(Dtype):
         return False
 
 
-class Float(Dtype):
-    name = "float"
+class Float64(Dtype):
+    name = "float64"
+
+
+class Decimal(Dtype):
+    name = "decimal"
 
 
 class String(Dtype):
@@ -144,7 +148,7 @@ def python_type_to_pdt(t: type) -> Dtype:
     if t is int:
         return Int()
     elif t is float:
-        return Float()
+        return Float64()
     elif t is bool:
         return Bool()
     elif t is str:
@@ -193,7 +197,7 @@ def dtype_from_string(t: str) -> Dtype:
     if base_type == "int":
         return Int(const=is_const, vararg=is_vararg)
     if base_type == "float":
-        return Float(const=is_const, vararg=is_vararg)
+        return Float64(const=is_const, vararg=is_vararg)
     if base_type == "str":
         return String(const=is_const, vararg=is_vararg)
     if base_type == "bool":

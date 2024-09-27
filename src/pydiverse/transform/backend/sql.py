@@ -550,7 +550,7 @@ def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
     if isinstance(t, sqa.Integer):
         return dtypes.Int()
     elif isinstance(t, sqa.Numeric):
-        return dtypes.Float()
+        return dtypes.Float64()
     elif isinstance(t, sqa.String):
         return dtypes.String()
     elif isinstance(t, sqa.Boolean):
@@ -570,7 +570,7 @@ def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
 def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
     if isinstance(t, dtypes.Int):
         return sqa.Integer()
-    elif isinstance(t, dtypes.Float):
+    elif isinstance(t, dtypes.Float64):
         return sqa.Numeric()
     elif isinstance(t, dtypes.String):
         return sqa.String()
@@ -686,9 +686,6 @@ with SqlImpl.op(ops.IsNotNull()) as op:
         return x.is_not(sqa.null())
 
 
-#### String Functions ####
-
-
 with SqlImpl.op(ops.StrStrip()) as op:
 
     @op.auto
@@ -751,9 +748,6 @@ with SqlImpl.op(ops.StrSlice()) as op:
     def _str_slice(x, offset, length):
         # SQL has 1-indexed strings but we do it 0-indexed
         return sqa.func.SUBSTR(x, offset + 1, length)
-
-
-#### Datetime Functions ####
 
 
 with SqlImpl.op(ops.DtYear()) as op:
@@ -819,9 +813,6 @@ with SqlImpl.op(ops.DtDayOfYear()) as op:
         return sqa.extract("doy", x)
 
 
-#### Generic Functions ####
-
-
 with SqlImpl.op(ops.Greatest()) as op:
 
     @op.auto
@@ -836,9 +827,6 @@ with SqlImpl.op(ops.Least()) as op:
     def _least(*x):
         # TODO: Determine return type
         return sqa.func.LEAST(*x)
-
-
-#### Summarising Functions ####
 
 
 with SqlImpl.op(ops.Mean()) as op:
@@ -919,9 +907,6 @@ with SqlImpl.op(ops.Count()) as op:
             return sqa.func.count(x)
 
 
-#### Window Functions ####
-
-
 with SqlImpl.op(ops.Shift()) as op:
 
     @op.auto
@@ -968,3 +953,23 @@ with SqlImpl.op(ops.DenseRank()) as op:
     @op.auto
     def _dense_rank():
         return sqa.func.dense_rank()
+
+
+with SqlImpl.op(ops.Exp()) as op:
+
+    @op.auto
+    def _exp(x):
+        return sqa.func.exp(x)
+
+
+with SqlImpl.op(ops.Log()) as op:
+
+    @op.auto
+    def _log(x):
+        # TODO: we still need to handle inf / -inf / nan
+        return sqa.case(
+            (x > 0, sqa.func.ln(x)),
+            (x < 0, sqa.literal("nan")),
+            (x.is_(sqa.null()), None),
+            else_=sqa.literal("-inf"),
+        )

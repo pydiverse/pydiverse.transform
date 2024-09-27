@@ -195,7 +195,7 @@ class TestOperatorRegistry:
         )
         assert isinstance(
             reg.get_impl("op3", parse_dtypes("str", "int", "float")).return_type,
-            dtypes.Float,
+            dtypes.Float64,
         )
 
     def test_vararg(self):
