@@ -17,7 +17,7 @@ class Min(Aggregate, Unary):
     name = "min"
     signatures = [
         "int -> int",
-        "float -> float",
+        "float64 -> float64",
         "str -> str",
         "datetime -> datetime",
         "date -> date",
@@ -28,7 +28,7 @@ class Max(Aggregate, Unary):
     name = "max"
     signatures = [
         "int -> int",
-        "float -> float",
+        "float64 -> float64",
         "str -> str",
         "datetime -> datetime",
         "date -> date",
@@ -38,8 +38,8 @@ class Max(Aggregate, Unary):
 class Mean(Aggregate, Unary):
     name = "mean"
     signatures = [
-        "int -> float",
-        "float -> float",
+        "int -> float64",
+        "float64 -> float64",
     ]
 
 
@@ -47,7 +47,7 @@ class Sum(Aggregate, Unary):
     name = "sum"
     signatures = [
         "int -> int",
-        "float -> float",
+        "float64 -> float64",
     ]
 
 

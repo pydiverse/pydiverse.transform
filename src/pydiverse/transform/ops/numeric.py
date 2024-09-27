@@ -30,9 +30,8 @@ class Add(ElementWise, Binary):
     name = "__add__"
     signatures = [
         "int, int -> int",
-        "int, float -> float",
-        "float, int -> float",
-        "float, float -> float",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -44,9 +43,8 @@ class Sub(ElementWise, Binary):
     name = "__sub__"
     signatures = [
         "int, int -> int",
-        "int, float -> float",
-        "float, int -> float",
-        "float, float -> float",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -58,9 +56,8 @@ class Mul(ElementWise, Binary):
     name = "__mul__"
     signatures = [
         "int, int -> int",
-        "int, float -> float",
-        "float, int -> float",
-        "float, float -> float",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -71,8 +68,9 @@ class RMul(Mul):
 class TrueDiv(ElementWise, Binary):
     name = "__truediv__"
     signatures = [
-        "int, int -> float",
-        "float, float -> float",
+        "int, int -> float64",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -94,8 +92,8 @@ class RFloorDiv(FloorDiv):
 class Pow(ElementWise, Binary):
     name = "__pow__"
     signatures = [
-        "int, int -> float",
-        "float, float -> float",
+        "int, int -> float64",
+        "float64, float64 -> float64",
     ]
 
 
@@ -118,7 +116,7 @@ class Neg(ElementWise, Unary):
     name = "__neg__"
     signatures = [
         "int -> int",
-        "float -> float",
+        "float64 -> float64",
     ]
 
 
@@ -126,7 +124,7 @@ class Pos(ElementWise, Unary):
     name = "__pos__"
     signatures = [
         "int -> int",
-        "float -> float",
+        "float64 -> float64",
     ]
 
 
@@ -134,7 +132,7 @@ class Abs(ElementWise, Unary):
     name = "__abs__"
     signatures = [
         "int -> int",
-        "float -> float",
+        "float64 -> float64",
     ]
 
 
@@ -143,16 +141,16 @@ class Round(ElementWise):
     signatures = [
         "int -> int",
         "int, const int -> int",
-        "float -> float",
-        "float, const int -> float",
+        "float64 -> float64",
+        "float64, const int -> float64",
     ]
 
 
 class Log(ElementWise):
     name = "log"
-    signatures = ["float -> float"]
+    signatures = ["float64 -> float64"]
 
 
 class Exp(Log):
     name = "exp"
-    signatures = ["float -> float"]
+    signatures = ["float64 -> float64"]

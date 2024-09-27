@@ -75,7 +75,7 @@ class Int(Dtype):
         if super().can_promote_to(other):
             return True
 
-        # int can be promoted to float
+        # int can be promoted to float64
         if Float64().same_kind(other):
             if other.const and not self.const:
                 return False
@@ -196,8 +196,10 @@ def dtype_from_string(t: str) -> Dtype:
 
     if base_type == "int":
         return Int(const=is_const, vararg=is_vararg)
-    if base_type == "float":
+    if base_type == "float64":
         return Float64(const=is_const, vararg=is_vararg)
+    if base_type == "decimal":
+        return Decimal(const=is_const, vararg=is_vararg)
     if base_type == "str":
         return String(const=is_const, vararg=is_vararg)
     if base_type == "bool":

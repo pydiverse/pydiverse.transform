@@ -152,8 +152,8 @@ class TestOperatorRegistry:
         assert reg.get_impl("op1", parse_dtypes("int", "int"))() == 1
         assert reg.get_impl("op1", parse_dtypes("int", "str"))() == 2
         # int can be promoted to float; results in "float, float -> bool" signature
-        assert reg.get_impl("op1", parse_dtypes("int", "float"))() == 1
-        assert reg.get_impl("op1", parse_dtypes("float", "int"))() == 1
+        assert reg.get_impl("op1", parse_dtypes("int", "float64"))() == 1
+        assert reg.get_impl("op1", parse_dtypes("float64", "int"))() == 1
 
         # More template matching... Also check matching precedence
         reg.add_impl(op2, lambda: 1, "int, int, int -> int")
@@ -168,10 +168,10 @@ class TestOperatorRegistry:
         assert reg.get_impl("op2", parse_dtypes("int", "int", "str"))() == 3
         assert reg.get_impl("op2", parse_dtypes("int", "bool", "bool"))() == 4
         assert reg.get_impl("op2", parse_dtypes("str", "str", "str"))() == 5
-        assert reg.get_impl("op2", parse_dtypes("float", "str", "str"))() == 6
+        assert reg.get_impl("op2", parse_dtypes("float64", "str", "str"))() == 6
 
         with pytest.raises(ValueError):
-            reg.get_impl("op2", parse_dtypes("int", "bool", "float"))
+            reg.get_impl("op2", parse_dtypes("int", "bool", "float64"))
 
         # Return type
         reg.add_impl(op3, lambda: 1, "T -> T")
@@ -190,11 +190,11 @@ class TestOperatorRegistry:
             dtypes.Int,
         )
         assert isinstance(
-            reg.get_impl("op3", parse_dtypes("int", "int", "float")).return_type,
+            reg.get_impl("op3", parse_dtypes("int", "int", "float64")).return_type,
             dtypes.Int,
         )
         assert isinstance(
-            reg.get_impl("op3", parse_dtypes("str", "int", "float")).return_type,
+            reg.get_impl("op3", parse_dtypes("str", "int", "float64")).return_type,
             dtypes.Float64,
         )
 

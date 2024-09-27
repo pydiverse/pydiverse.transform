@@ -55,3 +55,11 @@ def test_round(df_num):
             round_d=round(t.d),
         ),
     )
+
+
+def test_div(df_num):
+    assert_result_equal(df_num, lambda t: t >> mutate(u=t.a / 2, v=t.b / 3.1))
+
+
+def test_decimal(df_num):
+    assert_result_equal(df_num, lambda t: t >> mutate(u=t.f + t.g, z=t.f * t.g))

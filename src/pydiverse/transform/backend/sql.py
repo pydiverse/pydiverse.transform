@@ -549,8 +549,10 @@ def get_engine(nd: AstNode) -> sqa.Engine:
 def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
     if isinstance(t, sqa.Integer):
         return dtypes.Int()
-    elif isinstance(t, sqa.Numeric):
+    elif isinstance(t, sqa.Float):
         return dtypes.Float64()
+    elif isinstance(t, (sqa.DECIMAL, sqa.NUMERIC)):
+        return dtypes.Decimal()
     elif isinstance(t, sqa.String):
         return dtypes.String()
     elif isinstance(t, sqa.Boolean):
@@ -571,7 +573,9 @@ def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
     if isinstance(t, dtypes.Int):
         return sqa.Integer()
     elif isinstance(t, dtypes.Float64):
-        return sqa.Numeric()
+        return sqa.Float()
+    elif isinstance(t, dtypes.Decimal):
+        return sqa.DECIMAL()
     elif isinstance(t, dtypes.String):
         return sqa.String()
     elif isinstance(t, dtypes.Bool):

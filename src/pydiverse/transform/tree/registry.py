@@ -296,7 +296,7 @@ class OperatorSignature:
         terminal_arg ::= modifiers (dtype | vararg)
         vararg ::= dtype "..."
         rtype ::= dtype
-        dtype ::= template | "int" | "float" | "str" | "bool" | and others...
+        dtype ::= template | "int" | "float64" | "str" | "bool" | and others...
         modifiers ::= "const"?
         template ::= single uppercase character
 
@@ -523,7 +523,7 @@ class OperatorImplStore:
             elif not node.value.same_kind(dtype):
                 # Needs type promotion
                 # This only works when types can be promoted once
-                # -> (uint > int) wouldn't be preferred over (uint > int > float)
+                # -> (uint > int) wouldn't be preferred over (uint > int > float64)
                 type_promotion_indices = (*type_promotion_indices, s_i)
 
             if s_i + 1 == len(signature):
