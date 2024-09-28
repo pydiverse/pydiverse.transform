@@ -987,3 +987,17 @@ with SqlImpl.op(ops.Log()) as op:
             (x.is_(sqa.null()), None),
             else_=sqa.literal("-inf"),
         )
+
+
+with SqlImpl.op(ops.Floor()) as op:
+
+    @op.auto
+    def _floor(x):
+        return sqa.func.floor(x)
+
+
+with SqlImpl.op(ops.Ceil()) as op:
+
+    @op.auto
+    def _ceil(x):
+        return sqa.func.ceil(x)

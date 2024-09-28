@@ -63,3 +63,35 @@ def test_div(df_num):
 
 def test_decimal(df_num):
     assert_result_equal(df_num, lambda t: t >> mutate(u=t.f + t.g, z=t.f * t.g))
+
+
+def test_floor(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(
+            u=t.a.floor(),
+            v=t.b.floor(),
+            w=t.f.floor(),
+            x=t.d.floor(),
+            y=t.e.floor(),
+            z=t.f.floor(),
+            q=t.g.floor(),
+        ),
+    )
+
+
+def test_ceil(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(
+            u=t.a.ceil(),
+            v=t.b.ceil(),
+            w=t.f.ceil(),
+            x=t.d.ceil(),
+            y=t.e.ceil(),
+            z=t.f.ceil(),
+            q=t.g.ceil(),
+        ),
+    )

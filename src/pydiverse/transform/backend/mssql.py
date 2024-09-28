@@ -334,3 +334,10 @@ with MsSqlImpl.op(ops.Log()) as op:
             (x.is_(sqa.null()), None),
             else_=-MSSQL_INF,
         )
+
+
+with MsSqlImpl.op(ops.Ceil()) as op:
+
+    @op.auto
+    def _ceil(x):
+        return sqa.func.ceiling(x)

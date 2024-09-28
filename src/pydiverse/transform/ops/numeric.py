@@ -21,6 +21,8 @@ __all__ = [
     "Pos",
     "Abs",
     "Round",
+    "Floor",
+    "Ceil",
     "Exp",
     "Log",
 ]
@@ -150,6 +152,18 @@ class Round(ElementWise):
         "decimal -> decimal",
         "decimal, const int -> decimal",
     ]
+
+
+class Floor(ElementWise):
+    name = "floor"
+    signatures = [
+        "float64 -> float64",
+        "decimal -> decimal",
+    ]
+
+
+class Ceil(Floor):
+    name = "ceil"
 
 
 class Log(ElementWise):

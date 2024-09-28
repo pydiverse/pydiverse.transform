@@ -713,3 +713,17 @@ with PolarsImpl.op(ops.Log()) as op:
     @op.auto
     def _log(x):
         return x.log()
+
+
+with PolarsImpl.op(ops.Floor()) as op:
+
+    @op.auto
+    def _floor(x):
+        return x.floor()
+
+
+with PolarsImpl.op(ops.Ceil()) as op:
+
+    @op.auto
+    def _ceil(x):
+        return x.ceil()
