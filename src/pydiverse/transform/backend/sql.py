@@ -142,6 +142,12 @@ class SqlImpl(TableImpl):
         return order_expr
 
     @classmethod
+    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
+        return cls.compile_col_expr(cast.val, sqa_col).cast(
+            pdt_type_to_sqa(cast.target_type)
+        )
+
+    @classmethod
     def compile_col_expr(
         cls, expr: ColExpr, sqa_col: dict[str, sqa.Label]
     ) -> sqa.ColumnElement:
@@ -209,9 +215,7 @@ class SqlImpl(TableImpl):
             return expr.val
 
         elif isinstance(expr, Cast):
-            return cls.compile_col_expr(expr.val, sqa_col).cast(
-                pdt_type_to_sqa(expr.target_type)
-            )
+            return cls.compile_cast(expr, sqa_col)
 
         raise AssertionError
 

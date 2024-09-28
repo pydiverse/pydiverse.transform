@@ -8,11 +8,12 @@ import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
-from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.backend.sql import SqlImpl, pdt_type_to_sqa
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Cast,
     Col,
     ColExpr,
     ColFn,
@@ -29,6 +30,22 @@ MSSQL_NAN = MSSQL_INF + (-MSSQL_INF)
 
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
+
+    @classmethod
+    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
+        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
+        if isinstance(cast.val.dtype(), dtypes.String) and isinstance(
+            cast.target_type, dtypes.Float64
+        ):
+            return sqa.case(
+                (compiled_val == "inf", MSSQL_INF),
+                (compiled_val == "-inf", -MSSQL_INF),
+                (compiled_val == "nan", MSSQL_NAN),
+                else_=sqa.cast(
+                    compiled_val,
+                    pdt_type_to_sqa(cast.target_type),
+                ),
+            )
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
@@ -150,6 +167,14 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
 
     elif isinstance(expr, LiteralCol):
         return expr
+
+    elif isinstance(expr, Cast):
+        # TODO: does this really work for casting onto / from booleans? we probably have
+        # to use wants_bool_as_bit in some way when casting to bool
+        return Cast(
+            convert_bool_bit(expr.val, wants_bool_as_bit=wants_bool_as_bit),
+            expr.target_type,
+        )
 
     raise AssertionError
 

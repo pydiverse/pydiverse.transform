@@ -3,12 +3,30 @@ from __future__ import annotations
 import sqlalchemy as sqa
 
 from pydiverse.transform import ops
-from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.backend.sql import SqlImpl, pdt_type_to_sqa
+from pydiverse.transform.tree import dtypes
+from pydiverse.transform.tree.col_expr import Cast
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
 class SqliteImpl(SqlImpl):
     dialect_name = "sqlite"
+
+    @classmethod
+    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
+        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
+        if isinstance(cast.val.dtype(), dtypes.String) and isinstance(
+            cast.target_type, dtypes.Float64
+        ):
+            return sqa.case(
+                (compiled_val == "inf", sqa.literal("inf")),
+                (compiled_val == "-inf", sqa.literal("-inf")),
+                (compiled_val == "nan", sqa.literal("nan")),
+                else_=sqa.cast(
+                    compiled_val,
+                    pdt_type_to_sqa(cast.target_type),
+                ),
+            )
 
 
 with SqliteImpl.op(ops.Round()) as op:
