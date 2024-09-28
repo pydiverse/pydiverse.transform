@@ -13,6 +13,7 @@ from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Cast,
     Col,
     ColExpr,
     ColFn,
@@ -157,7 +158,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
-            inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
+            inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
                 by=order_by,
                 descending=descending,
                 nulls_last=nulls_last,
@@ -183,6 +184,11 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         if isinstance(expr.dtype(), dtypes.String):
             return pl.lit(expr.val)  # polars interprets strings as column names
         return expr.val
+
+    elif isinstance(expr, Cast):
+        return compile_col_expr(expr.val, name_in_df).cast(
+            pdt_type_to_polars(expr.target_type)
+        )
 
     else:
         raise AssertionError
@@ -339,8 +345,6 @@ def compile_ast(
 def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     if t.is_float():
         return dtypes.Float64()
-    elif t.is_decimal():
-        return dtypes.Decimal()
     elif t.is_integer():
         return dtypes.Int()
     elif isinstance(t, pl.Boolean):
@@ -360,10 +364,8 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
 
 
 def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
-    if isinstance(t, dtypes.Float64):
+    if isinstance(t, (dtypes.Float64, dtypes.Decimal)):
         return pl.Float64()
-    elif isinstance(t, dtypes.Decimal):
-        return pl.Decimal()
     elif isinstance(t, dtypes.Int):
         return pl.Int64()
     elif isinstance(t, dtypes.Bool):
