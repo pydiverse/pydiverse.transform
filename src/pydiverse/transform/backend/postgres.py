@@ -13,10 +13,12 @@ class PostgresImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        if isinstance(cast.dtype(), dtypes.Float64) and isinstance(
+        if isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
             cast.target_type, dtypes.Int
         ):
-            return ...
+            return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
+                sqa.Integer()
+            )
         return super().compile_cast(cast, sqa_col)
 
 
