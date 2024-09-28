@@ -47,6 +47,8 @@ class MsSqlImpl(SqlImpl):
                 ),
             )
 
+        return sqa.cast(compiled_val, pdt_type_to_sqa(cast.target_type))
+
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
         # boolean / bit conversion

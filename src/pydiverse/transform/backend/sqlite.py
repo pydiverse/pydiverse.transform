@@ -15,6 +15,7 @@ class SqliteImpl(SqlImpl):
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
+
         if isinstance(cast.val.dtype(), dtypes.String) and isinstance(
             cast.target_type, dtypes.Float64
         ):
@@ -27,6 +28,8 @@ class SqliteImpl(SqlImpl):
                     pdt_type_to_sqa(cast.target_type),
                 ),
             )
+
+        return sqa.cast(compiled_val, pdt_type_to_sqa(cast.target_type))
 
 
 with SqliteImpl.op(ops.Round()) as op:
