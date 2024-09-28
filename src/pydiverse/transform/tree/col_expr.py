@@ -462,7 +462,6 @@ class Cast(ColExpr):
             valid_casts = {
                 (dtypes.String, dtypes.Int),
                 (dtypes.String, dtypes.Float64),
-                (dtypes.String, dtypes.Bool),
                 (dtypes.Float64, dtypes.Int),
             }
 
