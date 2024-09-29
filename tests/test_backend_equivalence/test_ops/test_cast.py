@@ -22,14 +22,5 @@ def test_string_to_int(df_strings):
 def test_float_to_int(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            u=t.a.cast(pdt.Int()),
-            v=t.b.cast(pdt.Int()),
-            w=t.f.cast(pdt.Int()),
-            x=t.d.cast(pdt.Int()),
-            y=t.e.cast(pdt.Int()),
-            z=t.f.cast(pdt.Int()),
-            q=t.g.cast(pdt.Int()),
-        ),
+        lambda t: t >> mutate(**{c.name: c.cast(pdt.Int()) for c in t}),
     )

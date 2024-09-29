@@ -9,15 +9,9 @@ import sqlalchemy as sqa
 
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import (
-    Col,
-    ColExpr,
-)
+from pydiverse.transform.tree.col_expr import Col
 
 
-# TODO: if we decide that select controls the C-space, the columns in _select will
-# always be the same as those that we have to keep in _schema. However, we still need
-# _select for the order.
 class Table:
     __slots__ = ["_ast", "_cache"]
 
@@ -26,7 +20,8 @@ class Table:
     which is a reference to the underlying abstract syntax tree.
     """
 
-    # TODO: define exactly what can be given for the two
+    # TODO: define exactly what can be given for the two and do type checks
+    #       maybe call the second one execution_engine or similar?
     def __init__(self, resource, backend=None, *, name: str | None = None):
         import polars as pl
 
@@ -40,6 +35,8 @@ class Table:
             self._ast: AstNode = resource
         elif isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
             if name is None:
+                # TODO: we could look whether the df has a name attr set (which is the
+                # case if it was previously exported)
                 name = "?"
             self._ast = PolarsImpl(name, resource)
         elif isinstance(resource, (str, sqa.Table)):
@@ -77,7 +74,7 @@ class Table:
         for slot, val in d[1].items():
             setattr(self, slot, val)
 
-    def __iter__(self) -> Iterable[ColExpr]:
+    def __iter__(self) -> Iterable[Col]:
         cols = copy.copy(self._cache.select)
         yield from cols
 

@@ -7,91 +7,80 @@ from tests.util.assertion import assert_result_equal
 def test_exp(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            exp_a=t.a.exp(),
-            exp_b=t.b.exp(),
-            exp_c=t.c.exp(),
-            exp_d=t.d.exp(),
-        ),
+        lambda t: t >> mutate(**{c.name: c.exp() for c in t}),
     )
 
 
 def test_log(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            log_a=t.a.log(),
-            log_b=t.b.log(),
-            log_c=t.c.log(),
-            log_d=t.d.log(),
-            log_e=t.e.exp(),
-        ),
+        lambda t: t >> mutate(**{c.name: c.log() for c in t}),
     )
 
 
 def test_abs(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            abs_a=abs(t.a),
-            abs_b=abs(t.b),
-            abs_c=abs(t.c),
-            abs_d=abs(t.d),
-        ),
+        lambda t: t >> mutate(**{c.name: abs(c) for c in t}),
     )
 
 
 def test_round(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            round_a=round(t.a),
-            round_b=round(t.b),
-            round_c=round(t.c),
-            round_d=round(t.d),
-        ),
+        lambda t: t >> mutate(**{c.name: round(c) for c in t}),
+    )
+
+
+def test_add(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{f"{c.name}+{d.name}": c + d for d in t for c in t}),
+    )
+
+
+def test_sub(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{f"{c.name}-{d.name}": c - d for d in t for c in t}),
+    )
+
+
+def test_neg(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{c.name: -c for c in t}),
+    )
+
+
+def test_mul(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{f"{c.name}*{d.name}": c * d for d in t for c in t}),
     )
 
 
 def test_div(df_num):
-    assert_result_equal(df_num, lambda t: t >> mutate(u=t.a / 2, v=t.b / 3.1))
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{f"{c.name}/{d.name}": c / d for d in t for c in t}),
+    )
 
 
 def test_decimal(df_num):
+    # TODO: test the decimal here
     assert_result_equal(df_num, lambda t: t >> mutate(u=t.f + t.g, z=t.f * t.g))
 
 
 def test_floor(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            u=t.a.floor(),
-            v=t.b.floor(),
-            w=t.f.floor(),
-            x=t.d.floor(),
-            y=t.e.floor(),
-            z=t.f.floor(),
-            q=t.g.floor(),
-        ),
+        lambda t: t >> mutate(**{c.name: c.floor() for c in t}),
     )
 
 
 def test_ceil(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            u=t.a.ceil(),
-            v=t.b.ceil(),
-            w=t.f.ceil(),
-            x=t.d.ceil(),
-            y=t.e.ceil(),
-            z=t.f.ceil(),
-            q=t.g.ceil(),
-        ),
+        lambda t: t >> mutate(**{c.name: c.ceil() for c in t}),
     )
