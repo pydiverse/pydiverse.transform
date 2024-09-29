@@ -22,7 +22,7 @@ class SqliteImpl(SqlImpl):
             return sqa.case(
                 (compiled_val == "inf", sqa.literal("inf")),
                 (compiled_val == "-inf", sqa.literal("-inf")),
-                (compiled_val == "nan", sqa.literal("nan")),
+                (compiled_val.in_(("nan", "-nan")), sqa.literal("nan")),
                 else_=sqa.cast(
                     compiled_val,
                     pdt_type_to_sqa(cast.target_type),
