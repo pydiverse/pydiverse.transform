@@ -12,6 +12,10 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class SqliteImpl(SqlImpl):
     dialect_name = "sqlite"
 
+    INF = sqa.cast(sqa.literal("1e314"), sqa.Float)
+    NEG_INF = -INF
+    NAN = sqa.null()
+
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
@@ -20,9 +24,9 @@ class SqliteImpl(SqlImpl):
             cast.target_type, dtypes.Float64
         ):
             return sqa.case(
-                (compiled_val == "inf", sqa.literal("inf")),
-                (compiled_val == "-inf", sqa.literal("-inf")),
-                (compiled_val.in_(("nan", "-nan")), sqa.literal("nan")),
+                (compiled_val == "inf", cls.INF),
+                (compiled_val == "-inf", cls.NEG_INF),
+                (compiled_val.in_(("nan", "-nan")), cls.NAN),
                 else_=sqa.cast(
                     compiled_val,
                     pdt_type_to_sqa(cast.target_type),

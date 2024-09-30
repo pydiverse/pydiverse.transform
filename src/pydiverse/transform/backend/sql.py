@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import inspect
 import itertools
+import math
 import operator
 from collections.abc import Iterable
 from typing import Any
@@ -33,6 +34,10 @@ from pydiverse.transform.tree.dtypes import Dtype
 
 class SqlImpl(TableImpl):
     Dialects: dict[str, type[TableImpl]] = {}
+
+    INF = sqa.cast(sqa.literal("inf"), sqa.Float())
+    NEG_INF = sqa.cast(sqa.literal("-inf"), sqa.Float())
+    NAN = sqa.cast(sqa.literal("nan"), sqa.Float())
 
     def __new__(cls, *args, **kwargs) -> SqlImpl:
         engine: str | sqa.Engine = (
@@ -113,6 +118,7 @@ class SqlImpl(TableImpl):
                         sql_col.name: pdt_type_to_polars(col.dtype())
                         for sql_col, col in zip(sel.columns.values(), final_select)
                     },
+                    infer_schema_length=0,
                 )
                 df.name = nd.name
                 return df
@@ -212,6 +218,11 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(expr, LiteralCol):
+            if isinstance(expr.val, float):
+                if math.isnan(expr.val):
+                    return cls.NAN
+                elif math.isinf(expr.val):
+                    return cls.INF if expr.val > 0 else cls.NEG_INF
             return expr.val
 
         elif isinstance(expr, Cast):
@@ -581,7 +592,7 @@ def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
 
 def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
     if isinstance(t, dtypes.Int):
-        return sqa.Integer()
+        return sqa.BigInteger()
     elif isinstance(t, dtypes.Float64):
         return sqa.Float()
     elif isinstance(t, dtypes.Decimal):

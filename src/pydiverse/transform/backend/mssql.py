@@ -22,14 +22,15 @@ from pydiverse.transform.tree.col_expr import (
 )
 from pydiverse.transform.util.warnings import warn_non_standard
 
-MSSQL_INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Float()) / sqa.literal(
-    "0.0", type_=sqa.Float()
-)
-MSSQL_NAN = MSSQL_INF + (-MSSQL_INF)
-
 
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
+
+    INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Float()) / sqa.literal(
+        "0.0", type_=sqa.Float()
+    )
+    NEG_INF = -INF
+    NAN = INF + NEG_INF
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
@@ -38,9 +39,9 @@ class MsSqlImpl(SqlImpl):
             cast.target_type, dtypes.Float64
         ):
             return sqa.case(
-                (compiled_val == "inf", MSSQL_INF),
-                (compiled_val == "-inf", -MSSQL_INF),
-                (compiled_val.in_(("nan", "-nan")), MSSQL_NAN),
+                (compiled_val == "inf", cls.INF),
+                (compiled_val == "-inf", -cls.INF),
+                (compiled_val.in_(("nan", "-nan")), cls.NAN),
                 else_=sqa.cast(
                     compiled_val,
                     pdt_type_to_sqa(cast.target_type),
@@ -330,9 +331,9 @@ with MsSqlImpl.op(ops.Log()) as op:
         # TODO: we still need to handle inf / -inf / nan
         return sqa.case(
             (x > 0, sqa.func.log(x)),
-            (x < 0, MSSQL_NAN),
+            (x < 0, MsSqlImpl.NAN),
             (x.is_(sqa.null()), None),
-            else_=-MSSQL_INF,
+            else_=-MsSqlImpl.INF,
         )
 
 
