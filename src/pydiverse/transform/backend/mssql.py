@@ -364,3 +364,13 @@ with MsSqlImpl.op(ops.StrToDateTime()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.cast(x, DATETIME2)
+
+
+with MsSqlImpl.op(ops.Round()) as op:
+
+    @op.auto
+    def _round(x, decimals=0):
+        return sqa.case(
+            (x != x, MsSqlImpl.NAN),
+            else_=sqa.func.round(x, decimals, type_=x.type),
+        )
