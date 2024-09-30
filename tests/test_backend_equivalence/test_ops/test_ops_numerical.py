@@ -21,28 +21,36 @@ def add_nan_inf_cols(table: pdt.Table) -> pdt.Table:
 def test_exp(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> add_nan_inf_cols() >> mutate(**{c.name: c.exp() for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: mutate(**{c.name: c.exp() for c in s})),
     )
 
 
 def test_log(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{c.name: c.log() for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: mutate(**{c.name: c.log() for c in s})),
     )
 
 
 def test_abs(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{c.name: abs(c) for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: mutate(**{c.name: c.abs() for c in s})),
     )
 
 
 def test_round(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{c.name: round(c) for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: mutate(**{c.name: round(c) for c in s})),
     )
 
 
@@ -52,8 +60,7 @@ def test_add(df_num):
         lambda t: t
         >> add_nan_inf_cols()
         >> (
-            lambda s: s
-            >> mutate(**{f"add_{c.name}_{d.name}": c + d for d in s for c in s})
+            lambda s: mutate(**{f"add_{c.name}_{d.name}": c + d for d in s for c in s})
         ),
     )
 
@@ -64,8 +71,10 @@ def test_sub(df_num):
         lambda t: t
         >> add_nan_inf_cols()
         >> (
-            lambda s: s
-            >> mutate(**{f"sub_{c.name}_{d.name}": c - d for d in s for c in s})
+            lambda s: (
+                mutate(**{f"sub_{c.name}_{d.name}": c - d for d in s for c in s})
+                >> (lambda u: mutate())
+            )
         ),
     )
 
@@ -75,21 +84,29 @@ def test_neg(df_num):
         df_num,
         lambda t: t
         >> add_nan_inf_cols()
-        >> (lambda s: s >> mutate(**{f"neg_{c.name}": -c for c in s})),
+        >> (lambda s: mutate(**{f"neg_{c.name}": -c for c in s})),
     )
 
 
 def test_mul(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{f"{c.name}*{d.name}": c * d for d in t for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (
+            lambda s: mutate(**{f"mul_{c.name}_{d.name}": c * d for d in s for c in s})
+        ),
     )
 
 
 def test_div(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{f"{c.name}/{d.name}": c / d for d in t for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (
+            lambda s: mutate(**{f"div_{c.name}_{d.name}": c / d for d in s for c in s})
+        ),
     )
 
 
@@ -101,12 +118,16 @@ def test_decimal(df_num):
 def test_floor(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{c.name: c.floor() for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: mutate(**{c.name: c.floor() for c in s})),
     )
 
 
 def test_ceil(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{c.name: c.ceil() for c in t}),
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: mutate(**{c.name: c.ceil() for c in s})),
     )

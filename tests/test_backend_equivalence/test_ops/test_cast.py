@@ -59,8 +59,8 @@ def test_float_to_string(df_num):
         df_num,
         lambda t: t
         >> add_nan_inf_cols()
-        >> (lambda s: s >> mutate(**{c.name: c.cast(pdt.String()) for c in s}))
-        >> (lambda s: s >> mutate(**{c.name: c.cast(pdt.Float64()) for c in s})),
+        >> (lambda s: mutate(**{c.name: c.cast(pdt.String()) for c in s}))
+        >> (lambda s: mutate(**{c.name: c.cast(pdt.Float64()) for c in s})),
     )
 
 

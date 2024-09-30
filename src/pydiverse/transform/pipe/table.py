@@ -85,7 +85,7 @@ class Table:
 
     def __rshift__(self, rhs):
         if isinstance(rhs, Pipeable):
-            return rhs.__rrshift__(self)
+            return rhs(self)
         if isinstance(rhs, Callable):
             num_params = len(inspect.signature(rhs).parameters)
             if num_params != 1:
@@ -93,7 +93,7 @@ class Table:
                     "only functions with one parameter can be used in a pipe, got "
                     f"function with {num_params} parameters."
                 )
-            return rhs(self)
+            return self >> rhs(self)
 
         raise TypeError(
             f"found instance of invalid type `{type(rhs)}` in the pipe. \n"
