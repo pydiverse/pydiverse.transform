@@ -464,6 +464,8 @@ class Cast(ColExpr):
                 (dtypes.String, dtypes.Float64),
                 (dtypes.Float64, dtypes.Int),
                 (dtypes.DateTime, dtypes.Date),
+                (dtypes.Int, dtypes.String),
+                (dtypes.Float64, dtypes.String),
             }
 
             if (

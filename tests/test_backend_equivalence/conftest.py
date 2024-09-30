@@ -178,6 +178,13 @@ dataframes = {
             "null_s": [0.0, None, None, None, None, None, None, None],
         }
     ),
+    "df_int": pl.DataFrame(
+        {
+            "a": [3, 1, 0, -12, 4, 5, 1 << 20, 5],
+            "b": [-23, 18282, -42, 1729, None, -2323, 11, 1],
+            "null_s": [0] + [None] * 7,
+        }
+    ),
 }
 
 # compare one dataframe and one SQL backend to all others

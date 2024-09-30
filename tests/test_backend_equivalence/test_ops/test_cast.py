@@ -46,3 +46,18 @@ def test_datetime_to_date(df_datetime):
         df_datetime,
         lambda t: t >> mutate(u=t.col1.cast(pdt.Date()), v=t.col2.cast(pdt.Date())),
     )
+
+
+def test_int_to_string(df_int):
+    assert_result_equal(
+        df_int, lambda t: t >> mutate(**{c.name: c.cast(pdt.String()) for c in t})
+    )
+
+
+def test_float_to_string(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: s >> mutate(**{c.name: c.cast(pdt.String()) for c in s})),
+    )
