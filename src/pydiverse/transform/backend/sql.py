@@ -1004,9 +1004,9 @@ with SqlImpl.op(ops.Log()) as op:
         # TODO: we still need to handle inf / -inf / nan
         return sqa.case(
             (x > 0, sqa.func.ln(x)),
-            (x < 0, sqa.literal("nan")),
+            (x < 0, SqlImpl.NAN),
             (x.is_(sqa.null()), None),
-            else_=sqa.literal("-inf"),
+            else_=SqlImpl.NEG_INF,
         )
 
 

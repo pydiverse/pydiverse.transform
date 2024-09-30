@@ -343,7 +343,6 @@ with MsSqlImpl.op(ops.Log()) as op:
 
     @op.auto
     def _log(x):
-        # TODO: we still need to handle inf / -inf / nan
         return sqa.case(
             (x > 0, sqa.func.log(x)),
             (x < 0, MsSqlImpl.NAN),

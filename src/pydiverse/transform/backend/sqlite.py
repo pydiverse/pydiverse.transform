@@ -157,3 +157,15 @@ with SqliteImpl.op(ops.Floor()) as op:
     @op.auto
     def _floor(x):
         return -sqa.func.ceil(-x)
+
+
+with SqliteImpl.op(ops.Log()) as op:
+
+    @op.auto
+    def _log(x):
+        return sqa.case(
+            (x > 0, sqa.func.ln(x)),
+            (x < 0, SqliteImpl.NAN),
+            (x.is_(sqa.null()), None),
+            else_=SqliteImpl.NEG_INF,
+        )
