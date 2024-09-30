@@ -80,7 +80,7 @@ class Int64(Dtype):
         if super().can_promote_to(other):
             return True
 
-        # int can be promoted to float64
+        # int64 can be promoted to float64
         if Float64().same_kind(other):
             if other.const and not self.const:
                 return False
@@ -199,7 +199,7 @@ def dtype_from_string(t: str) -> Dtype:
     if is_template:
         return Template(base_type, const=is_const, vararg=is_vararg)
 
-    if base_type == "int":
+    if base_type == "int64":
         return Int64(const=is_const, vararg=is_vararg)
     if base_type == "float64":
         return Float64(const=is_const, vararg=is_vararg)

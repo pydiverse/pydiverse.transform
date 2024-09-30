@@ -26,11 +26,11 @@ __all__ = [
 
 
 class DtExtract(ElementWise, Unary):
-    signatures = ["datetime -> int"]
+    signatures = ["datetime -> int64"]
 
 
 class DateExtract(ElementWise, Unary):
-    signatures = ["datetime -> int", "date -> int"]
+    signatures = ["datetime -> int64", "date -> int64"]
 
 
 class DtYear(DateExtract):
@@ -70,7 +70,7 @@ class DtDayOfYear(DateExtract):
 
 
 class DurationToUnit(ElementWise, Unary):
-    signatures = ["duration -> int"]
+    signatures = ["duration -> int64"]
 
 
 class DtDays(DurationToUnit):
