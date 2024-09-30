@@ -38,6 +38,15 @@ class SqliteImpl(SqlImpl):
         ):
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.DATE())
 
+        elif isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
+            cast.target_type, dtypes.String
+        ):
+            return sqa.case(
+                (compiled_val == cls.INF, "inf"),
+                (compiled_val == cls.NEG_INF, "-inf"),
+                else_=sqa.cast(compiled_val, sqa.String),
+            )
+
         return sqa.cast(compiled_val, pdt_type_to_sqa(cast.target_type))
 
 

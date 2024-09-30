@@ -48,6 +48,17 @@ class MsSqlImpl(SqlImpl):
                 ),
             )
 
+        if isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
+            cast.target_type, dtypes.String
+        ):
+            compiled = super().compile_cast(cast, sqa_col)
+            return sqa.case(
+                (compiled == "1.#QNAN", "nan"),
+                (compiled == "1.#INF", "inf"),
+                (compiled == "-1.#INF", "-inf"),
+                else_=compiled,
+            )
+
         return sqa.cast(compiled_val, pdt_type_to_sqa(cast.target_type))
 
     @classmethod

@@ -186,9 +186,15 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return expr.val
 
     elif isinstance(expr, Cast):
-        return compile_col_expr(expr.val, name_in_df).cast(
+        compiled = compile_col_expr(expr.val, name_in_df).cast(
             pdt_type_to_polars(expr.target_type)
         )
+        if isinstance(expr.val.dtype(), dtypes.Float64) and isinstance(
+            expr.target_type, dtypes.String
+        ):
+            compiled = compiled.replace("NaN", "nan")
+
+        return compiled
 
     else:
         raise AssertionError

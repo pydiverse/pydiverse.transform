@@ -13,12 +13,21 @@ class PostgresImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        if isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
-            cast.target_type, dtypes.Int
-        ):
-            return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
-                sqa.BigInteger()
-            )
+        if isinstance(cast.val.dtype(), dtypes.Float64):
+            if isinstance(cast.target_type, dtypes.Int):
+                return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
+                    sqa.BigInteger()
+                )
+
+            if isinstance(cast.target_type, dtypes.String):
+                compiled = super().compile_cast(cast, sqa_col)
+                return sqa.case(
+                    (compiled == "NaN", "nan"),
+                    (compiled == "Infinity", "inf"),
+                    (compiled == "-Infinity", "-inf"),
+                    else_=compiled,
+                )
+
         return super().compile_cast(cast, sqa_col)
 
 
