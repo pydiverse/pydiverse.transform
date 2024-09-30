@@ -20,9 +20,7 @@ class SqliteImpl(SqlImpl):
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
 
-        if isinstance(cast.val.dtype(), dtypes.String) and isinstance(
-            cast.target_type, dtypes.Float64
-        ):
+        if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
             return sqa.case(
                 (compiled_val == "inf", cls.INF),
                 (compiled_val == "-inf", cls.NEG_INF),
@@ -33,14 +31,10 @@ class SqliteImpl(SqlImpl):
                 ),
             )
 
-        elif isinstance(cast.val.dtype(), dtypes.DateTime) and isinstance(
-            cast.target_type, dtypes.Date
-        ):
+        elif cast.val.dtype() == dtypes.DateTime and cast.target_type == dtypes.Date:
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
 
-        elif isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
-            cast.target_type, dtypes.String
-        ):
+        elif cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
             return sqa.case(
                 (compiled_val == cls.INF, "inf"),
                 (compiled_val == cls.NEG_INF, "-inf"),

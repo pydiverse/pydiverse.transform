@@ -181,7 +181,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        if isinstance(expr.dtype(), dtypes.String):
+        if expr.dtype() == dtypes.String:
             return pl.lit(expr.val)  # polars interprets strings as column names
         return expr.val
 
@@ -190,9 +190,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             pdt_type_to_polars(expr.target_type)
         )
 
-        if isinstance(expr.val.dtype(), dtypes.Float64) and isinstance(
-            expr.target_type, dtypes.String
-        ):
+        if expr.val.dtype() == dtypes.Float64 and expr.target_type == dtypes.String:
             compiled = compiled.replace("NaN", "nan")
 
         return compiled

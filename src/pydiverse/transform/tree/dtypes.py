@@ -13,18 +13,21 @@ class Dtype(ABC):
         self.const = const
         self.vararg = vararg
 
-    def __eq__(self, other):
-        if type(self) is other:
+    def __eq__(self, rhs):
+        if type(self) is rhs:
             return True
-        if type(self) is not type(other):
+        if type(self) is not type(rhs):
             return False
-        if self.const != other.const:
+        if self.const != rhs.const:
             return False
-        if self.vararg != other.vararg:
+        if self.vararg != rhs.vararg:
             return False
-        if self.name != other.name:
+        if self.name != rhs.name:
             return False
         return True
+
+    def __ne__(self, rhs: object) -> bool:
+        return not self.__eq__(rhs)
 
     def __hash__(self):
         return hash((self.name, self.const, self.vararg, type(self).__qualname__))

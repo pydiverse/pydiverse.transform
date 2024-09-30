@@ -118,7 +118,6 @@ class SqlImpl(TableImpl):
                         sql_col.name: pdt_type_to_polars(col.dtype())
                         for sql_col, col in zip(sel.columns.values(), final_select)
                     },
-                    infer_schema_length=0,
                 )
                 df.name = nd.name
                 return df

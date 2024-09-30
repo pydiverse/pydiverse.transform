@@ -36,9 +36,7 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
-        if isinstance(cast.val.dtype(), dtypes.String) and isinstance(
-            cast.target_type, dtypes.Float64
-        ):
+        if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
             return sqa.case(
                 (compiled_val == "inf", cls.INF),
                 (compiled_val == "-inf", -cls.INF),
@@ -49,9 +47,7 @@ class MsSqlImpl(SqlImpl):
                 ),
             )
 
-        if isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
-            cast.target_type, dtypes.String
-        ):
+        if cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
             compiled = sqa.cast(cls.compile_col_expr(cast.val, sqa_col), sqa.String)
             return sqa.case(
                 (compiled == "1.#QNAN", "nan"),
@@ -137,7 +133,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         )
 
     elif isinstance(expr, Col):
-        if not wants_bool_as_bit and isinstance(expr.dtype(), dtypes.Bool):
+        if not wants_bool_as_bit and expr.dtype() == dtypes.Bool:
             return ColFn("__eq__", expr, LiteralCol(True))
         return expr
 

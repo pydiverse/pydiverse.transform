@@ -18,7 +18,7 @@ def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
 
 
 def when(condition: ColExpr) -> WhenClause:
-    if condition.dtype() is not None and not isinstance(condition.dtype(), dtypes.Bool):
+    if condition.dtype() is not None and condition.dtype() != dtypes.Bool:
         raise TypeError(
             "argument for `when` must be of boolean type, but has type "
             f"`{condition.dtype()}`"

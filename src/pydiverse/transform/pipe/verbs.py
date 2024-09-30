@@ -198,7 +198,7 @@ def filter(table: Table, *predicates: ColExpr):
     new._ast = Filter(table._ast, preprocess_arg(predicates, table))
 
     for cond in new._ast.filters:
-        if not isinstance(cond.dtype(), dtypes.Bool):
+        if cond.dtype() != dtypes.Bool:
             raise TypeError(
                 "predicates given to `filter` must be of boolean type.\n"
                 f"hint: {cond} is of type {cond.dtype()} instead."

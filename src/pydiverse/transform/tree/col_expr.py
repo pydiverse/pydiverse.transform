@@ -115,7 +115,7 @@ class Col(ColExpr):
             )
 
     def __hash__(self) -> int:
-        return hash(self.uuid)
+        return hash(self._uuid)
 
 
 class ColName(ColExpr):
@@ -384,7 +384,7 @@ class CaseExpr(ColExpr):
             raise TypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
-            if cond.dtype() is not None and not isinstance(cond.dtype(), dtypes.Bool):
+            if cond.dtype() is not None and cond.dtype() != dtypes.Bool:
                 raise TypeError(
                     f"argument `{cond}` for `when` must be of boolean type, but has "
                     f"type `{cond.dtype()}`"
@@ -475,9 +475,9 @@ class Cast(ColExpr):
                 self.target_type.__class__,
             ) not in valid_casts:
                 hint = ""
-                if self.val.dtype() == dtypes.String and (
-                    (self.target_type == dtypes.DateTime)
-                    or (self.target_type == dtypes.Date)
+                if self.val.dtype() == dtypes.String and self.target_type in (
+                    dtypes.DateTime,
+                    dtypes.Date,
                 ):
                     hint = (
                         "\nhint: to convert a str to datetime, call "

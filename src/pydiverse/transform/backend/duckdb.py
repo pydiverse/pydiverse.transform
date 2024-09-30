@@ -26,9 +26,7 @@ class DuckDbImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        if isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
-            cast.target_type, dtypes.Int
-        ):
+        if cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.Int:
             return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
                 sqa.BigInteger()
             )
