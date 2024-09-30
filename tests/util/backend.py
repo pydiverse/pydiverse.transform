@@ -38,7 +38,6 @@ def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
     global _sql_engine_cache
 
     dtypes_map = dtypes_map or {}
-    dtypes_map[pl.Decimal()] = sqa.DECIMAL()
 
     if url in _sql_engine_cache:
         engine = _sql_engine_cache[url]

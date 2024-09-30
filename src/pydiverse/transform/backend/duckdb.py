@@ -30,6 +30,6 @@ class DuckDbImpl(SqlImpl):
             cast.target_type, dtypes.Int
         ):
             return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
-                sqa.Integer()
+                sqa.BigInteger()
             )
         return super().compile_cast(cast, sqa_col)
