@@ -594,7 +594,7 @@ def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
     if isinstance(t, dtypes.Int):
         return sqa.BigInteger()
     elif isinstance(t, dtypes.Float64):
-        return sqa.Float()
+        return sqa.Double()
     elif isinstance(t, dtypes.Decimal):
         return sqa.DECIMAL()
     elif isinstance(t, dtypes.String):

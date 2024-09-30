@@ -33,6 +33,11 @@ class SqliteImpl(SqlImpl):
                 ),
             )
 
+        elif isinstance(cast.val.dtype(), dtypes.DateTime) and isinstance(
+            cast.target_type, dtypes.Date
+        ):
+            return sqa.type_coerce(sqa.func.date(compiled_val), sqa.DATE())
+
         return sqa.cast(compiled_val, pdt_type_to_sqa(cast.target_type))
 
 

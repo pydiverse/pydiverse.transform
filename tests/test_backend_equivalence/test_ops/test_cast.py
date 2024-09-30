@@ -39,3 +39,10 @@ def test_float_to_int(df_num):
         exception=Exception,
         may_throw=True,
     )
+
+
+def test_datetime_to_date(df_datetime):
+    assert_result_equal(
+        df_datetime,
+        lambda t: t >> mutate(u=t.col1.cast(pdt.Date()), v=t.col2.cast(pdt.Date())),
+    )

@@ -32,7 +32,7 @@ def polars_table(df: pl.DataFrame, name: str):
 _sql_engine_cache = {}
 
 
-def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
+def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict | None = None):
     import sqlalchemy as sqa
 
     global _sql_engine_cache
