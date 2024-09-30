@@ -73,8 +73,8 @@ class Dtype(ABC):
         return other.same_kind(self)
 
 
-class Int(Dtype):
-    name = "int"
+class Int64(Dtype):
+    name = "int64"
 
     def can_promote_to(self, other: Dtype) -> bool:
         if super().can_promote_to(other):
@@ -151,7 +151,7 @@ class NoneDtype(Dtype):
 
 def python_type_to_pdt(t: type) -> Dtype:
     if t is int:
-        return Int()
+        return Int64()
     elif t is float:
         return Float64()
     elif t is bool:
@@ -200,7 +200,7 @@ def dtype_from_string(t: str) -> Dtype:
         return Template(base_type, const=is_const, vararg=is_vararg)
 
     if base_type == "int":
-        return Int(const=is_const, vararg=is_vararg)
+        return Int64(const=is_const, vararg=is_vararg)
     if base_type == "float64":
         return Float64(const=is_const, vararg=is_vararg)
     if base_type == "decimal":

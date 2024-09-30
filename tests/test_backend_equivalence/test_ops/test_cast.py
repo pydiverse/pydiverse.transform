@@ -17,25 +17,25 @@ def test_string_to_float(df_strings):
 def test_string_to_int(df_strings):
     assert_result_equal(
         df_strings,
-        lambda t: t >> mutate(u=t.d.cast(pdt.Int())),
+        lambda t: t >> mutate(u=t.d.cast(pdt.Int64())),
     )
 
 
 def test_float_to_int(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{col.name: col.cast(pdt.Int()) for col in t}),
+        lambda t: t >> mutate(**{col.name: col.cast(pdt.Int64()) for col in t}),
     )
 
     assert_result_equal(
         df_num,
-        lambda t: t >> add_nan_inf_cols() >> mutate(u=C.inf.cast(pdt.Int())),
+        lambda t: t >> add_nan_inf_cols() >> mutate(u=C.inf.cast(pdt.Int64())),
         exception=Exception,
         may_throw=True,
     )
     assert_result_equal(
         df_num,
-        lambda t: t >> add_nan_inf_cols() >> mutate(u=C.nan.cast(pdt.Int())),
+        lambda t: t >> add_nan_inf_cols() >> mutate(u=C.nan.cast(pdt.Int64())),
         exception=Exception,
         may_throw=True,
     )

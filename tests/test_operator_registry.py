@@ -24,13 +24,13 @@ def assert_signature(
 class TestOperatorSignature:
     def test_parse_simple(self):
         s = OperatorSignature.parse("int, int -> int")
-        assert_signature(s, [dtypes.Int(), dtypes.Int()], dtypes.Int())
+        assert_signature(s, [dtypes.Int64(), dtypes.Int64()], dtypes.Int64())
 
         s = OperatorSignature.parse("bool->bool ")
         assert_signature(s, [dtypes.Bool()], dtypes.Bool())
 
         s = OperatorSignature.parse("-> int")
-        assert_signature(s, [], dtypes.Int())
+        assert_signature(s, [], dtypes.Int64())
 
         with pytest.raises(ValueError):
             OperatorSignature.parse("int, int -> ")
@@ -112,7 +112,7 @@ class TestOperatorRegistry:
         assert reg.get_impl("op1", parse_dtypes("int", "int"))() == 1
         assert isinstance(
             reg.get_impl("op1", parse_dtypes("int", "int")).return_type,
-            dtypes.Int,
+            dtypes.Int64,
         )
         assert reg.get_impl("op2", parse_dtypes("int", "int"))() == 10
 
@@ -187,11 +187,11 @@ class TestOperatorRegistry:
         )
         assert isinstance(
             reg.get_impl("op3", parse_dtypes("int")).return_type,
-            dtypes.Int,
+            dtypes.Int64,
         )
         assert isinstance(
             reg.get_impl("op3", parse_dtypes("int", "int", "float64")).return_type,
-            dtypes.Int,
+            dtypes.Int64,
         )
         assert isinstance(
             reg.get_impl("op3", parse_dtypes("str", "int", "float64")).return_type,

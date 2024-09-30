@@ -351,7 +351,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     if t.is_float():
         return dtypes.Float64()
     elif t.is_integer():
-        return dtypes.Int()
+        return dtypes.Int64()
     elif isinstance(t, pl.Boolean):
         return dtypes.Bool()
     elif isinstance(t, pl.String):
@@ -371,7 +371,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
 def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
     if isinstance(t, (dtypes.Float64, dtypes.Decimal)):
         return pl.Float64()
-    elif isinstance(t, dtypes.Int):
+    elif isinstance(t, dtypes.Int64):
         return pl.Int64()
     elif isinstance(t, dtypes.Bool):
         return pl.Boolean()

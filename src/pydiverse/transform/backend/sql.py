@@ -489,7 +489,7 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def sqa_type(cls, t: Dtype) -> sqa.types.TypeEngine:
-        if isinstance(t, dtypes.Int):
+        if isinstance(t, dtypes.Int64):
             return sqa.BigInteger()
         elif isinstance(t, dtypes.Float64):
             return sqa.Double()
@@ -513,7 +513,7 @@ class SqlImpl(TableImpl):
     @classmethod
     def pdt_type(cls, t: sqa.types.TypeEngine) -> Dtype:
         if isinstance(t, sqa.Integer):
-            return dtypes.Int()
+            return dtypes.Int64()
         elif isinstance(t, sqa.Float):
             return dtypes.Float64()
         elif isinstance(t, (sqa.DECIMAL, sqa.NUMERIC)):

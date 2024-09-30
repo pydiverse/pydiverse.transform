@@ -16,7 +16,7 @@ class PostgresImpl(SqlImpl):
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
 
         if isinstance(cast.val.dtype(), dtypes.Float64):
-            if isinstance(cast.target_type, dtypes.Int):
+            if isinstance(cast.target_type, dtypes.Int64):
                 return sqa.func.trunc(compiled_val).cast(sqa.BigInteger())
 
             if isinstance(cast.target_type, dtypes.String):

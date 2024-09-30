@@ -460,11 +460,11 @@ class Cast(ColExpr):
 
         if not self.val.dtype().can_promote_to(self.target_type):
             valid_casts = {
-                (dtypes.String, dtypes.Int),
+                (dtypes.String, dtypes.Int64),
                 (dtypes.String, dtypes.Float64),
-                (dtypes.Float64, dtypes.Int),
+                (dtypes.Float64, dtypes.Int64),
                 (dtypes.DateTime, dtypes.Date),
-                (dtypes.Int, dtypes.String),
+                (dtypes.Int64, dtypes.String),
                 (dtypes.Float64, dtypes.String),
                 (dtypes.DateTime, dtypes.String),
                 (dtypes.Date, dtypes.String),
