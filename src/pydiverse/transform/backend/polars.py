@@ -189,6 +189,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         compiled = compile_col_expr(expr.val, name_in_df).cast(
             pdt_type_to_polars(expr.target_type)
         )
+
         if isinstance(expr.val.dtype(), dtypes.Float64) and isinstance(
             expr.target_type, dtypes.String
         ):

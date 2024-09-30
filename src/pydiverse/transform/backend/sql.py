@@ -75,7 +75,7 @@ class SqlImpl(TableImpl):
 
         super().__init__(
             name,
-            {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns},
+            {col.name: self.pdt_type(col.type) for col in self.table.columns},
         )
 
     def __init_subclass__(cls, **kwargs):
@@ -86,7 +86,7 @@ class SqlImpl(TableImpl):
         return [col.name for col in self.table.columns]
 
     def schema(self) -> dict[str, Dtype]:
-        return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
+        return {col.name: self.pdt_type(col.type) for col in self.table.columns}
 
     def _clone(self) -> tuple[SqlImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned = self.__class__(self.table, SqlAlchemy(self.engine), self.name)
@@ -150,7 +150,7 @@ class SqlImpl(TableImpl):
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         return cls.compile_col_expr(cast.val, sqa_col).cast(
-            pdt_type_to_sqa(cast.target_type)
+            cls.sqa_type(cast.target_type)
         )
 
     @classmethod
@@ -488,6 +488,52 @@ class SqlImpl(TableImpl):
 
         return table, query, sqa_col
 
+    @classmethod
+    def sqa_type(cls, t: Dtype) -> sqa.types.TypeEngine:
+        if isinstance(t, dtypes.Int):
+            return sqa.BigInteger()
+        elif isinstance(t, dtypes.Float64):
+            return sqa.Double()
+        elif isinstance(t, dtypes.Decimal):
+            return sqa.DECIMAL()
+        elif isinstance(t, dtypes.String):
+            return sqa.String()
+        elif isinstance(t, dtypes.Bool):
+            return sqa.Boolean()
+        elif isinstance(t, dtypes.DateTime):
+            return sqa.DateTime()
+        elif isinstance(t, dtypes.Date):
+            return sqa.Date()
+        elif isinstance(t, dtypes.Duration):
+            return sqa.Interval()
+        elif isinstance(t, dtypes.NoneDtype):
+            return sqa.types.NullType()
+
+        raise AssertionError
+
+    @classmethod
+    def pdt_type(cls, t: sqa.types.TypeEngine) -> Dtype:
+        if isinstance(t, sqa.Integer):
+            return dtypes.Int()
+        elif isinstance(t, sqa.Float):
+            return dtypes.Float64()
+        elif isinstance(t, (sqa.DECIMAL, sqa.NUMERIC)):
+            return dtypes.Decimal()
+        elif isinstance(t, sqa.String):
+            return dtypes.String()
+        elif isinstance(t, sqa.Boolean):
+            return dtypes.Bool()
+        elif isinstance(t, sqa.DateTime):
+            return dtypes.DateTime()
+        elif isinstance(t, sqa.Date):
+            return dtypes.Date()
+        elif isinstance(t, sqa.Interval):
+            return dtypes.Duration()
+        elif isinstance(t, sqa.Null):
+            return dtypes.NoneDtype()
+
+        raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
+
 
 @dataclasses.dataclass(slots=True)
 class Query:
@@ -565,52 +611,6 @@ def get_engine(nd: AstNode) -> sqa.Engine:
         engine = nd.engine
 
     return engine
-
-
-def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
-    if isinstance(t, sqa.Integer):
-        return dtypes.Int()
-    elif isinstance(t, sqa.Float):
-        return dtypes.Float64()
-    elif isinstance(t, (sqa.DECIMAL, sqa.NUMERIC)):
-        return dtypes.Decimal()
-    elif isinstance(t, sqa.String):
-        return dtypes.String()
-    elif isinstance(t, sqa.Boolean):
-        return dtypes.Bool()
-    elif isinstance(t, sqa.DateTime):
-        return dtypes.DateTime()
-    elif isinstance(t, sqa.Date):
-        return dtypes.Date()
-    elif isinstance(t, sqa.Interval):
-        return dtypes.Duration()
-    elif isinstance(t, sqa.Null):
-        return dtypes.NoneDtype()
-
-    raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
-
-
-def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
-    if isinstance(t, dtypes.Int):
-        return sqa.BigInteger()
-    elif isinstance(t, dtypes.Float64):
-        return sqa.Double()
-    elif isinstance(t, dtypes.Decimal):
-        return sqa.DECIMAL()
-    elif isinstance(t, dtypes.String):
-        return sqa.String()
-    elif isinstance(t, dtypes.Bool):
-        return sqa.Boolean()
-    elif isinstance(t, dtypes.DateTime):
-        return sqa.DateTime()
-    elif isinstance(t, dtypes.Date):
-        return sqa.Date()
-    elif isinstance(t, dtypes.Duration):
-        return sqa.Interval()
-    elif isinstance(t, dtypes.NoneDtype):
-        return sqa.types.NullType()
-
-    raise AssertionError
 
 
 with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:

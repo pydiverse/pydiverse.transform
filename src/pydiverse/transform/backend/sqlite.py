@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sqa
 
 from pydiverse.transform import ops
-from pydiverse.transform.backend.sql import SqlImpl, pdt_type_to_sqa
+from pydiverse.transform.backend.sql import SqlImpl
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.col_expr import Cast
 from pydiverse.transform.util.warnings import warn_non_standard
@@ -29,14 +29,14 @@ class SqliteImpl(SqlImpl):
                 (compiled_val.in_(("nan", "-nan")), cls.NAN),
                 else_=sqa.cast(
                     compiled_val,
-                    pdt_type_to_sqa(cast.target_type),
+                    cls.sqa_type(cast.target_type),
                 ),
             )
 
         elif isinstance(cast.val.dtype(), dtypes.DateTime) and isinstance(
             cast.target_type, dtypes.Date
         ):
-            return sqa.type_coerce(sqa.func.date(compiled_val), sqa.DATE())
+            return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
 
         elif isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
             cast.target_type, dtypes.String
@@ -47,7 +47,7 @@ class SqliteImpl(SqlImpl):
                 else_=sqa.cast(compiled_val, sqa.String),
             )
 
-        return sqa.cast(compiled_val, pdt_type_to_sqa(cast.target_type))
+        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
 
 with SqliteImpl.op(ops.Round()) as op:

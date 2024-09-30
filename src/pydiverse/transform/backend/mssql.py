@@ -8,7 +8,7 @@ import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
-from pydiverse.transform.backend.sql import SqlImpl, pdt_type_to_sqa
+from pydiverse.transform.backend.sql import SqlImpl
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
@@ -44,14 +44,14 @@ class MsSqlImpl(SqlImpl):
                 (compiled_val.in_(("nan", "-nan")), cls.NAN),
                 else_=sqa.cast(
                     compiled_val,
-                    pdt_type_to_sqa(cast.target_type),
+                    cls.sqa_type(cast.target_type),
                 ),
             )
 
         if isinstance(cast.val.dtype(), dtypes.Float64) and isinstance(
             cast.target_type, dtypes.String
         ):
-            compiled = super().compile_cast(cast, sqa_col)
+            compiled = sqa.cast(cls.compile_col_expr(cast.val, sqa_col), sqa.String)
             return sqa.case(
                 (compiled == "1.#QNAN", "nan"),
                 (compiled == "1.#INF", "inf"),
@@ -59,7 +59,7 @@ class MsSqlImpl(SqlImpl):
                 else_=compiled,
             )
 
-        return sqa.cast(compiled_val, pdt_type_to_sqa(cast.target_type))
+        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
@@ -89,6 +89,15 @@ class MsSqlImpl(SqlImpl):
         sql.create_aliases(nd, {})
         table, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
         return cls.compile_query(table, query)
+
+    @classmethod
+    def sqa_type(cls, t: dtypes.Dtype):
+        if isinstance(t, dtypes.DateTime):
+            from sqlalchemy.dialects.mssql import DATETIME2
+
+            return DATETIME2()
+
+        return super().sqa_type(t)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
