@@ -466,6 +466,8 @@ class Cast(ColExpr):
                 (dtypes.DateTime, dtypes.Date),
                 (dtypes.Int, dtypes.String),
                 (dtypes.Float64, dtypes.String),
+                (dtypes.DateTime, dtypes.String),
+                (dtypes.Date, dtypes.String),
             }
 
             if (
@@ -485,7 +487,7 @@ class Cast(ColExpr):
         yield self.val
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        return g(Cast(g(self.val), self.target_type))
+        return g(Cast(self.val.map_subtree(g), self.target_type))
 
 
 @dataclasses.dataclass(slots=True)

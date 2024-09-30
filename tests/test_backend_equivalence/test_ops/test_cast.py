@@ -62,3 +62,26 @@ def test_float_to_string(df_num):
         >> (lambda s: s >> mutate(**{c.name: c.cast(pdt.String()) for c in s}))
         >> (lambda s: s >> mutate(**{c.name: c.cast(pdt.Float64()) for c in s})),
     )
+
+
+def test_datetime_to_string(df_datetime):
+    assert_result_equal(
+        df_datetime,
+        lambda t: t
+        >> mutate(
+            x=t.col1.cast(pdt.String()),
+            y=t.col2.cast(pdt.String()),
+        ),
+    )
+
+
+def test_date_to_string(df_datetime):
+    assert_result_equal(
+        df_datetime,
+        lambda t: t
+        >> mutate(
+            x=t.col1.cast(pdt.Date()).cast(pdt.String()),
+            y=t.col2.cast(pdt.Date()).cast(pdt.String()),
+            z=t.cdate.cast(pdt.String()),
+        ),
+    )
