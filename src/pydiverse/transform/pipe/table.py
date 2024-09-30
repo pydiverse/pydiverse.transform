@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-from collections.abc import Iterable
+import inspect
+from collections.abc import Callable, Iterable
 from html import escape
 
 import sqlalchemy as sqa
 
 from pydiverse.transform.backend.table_impl import TableImpl
+from pydiverse.transform.pipe.pipeable import Pipeable
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import Col
 
@@ -80,6 +82,25 @@ class Table:
 
     def __len__(self) -> int:
         return len(self._cache.select)
+
+    def __rshift__(self, rhs):
+        if isinstance(rhs, Pipeable):
+            return rhs.__rrshift__(self)
+        if isinstance(rhs, Callable):
+            num_params = len(inspect.signature(rhs).parameters)
+            if num_params != 1:
+                raise TypeError(
+                    "only functions with one parameter can be used in a pipe, got "
+                    f"function with {num_params} parameters."
+                )
+            return rhs(self)
+
+        raise TypeError(
+            f"found instance of invalid type `{type(rhs)}` in the pipe. \n"
+            "hint: You can use a `Table` or a Callable taking a single argument in a "
+            "pipe. If you use a Callable, it will receive the current table as an "
+            "and must return a `Table`."
+        )
 
     def __str__(self):
         try:
