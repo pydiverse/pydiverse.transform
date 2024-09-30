@@ -46,7 +46,7 @@ class SqliteImpl(SqlImpl):
 
 with SqliteImpl.op(ops.Round()) as op:
 
-    @op.auto
+    @op("decimal -> decimal")
     def _round(x, decimals=0):
         if decimals >= 0:
             return sqa.func.ROUND(x, decimals, type_=x.type)
@@ -149,3 +149,11 @@ with SqliteImpl.op(ops.StrToDate()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.type_coerce(x, sqa.Date)
+
+
+with SqliteImpl.op(ops.Floor()) as op:
+    # the SQLite floor function is cursed... it throws if you pass in a large value
+    # like 1e19. surprisingly, 1e18 works... what a coincidence... :)
+    @op.auto
+    def _floor(x):
+        return -sqa.func.ceil(-x)

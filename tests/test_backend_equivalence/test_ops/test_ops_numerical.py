@@ -41,7 +41,7 @@ def test_abs(df_num):
         df_num,
         lambda t: t
         >> add_nan_inf_cols()
-        >> (lambda s: mutate(**{c.name: c.abs() for c in s})),
+        >> (lambda s: mutate(**{c.name: abs(c) for c in s})),
     )
 
 
