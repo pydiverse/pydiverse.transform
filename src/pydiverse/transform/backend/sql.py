@@ -35,9 +35,9 @@ from pydiverse.transform.tree.dtypes import Dtype
 class SqlImpl(TableImpl):
     Dialects: dict[str, type[TableImpl]] = {}
 
-    INF = sqa.cast(sqa.literal("inf"), sqa.Float())
-    NEG_INF = sqa.cast(sqa.literal("-inf"), sqa.Float())
-    NAN = sqa.cast(sqa.literal("nan"), sqa.Float())
+    INF = sqa.cast(sqa.literal("inf"), sqa.Double)
+    NEG_INF = sqa.cast(sqa.literal("-inf"), sqa.Double)
+    NAN = sqa.cast(sqa.literal("nan"), sqa.Double)
 
     def __new__(cls, *args, **kwargs) -> SqlImpl:
         engine: str | sqa.Engine = (
@@ -469,10 +469,21 @@ class SqlImpl(TableImpl):
 
         elif isinstance(nd, SqlImpl):
             table = nd.table
-            query = Query([sqa.Label(col.name, col) for col in nd.table.columns])
+            cols = [
+                (
+                    sqa.type_coerce(col, sqa_type)
+                    if not isinstance(
+                        col.type,
+                        (sqa_type := cls.sqa_type(nd.cols[col.name].dtype())),
+                    )
+                    else col
+                ).label(col.name)
+                for col in nd.table.columns
+            ]
+            query = Query(cols)
             sqa_col = {
-                col._uuid: sqa.label(col.name, nd.table.columns[col.name])
-                for col in nd.cols.values()
+                nd.cols[table_col.name]._uuid: col
+                for table_col, col in zip(nd.table.columns, cols)
             }
 
         if isinstance(nd, verbs.Verb):
@@ -488,25 +499,25 @@ class SqlImpl(TableImpl):
         return table, query, sqa_col
 
     @classmethod
-    def sqa_type(cls, t: Dtype) -> sqa.types.TypeEngine:
+    def sqa_type(cls, t: Dtype) -> type[sqa.types.TypeEngine]:
         if isinstance(t, dtypes.Int64):
-            return sqa.BigInteger()
+            return sqa.BigInteger
         elif isinstance(t, dtypes.Float64):
-            return sqa.Double()
+            return sqa.Double
         elif isinstance(t, dtypes.Decimal):
-            return sqa.DECIMAL()
+            return sqa.DECIMAL
         elif isinstance(t, dtypes.String):
-            return sqa.String()
+            return sqa.String
         elif isinstance(t, dtypes.Bool):
-            return sqa.Boolean()
+            return sqa.Boolean
         elif isinstance(t, dtypes.DateTime):
-            return sqa.DateTime()
+            return sqa.DateTime
         elif isinstance(t, dtypes.Date):
-            return sqa.Date()
+            return sqa.Date
         elif isinstance(t, dtypes.Duration):
-            return sqa.Interval()
+            return sqa.Interval
         elif isinstance(t, dtypes.NoneDtype):
-            return sqa.types.NullType()
+            return sqa.types.NullType
 
         raise AssertionError
 

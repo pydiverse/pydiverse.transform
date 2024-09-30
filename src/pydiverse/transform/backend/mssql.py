@@ -27,8 +27,8 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
 
-    INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Float()) / sqa.literal(
-        "0.0", type_=sqa.Float()
+    INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Double) / sqa.literal(
+        "0.0", type_=sqa.Double
     )
     NEG_INF = -INF
     NAN = INF + NEG_INF
@@ -90,7 +90,7 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def sqa_type(cls, t: dtypes.Dtype):
         if isinstance(t, dtypes.DateTime):
-            return DATETIME2()
+            return DATETIME2
 
         return super().sqa_type(t)
 

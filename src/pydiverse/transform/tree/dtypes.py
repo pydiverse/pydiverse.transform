@@ -76,6 +76,9 @@ class Dtype(ABC):
 class Int64(Dtype):
     name = "int64"
 
+    MIN = -(1 << 63)
+    MAX = (1 << 63) - 1
+
     def can_promote_to(self, other: Dtype) -> bool:
         if super().can_promote_to(other):
             return True

@@ -12,7 +12,7 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class SqliteImpl(SqlImpl):
     dialect_name = "sqlite"
 
-    INF = sqa.cast(sqa.literal("1e314"), sqa.Float)
+    INF = sqa.cast(sqa.literal("1e314"), sqa.Double)
     NEG_INF = -INF
     NAN = sqa.null()
 

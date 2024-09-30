@@ -24,7 +24,23 @@ def test_string_to_int(df_strings):
 def test_float_to_int(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{col.name: col.cast(pdt.Int64()) for col in t}),
+        lambda t: t
+        >> mutate(
+            **{
+                col.name: pdt.when((col <= pdt.Int64.MAX) & (col >= pdt.Int64.MIN))
+                .then(col)
+                .otherwise(0)
+                .cast(pdt.Float64())
+                for col in t
+            }
+        ),
+    )
+
+    # all backends throw on out of range values
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{c.cast(pdt.Int64()) for c in t}),
+        exception=Exception,
     )
 
     assert_result_equal(
