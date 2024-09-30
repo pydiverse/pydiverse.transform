@@ -140,3 +140,18 @@ with SqliteImpl.op(ops.Least()) as op:
 
         # TODO: Determine return type
         return sqa.func.coalesce(sqa.func.MIN(left, right), left, right)
+
+
+# TODO: we need to get the string in the right format here (so sqlite can work with it)
+with SqliteImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.type_coerce(x, sqa.DateTime)
+
+
+with SqliteImpl.op(ops.StrToDate()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.type_coerce(x, sqa.Date)

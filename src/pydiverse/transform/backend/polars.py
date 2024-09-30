@@ -734,3 +734,17 @@ with PolarsImpl.op(ops.Ceil()) as op:
     @op.auto
     def _ceil(x):
         return x.ceil()
+
+
+with PolarsImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return x.str.to_datetime()
+
+
+with PolarsImpl.op(ops.StrToDate()) as op:
+
+    @op.auto
+    def _str_to_date(x):
+        return x.str.to_date()

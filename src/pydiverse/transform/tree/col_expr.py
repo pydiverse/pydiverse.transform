@@ -474,8 +474,19 @@ class Cast(ColExpr):
                 self.val.dtype().__class__,
                 self.target_type.__class__,
             ) not in valid_casts:
+                hint = ""
+                if self.val.dtype() == dtypes.String and (
+                    (self.target_type == dtypes.DateTime)
+                    or (self.target_type == dtypes.Date)
+                ):
+                    hint = (
+                        "\nhint: to convert a str to datetime, call "
+                        f"`.str.to_{self.target_type.name}()` on the expression."
+                    )
+
                 raise TypeError(
-                    f"cannot cast type `{self.val.dtype()}` to `{self.target_type}`"
+                    f"cannot cast type {self.val.dtype()} to {self.target_type}."
+                    f"{hint}"
                 )
 
         return self._dtype

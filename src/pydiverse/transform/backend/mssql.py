@@ -5,6 +5,7 @@ import functools
 from typing import Any
 
 import sqlalchemy as sqa
+from sqlalchemy.dialects.mssql import DATETIME2
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
@@ -93,8 +94,6 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def sqa_type(cls, t: dtypes.Dtype):
         if isinstance(t, dtypes.DateTime):
-            from sqlalchemy.dialects.mssql import DATETIME2
-
             return DATETIME2()
 
         return super().sqa_type(t)
@@ -362,3 +361,10 @@ with MsSqlImpl.op(ops.Ceil()) as op:
     @op.auto
     def _ceil(x):
         return sqa.func.ceiling(x)
+
+
+with MsSqlImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.cast(x, DATETIME2)

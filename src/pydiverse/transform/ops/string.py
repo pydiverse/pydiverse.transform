@@ -16,6 +16,8 @@ __all__ = [
     "StrEndsWith",
     "StrContains",
     "StrSlice",
+    "StrToDateTime",
+    "StrToDate",
 ]
 
 
@@ -92,3 +94,13 @@ class StrContains(ElementWise, Logical):
 class StrSlice(ElementWise):
     name = "str.slice"
     signatures = ["str, int, int -> str"]
+
+
+class StrToDateTime(ElementWise):
+    name = "str.to_datetime"
+    signatures = ["str -> datetime"]
+
+
+class StrToDate(ElementWise):
+    name = "str.to_date"
+    signatures = ["str -> date"]

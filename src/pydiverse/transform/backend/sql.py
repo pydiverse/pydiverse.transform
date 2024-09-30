@@ -1012,3 +1012,17 @@ with SqlImpl.op(ops.Ceil()) as op:
     @op.auto
     def _ceil(x):
         return sqa.func.ceil(x)
+
+
+with SqlImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.cast(x, sqa.DateTime)
+
+
+with SqlImpl.op(ops.StrToDate()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.cast(x, sqa.Date)

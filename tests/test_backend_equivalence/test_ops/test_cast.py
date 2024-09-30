@@ -71,6 +71,10 @@ def test_datetime_to_string(df_datetime):
         >> mutate(
             x=t.col1.cast(pdt.String()),
             y=t.col2.cast(pdt.String()),
+        )
+        >> mutate(
+            x=C.x.str.to_datetime(),
+            y=C.y.str.to_datetime(),
         ),
     )
 
