@@ -5,6 +5,7 @@ import datetime as dt
 import polars as pl
 import pytest
 
+import pydiverse.transform as pdt
 from pydiverse.transform import C
 from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.pipeable import verb
@@ -214,18 +215,18 @@ class TestPolarsLazyImpl:
             df_left.join(df_left, on="a", coalesce=False, suffix="_df_left"),
         )
 
-        # assert_equal(
-        #     tbl_right
-        #     >> inner_join(
-        #         tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
-        #     )
-        #     >> inner_join(
-        #         tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
-        #     ),
-        #     df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
-        #         df_right, "b", suffix="_df_right1", coalesce=False
-        #     ),
-        # )
+        assert_equal(
+            tbl_right
+            >> inner_join(
+                tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
+            )
+            >> inner_join(
+                tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
+            ),
+            df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
+                df_right, "b", suffix="_df_right_1", coalesce=False
+            ),
+        )
 
     def test_filter(self, tbl1, tbl2):
         # Simple filter expressions
@@ -531,11 +532,13 @@ class TestPolarsLazyImpl:
             tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
             df4.with_columns(pl.col("col3").fill_null(pl.col("col2")).alias("u")),
         )
-        # assert_equal(
-        #     tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
-        #     tbl4
-        #     >> mutate(u=f.case((tbl4.col3.is_null(), tbl4.col2), default=tbl4.col3)),
-        # )
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
+            tbl4
+            >> mutate(
+                u=pdt.when(tbl4.col3.is_null()).then(tbl4.col2).otherwise(tbl4.col3)
+            ),
+        )
 
     def test_datetime(self, tbl_dt):
         assert_equal(

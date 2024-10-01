@@ -130,31 +130,29 @@ def test_filter(df3):
     )
 
 
-# def test_filter_argument(df3, df4):
-#     assert_result_equal(
-#         df4, lambda t: t >> mutate(u=t.col2.mean(filter=~t.col2.is_null()))
-#     )
+def test_filter_argument(df3, df4):
+    assert_result_equal(
+        df4, lambda t: t >> mutate(u=t.col2.mean(filter=~t.col2.is_null()))
+    )
 
-#     assert_result_equal(
-#         df4, lambda t: t >> mutate(u=t.col2.mean(filter=~(t.col4 % 3 == 0)))
-#     )
+    assert_result_equal(
+        df4, lambda t: t >> mutate(u=t.col2.mean(filter=~(t.col4 % 3 == 0)))
+    )
 
-#     assert_result_equal(
-#         df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=[t.col2]))
-#     )
+    assert_result_equal(df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=[t.col2])))
 
-#     assert_result_equal(
-#         df4,
-#         lambda t: t
-#         >> mutate(
-#             u=t.col1.min(filter=(~t.col1.is_null()), partition_by=[t.col3]),
-#             v=t.col4.max(filter=~t.col4.is_null(), partition_by=[t.col1]),
-#         ),
-#     )
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            u=t.col1.min(filter=(~t.col1.is_null()), partition_by=[t.col3]),
+            v=t.col4.max(filter=~t.col4.is_null(), partition_by=[t.col1]),
+        ),
+    )
 
-#     assert_result_equal(
-#         df4, lambda t: t >> mutate(u=t.col3.min(filter=t.col3.is_null()))
-#     )
+    assert_result_equal(
+        df4, lambda t: t >> mutate(u=t.col3.min(filter=t.col3.is_null()))
+    )
 
 
 def test_arrange(df3):

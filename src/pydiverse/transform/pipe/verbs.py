@@ -343,11 +343,32 @@ def join(
     elif right._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{right._ast.name}`")
 
-    # TODO: more sophisticated resolution
+    user_suffix = suffix
     if suffix is None and right._ast.name:
         suffix = f"_{right._ast.name}"
     if suffix is None:
         suffix = "_right"
+
+    left_names = set(left._cache.cols.keys())
+    if user_suffix is not None:
+        for name in right._cache.cols.keys():
+            if name + suffix in left_names:
+                raise ValueError(
+                    f"column name `{name + suffix}` appears both in the left and right "
+                    f"table using the user-provided suffix `{suffix}`\n"
+                    "hint: Specify a different suffix to prevent name collisions or "
+                    "none at all for automatic name collision resolution."
+                )
+    else:
+        cnt = 0
+        for name in right._cache.cols.keys():
+            suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
+            while suffixed in left_names:
+                cnt += 1
+                suffixed = name + suffix + f"_{cnt}"
+
+        if cnt > 0:
+            suffix += f"_{cnt}"
 
     new = copy.copy(left)
     new._ast = Join(

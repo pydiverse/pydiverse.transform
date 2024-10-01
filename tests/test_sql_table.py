@@ -164,19 +164,19 @@ class TestSqlTable:
         )
 
     def test_join(self, tbl_left, tbl_right):
-        # assert_equal(
-        #     tbl_left
-        #     >> join(tbl_right, tbl_left.a == tbl_right.b, "left", suffix="")
-        #     >> select(tbl_left.a, tbl_right.b),
-        #     pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
-        # )
+        assert_equal(
+            tbl_left
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "left", suffix="")
+            >> select(tbl_left.a, tbl_right.b),
+            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
+        )
 
-        # assert_equal(
-        #     tbl_left
-        #     >> join(tbl_right, tbl_left.a == tbl_right.b, "inner", suffix="")
-        #     >> select(tbl_left.a, tbl_right.b),
-        #     pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
-        # )
+        assert_equal(
+            tbl_left
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "inner", suffix="")
+            >> select(tbl_left.a, tbl_right.b),
+            pl.DataFrame({"a": [1, 2, 2], "b": [1, 2, 2]}),
+        )
 
         assert_equal(
             (

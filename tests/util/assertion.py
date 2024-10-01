@@ -8,10 +8,9 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from pydiverse.transform import Table
-from pydiverse.transform.backend.sqlite import SqliteImpl
 from pydiverse.transform.backend.targets import Polars
 from pydiverse.transform.errors import NonStandardWarning
-from pydiverse.transform.pipe.verbs import export, get_backend, show_query
+from pydiverse.transform.pipe.verbs import export, show_query
 
 
 def assert_equal(left, right, check_dtypes=False, check_row_order=True):
@@ -85,10 +84,6 @@ def assert_result_equal(
             dfy: pl.DataFrame = (query_y >> export(Polars())).with_columns(
                 pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
             )
-
-            # sqlite does not know NaN
-            if get_backend(query_y._ast) is SqliteImpl:
-                dfx = dfx.fill_nan(None)
 
             # after a join, cols containing only null values get type Null on SQLite and
             # Postgres. maybe we can fix this but for now we just ignore such cols
