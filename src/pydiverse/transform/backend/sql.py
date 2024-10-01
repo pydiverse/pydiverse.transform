@@ -222,7 +222,8 @@ class SqlImpl(TableImpl):
                     return cls.NAN
                 elif math.isinf(expr.val):
                     return cls.INF if expr.val > 0 else cls.NEG_INF
-            return sqa.type_coerce(expr.val, cls.sqa_type(expr.dtype()))
+                return sqa.type_coerce(expr.val, cls.sqa_type(expr.dtype()))
+            return expr.val
 
         elif isinstance(expr, Cast):
             return cls.compile_cast(expr, sqa_col)

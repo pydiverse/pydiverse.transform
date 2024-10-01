@@ -761,6 +761,6 @@ with PolarsImpl.op(ops.Mod()) as op:
 
     @op.auto
     def _mod(lhs, rhs):
-        return lhs % (abs(rhs) * lhs.sign())
+        return lhs % (abs(rhs) * pl.when(lhs >= 0).then(1).otherwise(-1))
         # TODO: see whether the following is faster:
         # pl.when(lhs >= 0).then(lhs % abs(rhs)).otherwise(lhs % -abs(rhs))
