@@ -5,13 +5,14 @@ import dataclasses
 import inspect
 from collections.abc import Callable, Iterable
 from html import escape
+from uuid import UUID
 
 import sqlalchemy as sqa
 
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.pipe.pipeable import Pipeable
 from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import Col
+from pydiverse.transform.tree.col_expr import Col, ColName
 
 
 class Table:
@@ -48,7 +49,12 @@ class Table:
         if self._ast is None:
             raise AssertionError
 
-        self._cache = Cache(self._ast.cols, list(self._ast.cols.values()), [])
+        self._cache = Cache(
+            self._ast.cols,
+            list(self._ast.cols.values()),
+            {col._uuid for col in self._ast.cols.values()},
+            [],
+        )
 
     def __getitem__(self, key: str) -> Col:
         if not isinstance(key, str):
@@ -56,21 +62,21 @@ class Table:
                 f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
                 f"str, got {type(key)} instead."
             )
-        if (col := self._cache.cols.get(key)) is None:
+        if not self._cache.has_col(key):
             raise ValueError(
                 f"column `{key}` does not exist in table `{self._ast.name}`"
             )
-        return col
+        return self._cache.cols[key]
 
     def __getattr__(self, name: str) -> Col:
         if name in ("__copy__", "__deepcopy__", "__setstate__", "__getstate__"):
             # for hasattr to work correctly on dunder methods
             raise AttributeError
-        if (col := self._cache.cols.get(name)) is None:
+        if not self._cache.has_col(name):
             raise ValueError(
                 f"column `{name}` does not exist in table `{self._ast.name}`"
             )
-        return col
+        return self._cache.cols[name]
 
     def __setstate__(self, d):  # to avoid very annoying AttributeErrors
         for slot, val in d[1].items():
@@ -118,6 +124,9 @@ class Table:
                 f"{type(e).__name__}: {str(e)}"
             )
 
+    def __dir__(self) -> list[str]:
+        return [name for name in self._cache.cols.keys() if self._cache.has_col(name)]
+
     def _repr_html_(self) -> str | None:
         html = (
             f"Table <code>{self._ast.name}</code> using"
@@ -144,4 +153,20 @@ class Table:
 class Cache:
     cols: dict[str, Col]
     select: list[Col]
+    select_uuids: set[UUID]
     partition_by: list[Col]
+
+    def has_col(self, col: str | Col | ColName) -> bool:
+        if isinstance(col, Col):
+            return col._uuid in self.select_uuids
+        if isinstance(col, ColName):
+            col = col.name
+        return col in self.cols and self.cols[col]._uuid in self.select_uuids
+
+    def update_select(self, new_select: list[Col]):
+        self.select = new_select
+        self.select_uuids = {col._uuid for col in new_select}
+
+    def update_cols(self, new_cols: dict[str, Col]):
+        self.cols = new_cols
+        self.all_uuids = {col._uuid for col in new_cols.values()}

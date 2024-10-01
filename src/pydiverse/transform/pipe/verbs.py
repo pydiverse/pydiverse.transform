@@ -77,10 +77,12 @@ def alias(table: Table, new_name: str | None = None):
         Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
         for col in table._cache.partition_by
     ]
-    new._cache.select = [
-        Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
-        for col in table._cache.select
-    ]
+    new._cache.update_select(
+        [
+            Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
+            for col in table._cache.select
+        ]
+    )
     return new
 
 
@@ -119,7 +121,8 @@ def select(table: Table, *args: Col | ColName):
     new = copy.copy(table)
     new._ast = Select(table._ast, preprocess_arg(args, table))
     new._cache = copy.copy(table._cache)
-    new._cache.select = new._ast.select
+    # TODO: prevent selection of overwritten columns
+    new._cache.update_select(new._ast.select)
     return new
 
 
@@ -182,9 +185,14 @@ def mutate(table: Table, **kwargs: ColExpr):
     overwritten = {
         col_name for col_name in new._ast.names if col_name in new._cache.cols
     }
-    new._cache.select = [
-        col for col in table._cache.select if col.name not in overwritten
-    ] + [new._cache.cols[name] for name in new._ast.names]
+    new._cache.update_select(
+        [
+            col
+            for name, col in table._cache.cols.items()
+            if name not in overwritten and table._cache.has_col(col)
+        ]
+        + [new._cache.cols[name] for name in new._ast.names]
+    )
 
     return new
 
@@ -289,9 +297,9 @@ def summarise(table: Table, **kwargs: ColExpr):
         for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids)
     }
 
-    new._cache.select = table._cache.partition_by + [
-        new._cache.cols[name] for name in new._ast.names
-    ]
+    new._cache.update_select(
+        table._cache.partition_by + [new._cache.cols[name] for name in new._ast.names]
+    )
     new._cache.partition_by = []
 
     return new
@@ -336,7 +344,7 @@ def join(
     new._cache.cols = left._cache.cols | {
         name + suffix: col for name, col in right._cache.cols.items()
     }
-    new._cache.select = left._cache.select + right._cache.select
+    new._cache.update_select(left._cache.select + right._cache.select)
 
     return new
 
