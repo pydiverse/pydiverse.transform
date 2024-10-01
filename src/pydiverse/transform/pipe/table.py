@@ -108,20 +108,20 @@ class Table:
             from pydiverse.transform.pipe.verbs import export
 
             return (
-                f"Table: {self.name}, backend: {type(self._impl).__name__}\n"
+                f"Table: {self._ast.name}, backend: {type(self._ast).__name__}\n"
                 f"{self >> export(Polars())}"
             )
         except Exception as e:
             return (
-                f"Table: {self.name}, backend: {type(self._impl).__name__}\n"
+                f"Table: {self._ast.name}, backend: {type(self._ast).__name__}\n"
                 "failed to collect table due to an exception. "
                 f"{type(e).__name__}: {str(e)}"
             )
 
     def _repr_html_(self) -> str | None:
         html = (
-            f"Table <code>{self.name}</code> using"
-            f" <code>{type(self._impl).__name__}</code> backend:</br>"
+            f"Table <code>{self._ast.name}</code> using"
+            f" <code>{type(self._ast).__name__}</code> backend:</br>"
         )
         try:
             from pydiverse.transform.backend.targets import Polars

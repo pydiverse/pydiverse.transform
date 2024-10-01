@@ -571,7 +571,7 @@ class TestPrintAndRepr:
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
-        series = tbl1._impl.df.collect().get_column("col1")
+        series = tbl1._ast.df.get_column("col1")
 
         assert str(series) in col1_str
         assert "exception" not in col1_str

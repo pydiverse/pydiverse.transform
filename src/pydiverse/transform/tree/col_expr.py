@@ -102,11 +102,11 @@ class Col(ColExpr):
 
     def __str__(self) -> str:
         try:
+            from pydiverse.transform.backend.polars import PolarsImpl
             from pydiverse.transform.backend.targets import Polars
-            from pydiverse.transform.pipe.verbs import export, select
 
-            df = self.table >> select(self) >> export(Polars())
-            return str(df)
+            df = PolarsImpl.export(self._ast, Polars(), [self])
+            return str(df.get_column(df.columns[0]))
         except Exception as e:
             return (
                 repr(self)
