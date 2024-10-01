@@ -61,27 +61,33 @@ class PolarsImpl(TableImpl):
 
 # merges descending and null_last markers into the ordering expression
 def merge_desc_nulls_last(
-    order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool]
+    order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool | None]
 ) -> list[pl.Expr]:
-    with_signs: list[pl.Expr] = []
-    for ord, desc in zip(order_by, descending):
-        numeric = ord.rank("dense").cast(pl.Int64)
-        with_signs.append(-numeric if desc else numeric)
-    return [
-        expr.fill_null(
-            pl.len().cast(pl.Int64) + 1 if nl else -(pl.len().cast(pl.Int64) + 1)
-        )
-        for expr, nl in zip(with_signs, nulls_last)
-    ]
+    merged = []
+    for ord, desc, nl in zip(order_by, descending, nulls_last):
+        # try to avoid this workaround whenever possible
+        if nl is not None or desc:
+            numeric = ord.rank("dense").cast(pl.Int64)
+            if desc:
+                numeric = -numeric
+            if nl is True:
+                numeric = numeric.fill_null(pl.len().cast(pl.Int64) + 1)
+            elif nl is False:
+                numeric = numeric.fill_null(-pl.len().cast(pl.Int64) - 1)
+            merged.append(numeric)
+        else:
+            merged.append(ord)
+
+    return merged
 
 
 def compile_order(
     order: Order, name_in_df: dict[UUID, str]
-) -> tuple[pl.Expr, bool, bool]:
+) -> tuple[pl.Expr, bool, bool | None]:
     return (
         compile_col_expr(order.order_by, name_in_df),
         order.descending,
-        order.nulls_last if order.nulls_last is not None else False,
+        order.nulls_last,
     )
 
 
@@ -115,7 +121,11 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             # partition_by=, the groups will be sorted via over(order_by=)
             # anyways so it need not be done here.
             args = [
-                arg.sort_by(by=order_by, descending=descending, nulls_last=nulls_last)
+                arg.sort_by(
+                    by=order_by,
+                    descending=descending,
+                    nulls_last=[nl if nl is not None else False for nl in nulls_last],
+                )
                 if isinstance(arg, pl.Expr)
                 else arg
                 for arg in args
@@ -161,7 +171,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
                 by=order_by,
                 descending=descending,
-                nulls_last=nulls_last,
+                nulls_last=[nl if nl is not None else False for nl in nulls_last],
             )
             value = value.sort_by(inv_permutation)
 
@@ -272,7 +282,7 @@ def compile_ast(
         df = df.sort(
             order_by,
             descending=descending,
-            nulls_last=nulls_last,
+            nulls_last=[False if nl is None else nl for nl in nulls_last],
             maintain_order=True,
         )
 

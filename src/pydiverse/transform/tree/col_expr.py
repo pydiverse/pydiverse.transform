@@ -98,7 +98,8 @@ class Col(ColExpr):
         super().__init__(_dtype, _ftype)
 
     def __repr__(self) -> str:
-        return f"{self._ast.name}.{self.name}" f"({self.dtype()})"
+        dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
+        return f"{self._ast.name}.{self.name}{dtype_str}"
 
     def __str__(self) -> str:
         try:
