@@ -105,6 +105,11 @@ def test_div(df_num):
         lambda t: t
         >> add_nan_inf_cols()
         >> (
+            lambda s: mutate(
+                **{c.name: pdt.when(c < 1e-10).then(1.0).otherwise(c) for c in s}
+            )
+        )
+        >> (
             lambda s: mutate(**{f"div_{c.name}_{d.name}": c / d for d in s for c in s})
         ),
     )
