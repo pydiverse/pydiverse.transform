@@ -52,7 +52,7 @@ class Table:
         self._cache = Cache(
             self._ast.cols,
             list(self._ast.cols.values()),
-            {col._uuid for col in self._ast.cols.values()},
+            {col._uuid: col.name for col in self._ast.cols.values()},
             [],
         )
 
@@ -156,20 +156,35 @@ class Table:
 class Cache:
     cols: dict[str, Col]
     select: list[Col]
-    select_uuids: set[UUID]
+    uuid_to_name: dict[UUID, str]  # only the selected UUIDs
     partition_by: list[Col]
 
     def has_col(self, col: str | Col | ColName) -> bool:
         if isinstance(col, Col):
-            return col._uuid in self.select_uuids
+            return col._uuid in self.uuid_to_name
         if isinstance(col, ColName):
             col = col.name
-        return col in self.cols and self.cols[col]._uuid in self.select_uuids
+        return col in self.cols and self.cols[col]._uuid in self.uuid_to_name
 
-    def update_select(self, new_select: list[Col]):
-        self.select = new_select
-        self.select_uuids = {col._uuid for col in new_select}
+    def update(
+        self,
+        *,
+        new_select: list[Col] | None = None,
+        new_cols: dict[str, Col] | None = None,
+    ):
+        if new_select is not None:
+            self.select = new_select
+        if new_cols is not None:
+            self.cols = new_cols
 
-    def update_cols(self, new_cols: dict[str, Col]):
-        self.cols = new_cols
-        self.all_uuids = {col._uuid for col in new_cols.values()}
+        if new_select is not None or new_cols is not None:
+            selected_uuids = (
+                self.uuid_to_name
+                if new_select is None
+                else set(col._uuid for col in new_select)
+            )
+            self.uuid_to_name = {
+                col._uuid: name
+                for name, col in self.cols.items()
+                if col._uuid in selected_uuids
+            }
