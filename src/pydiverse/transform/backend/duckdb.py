@@ -46,3 +46,31 @@ with DuckDbImpl.op(ops.RFloorDiv()) as op:
     @op.auto
     def _floordiv(rhs, lhs):
         return sqa.func.divide(lhs, rhs)
+
+
+with DuckDbImpl.op(ops.IsInf()) as op:
+
+    @op.auto
+    def _is_inf(x):
+        return sqa.func.isinf(x)
+
+
+with DuckDbImpl.op(ops.IsNotInf()) as op:
+
+    @op.auto
+    def _is_not_inf(x):
+        return sqa.func.isfinite(x)
+
+
+with DuckDbImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return sqa.func.isnan(x)
+
+
+with DuckDbImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return ~sqa.func.isnan(x)

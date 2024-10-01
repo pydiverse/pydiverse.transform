@@ -130,3 +130,33 @@ def test_nan_lit(df_num):
         >> mutate(nan_str=C.nan.cast(pdt.String()))
         >> mutate(nan_back=C.nan_str.cast(pdt.Float64())),
     )
+
+
+@skip_backends("mssql")
+def test_is_inf(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(inf=float("inf"))
+        >> mutate(
+            inf_is_inf=C.inf.is_inf(),
+            **{c.name + "is_inf": c.is_inf() for c in t},
+            inf_is_not_inf=C.inf.is_not_inf(),
+            **{c.name + "is_not_inf": c.is_not_inf() for c in t},
+        ),
+    )
+
+
+@skip_backends("mssql", "sqlite")
+def test_is_nan(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(nan=float("nan"))
+        >> mutate(
+            nan_is_nan=C.nan.is_nan(),
+            **{c.name + "is_nan": c.is_nan() for c in t},
+            nan_is_not_nan=C.nan.is_not_nan(),
+            **{c.name + "is_not_nan": c.is_not_nan() for c in t},
+        ),
+    )

@@ -336,3 +336,31 @@ with MsSqlImpl.op(ops.StrToDateTime()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.cast(x, DATETIME2)
+
+
+with MsSqlImpl.op(ops.IsInf()) as op:
+
+    @op.auto
+    def _is_inf(x):
+        return False
+
+
+with MsSqlImpl.op(ops.IsNotInf()) as op:
+
+    @op.auto
+    def _is_not_inf(x):
+        return True
+
+
+with MsSqlImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return False
+
+
+with MsSqlImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return True

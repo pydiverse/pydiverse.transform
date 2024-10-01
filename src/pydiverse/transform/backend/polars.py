@@ -787,7 +787,7 @@ with PolarsImpl.op(ops.IsNotInf()) as op:
 
     @op.auto
     def _is_not_inf(x):
-        return x.is_not_infinite()
+        return x.is_finite()
 
 
 with PolarsImpl.op(ops.IsNan()) as op:

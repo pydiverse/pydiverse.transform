@@ -192,8 +192,8 @@ class OperatorRegistry:
     # Used for __dir__ method of SymbolicExpression
     ALL_REGISTERED_OPS: set[str] = set()
 
-    def __init__(self, name, super_registry=None):
-        self.name = name
+    def __init__(self, impl_class, super_registry=None):
+        self.impl_class = impl_class
         self.super_registry: OperatorRegistry | None = super_registry
         self.registered_ops: set[Operator] = set()
         self.implementations: dict[str, OperatorImplStore] = dict()
@@ -214,7 +214,7 @@ class OperatorRegistry:
         if operator in self.registered_ops:
             raise ValueError(
                 f"Operator {operator} ({name}) already registered in this operator"
-                f" registry '{self.name}'"
+                f" registry '{self.impl_class.__name__}'"
             )
         if name in self.implementations:
             raise ValueError(
@@ -248,7 +248,7 @@ class OperatorRegistry:
         if operator not in self.registered_ops:
             raise ValueError(
                 f"operator `{operator}` ({operator.name}) hasn't been registered in the"
-                f" operator registry `{self.name}` yet"
+                f" operator registry `{self.impl_class.__name__}` yet"
             )
 
         signature = OperatorSignature.parse(signature)

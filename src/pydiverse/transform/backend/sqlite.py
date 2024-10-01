@@ -161,3 +161,17 @@ with SqliteImpl.op(ops.Floor()) as op:
     @op.auto
     def _floor(x):
         return -sqa.func.ceil(-x)
+
+
+with SqliteImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return False
+
+
+with SqliteImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return True

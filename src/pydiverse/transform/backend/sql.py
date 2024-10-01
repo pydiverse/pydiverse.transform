@@ -198,7 +198,7 @@ class SqlImpl(TableImpl):
                 value = window_impl(*args, partition_by=partition_by, order_by=order_by)
 
             else:
-                value: sqa.ColumnElement = impl(*args)
+                value: sqa.ColumnElement = impl(*args, _Impl=cls)
                 if partition_by is not None or order_by is not None:
                     value = value.over(partition_by=partition_by, order_by=order_by)
 
@@ -1035,3 +1035,17 @@ with SqlImpl.op(ops.StrToDate()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.cast(x, sqa.Date)
+
+
+with SqlImpl.op(ops.IsInf()) as op:
+
+    @op.auto
+    def _is_inf(x, *, _Impl):
+        return x == _Impl.inf()
+
+
+with SqlImpl.op(ops.IsNotInf()) as op:
+
+    @op.auto
+    def _is_not_inf(x, *, _Impl):
+        return x != _Impl.inf()
