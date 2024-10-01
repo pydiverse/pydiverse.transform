@@ -98,7 +98,7 @@ class Col(ColExpr):
         super().__init__(_dtype, _ftype)
 
     def __repr__(self) -> str:
-        return f"<{self._ast.name}.{self.name}" f"({self.dtype()})>"
+        return f"{self._ast.name}.{self.name}" f"({self.dtype()})"
 
     def __str__(self) -> str:
         try:
@@ -128,7 +128,9 @@ class ColName(ColExpr):
         super().__init__(dtype, ftype)
 
     def __repr__(self) -> str:
-        return f"<C.{self.name}" f"{f" ({self.dtype()})" if self.dtype() else ""}>"
+        return (
+            f"C.{self.name}{f" ({self.dtype()})" if self.dtype() is not None else ""}"
+        )
 
 
 class LiteralCol(ColExpr):
@@ -141,7 +143,7 @@ class LiteralCol(ColExpr):
         super().__init__(dtype, Ftype.EWISE)
 
     def __repr__(self):
-        return f"<{self.val} ({self.dtype()})>"
+        return f"lit({self.val}, {self.dtype()})"
 
 
 class ColFn(ColExpr):
@@ -309,7 +311,7 @@ class FnAttr:
         )
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {self.name}({self.arg})>"
+        return f"{self.__class__.__name__}({self.name}, {self.arg})"
 
 
 @dataclasses.dataclass(slots=True)
@@ -321,7 +323,7 @@ class WhenClause:
         return CaseExpr((*self.cases, (self.cond, wrap_literal(value))))
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {self.cond}>"
+        return f"when_clause({self.cond})"
 
 
 class CaseExpr(ColExpr):
@@ -343,11 +345,11 @@ class CaseExpr(ColExpr):
 
     def __repr__(self) -> str:
         return (
-            "<case "
+            "case_when( "
             + functools.reduce(
                 operator.add, (f"{cond} -> {val}, " for cond, val in self.cases), ""
             )
-            + f"default={self.default_val}>"
+            + f"default={self.default_val})"
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
