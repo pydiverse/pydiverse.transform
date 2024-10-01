@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     paths-ignore:
-      - 'docs/**'
+      - "docs/**"
 
 jobs:
   lint:
@@ -36,6 +36,7 @@ jobs:
           - py39
           - py310
           - py311
+          - py312
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +64,6 @@ jobs:
         env:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}        
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
         run: |
           pixi run -e ${{ matrix.environment }} pytest tests -ra ${RUNNER_DEBUG:+-v} --color=yes --postgres --mssql
-  
