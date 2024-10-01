@@ -3,6 +3,7 @@ from __future__ import annotations
 import pydiverse.transform as pdt
 from pydiverse.transform.pipe.pipeable import verb
 from pydiverse.transform.pipe.verbs import mutate
+from tests.fixtures.backend import skip_backends
 from tests.util.assertion import assert_result_equal
 
 
@@ -18,10 +19,30 @@ def add_nan_inf_cols(table: pdt.Table) -> pdt.Table:
     )
 
 
+@skip_backends("postgres")
 def test_exp(df_num):
     assert_result_equal(
         df_num,
         lambda t: t
+        >> add_nan_inf_cols()
+        >> (lambda s: mutate(**{c.name: c.exp() for c in s})),
+    )
+
+
+def test_exp_normal_inputs(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(
+            **{
+                c.name: pdt.when(c > 700)
+                .then(700)
+                .when(c < -700)
+                .then(-700)
+                .otherwise(c)
+                for c in t
+            }
+        )
         >> add_nan_inf_cols()
         >> (lambda s: mutate(**{c.name: c.exp() for c in s})),
     )
@@ -54,6 +75,7 @@ def test_round(df_num):
     )
 
 
+@skip_backends("postgres")
 def test_add(df_num):
     assert_result_equal(
         df_num,
@@ -65,6 +87,19 @@ def test_add(df_num):
     )
 
 
+def test_add_normal_inputs(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(**{c.name: c / 3 for c in t})
+        >> add_nan_inf_cols()
+        >> (
+            lambda s: mutate(**{f"add_{c.name}_{d.name}": c + d for d in s for c in s})
+        ),
+    )
+
+
+@skip_backends("postgres")
 def test_sub(df_num):
     assert_result_equal(
         df_num,
@@ -79,6 +114,18 @@ def test_sub(df_num):
     )
 
 
+def test_sub_normal_inputs(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(**{c.name: c / 3 for c in t})
+        >> add_nan_inf_cols()
+        >> (
+            lambda s: mutate(**{f"sub_{c.name}_{d.name}": c - d for d in s for c in s})
+        ),
+    )
+
+
 def test_neg(df_num):
     assert_result_equal(
         df_num,
@@ -88,10 +135,23 @@ def test_neg(df_num):
     )
 
 
+@skip_backends("postgres")
 def test_mul(df_num):
     assert_result_equal(
         df_num,
         lambda t: t
+        >> add_nan_inf_cols()
+        >> (
+            lambda s: mutate(**{f"mul_{c.name}_{d.name}": c * d for d in s for c in s})
+        ),
+    )
+
+
+def test_mul_normal_inputs(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(**{c.name: abs(c) ** 0.4 for c in t})
         >> add_nan_inf_cols()
         >> (
             lambda s: mutate(**{f"mul_{c.name}_{d.name}": c * d for d in s for c in s})
