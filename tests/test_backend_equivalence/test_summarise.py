@@ -133,19 +133,6 @@ def test_arrange(df3):
     )
 
 
-def test_intermediate_select(df3):
-    # Check that subqueries happen transparently
-    assert_result_equal(
-        df3,
-        lambda t: t
-        >> group_by(t.col1, t.col2)
-        >> summarise(x=t.col4.mean())
-        >> mutate(x2=C.x * 2)
-        >> select()
-        >> summarise(y=(C.x - C.x2).min()),
-    )
-
-
 def test_not_summarising(df4):
     assert_result_equal(
         df4, lambda t: t >> summarise(x=C.col1), exception=FunctionTypeError

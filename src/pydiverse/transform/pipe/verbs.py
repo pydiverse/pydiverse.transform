@@ -69,18 +69,24 @@ def alias(table: Table, new_name: str | None = None):
     new._ast.name = new_name
     new._cache = copy.copy(table._cache)
 
-    new._cache.cols = {
-        name: Col(name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
-        for name, col in table._cache.cols.items()
-    }
     new._cache.partition_by = [
         Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
         for col in table._cache.partition_by
     ]
-    new._cache.select = [
-        Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
-        for col in table._cache.select
-    ]
+
+    new._cache.update(
+        new_select=[
+            Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
+            for col in table._cache.select
+        ],
+        new_cols={
+            name: Col(
+                name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+            )
+            for name, col in table._cache.cols.items()
+        },
+    )
+
     return new
 
 
@@ -119,7 +125,8 @@ def select(table: Table, *args: Col | ColName):
     new = copy.copy(table)
     new._ast = Select(table._ast, preprocess_arg(args, table))
     new._cache = copy.copy(table._cache)
-    new._cache.select = new._ast.select
+    # TODO: prevent selection of overwritten columns
+    new._cache.update(new_select=new._ast.select)
     return new
 
 
@@ -128,7 +135,7 @@ def drop(table: Table, *args: Col | ColName):
     dropped_uuids = {col._uuid for col in preprocess_arg(args, table)}
     return select(
         table,
-        *(col for col in table._cache.cols.values() if col._uuid not in dropped_uuids),
+        *(col for col in table._cache.select if col._uuid not in dropped_uuids),
     )
 
 
@@ -142,19 +149,21 @@ def rename(table: Table, name_map: dict[str, str]):
     new = copy.copy(table)
     new._ast = Rename(table._ast, name_map)
     new._cache = copy.copy(table._cache)
-    new._cache.cols = copy.copy(table._cache.cols)
+    new_cols = copy.copy(table._cache.cols)
 
     for name, _ in name_map.items():
-        if name not in new._cache.cols:
+        if name not in new_cols:
             raise ValueError(
                 f"no column with name `{name}` in table `{table._ast.name}`"
             )
-        del new._cache.cols[name]
+        del new_cols[name]
 
     for name, replacement in name_map.items():
-        if replacement in new._cache.cols:
+        if replacement in new_cols:
             raise ValueError(f"duplicate column name `{replacement}`")
-        new._cache.cols[replacement] = table._cache.cols[name]
+        new_cols[replacement] = table._cache.cols[name]
+
+    new._cache.update(new_cols=new_cols)
 
     return new
 
@@ -173,18 +182,26 @@ def mutate(table: Table, **kwargs: ColExpr):
     )
 
     new._cache = copy.copy(table._cache)
-    new._cache.cols = copy.copy(table._cache.cols)
+    new_cols = copy.copy(table._cache.cols)
+
     for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids):
-        new._cache.cols[name] = Col(
+        new_cols[name] = Col(
             name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=True)
         )
 
     overwritten = {
-        col_name for col_name in new._ast.names if col_name in new._cache.cols
+        col_name for col_name in new._ast.names if col_name in table._cache.cols
     }
-    new._cache.select = [
-        col for col in table._cache.select if col.name not in overwritten
-    ] + [new._cache.cols[name] for name in new._ast.names]
+
+    new._cache.update(
+        new_select=[
+            col
+            for col in table._cache.select
+            if table._cache.uuid_to_name[col._uuid] not in overwritten
+        ]
+        + [new_cols[name] for name in new._ast.names],
+        new_cols=new_cols,
+    )
 
     return new
 
@@ -198,7 +215,7 @@ def filter(table: Table, *predicates: ColExpr):
     new._ast = Filter(table._ast, preprocess_arg(predicates, table))
 
     for cond in new._ast.filters:
-        if not isinstance(cond.dtype(), dtypes.Bool):
+        if cond.dtype() != dtypes.Bool:
             raise TypeError(
                 "predicates given to `filter` must be of boolean type.\n"
                 f"hint: {cond} is of type {cond.dtype()} instead."
@@ -283,15 +300,19 @@ def summarise(table: Table, **kwargs: ColExpr):
     for root in new._ast.values:
         check_summarise_col_expr(root, False)
 
+    # TODO: handle duplicate column names
     new._cache = copy.copy(table._cache)
-    new._cache.cols = table._cache.cols | {
+
+    new_cols = table._cache.cols | {
         name: Col(name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=False))
         for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids)
     }
 
-    new._cache.select = table._cache.partition_by + [
-        new._cache.cols[name] for name in new._ast.names
-    ]
+    new._cache.update(
+        new_select=table._cache.partition_by
+        + [new_cols[name] for name in new._ast.names],
+        new_cols=new_cols,
+    )
     new._cache.partition_by = []
 
     return new
@@ -332,11 +353,13 @@ def join(
     new._ast = Join(
         left._ast, right._ast, preprocess_arg(on, left), how, validate, suffix
     )
+
     new._cache = copy.copy(left._cache)
-    new._cache.cols = left._cache.cols | {
-        name + suffix: col for name, col in right._cache.cols.items()
-    }
-    new._cache.select = left._cache.select + right._cache.select
+    new._cache.update(
+        new_cols=left._cache.cols
+        | {name + suffix: col for name, col in right._cache.cols.items()},
+        new_select=left._cache.select + right._cache.select,
+    )
 
     return new
 

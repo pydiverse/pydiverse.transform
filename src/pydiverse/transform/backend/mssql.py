@@ -5,6 +5,7 @@ import functools
 from typing import Any
 
 import sqlalchemy as sqa
+from sqlalchemy.dialects.mssql import DATETIME2
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
@@ -13,6 +14,7 @@ from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Cast,
     Col,
     ColExpr,
     ColFn,
@@ -24,6 +26,37 @@ from pydiverse.transform.util.warnings import warn_non_standard
 
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
+
+    INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Double) / sqa.literal(
+        "0.0", type_=sqa.Double
+    )
+    NEG_INF = -INF
+    NAN = INF + NEG_INF
+
+    @classmethod
+    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
+        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
+        if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
+            return sqa.case(
+                (compiled_val == "inf", cls.INF),
+                (compiled_val == "-inf", -cls.INF),
+                (compiled_val.in_(("nan", "-nan")), cls.NAN),
+                else_=sqa.cast(
+                    compiled_val,
+                    cls.sqa_type(cast.target_type),
+                ),
+            )
+
+        if cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
+            compiled = sqa.cast(cls.compile_col_expr(cast.val, sqa_col), sqa.String)
+            return sqa.case(
+                (compiled == "1.#QNAN", "nan"),
+                (compiled == "1.#INF", "inf"),
+                (compiled == "-1.#INF", "-inf"),
+                else_=compiled,
+            )
+
+        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
@@ -53,6 +86,13 @@ class MsSqlImpl(SqlImpl):
         sql.create_aliases(nd, {})
         table, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
         return cls.compile_query(table, query)
+
+    @classmethod
+    def sqa_type(cls, t: dtypes.Dtype):
+        if isinstance(t, dtypes.DateTime):
+            return DATETIME2
+
+        return super().sqa_type(t)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
@@ -93,7 +133,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         )
 
     elif isinstance(expr, Col):
-        if not wants_bool_as_bit and isinstance(expr.dtype(), dtypes.Bool):
+        if not wants_bool_as_bit and expr.dtype() == dtypes.Bool:
             return ColFn("__eq__", expr, LiteralCol(True))
         return expr
 
@@ -145,6 +185,14 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
 
     elif isinstance(expr, LiteralCol):
         return expr
+
+    elif isinstance(expr, Cast):
+        # TODO: does this really work for casting onto / from booleans? we probably have
+        # to use wants_bool_as_bit in some way when casting to bool
+        return Cast(
+            convert_bool_bit(expr.val, wants_bool_as_bit=wants_bool_as_bit),
+            expr.target_type,
+        )
 
     raise AssertionError
 
@@ -289,3 +337,39 @@ with MsSqlImpl.op(ops.Mean()) as op:
     @op.auto
     def _mean(x):
         return sqa.func.AVG(sqa.cast(x, sqa.Double()), type_=sqa.Double())
+
+
+with MsSqlImpl.op(ops.Log()) as op:
+
+    @op.auto
+    def _log(x):
+        return sqa.case(
+            (x > 0, sqa.func.log(x)),
+            (x < 0, MsSqlImpl.NAN),
+            (x.is_(sqa.null()), None),
+            else_=-MsSqlImpl.INF,
+        )
+
+
+with MsSqlImpl.op(ops.Ceil()) as op:
+
+    @op.auto
+    def _ceil(x):
+        return sqa.func.ceiling(x)
+
+
+with MsSqlImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.cast(x, DATETIME2)
+
+
+with MsSqlImpl.op(ops.Round()) as op:
+
+    @op.auto
+    def _round(x, decimals=0):
+        return sqa.case(
+            (x != x, MsSqlImpl.NAN),
+            else_=sqa.func.round(x, decimals, type_=x.type),
+        )

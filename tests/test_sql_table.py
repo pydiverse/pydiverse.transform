@@ -144,7 +144,7 @@ class TestSqlTable:
         )
 
         assert_equal(
-            tbl1 >> select() >> mutate(col1times2=tbl1.col1 * 2),
+            tbl1 >> mutate(col1times2=tbl1.col1 * 2) >> select(C.col1times2),
             pl.DataFrame(
                 {
                     "col1times2": [2, 4, 6, 8],
@@ -153,13 +153,13 @@ class TestSqlTable:
         )
 
         # Check proper column referencing
-        t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2) >> select()
+        t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2)
         assert_equal(
-            t >> mutate(x=t.col1, y=t.col2),
+            t >> select() >> mutate(x=t.col1, y=t.col2),
             tbl1 >> select() >> mutate(x=tbl1.col2, y=tbl1.col1),
         )
         assert_equal(
-            t >> mutate(x=tbl1.col1, y=tbl1.col2),
+            t >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
             tbl1 >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
         )
 
@@ -316,7 +316,7 @@ class TestSqlTable:
 
         # Mutate
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> select() >> mutate(b=C.a * 2),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> mutate(b=C.a * 2) >> select(C.b),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
@@ -331,13 +331,13 @@ class TestSqlTable:
         # Join
         assert_equal(
             tbl1
-            >> select()
-            >> mutate(a=tbl1.col1 * 2)
-            >> join(tbl2, C.a == tbl2.col1, "left"),
+            >> mutate(a=tbl1.col1)
+            >> join(tbl2, C.a == tbl2.col1, "left")
+            >> select(C.a, *tbl2),
             tbl1
             >> select()
-            >> mutate(a=tbl1.col1 * 2)
-            >> join(tbl2, tbl1.col1 * 2 == tbl2.col1, "left"),
+            >> mutate(a=tbl1.col1)
+            >> join(tbl2, tbl1.col1 == tbl2.col1, "left"),
         )
 
         # Filter
@@ -377,7 +377,6 @@ class TestSqlTable:
         assert_equal(
             (
                 tbl3
-                >> select()
                 >> mutate(
                     col1=f.when(C.col1 == 0)
                     .then(1)
@@ -387,6 +386,7 @@ class TestSqlTable:
                     .then(3)
                     .otherwise(-1)
                 )
+                >> select(C.col1)
             ),
             (df3.select("col1") + 1),
         )
@@ -394,7 +394,6 @@ class TestSqlTable:
         assert_equal(
             (
                 tbl3
-                >> select()
                 >> mutate(
                     x=f.when(C.col1 == C.col2)
                     .then(1)
@@ -402,6 +401,7 @@ class TestSqlTable:
                     .then(2)
                     .otherwise(C.col4)
                 )
+                >> select(C.x)
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
         )

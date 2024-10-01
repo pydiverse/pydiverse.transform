@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import datetime
-from types import NoneType
 from typing import Any
 from uuid import UUID
 
@@ -15,6 +13,7 @@ from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Cast,
     Col,
     ColExpr,
     ColFn,
@@ -159,7 +158,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
-            inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64).sort_by(
+            inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
                 by=order_by,
                 descending=descending,
                 nulls_last=nulls_last,
@@ -182,9 +181,19 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        if isinstance(expr.dtype(), dtypes.String):
+        if expr.dtype() == dtypes.String:
             return pl.lit(expr.val)  # polars interprets strings as column names
         return expr.val
+
+    elif isinstance(expr, Cast):
+        compiled = compile_col_expr(expr.val, name_in_df).cast(
+            pdt_type_to_polars(expr.target_type)
+        )
+
+        if expr.val.dtype() == dtypes.Float64 and expr.target_type == dtypes.String:
+            compiled = compiled.replace("NaN", "nan")
+
+        return compiled
 
     else:
         raise AssertionError
@@ -340,9 +349,9 @@ def compile_ast(
 
 def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     if t.is_float():
-        return dtypes.Float()
+        return dtypes.Float64()
     elif t.is_integer():
-        return dtypes.Int()
+        return dtypes.Int64()
     elif isinstance(t, pl.Boolean):
         return dtypes.Bool()
     elif isinstance(t, pl.String):
@@ -360,9 +369,9 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
 
 
 def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
-    if isinstance(t, dtypes.Float):
+    if isinstance(t, (dtypes.Float64, dtypes.Decimal)):
         return pl.Float64()
-    elif isinstance(t, dtypes.Int):
+    elif isinstance(t, dtypes.Int64):
         return pl.Int64()
     elif isinstance(t, dtypes.Bool):
         return pl.Boolean()
@@ -378,27 +387,6 @@ def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
         return pl.Null()
 
     raise AssertionError
-
-
-def python_type_to_polars(t: type) -> pl.DataType:
-    if t is int:
-        return pl.Int64()
-    elif t is float:
-        return pl.Float64()
-    elif t is bool:
-        return pl.Boolean()
-    elif t is str:
-        return pl.String()
-    elif t is datetime.datetime:
-        return pl.Datetime()
-    elif t is datetime.date:
-        return pl.Date()
-    elif t is datetime.timedelta:
-        return pl.Duration()
-    elif t is NoneType:
-        return pl.Null()
-
-    raise TypeError(f"python builtin type {t} is not supported by pydiverse.transform")
 
 
 with PolarsImpl.op(ops.Mean()) as op:
@@ -709,3 +697,70 @@ with PolarsImpl.op(ops.Least()) as op:
     @op.auto
     def _least(*x):
         return pl.min_horizontal(*x)
+
+
+with PolarsImpl.op(ops.Round()) as op:
+
+    @op.auto
+    def _round(x, digits=0):
+        return x.round(digits)
+
+
+with PolarsImpl.op(ops.Exp()) as op:
+
+    @op.auto
+    def _exp(x):
+        return x.exp()
+
+
+with PolarsImpl.op(ops.Log()) as op:
+
+    @op.auto
+    def _log(x):
+        return x.log()
+
+
+with PolarsImpl.op(ops.Floor()) as op:
+
+    @op.auto
+    def _floor(x):
+        return x.floor()
+
+
+with PolarsImpl.op(ops.Ceil()) as op:
+
+    @op.auto
+    def _ceil(x):
+        return x.ceil()
+
+
+with PolarsImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return x.str.to_datetime()
+
+
+with PolarsImpl.op(ops.StrToDate()) as op:
+
+    @op.auto
+    def _str_to_date(x):
+        return x.str.to_date()
+
+
+with PolarsImpl.op(ops.FloorDiv()) as op:
+
+    @op.auto
+    def _floordiv(lhs, rhs):
+        result_sign = (lhs < 0) ^ (rhs < 0)
+        return (abs(lhs) // abs(rhs)) * pl.when(result_sign).then(-1).otherwise(1)
+        # TODO: test some alternatives if this is too slow
+
+
+with PolarsImpl.op(ops.Mod()) as op:
+
+    @op.auto
+    def _mod(lhs, rhs):
+        return lhs % (abs(rhs) * pl.when(lhs >= 0).then(1).otherwise(-1))
+        # TODO: see whether the following is faster:
+        # pl.when(lhs >= 0).then(lhs % abs(rhs)).otherwise(lhs % -abs(rhs))

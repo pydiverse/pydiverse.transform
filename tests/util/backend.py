@@ -32,12 +32,13 @@ def polars_table(df: pl.DataFrame, name: str):
 _sql_engine_cache = {}
 
 
-def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict = None):
+def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict | None = None):
     import sqlalchemy as sqa
 
     global _sql_engine_cache
 
     dtypes_map = dtypes_map or {}
+    dtypes_map[pl.Float64] = sqa.Double
 
     if url in _sql_engine_cache:
         engine = _sql_engine_cache[url]
@@ -69,6 +70,7 @@ def duckdb_table(df: pl.DataFrame, name: str):
 @_cached_table
 def postgres_table(df: pl.DataFrame, name: str):
     url = "postgresql://sa:Pydiverse23@127.0.0.1:6543"
+
     return sql_table(df, name, url)
 
 
@@ -80,12 +82,7 @@ def mssql_table(df: pl.DataFrame, name: str):
         "mssql+pyodbc://sa:PydiQuant27@127.0.0.1:1433"
         "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
     )
-    return sql_table(
-        df,
-        name,
-        url,
-        dtypes_map={pl.Datetime(): DATETIME2()},
-    )
+    return sql_table(df, name, url, dtypes_map={pl.Datetime(): DATETIME2()})
 
 
 BACKEND_TABLES = {

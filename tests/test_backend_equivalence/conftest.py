@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import date, datetime
 
 import polars as pl
@@ -69,6 +70,32 @@ dataframes = {
                 None,
                 "% _.AbAbAb",
             ],
+            "c": [
+                "4352.0",
+                "-21",
+                "-nan",
+                "3.313",
+                None,
+                "-inf",
+                "inf",
+                "nan",
+                "-0.000",
+                "-0.0",
+                "0.0",
+            ],
+            "d": [
+                None,
+                "-123124",
+                "21241",
+                "010101",
+                "0",
+                "1",
+                "-12",
+                "42",
+                "197",
+                "1729",
+                "-100110",
+            ],
         }
     ),
     "df_datetime": pl.DataFrame(
@@ -119,6 +146,57 @@ dataframes = {
             # ],
         }
     ),
+    "df_num": pl.DataFrame(
+        {
+            "a": [0.4, -1.1, -0.0, 0.0, 9.0, 2.0, -344.0053, -1000.0],
+            "b": [None, 2, 0, -11, 4, 19, -5190, 2000000],
+            "c": [0.0, None, None, 2.9, -0.0, 10.0, -10.0, 3.1415926535],
+            "d": [None, 2352.0230, 0.577, 901234, -6.0, 4.0, None, -99.0],
+            "e": [1.0, 2.0, 3.0, 4.99, -442.0, 6.0, 7.0, 500.0],
+            "f": [3.0, None, 0.0, 4.3, 10.0, -1.2, -9999.1, -34.1],
+            "g": [-5.5, None, None, 1.100212, -3.412351, 1000.4252, 0.0, -1.6],
+            "zero": [0.0, -0.0] * 4,
+            "pos": [
+                1.123,
+                1297.324,
+                7.5,
+                1e200 + 54356346912.332131,
+                912.097,
+                sys.float_info.min,
+                sys.float_info.max,
+                5002352.434,
+            ],
+            "neg": [
+                -9623.1,
+                -0.1,
+                -1.0,
+                -1e190 - 1e187 - 3947392352524729923737552.5,
+                -5.5,
+                -sys.float_info.min,
+                -sys.float_info.max,
+                -6699917733.1242,
+            ],
+            "null_s": [0.0, None, None, None, None, None, None, None],
+        }
+    ),
+    "df_int": pl.DataFrame(
+        {
+            "a": [3, 1, 0, -12, 4, 5, 1 << 20, 5],
+            "b": [-23, 18282, -42, 1729, None, -2323, 11, 1],
+            "pos": [1 << 31, (1 << 23) - 1, 2, 129879000, 233, 9223222, 1, 5],
+            "neg": [
+                -(1 << 22),
+                -(1 << 31),
+                -(1 << 26) + 1,
+                -1,
+                -234,
+                -3,
+                -22,
+                -23938333,
+            ],
+            "null_s": [0] + [None] * 7,
+        }
+    ),
 }
 
 # compare one dataframe and one SQL backend to all others
@@ -127,8 +205,9 @@ reference_backends = ["polars", "duckdb"]
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc):
-    pl.Config.set_tbl_cols(12)
+    pl.Config.set_tbl_cols(20)
     pl.Config.set_tbl_rows(40)
+    pl.Config.set_tbl_width_chars(160)
     # Parametrize tests based on `backends` and `skip_backends` mark.
 
     backends = dict.fromkeys(BACKEND_TABLES)

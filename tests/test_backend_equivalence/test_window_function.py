@@ -195,16 +195,14 @@ def test_summarise(df3):
 
 
 def test_intermediate_select(df3):
-    # Check that subqueries happen transparently
     assert_result_equal(
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(x=t.col4.mean())
-        >> select()
         >> mutate(y=C.x.min())
-        >> select()
-        >> mutate(z=(C.x - C.y).mean()),
+        >> mutate(z=(C.x - C.y).mean())
+        >> select(C.z),
     )
 
 

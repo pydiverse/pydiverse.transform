@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from functools import partial, reduce, wraps
+from functools import partial, wraps
 
 
 class Pipeable:
@@ -24,17 +24,13 @@ class Pipeable:
 
         raise RuntimeError
 
-    def __rrshift__(self, other):
-        """
-        other >> Pipeable
-        -> Eager.
-        """
-        if callable(other):
-            return Pipeable(calls=[other] + self.calls)
-        return self(other)
-
     def __call__(self, arg):
-        return reduce(lambda x, f: f(x), self.calls, arg)
+        for c in self.calls:
+            res = c(arg)
+            if isinstance(res, Pipeable):
+                res = res(arg)
+            arg = res
+        return arg
 
 
 class inverse_partial(partial):

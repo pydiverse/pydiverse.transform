@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import inspect
 import itertools
+import math
 import operator
 from collections.abc import Iterable
 from typing import Any
@@ -21,6 +22,7 @@ from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     CaseExpr,
+    Cast,
     Col,
     ColExpr,
     ColFn,
@@ -32,6 +34,10 @@ from pydiverse.transform.tree.dtypes import Dtype
 
 class SqlImpl(TableImpl):
     Dialects: dict[str, type[TableImpl]] = {}
+
+    INF = sqa.cast(sqa.literal("inf"), sqa.Double)
+    NEG_INF = sqa.cast(sqa.literal("-inf"), sqa.Double)
+    NAN = sqa.cast(sqa.literal("nan"), sqa.Double)
 
     def __new__(cls, *args, **kwargs) -> SqlImpl:
         engine: str | sqa.Engine = (
@@ -69,7 +75,7 @@ class SqlImpl(TableImpl):
 
         super().__init__(
             name,
-            {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns},
+            {col.name: self.pdt_type(col.type) for col in self.table.columns},
         )
 
     def __init_subclass__(cls, **kwargs):
@@ -80,7 +86,7 @@ class SqlImpl(TableImpl):
         return [col.name for col in self.table.columns]
 
     def schema(self) -> dict[str, Dtype]:
-        return {col.name: sqa_type_to_pdt(col.type) for col in self.table.columns}
+        return {col.name: self.pdt_type(col.type) for col in self.table.columns}
 
     def _clone(self) -> tuple[SqlImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned = self.__class__(self.table, SqlAlchemy(self.engine), self.name)
@@ -139,6 +145,12 @@ class SqlImpl(TableImpl):
                 else order_expr.nulls_first()
             )
         return order_expr
+
+    @classmethod
+    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
+        return cls.compile_col_expr(cast.val, sqa_col).cast(
+            cls.sqa_type(cast.target_type)
+        )
 
     @classmethod
     def compile_col_expr(
@@ -205,7 +217,16 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(expr, LiteralCol):
+            if isinstance(expr.val, float):
+                if math.isnan(expr.val):
+                    return cls.NAN
+                elif math.isinf(expr.val):
+                    return cls.INF if expr.val > 0 else cls.NEG_INF
+                return sqa.type_coerce(expr.val, cls.sqa_type(expr.dtype()))
             return expr.val
+
+        elif isinstance(expr, Cast):
+            return cls.compile_cast(expr, sqa_col)
 
         raise AssertionError
 
@@ -449,10 +470,21 @@ class SqlImpl(TableImpl):
 
         elif isinstance(nd, SqlImpl):
             table = nd.table
-            query = Query([sqa.Label(col.name, col) for col in nd.table.columns])
+            cols = [
+                (
+                    sqa.type_coerce(col, sqa_type)
+                    if not isinstance(
+                        col.type,
+                        (sqa_type := cls.sqa_type(nd.cols[col.name].dtype())),
+                    )
+                    else col
+                ).label(col.name)
+                for col in nd.table.columns
+            ]
+            query = Query(cols)
             sqa_col = {
-                col._uuid: sqa.label(col.name, nd.table.columns[col.name])
-                for col in nd.cols.values()
+                nd.cols[table_col.name]._uuid: col
+                for table_col, col in zip(nd.table.columns, cols)
             }
 
         if isinstance(nd, verbs.Verb):
@@ -466,6 +498,52 @@ class SqlImpl(TableImpl):
                         needed_cols[node._uuid] = cnt - 1
 
         return table, query, sqa_col
+
+    @classmethod
+    def sqa_type(cls, t: Dtype) -> type[sqa.types.TypeEngine]:
+        if isinstance(t, dtypes.Int64):
+            return sqa.BigInteger
+        elif isinstance(t, dtypes.Float64):
+            return sqa.Double
+        elif isinstance(t, dtypes.Decimal):
+            return sqa.DECIMAL
+        elif isinstance(t, dtypes.String):
+            return sqa.String
+        elif isinstance(t, dtypes.Bool):
+            return sqa.Boolean
+        elif isinstance(t, dtypes.DateTime):
+            return sqa.DateTime
+        elif isinstance(t, dtypes.Date):
+            return sqa.Date
+        elif isinstance(t, dtypes.Duration):
+            return sqa.Interval
+        elif isinstance(t, dtypes.NoneDtype):
+            return sqa.types.NullType
+
+        raise AssertionError
+
+    @classmethod
+    def pdt_type(cls, t: sqa.types.TypeEngine) -> Dtype:
+        if isinstance(t, sqa.Integer):
+            return dtypes.Int64()
+        elif isinstance(t, sqa.Float):
+            return dtypes.Float64()
+        elif isinstance(t, (sqa.DECIMAL, sqa.NUMERIC)):
+            return dtypes.Decimal()
+        elif isinstance(t, sqa.String):
+            return dtypes.String()
+        elif isinstance(t, sqa.Boolean):
+            return dtypes.Bool()
+        elif isinstance(t, sqa.DateTime):
+            return dtypes.DateTime()
+        elif isinstance(t, sqa.Date):
+            return dtypes.Date()
+        elif isinstance(t, sqa.Interval):
+            return dtypes.Duration()
+        elif isinstance(t, sqa.Null):
+            return dtypes.NoneDtype()
+
+        raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
 
 
 @dataclasses.dataclass(slots=True)
@@ -544,48 +622,6 @@ def get_engine(nd: AstNode) -> sqa.Engine:
         engine = nd.engine
 
     return engine
-
-
-def sqa_type_to_pdt(t: sqa.types.TypeEngine) -> Dtype:
-    if isinstance(t, sqa.Integer):
-        return dtypes.Int()
-    elif isinstance(t, sqa.Numeric):
-        return dtypes.Float()
-    elif isinstance(t, sqa.String):
-        return dtypes.String()
-    elif isinstance(t, sqa.Boolean):
-        return dtypes.Bool()
-    elif isinstance(t, sqa.DateTime):
-        return dtypes.DateTime()
-    elif isinstance(t, sqa.Date):
-        return dtypes.Date()
-    elif isinstance(t, sqa.Interval):
-        return dtypes.Duration()
-    elif isinstance(t, sqa.Null):
-        return dtypes.NoneDtype()
-
-    raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
-
-
-def pdt_type_to_sqa(t: Dtype) -> sqa.types.TypeEngine:
-    if isinstance(t, dtypes.Int):
-        return sqa.Integer()
-    elif isinstance(t, dtypes.Float):
-        return sqa.Numeric()
-    elif isinstance(t, dtypes.String):
-        return sqa.String()
-    elif isinstance(t, dtypes.Bool):
-        return sqa.Boolean()
-    elif isinstance(t, dtypes.DateTime):
-        return sqa.DateTime()
-    elif isinstance(t, dtypes.Date):
-        return sqa.Date()
-    elif isinstance(t, dtypes.Duration):
-        return sqa.Interval()
-    elif isinstance(t, dtypes.NoneDtype):
-        return sqa.types.NullType()
-
-    raise AssertionError
 
 
 with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
@@ -686,9 +722,6 @@ with SqlImpl.op(ops.IsNotNull()) as op:
         return x.is_not(sqa.null())
 
 
-#### String Functions ####
-
-
 with SqlImpl.op(ops.StrStrip()) as op:
 
     @op.auto
@@ -751,9 +784,6 @@ with SqlImpl.op(ops.StrSlice()) as op:
     def _str_slice(x, offset, length):
         # SQL has 1-indexed strings but we do it 0-indexed
         return sqa.func.SUBSTR(x, offset + 1, length)
-
-
-#### Datetime Functions ####
 
 
 with SqlImpl.op(ops.DtYear()) as op:
@@ -819,9 +849,6 @@ with SqlImpl.op(ops.DtDayOfYear()) as op:
         return sqa.extract("doy", x)
 
 
-#### Generic Functions ####
-
-
 with SqlImpl.op(ops.Greatest()) as op:
 
     @op.auto
@@ -836,9 +863,6 @@ with SqlImpl.op(ops.Least()) as op:
     def _least(*x):
         # TODO: Determine return type
         return sqa.func.LEAST(*x)
-
-
-#### Summarising Functions ####
 
 
 with SqlImpl.op(ops.Mean()) as op:
@@ -919,9 +943,6 @@ with SqlImpl.op(ops.Count()) as op:
             return sqa.func.count(x)
 
 
-#### Window Functions ####
-
-
 with SqlImpl.op(ops.Shift()) as op:
 
     @op.auto
@@ -968,3 +989,51 @@ with SqlImpl.op(ops.DenseRank()) as op:
     @op.auto
     def _dense_rank():
         return sqa.func.dense_rank()
+
+
+with SqlImpl.op(ops.Exp()) as op:
+
+    @op.auto
+    def _exp(x):
+        return sqa.func.exp(x)
+
+
+with SqlImpl.op(ops.Log()) as op:
+
+    @op.auto
+    def _log(x):
+        # TODO: we still need to handle inf / -inf / nan
+        return sqa.case(
+            (x > 0, sqa.func.ln(x)),
+            (x < 0, SqlImpl.NAN),
+            (x.is_(sqa.null()), None),
+            else_=SqlImpl.NEG_INF,
+        )
+
+
+with SqlImpl.op(ops.Floor()) as op:
+
+    @op.auto
+    def _floor(x):
+        return sqa.func.floor(x)
+
+
+with SqlImpl.op(ops.Ceil()) as op:
+
+    @op.auto
+    def _ceil(x):
+        return sqa.func.ceil(x)
+
+
+with SqlImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.cast(x, sqa.DateTime)
+
+
+with SqlImpl.op(ops.StrToDate()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.cast(x, sqa.Date)

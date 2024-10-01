@@ -116,12 +116,12 @@ def tbl_dt():
 
 class TestPolarsLazyImpl:
     def test_dtype(self, tbl1, tbl2):
-        assert isinstance(tbl1.col1.dtype(), dtypes.Int)
+        assert isinstance(tbl1.col1.dtype(), dtypes.Int64)
         assert isinstance(tbl1.col2.dtype(), dtypes.String)
 
-        assert isinstance(tbl2.col1.dtype(), dtypes.Int)
-        assert isinstance(tbl2.col2.dtype(), dtypes.Int)
-        assert isinstance(tbl2.col3.dtype(), dtypes.Float)
+        assert isinstance(tbl2.col1.dtype(), dtypes.Int64)
+        assert isinstance(tbl2.col2.dtype(), dtypes.Int64)
+        assert isinstance(tbl2.col3.dtype(), dtypes.Float64)
 
         # test that column expression type errors are checked immediately
         with pytest.raises(TypeError):
@@ -164,13 +164,13 @@ class TestPolarsLazyImpl:
         )
 
         # # Check proper column referencing
-        t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2) >> select()
+        t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2)
         assert_equal(
-            t >> mutate(x=t.col1, y=t.col2),
+            t >> select() >> mutate(x=t.col1, y=t.col2),
             tbl1 >> select() >> mutate(x=tbl1.col2, y=tbl1.col1),
         )
         assert_equal(
-            t >> mutate(x=tbl1.col1, y=tbl1.col2),
+            t >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
             tbl1 >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
         )
 
@@ -384,8 +384,8 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> group_by(C.col2)
-                >> select()
                 >> mutate(x=f.row_number(arrange=[-C.col4]))
+                >> select(C.x)
             ),
             pl.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
         )
@@ -395,13 +395,13 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> group_by(C.col2)
-                >> select()
                 >> mutate(x=f.row_number(arrange=[-C.col4]))
+                >> select(C.x)
             ),
             (
                 tbl3
-                >> select()
                 >> mutate(x=f.row_number(arrange=[-C.col4], partition_by=[C.col2]))
+                >> select(C.x)
             ),
         )
 
@@ -435,7 +435,6 @@ class TestPolarsLazyImpl:
         assert_equal(
             (
                 tbl3
-                >> select()
                 >> mutate(
                     col1=f.when(C.col1 == 0)
                     .then(1)
@@ -445,6 +444,7 @@ class TestPolarsLazyImpl:
                     .then(3)
                     .otherwise(-1)
                 )
+                >> select(C.col1)
             ),
             (df3.select("col1") + 1),
         )
@@ -452,7 +452,6 @@ class TestPolarsLazyImpl:
         assert_equal(
             (
                 tbl3
-                >> select()
                 >> mutate(
                     x=f.when(C.col1 == C.col2)
                     .then(1)
@@ -460,6 +459,7 @@ class TestPolarsLazyImpl:
                     .then(2)
                     .otherwise(C.col4)
                 )
+                >> select(C.x)
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
         )
@@ -470,7 +470,7 @@ class TestPolarsLazyImpl:
 
         # Mutate
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> select() >> mutate(b=C.a * 2),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> mutate(b=C.a * 2) >> select(C.b),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
@@ -485,9 +485,9 @@ class TestPolarsLazyImpl:
         # Join
         assert_equal(
             tbl1
-            >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == tbl2.col1, "left"),
+            >> join(tbl2, C.a == tbl2.col1, "left")
+            >> select(C.a, *tbl2),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
@@ -571,7 +571,7 @@ class TestPrintAndRepr:
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
-        series = tbl1._impl.df.collect().get_column("col1")
+        series = tbl1._ast.df.get_column("col1")
 
         assert str(series) in col1_str
         assert "exception" not in col1_str
