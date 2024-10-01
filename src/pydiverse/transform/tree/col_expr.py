@@ -429,6 +429,7 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             raise TypeError("cannot call `when` on a closed case expression after")
 
+        condition = wrap_literal(condition)
         if condition.dtype() is not None and not isinstance(
             condition.dtype(), dtypes.Bool
         ):
@@ -571,5 +572,10 @@ def wrap_literal(expr: Any) -> Any:
         return expr.__class__(wrap_literal(elem) for elem in expr)
     elif isinstance(expr, Generator):
         return (wrap_literal(elem) for elem in expr)
+    elif isinstance(expr, FnAttr):
+        raise TypeError(
+            "invalid usage of a column function as an expression.\n"
+            "hint: Maybe you forgot to put parentheses `()` after the function?"
+        )
     else:
         return LiteralCol(expr)
