@@ -128,9 +128,8 @@ class ColName(ColExpr):
         super().__init__(dtype, ftype)
 
     def __repr__(self) -> str:
-        return (
-            f"C.{self.name}{f" ({self.dtype()})" if self.dtype() is not None else ""}"
-        )
+        dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
+        return f"C.{self.name}{dtype_str}"
 
 
 class LiteralCol(ColExpr):
