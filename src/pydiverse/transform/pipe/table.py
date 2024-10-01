@@ -86,6 +86,9 @@ class Table:
         cols = copy.copy(self._cache.select)
         yield from cols
 
+    def __contains__(self, col: str | Col | ColName) -> bool:
+        return self._cache.has_col(col)
+
     def __len__(self) -> int:
         return len(self._cache.select)
 
