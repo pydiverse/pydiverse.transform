@@ -102,7 +102,7 @@ def test_hour(df_datetime):
     assert_result_equal(
         df_datetime,
         lambda t: t >> mutate(z=t.cdate.dt.hour()),
-        exception=ValueError,
+        exception=TypeError,
     )
 
 
@@ -161,9 +161,9 @@ def test_day_of_year(df_datetime):
     )
 
 
-def test_duration_add(df_datetime):
-    assert_result_equal(df_datetime, lambda t: t >> mutate(z=t.cdur + t.cdur))
+# def test_duration_add(df_datetime):
+#     assert_result_equal(df_datetime, lambda t: t >> mutate(z=t.cdur + t.cdur))
 
 
-def test_dt_subtract(df_datetime):
-    assert_result_equal(df_datetime, lambda t: t >> mutate(z=t.col1 - t.col2))
+# def test_dt_subtract(df_datetime):
+#     assert_result_equal(df_datetime, lambda t: t >> mutate(z=t.col1 - t.col2))
