@@ -25,6 +25,10 @@ __all__ = [
     "Ceil",
     "Exp",
     "Log",
+    "IsInf",
+    "IsNotInf",
+    "IsNan",
+    "IsNotNan",
 ]
 
 
@@ -174,3 +178,21 @@ class Log(ElementWise):
 class Exp(Log):
     name = "exp"
     signatures = ["float64 -> float64"]
+
+
+class IsInf(ElementWise):
+    name = "is_inf"
+    signatures = ["float64 -> bool"]
+
+
+class IsNotInf(IsInf):
+    name = "is_not_inf"
+
+
+class IsNan(ElementWise):
+    name = "is_nan"
+    signatures = ["float64 -> bool"]
+
+
+class IsNotNan(IsNan):
+    name = "is_not_nan"

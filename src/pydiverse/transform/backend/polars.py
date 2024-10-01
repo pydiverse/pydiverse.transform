@@ -774,3 +774,31 @@ with PolarsImpl.op(ops.Mod()) as op:
         return lhs % (abs(rhs) * pl.when(lhs >= 0).then(1).otherwise(-1))
         # TODO: see whether the following is faster:
         # pl.when(lhs >= 0).then(lhs % abs(rhs)).otherwise(lhs % -abs(rhs))
+
+
+with PolarsImpl.op(ops.IsInf()) as op:
+
+    @op.auto
+    def _is_inf(x):
+        return x.is_infinite()
+
+
+with PolarsImpl.op(ops.IsNotInf()) as op:
+
+    @op.auto
+    def _is_not_inf(x):
+        return x.is_not_infinite()
+
+
+with PolarsImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return x.is_nan()
+
+
+with PolarsImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return x.is_not_nan()
