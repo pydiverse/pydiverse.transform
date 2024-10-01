@@ -3,6 +3,7 @@ from __future__ import annotations
 import polars as pl
 import sqlalchemy as sqa
 
+from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
 from pydiverse.transform.backend.targets import Polars, Target
@@ -31,3 +32,17 @@ class DuckDbImpl(SqlImpl):
                 sqa.BigInteger()
             )
         return super().compile_cast(cast, sqa_col)
+
+
+with DuckDbImpl.op(ops.FloorDiv()) as op:
+
+    @op.auto
+    def _floordiv(lhs, rhs):
+        return sqa.func.divide(lhs, rhs)
+
+
+with DuckDbImpl.op(ops.RFloorDiv()) as op:
+
+    @op.auto
+    def _floordiv(rhs, lhs):
+        return sqa.func.divide(lhs, rhs)

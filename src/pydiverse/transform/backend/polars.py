@@ -746,3 +746,21 @@ with PolarsImpl.op(ops.StrToDate()) as op:
     @op.auto
     def _str_to_date(x):
         return x.str.to_date()
+
+
+with PolarsImpl.op(ops.FloorDiv()) as op:
+
+    @op.auto
+    def _floordiv(lhs, rhs):
+        result_sign = (lhs < 0) ^ (rhs < 0)
+        return (abs(lhs) // abs(rhs)) * pl.when(result_sign).then(-1).otherwise(1)
+        # TODO: test some alternatives if this is too slow
+
+
+with PolarsImpl.op(ops.Mod()) as op:
+
+    @op.auto
+    def _mod(lhs, rhs):
+        return lhs % (abs(rhs) * lhs.sign())
+        # TODO: see whether the following is faster:
+        # pl.when(lhs >= 0).then(lhs % abs(rhs)).otherwise(lhs % -abs(rhs))
