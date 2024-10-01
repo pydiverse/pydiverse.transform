@@ -16,6 +16,8 @@ __all__ = [
     "StrEndsWith",
     "StrContains",
     "StrSlice",
+    "StrToDateTime",
+    "StrToDate",
 ]
 
 
@@ -49,7 +51,7 @@ class StrStrip(StrUnary):
 class StrLen(StrUnary):
     name = "str.len"
     signatures = [
-        "str -> int",
+        "str -> int64",
     ]
 
 
@@ -91,4 +93,14 @@ class StrContains(ElementWise, Logical):
 
 class StrSlice(ElementWise):
     name = "str.slice"
-    signatures = ["str, int, int -> str"]
+    signatures = ["str, int64, int64 -> str"]
+
+
+class StrToDateTime(ElementWise):
+    name = "str.to_datetime"
+    signatures = ["str -> datetime"]
+
+
+class StrToDate(ElementWise):
+    name = "str.to_date"
+    signatures = ["str -> date"]

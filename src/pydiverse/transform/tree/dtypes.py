@@ -13,16 +13,21 @@ class Dtype(ABC):
         self.const = const
         self.vararg = vararg
 
-    def __eq__(self, other):
-        if type(self) is not type(other):
+    def __eq__(self, rhs):
+        if type(self) is rhs:
+            return True
+        if type(self) is not type(rhs):
             return False
-        if self.const != other.const:
+        if self.const != rhs.const:
             return False
-        if self.vararg != other.vararg:
+        if self.vararg != rhs.vararg:
             return False
-        if self.name != other.name:
+        if self.name != rhs.name:
             return False
         return True
+
+    def __ne__(self, rhs: object) -> bool:
+        return not self.__eq__(rhs)
 
     def __hash__(self):
         return hash((self.name, self.const, self.vararg, type(self).__qualname__))
@@ -68,15 +73,15 @@ class Dtype(ABC):
         return other.same_kind(self)
 
 
-class Int(Dtype):
-    name = "int"
+class Int64(Dtype):
+    name = "int64"
 
     def can_promote_to(self, other: Dtype) -> bool:
         if super().can_promote_to(other):
             return True
 
-        # int can be promoted to float
-        if Float().same_kind(other):
+        # int64 can be promoted to float64
+        if Float64().same_kind(other):
             if other.const and not self.const:
                 return False
 
@@ -85,8 +90,12 @@ class Int(Dtype):
         return False
 
 
-class Float(Dtype):
-    name = "float"
+class Float64(Dtype):
+    name = "float64"
+
+
+class Decimal(Dtype):
+    name = "decimal"
 
 
 class String(Dtype):
@@ -142,9 +151,9 @@ class NoneDtype(Dtype):
 
 def python_type_to_pdt(t: type) -> Dtype:
     if t is int:
-        return Int()
+        return Int64()
     elif t is float:
-        return Float()
+        return Float64()
     elif t is bool:
         return Bool()
     elif t is str:
@@ -190,10 +199,12 @@ def dtype_from_string(t: str) -> Dtype:
     if is_template:
         return Template(base_type, const=is_const, vararg=is_vararg)
 
-    if base_type == "int":
-        return Int(const=is_const, vararg=is_vararg)
-    if base_type == "float":
-        return Float(const=is_const, vararg=is_vararg)
+    if base_type == "int64":
+        return Int64(const=is_const, vararg=is_vararg)
+    if base_type == "float64":
+        return Float64(const=is_const, vararg=is_vararg)
+    if base_type == "decimal":
+        return Decimal(const=is_const, vararg=is_vararg)
     if base_type == "str":
         return String(const=is_const, vararg=is_vararg)
     if base_type == "bool":

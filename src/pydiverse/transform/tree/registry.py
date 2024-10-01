@@ -296,21 +296,21 @@ class OperatorSignature:
         terminal_arg ::= modifiers (dtype | vararg)
         vararg ::= dtype "..."
         rtype ::= dtype
-        dtype ::= template | "int" | "float" | "str" | "bool" | and others...
+        dtype ::= template | "int64" | "float64" | "str" | "bool" | and others...
         modifiers ::= "const"?
         template ::= single uppercase character
 
     Examples:
 
         Function that takes two integers and returns an integer:
-            int, int -> int
+            int64, int64 -> int64
 
         Templated argument (templates consist of single uppercase characters):
             T, T -> T
             T, U -> bool
 
         Variable number of arguments:
-            int... -> int
+            int64... -> int64
 
     """
 
@@ -523,7 +523,7 @@ class OperatorImplStore:
             elif not node.value.same_kind(dtype):
                 # Needs type promotion
                 # This only works when types can be promoted once
-                # -> (uint > int) wouldn't be preferred over (uint > int > float)
+                # -> (uint > int64) wouldn't be preferred over (uint > int64 > float64)
                 type_promotion_indices = (*type_promotion_indices, s_i)
 
             if s_i + 1 == len(signature):

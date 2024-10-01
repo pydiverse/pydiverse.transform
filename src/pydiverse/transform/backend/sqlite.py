@@ -4,11 +4,44 @@ import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.tree import dtypes
+from pydiverse.transform.tree.col_expr import Cast
 from pydiverse.transform.util.warnings import warn_non_standard
 
 
 class SqliteImpl(SqlImpl):
     dialect_name = "sqlite"
+
+    INF = sqa.cast(sqa.literal("1e314"), sqa.Float)
+    NEG_INF = -INF
+    NAN = sqa.null()
+
+    @classmethod
+    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
+        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
+
+        if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
+            return sqa.case(
+                (compiled_val == "inf", cls.INF),
+                (compiled_val == "-inf", cls.NEG_INF),
+                (compiled_val.in_(("nan", "-nan")), cls.NAN),
+                else_=sqa.cast(
+                    compiled_val,
+                    cls.sqa_type(cast.target_type),
+                ),
+            )
+
+        elif cast.val.dtype() == dtypes.DateTime and cast.target_type == dtypes.Date:
+            return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
+
+        elif cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
+            return sqa.case(
+                (compiled_val == cls.INF, "inf"),
+                (compiled_val == cls.NEG_INF, "-inf"),
+                else_=sqa.cast(compiled_val, sqa.String),
+            )
+
+        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
 
 with SqliteImpl.op(ops.Round()) as op:
@@ -101,3 +134,18 @@ with SqliteImpl.op(ops.Least()) as op:
 
         # TODO: Determine return type
         return sqa.func.coalesce(sqa.func.MIN(left, right), left, right)
+
+
+# TODO: we need to get the string in the right format here (so sqlite can work with it)
+with SqliteImpl.op(ops.StrToDateTime()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.type_coerce(x, sqa.DateTime)
+
+
+with SqliteImpl.op(ops.StrToDate()) as op:
+
+    @op.auto
+    def _str_to_datetime(x):
+        return sqa.type_coerce(x, sqa.Date)

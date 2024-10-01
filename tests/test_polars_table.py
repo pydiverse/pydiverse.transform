@@ -116,12 +116,12 @@ def tbl_dt():
 
 class TestPolarsLazyImpl:
     def test_dtype(self, tbl1, tbl2):
-        assert isinstance(tbl1.col1.dtype(), dtypes.Int)
+        assert isinstance(tbl1.col1.dtype(), dtypes.Int64)
         assert isinstance(tbl1.col2.dtype(), dtypes.String)
 
-        assert isinstance(tbl2.col1.dtype(), dtypes.Int)
-        assert isinstance(tbl2.col2.dtype(), dtypes.Int)
-        assert isinstance(tbl2.col3.dtype(), dtypes.Float)
+        assert isinstance(tbl2.col1.dtype(), dtypes.Int64)
+        assert isinstance(tbl2.col2.dtype(), dtypes.Int64)
+        assert isinstance(tbl2.col3.dtype(), dtypes.Float64)
 
         # test that column expression type errors are checked immediately
         with pytest.raises(TypeError):

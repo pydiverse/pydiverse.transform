@@ -4,10 +4,31 @@ import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.tree import dtypes
+from pydiverse.transform.tree.col_expr import Cast
 
 
 class PostgresImpl(SqlImpl):
     dialect_name = "postgresql"
+
+    @classmethod
+    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
+        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
+
+        if isinstance(cast.val.dtype(), dtypes.Float64):
+            if isinstance(cast.target_type, dtypes.Int64):
+                return sqa.func.trunc(compiled_val).cast(sqa.BigInteger())
+
+            if isinstance(cast.target_type, dtypes.String):
+                compiled = sqa.cast(compiled_val, sqa.String)
+                return sqa.case(
+                    (compiled == "NaN", "nan"),
+                    (compiled == "Infinity", "inf"),
+                    (compiled == "-Infinity", "-inf"),
+                    else_=compiled,
+                )
+
+        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
 
 with PostgresImpl.op(ops.Less()) as op:

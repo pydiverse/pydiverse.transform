@@ -21,16 +21,19 @@ __all__ = [
     "Pos",
     "Abs",
     "Round",
+    "Floor",
+    "Ceil",
+    "Exp",
+    "Log",
 ]
 
 
 class Add(ElementWise, Binary):
     name = "__add__"
     signatures = [
-        "int, int -> int",
-        "int, float -> float",
-        "float, int -> float",
-        "float, float -> float",
+        "int64, int64 -> int64",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -41,10 +44,9 @@ class RAdd(Add):
 class Sub(ElementWise, Binary):
     name = "__sub__"
     signatures = [
-        "int, int -> int",
-        "int, float -> float",
-        "float, int -> float",
-        "float, float -> float",
+        "int64, int64 -> int64",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -55,10 +57,9 @@ class RSub(Sub):
 class Mul(ElementWise, Binary):
     name = "__mul__"
     signatures = [
-        "int, int -> int",
-        "int, float -> float",
-        "float, int -> float",
-        "float, float -> float",
+        "int64, int64 -> int64",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -69,8 +70,9 @@ class RMul(Mul):
 class TrueDiv(ElementWise, Binary):
     name = "__truediv__"
     signatures = [
-        "int, int -> float",
-        "float, float -> float",
+        "int64, int64 -> float64",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -81,7 +83,7 @@ class RTrueDiv(TrueDiv):
 class FloorDiv(ElementWise, Binary):
     name = "__floordiv__"
     signatures = [
-        "int, int -> int",
+        "int64, int64 -> int64",
     ]
 
 
@@ -92,8 +94,9 @@ class RFloorDiv(FloorDiv):
 class Pow(ElementWise, Binary):
     name = "__pow__"
     signatures = [
-        "int, int -> float",
-        "float, float -> float",
+        "int64, int64 -> float64",
+        "float64, float64 -> float64",
+        "decimal, decimal -> decimal",
     ]
 
 
@@ -104,7 +107,7 @@ class RPow(Pow):
 class Mod(ElementWise, Binary):
     name = "__mod__"
     signatures = [
-        "int, int -> int",
+        "int64, int64 -> int64",
     ]
 
 
@@ -115,32 +118,59 @@ class RMod(Mod):
 class Neg(ElementWise, Unary):
     name = "__neg__"
     signatures = [
-        "int -> int",
-        "float -> float",
+        "int64 -> int64",
+        "float64 -> float64",
+        "decimal -> decimal",
     ]
 
 
 class Pos(ElementWise, Unary):
     name = "__pos__"
     signatures = [
-        "int -> int",
-        "float -> float",
+        "int64 -> int64",
+        "float64 -> float64",
+        "decimal -> decimal",
     ]
 
 
 class Abs(ElementWise, Unary):
     name = "__abs__"
     signatures = [
-        "int -> int",
-        "float -> float",
+        "int64 -> int64",
+        "float64 -> float64",
+        "decimal -> decimal",
     ]
 
 
 class Round(ElementWise):
     name = "__round__"
     signatures = [
-        "int -> int",
-        "int, const int -> int",
-        "float -> float",
-        "float, const int -> float",
+        "int64 -> int64",
+        "int64, const int64 -> int64",
+        "float64 -> float64",
+        "float64, const int64 -> float64",
+        "decimal -> decimal",
+        "decimal, const int64 -> decimal",
     ]
+
+
+class Floor(ElementWise):
+    name = "floor"
+    signatures = [
+        "float64 -> float64",
+        "decimal -> decimal",
+    ]
+
+
+class Ceil(Floor):
+    name = "ceil"
+
+
+class Log(ElementWise):
+    name = "log"
+    signatures = ["float64 -> float64"]
+
+
+class Exp(Log):
+    name = "exp"
+    signatures = ["float64 -> float64"]

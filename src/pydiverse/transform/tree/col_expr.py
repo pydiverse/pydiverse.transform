@@ -115,7 +115,7 @@ class Col(ColExpr):
             )
 
     def __hash__(self) -> int:
-        return hash(self.uuid)
+        return hash(self._uuid)
 
 
 class ColName(ColExpr):
@@ -296,6 +296,11 @@ class FnAttr:
         return FnAttr(f"{self.name}.{name}", self.arg)
 
     def __call__(self, *args, **kwargs) -> ColExpr:
+        if self.name == "cast":
+            if len(kwargs) > 0:
+                raise ValueError("`cast` does not take any keyword arguments")
+            return Cast(self.arg, *args)
+
         return ColFn(
             self.name,
             wrap_literal(self.arg),
@@ -379,7 +384,7 @@ class CaseExpr(ColExpr):
             raise TypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
-            if cond.dtype() is not None and not isinstance(cond.dtype(), dtypes.Bool):
+            if cond.dtype() is not None and cond.dtype() != dtypes.Bool:
                 raise TypeError(
                     f"argument `{cond}` for `when` must be of boolean type, but has "
                     f"type `{cond.dtype()}`"
@@ -436,6 +441,64 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             raise TypeError("default value is already set on this case expression")
         return CaseExpr(self.cases, wrap_literal(value))
+
+
+class Cast(ColExpr):
+    __slots__ = ["val", "target_type"]
+
+    def __init__(self, val: ColExpr, target_type: Dtype):
+        self.val = val
+        self.target_type = target_type
+        super().__init__(target_type)
+        self.dtype()
+
+    def dtype(self) -> Dtype:
+        # Since `ColExpr.dtype` is also responsible for type checking, we may not set
+        # `_dtype` until we are able to retrieve the type of `val`.
+        if self.val.dtype() is None:
+            return None
+
+        if not self.val.dtype().can_promote_to(self.target_type):
+            valid_casts = {
+                (dtypes.String, dtypes.Int64),
+                (dtypes.String, dtypes.Float64),
+                (dtypes.Float64, dtypes.Int64),
+                (dtypes.DateTime, dtypes.Date),
+                (dtypes.Int64, dtypes.String),
+                (dtypes.Float64, dtypes.String),
+                (dtypes.DateTime, dtypes.String),
+                (dtypes.Date, dtypes.String),
+            }
+
+            if (
+                self.val.dtype().__class__,
+                self.target_type.__class__,
+            ) not in valid_casts:
+                hint = ""
+                if self.val.dtype() == dtypes.String and self.target_type in (
+                    dtypes.DateTime,
+                    dtypes.Date,
+                ):
+                    hint = (
+                        "\nhint: to convert a str to datetime, call "
+                        f"`.str.to_{self.target_type.name}()` on the expression."
+                    )
+
+                raise TypeError(
+                    f"cannot cast type {self.val.dtype()} to {self.target_type}."
+                    f"{hint}"
+                )
+
+        return self._dtype
+
+    def ftype(self, *, agg_is_window: bool) -> Ftype:
+        return self.val.ftype(agg_is_window=agg_is_window)
+
+    def iter_children(self) -> Iterable[ColExpr]:
+        yield self.val
+
+    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+        return g(Cast(self.val.map_subtree(g), self.target_type))
 
 
 @dataclasses.dataclass(slots=True)
