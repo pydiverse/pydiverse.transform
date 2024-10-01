@@ -27,37 +27,6 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
 
-    INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Double) / sqa.literal(
-        "0.0", type_=sqa.Double
-    )
-    NEG_INF = -INF
-    NAN = INF + NEG_INF
-
-    @classmethod
-    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
-        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
-        if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
-            return sqa.case(
-                (compiled_val == "inf", cls.INF),
-                (compiled_val == "-inf", -cls.INF),
-                (compiled_val.in_(("nan", "-nan")), cls.NAN),
-                else_=sqa.cast(
-                    compiled_val,
-                    cls.sqa_type(cast.target_type),
-                ),
-            )
-
-        if cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
-            compiled = sqa.cast(cls.compile_col_expr(cast.val, sqa_col), sqa.String)
-            return sqa.case(
-                (compiled == "1.#QNAN", "nan"),
-                (compiled == "1.#INF", "inf"),
-                (compiled == "-1.#INF", "-inf"),
-                else_=compiled,
-            )
-
-        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
-
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
         # boolean / bit conversion
@@ -343,12 +312,7 @@ with MsSqlImpl.op(ops.Log()) as op:
 
     @op.auto
     def _log(x):
-        return sqa.case(
-            (x > 0, sqa.func.log(x)),
-            (x < 0, MsSqlImpl.NAN),
-            (x.is_(sqa.null()), None),
-            else_=-MsSqlImpl.INF,
-        )
+        return sqa.func.log(x)
 
 
 with MsSqlImpl.op(ops.Ceil()) as op:
@@ -363,13 +327,3 @@ with MsSqlImpl.op(ops.StrToDateTime()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.cast(x, DATETIME2)
-
-
-with MsSqlImpl.op(ops.Round()) as op:
-
-    @op.auto
-    def _round(x, decimals=0):
-        return sqa.case(
-            (x != x, MsSqlImpl.NAN),
-            else_=sqa.func.round(x, decimals, type_=x.type),
-        )

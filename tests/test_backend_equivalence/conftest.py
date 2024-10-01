@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from datetime import date, datetime
 
 import polars as pl
@@ -73,12 +72,12 @@ dataframes = {
             "c": [
                 "4352.0",
                 "-21",
-                "-nan",
+                "-1.121222",
                 "3.313",
                 None,
-                "-inf",
-                "inf",
-                "nan",
+                "-444",
+                "5.3",
+                "1.33333",
                 "-0.000",
                 "-0.0",
                 "0.0",
@@ -160,20 +159,20 @@ dataframes = {
                 1.123,
                 1297.324,
                 7.5,
-                1e200 + 54356346912.332131,
+                1e50 + 54356346912.332131,
                 912.097,
-                sys.float_info.min,
-                sys.float_info.max,
+                1e-51,
+                0.12,
                 5002352.434,
             ],
             "neg": [
                 -9623.1,
                 -0.1,
                 -1.0,
-                -1e190 - 1e187 - 3947392352524729923737552.5,
+                -1e19 - 394734729923737552.5,
                 -5.5,
-                -sys.float_info.min,
-                -sys.float_info.max,
+                -0.0001,
+                -1.2e-39,
                 -6699917733.1242,
             ],
             "null_s": [0.0, None, None, None, None, None, None, None],

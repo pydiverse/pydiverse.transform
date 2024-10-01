@@ -4,7 +4,6 @@ import dataclasses
 import functools
 import inspect
 import itertools
-import math
 import operator
 from collections.abc import Iterable
 from typing import Any
@@ -34,10 +33,6 @@ from pydiverse.transform.tree.dtypes import Dtype
 
 class SqlImpl(TableImpl):
     Dialects: dict[str, type[TableImpl]] = {}
-
-    INF = sqa.cast(sqa.literal("inf"), sqa.Double)
-    NEG_INF = sqa.cast(sqa.literal("-inf"), sqa.Double)
-    NAN = sqa.cast(sqa.literal("nan"), sqa.Double)
 
     def __new__(cls, *args, **kwargs) -> SqlImpl:
         engine: str | sqa.Engine = (
@@ -218,11 +213,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, LiteralCol):
             if isinstance(expr.val, float):
-                if math.isnan(expr.val):
-                    return cls.NAN
-                elif math.isinf(expr.val):
-                    return cls.INF if expr.val > 0 else cls.NEG_INF
-                return sqa.type_coerce(expr.val, cls.sqa_type(expr.dtype()))
+                return sqa.type_coerce(expr.val, sqa.Double)
             return expr.val
 
         elif isinstance(expr, Cast):
@@ -1002,13 +993,7 @@ with SqlImpl.op(ops.Log()) as op:
 
     @op.auto
     def _log(x):
-        # TODO: we still need to handle inf / -inf / nan
-        return sqa.case(
-            (x > 0, sqa.func.ln(x)),
-            (x < 0, SqlImpl.NAN),
-            (x.is_(sqa.null()), None),
-            else_=SqlImpl.NEG_INF,
-        )
+        return sqa.func.ln(x)
 
 
 with SqlImpl.op(ops.Floor()) as op:

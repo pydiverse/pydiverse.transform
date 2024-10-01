@@ -3,7 +3,6 @@ from __future__ import annotations
 import pydiverse.transform as pdt
 from pydiverse.transform.pipe.c import C
 from pydiverse.transform.pipe.verbs import mutate
-from tests.test_backend_equivalence.test_ops.test_ops_numerical import add_nan_inf_cols
 from tests.util.assertion import assert_result_equal
 
 
@@ -43,19 +42,6 @@ def test_float_to_int(df_num):
         exception=Exception,
     )
 
-    assert_result_equal(
-        df_num,
-        lambda t: t >> add_nan_inf_cols() >> mutate(u=C.inf.cast(pdt.Int64())),
-        exception=Exception,
-        may_throw=True,
-    )
-    assert_result_equal(
-        df_num,
-        lambda t: t >> add_nan_inf_cols() >> mutate(u=C.nan.cast(pdt.Int64())),
-        exception=Exception,
-        may_throw=True,
-    )
-
 
 def test_datetime_to_date(df_datetime):
     assert_result_equal(
@@ -74,8 +60,7 @@ def test_float_to_string(df_num):
     assert_result_equal(
         df_num,
         lambda t: t
-        >> add_nan_inf_cols()
-        >> (lambda s: mutate(**{c.name: c.cast(pdt.String()) for c in s}))
+        >> mutate(**{c.name: c.cast(pdt.String()) for c in t})
         >> (lambda s: mutate(**{c.name: c.cast(pdt.Float64()) for c in s})),
     )
 
