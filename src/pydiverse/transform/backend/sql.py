@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import inspect
 import itertools
+import math
 import operator
 from collections.abc import Iterable
 from typing import Any
@@ -93,6 +94,14 @@ class SqlImpl(TableImpl):
                 for name in self.cols.keys()
             },
         )
+
+    @classmethod
+    def inf(cls):
+        return sqa.cast(sqa.literal("inf"), sqa.Double)
+
+    @classmethod
+    def nan(cls):
+        return sqa.cast(sqa.literal("nan"), sqa.Double)
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> sqa.Select:
@@ -213,6 +222,10 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, LiteralCol):
             if isinstance(expr.val, float):
+                if math.isnan(expr.val):
+                    return cls.nan()
+                elif math.isinf(expr.val):
+                    return cls.inf() if expr.val > 0 else -cls.inf()
                 return sqa.type_coerce(expr.val, sqa.Double)
             return expr.val
 

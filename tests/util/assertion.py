@@ -10,7 +10,7 @@ from polars.testing import assert_frame_equal
 from pydiverse.transform import Table
 from pydiverse.transform.backend.sqlite import SqliteImpl
 from pydiverse.transform.backend.targets import Polars
-from pydiverse.transform.errors import NonStandardBehaviourWarning
+from pydiverse.transform.errors import NonStandardWarning
 from pydiverse.transform.pipe.verbs import export, get_backend, show_query
 
 
@@ -49,7 +49,7 @@ def catch_warnings():
 def get_transform_warnings(
     warnings_: list[warnings.WarningMessage],
 ) -> list[warnings.WarningMessage]:
-    return [w for w in warnings_ if issubclass(w.category, NonStandardBehaviourWarning)]
+    return [w for w in warnings_ if issubclass(w.category, NonStandardWarning)]
 
 
 def assert_result_equal(

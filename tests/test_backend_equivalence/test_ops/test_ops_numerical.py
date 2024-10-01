@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import pydiverse.transform as pdt
-from pydiverse.transform.pipe.verbs import mutate
+from pydiverse.transform.pipe.c import C
+from pydiverse.transform.pipe.verbs import mutate, select
+from tests.fixtures.backend import skip_backends
 from tests.util.assertion import assert_result_equal
 
 
@@ -94,4 +96,37 @@ def test_ceil(df_num):
     assert_result_equal(
         df_num,
         lambda t: t >> mutate(**{c.name: c.ceil() for c in t}),
+    )
+
+
+@skip_backends("mssql")
+def test_inf_lit(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> select()
+        >> mutate(
+            inf=float("inf"),
+            neg_inf=float("-inf"),
+        )
+        >> mutate(
+            inf_str=C.inf.cast(pdt.String()),
+            neg_inf_str=C.neg_inf.cast(pdt.String()),
+        )
+        >> mutate(
+            inf_back=C.inf_str.cast(pdt.Float64()),
+            neg_inf_back=C.neg_inf_str.cast(pdt.Float64()),
+        ),
+    )
+
+
+@skip_backends("mssql", "sqlite")
+def test_nan_lit(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> select()
+        >> mutate(nan=float("nan"))
+        >> mutate(nan_str=C.nan.cast(pdt.String()))
+        >> mutate(nan_back=C.nan_str.cast(pdt.Float64())),
     )

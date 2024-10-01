@@ -4,7 +4,7 @@ import inspect
 import sys
 import warnings as py_warnings
 
-from pydiverse.transform.errors import NonStandardBehaviourWarning
+from pydiverse.transform.errors import NonStandardWarning
 
 
 def warn(
@@ -48,6 +48,6 @@ def warn_non_standard(
 ):
     warn(
         message,
-        category=NonStandardBehaviourWarning,
+        category=NonStandardWarning,
         stacklevel=stacklevel + 1,
     )

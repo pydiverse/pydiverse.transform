@@ -10,6 +10,7 @@ from sqlalchemy.dialects.mssql import DATETIME2
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.errors import NotSupportedError
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
@@ -26,6 +27,14 @@ from pydiverse.transform.util.warnings import warn_non_standard
 
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
+
+    @classmethod
+    def inf():
+        raise NotSupportedError("SQL Server does not support `inf`")
+
+    @classmethod
+    def nan():
+        raise NotSupportedError("SQL Server does not support `nan`")
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:

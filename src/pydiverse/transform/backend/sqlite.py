@@ -4,6 +4,7 @@ import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.errors import NotSupportedError
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.col_expr import Cast
 from pydiverse.transform.util.warnings import warn_non_standard
@@ -12,9 +13,13 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class SqliteImpl(SqlImpl):
     dialect_name = "sqlite"
 
-    INF = sqa.cast(sqa.literal("1e314"), sqa.Double)
-    NEG_INF = -INF
-    NAN = sqa.null()
+    @classmethod
+    def inf(cls):
+        return sqa.type_coerce(sqa.literal("1e314"), sqa.Double)
+
+    @classmethod
+    def nan(cls):
+        raise NotSupportedError("SQLite does not have `nan`, use `null` instead.")
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
@@ -22,9 +27,8 @@ class SqliteImpl(SqlImpl):
 
         if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
             return sqa.case(
-                (compiled_val == "inf", cls.INF),
-                (compiled_val == "-inf", cls.NEG_INF),
-                (compiled_val.in_(("nan", "-nan")), cls.NAN),
+                (compiled_val == "inf", cls.inf()),
+                (compiled_val == "-inf", -cls.inf()),
                 else_=sqa.cast(
                     compiled_val,
                     cls.sqa_type(cast.target_type),
@@ -36,8 +40,8 @@ class SqliteImpl(SqlImpl):
 
         elif cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
             return sqa.case(
-                (compiled_val == cls.INF, "inf"),
-                (compiled_val == cls.NEG_INF, "-inf"),
+                (compiled_val == cls.inf(), "inf"),
+                (compiled_val == -cls.inf(), "-inf"),
                 else_=sqa.cast(compiled_val, sqa.String),
             )
 

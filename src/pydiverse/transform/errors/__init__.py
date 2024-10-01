@@ -13,7 +13,13 @@ class FunctionTypeError(Exception):
     """
 
 
-class NonStandardBehaviourWarning(UserWarning):
+class NotSupportedError(Exception):
+    """
+    Signals operations that are not supported by a backend.
+    """
+
+
+class NonStandardWarning(UserWarning):
     """
     Category for when a specific backend deviates from
     the expected standard behaviour.
