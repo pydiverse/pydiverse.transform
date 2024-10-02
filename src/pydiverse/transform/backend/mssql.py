@@ -10,6 +10,7 @@ from sqlalchemy.dialects.mssql import DATETIME2
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.errors import NotSupportedError
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
@@ -27,36 +28,13 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class MsSqlImpl(SqlImpl):
     dialect_name = "mssql"
 
-    INF = sqa.cast(sqa.literal("1.0"), type_=sqa.Float()) / sqa.literal(
-        "0.0", type_=sqa.Float()
-    )
-    NEG_INF = -INF
-    NAN = INF + NEG_INF
+    @classmethod
+    def inf():
+        raise NotSupportedError("SQL Server does not support `inf`")
 
     @classmethod
-    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
-        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
-        if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
-            return sqa.case(
-                (compiled_val == "inf", cls.INF),
-                (compiled_val == "-inf", -cls.INF),
-                (compiled_val.in_(("nan", "-nan")), cls.NAN),
-                else_=sqa.cast(
-                    compiled_val,
-                    cls.sqa_type(cast.target_type),
-                ),
-            )
-
-        if cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
-            compiled = sqa.cast(cls.compile_col_expr(cast.val, sqa_col), sqa.String)
-            return sqa.case(
-                (compiled == "1.#QNAN", "nan"),
-                (compiled == "1.#INF", "inf"),
-                (compiled == "-1.#INF", "-inf"),
-                else_=compiled,
-            )
-
-        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
+    def nan():
+        raise NotSupportedError("SQL Server does not support `nan`")
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
@@ -90,7 +68,7 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def sqa_type(cls, t: dtypes.Dtype):
         if isinstance(t, dtypes.DateTime):
-            return DATETIME2()
+            return DATETIME2
 
         return super().sqa_type(t)
 
@@ -343,13 +321,7 @@ with MsSqlImpl.op(ops.Log()) as op:
 
     @op.auto
     def _log(x):
-        # TODO: we still need to handle inf / -inf / nan
-        return sqa.case(
-            (x > 0, sqa.func.log(x)),
-            (x < 0, MsSqlImpl.NAN),
-            (x.is_(sqa.null()), None),
-            else_=-MsSqlImpl.INF,
-        )
+        return sqa.func.log(x)
 
 
 with MsSqlImpl.op(ops.Ceil()) as op:
@@ -364,3 +336,31 @@ with MsSqlImpl.op(ops.StrToDateTime()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.cast(x, DATETIME2)
+
+
+with MsSqlImpl.op(ops.IsInf()) as op:
+
+    @op.auto
+    def _is_inf(x):
+        return False
+
+
+with MsSqlImpl.op(ops.IsNotInf()) as op:
+
+    @op.auto
+    def _is_not_inf(x):
+        return True
+
+
+with MsSqlImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return False
+
+
+with MsSqlImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return True

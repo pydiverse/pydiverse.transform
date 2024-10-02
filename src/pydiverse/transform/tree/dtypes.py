@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 from abc import ABC, abstractmethod
-from types import NoneType
 
 from pydiverse.transform._typing import T
 from pydiverse.transform.errors import DataTypeError
@@ -75,6 +74,9 @@ class Dtype(ABC):
 
 class Int64(Dtype):
     name = "int64"
+
+    MIN = -(1 << 63)
+    MAX = (1 << 63) - 1
 
     def can_promote_to(self, other: Dtype) -> bool:
         if super().can_promote_to(other):
@@ -164,10 +166,10 @@ def python_type_to_pdt(t: type) -> Dtype:
         return Date()
     elif t is datetime.timedelta:
         return Duration()
-    elif t is NoneType:
+    elif t is type(None):
         return NoneDtype()
 
-    raise TypeError(f"pydiverse.transform does not support python builtin type {t}")
+    raise TypeError(f"invalid usage of type {t} in a column expression")
 
 
 def dtype_from_string(t: str) -> Dtype:

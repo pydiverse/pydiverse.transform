@@ -8,15 +8,16 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from pydiverse.transform import Table
-from pydiverse.transform.backend.sqlite import SqliteImpl
 from pydiverse.transform.backend.targets import Polars
-from pydiverse.transform.errors import NonStandardBehaviourWarning
-from pydiverse.transform.pipe.verbs import export, get_backend, show_query
+from pydiverse.transform.errors import NonStandardWarning
+from pydiverse.transform.pipe.verbs import export, show_query
 
 
 def assert_equal(left, right, check_dtypes=False, check_row_order=True):
-    left_df = left >> export(Polars()) if isinstance(left, Table) else left
-    right_df = right >> export(Polars()) if isinstance(right, Table) else right
+    left_df = left >> export(Polars(lazy=False)) if isinstance(left, Table) else left
+    right_df = (
+        right >> export(Polars(lazy=False)) if isinstance(right, Table) else right
+    )
 
     try:
         assert_frame_equal(
@@ -49,7 +50,7 @@ def catch_warnings():
 def get_transform_warnings(
     warnings_: list[warnings.WarningMessage],
 ) -> list[warnings.WarningMessage]:
-    return [w for w in warnings_ if issubclass(w.category, NonStandardBehaviourWarning)]
+    return [w for w in warnings_ if issubclass(w.category, NonStandardWarning)]
 
 
 def assert_result_equal(
@@ -67,9 +68,9 @@ def assert_result_equal(
 
     if exception and not may_throw:
         with pytest.raises(exception):
-            pipe_factory(*x) >> export(Polars())
+            pipe_factory(*x) >> export(Polars(lazy=False))
         with pytest.raises(exception):
-            pipe_factory(*y) >> export(Polars())
+            pipe_factory(*y) >> export(Polars(lazy=False))
         return
 
     did_raise_warning = False
@@ -79,16 +80,12 @@ def assert_result_equal(
             query_x = pipe_factory(*x)
             query_y = pipe_factory(*y)
 
-            dfx: pl.DataFrame = (query_x >> export(Polars())).with_columns(
+            dfx: pl.DataFrame = (query_x >> export(Polars(lazy=False))).with_columns(
                 pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
             )
-            dfy: pl.DataFrame = (query_y >> export(Polars())).with_columns(
+            dfy: pl.DataFrame = (query_y >> export(Polars(lazy=False))).with_columns(
                 pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
             )
-
-            # sqlite does not know NaN
-            if get_backend(query_y._ast) is SqliteImpl:
-                dfx = dfx.fill_nan(None)
 
             # after a join, cols containing only null values get type Null on SQLite and
             # Postgres. maybe we can fix this but for now we just ignore such cols
@@ -128,7 +125,6 @@ def assert_result_equal(
         assert_frame_equal(
             dfx,
             dfy,
-            check_dtypes=False,
             check_row_order=check_row_order,
             check_exact=False,
         )

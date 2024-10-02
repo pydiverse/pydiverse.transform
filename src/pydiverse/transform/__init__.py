@@ -13,6 +13,15 @@ from pydiverse.transform.pipe.functions import (
 )
 from pydiverse.transform.pipe.pipeable import verb
 from pydiverse.transform.pipe.table import Table
+from pydiverse.transform.tree.dtypes import (
+    Bool,
+    Date,
+    DateTime,
+    Duration,
+    Float64,
+    Int64,
+    String,
+)
 
 __all__ = [
     "Polars",
@@ -22,4 +31,11 @@ __all__ = [
     "aligned",
     "verb",
     "C",
+    "Float64",
+    "Int64",
+    "String",
+    "Bool",
+    "DateTime",
+    "Date",
+    "Duration",
 ]

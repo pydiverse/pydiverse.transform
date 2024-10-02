@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     paths-ignore:
-      - 'docs/**'
+      - "docs/**"
 
 jobs:
   lint:
@@ -17,10 +17,10 @@ jobs:
       - name: Checkout branch
         uses: actions/checkout@v4
 
-      - name: Install Python 3.9
+      - name: Install Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: 3.9
+          python-version: "3.10"
 
       - name: Linting - Run pre-commit checks
         uses: pre-commit/action@v3.0.1
@@ -33,9 +33,9 @@ jobs:
         os:
           - ubuntu-latest
         environment:
-          - py39
           - py310
           - py311
+          - py312
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +63,6 @@ jobs:
         env:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}        
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
         run: |
           pixi run -e ${{ matrix.environment }} pytest tests -ra ${RUNNER_DEBUG:+-v} --color=yes --postgres --mssql
-  

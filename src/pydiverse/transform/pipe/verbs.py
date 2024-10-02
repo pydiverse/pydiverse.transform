@@ -5,8 +5,9 @@ import uuid
 from collections.abc import Iterable
 from typing import Any
 
+from pydiverse.transform import errors
 from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.backend.targets import Target
+from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.pipeable import builtin_verb
@@ -69,23 +70,36 @@ def alias(table: Table, new_name: str | None = None):
     new._ast.name = new_name
     new._cache = copy.copy(table._cache)
 
-    new._cache.cols = {
-        name: Col(name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
-        for name, col in table._cache.cols.items()
-    }
     new._cache.partition_by = [
         Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
         for col in table._cache.partition_by
     ]
-    new._cache.select = [
-        Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
-        for col in table._cache.select
-    ]
+
+    new._cache.update(
+        new_select=[
+            Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
+            for col in table._cache.select
+        ],
+        new_cols={
+            name: Col(
+                name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+            )
+            for name, col in table._cache.cols.items()
+        },
+    )
+
     return new
 
 
 @builtin_verb()
-def collect(table: Table) -> Table: ...
+def collect(table: Table, target: Target | None = None) -> Table:
+    errors.check_arg_type(Target | None, "collect", "target", target)
+
+    df = table >> export(Polars(lazy=False))
+    if target is None:
+        target = Polars()
+
+    return Table(df, target)
 
 
 @builtin_verb()
@@ -115,46 +129,52 @@ def show_query(table: Table):
 
 
 @builtin_verb()
-def select(table: Table, *args: Col | ColName):
+def select(table: Table, *cols: Col | ColName):
+    errors.check_vararg_type(Col | ColName, "select", *cols)
+
     new = copy.copy(table)
-    new._ast = Select(table._ast, preprocess_arg(args, table))
+    new._ast = Select(table._ast, preprocess_arg(cols, table))
     new._cache = copy.copy(table._cache)
-    new._cache.select = new._ast.select
+    # TODO: prevent selection of overwritten columns
+    new._cache.update(new_select=new._ast.select)
     return new
 
 
 @builtin_verb()
-def drop(table: Table, *args: Col | ColName):
-    dropped_uuids = {col._uuid for col in preprocess_arg(args, table)}
+def drop(table: Table, *cols: Col | ColName):
+    errors.check_vararg_type(Col | ColName, "drop", *cols)
+
+    dropped_uuids = {col._uuid for col in preprocess_arg(cols, table)}
     return select(
         table,
-        *(col for col in table._cache.cols.values() if col._uuid not in dropped_uuids),
+        *(col for col in table._cache.select if col._uuid not in dropped_uuids),
     )
 
 
 @builtin_verb()
 def rename(table: Table, name_map: dict[str, str]):
-    if not isinstance(name_map, dict):
-        raise TypeError("`name_map` argument to `rename` must be a dict")
+    errors.check_arg_type(dict, "rename", "name_map", name_map)
     if len(name_map) == 0:
         return table
 
     new = copy.copy(table)
     new._ast = Rename(table._ast, name_map)
     new._cache = copy.copy(table._cache)
-    new._cache.cols = copy.copy(table._cache.cols)
+    new_cols = copy.copy(table._cache.cols)
 
     for name, _ in name_map.items():
-        if name not in new._cache.cols:
+        if name not in new_cols:
             raise ValueError(
                 f"no column with name `{name}` in table `{table._ast.name}`"
             )
-        del new._cache.cols[name]
+        del new_cols[name]
 
     for name, replacement in name_map.items():
-        if replacement in new._cache.cols:
+        if replacement in new_cols:
             raise ValueError(f"duplicate column name `{replacement}`")
-        new._cache.cols[replacement] = table._cache.cols[name]
+        new_cols[replacement] = table._cache.cols[name]
+
+    new._cache.update(new_cols=new_cols)
 
     return new
 
@@ -173,18 +193,26 @@ def mutate(table: Table, **kwargs: ColExpr):
     )
 
     new._cache = copy.copy(table._cache)
-    new._cache.cols = copy.copy(table._cache.cols)
+    new_cols = copy.copy(table._cache.cols)
+
     for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids):
-        new._cache.cols[name] = Col(
+        new_cols[name] = Col(
             name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=True)
         )
 
     overwritten = {
-        col_name for col_name in new._ast.names if col_name in new._cache.cols
+        col_name for col_name in new._ast.names if col_name in table._cache.cols
     }
-    new._cache.select = [
-        col for col in table._cache.select if col.name not in overwritten
-    ] + [new._cache.cols[name] for name in new._ast.names]
+
+    new._cache.update(
+        new_select=[
+            col
+            for col in table._cache.select
+            if table._cache.uuid_to_name[col._uuid] not in overwritten
+        ]
+        + [new_cols[name] for name in new._ast.names],
+        new_cols=new_cols,
+    )
 
     return new
 
@@ -225,6 +253,8 @@ def arrange(table: Table, *order_by: ColExpr):
 def group_by(table: Table, *cols: Col | ColName, add=False):
     if len(cols) == 0:
         return table
+
+    errors.check_vararg_type(Col | ColName, "group_by", *cols)
 
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, preprocess_arg(cols, table), add)
@@ -283,15 +313,19 @@ def summarise(table: Table, **kwargs: ColExpr):
     for root in new._ast.values:
         check_summarise_col_expr(root, False)
 
+    # TODO: handle duplicate column names
     new._cache = copy.copy(table._cache)
-    new._cache.cols = table._cache.cols | {
+
+    new_cols = table._cache.cols | {
         name: Col(name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=False))
         for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids)
     }
 
-    new._cache.select = table._cache.partition_by + [
-        new._cache.cols[name] for name in new._ast.names
-    ]
+    new._cache.update(
+        new_select=table._cache.partition_by
+        + [new_cols[name] for name in new._ast.names],
+        new_cols=new_cols,
+    )
     new._cache.partition_by = []
 
     return new
@@ -299,6 +333,9 @@ def summarise(table: Table, **kwargs: ColExpr):
 
 @builtin_verb()
 def slice_head(table: Table, n: int, *, offset: int = 0):
+    errors.check_arg_type(int, "slice_head", "n", n)
+    errors.check_arg_type(int, "slice_head", "offset", offset)
+
     if table._cache.partition_by:
         raise ValueError("cannot apply `slice_head` to a grouped table")
 
@@ -317,26 +354,52 @@ def join(
     validate: JoinValidate = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
+    errors.check_arg_type(Table, "join", "right", right)
+    errors.check_arg_type(str | None, "join", "suffix", suffix)
+
     if left._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
     elif right._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{right._ast.name}`")
 
-    # TODO: more sophisticated resolution
+    user_suffix = suffix
     if suffix is None and right._ast.name:
         suffix = f"_{right._ast.name}"
     if suffix is None:
         suffix = "_right"
 
+    left_names = set(left._cache.cols.keys())
+    if user_suffix is not None:
+        for name in right._cache.cols.keys():
+            if name + suffix in left_names:
+                raise ValueError(
+                    f"column name `{name + suffix}` appears both in the left and right "
+                    f"table using the user-provided suffix `{suffix}`\n"
+                    "hint: Specify a different suffix to prevent name collisions or "
+                    "none at all for automatic name collision resolution."
+                )
+    else:
+        cnt = 0
+        for name in right._cache.cols.keys():
+            suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
+            while suffixed in left_names:
+                cnt += 1
+                suffixed = name + suffix + f"_{cnt}"
+
+        if cnt > 0:
+            suffix += f"_{cnt}"
+
     new = copy.copy(left)
     new._ast = Join(
         left._ast, right._ast, preprocess_arg(on, left), how, validate, suffix
     )
+
     new._cache = copy.copy(left._cache)
-    new._cache.cols = left._cache.cols | {
-        name + suffix: col for name, col in right._cache.cols.items()
-    }
-    new._cache.select = left._cache.select + right._cache.select
+    new._cache.update(
+        new_cols=left._cache.cols
+        | {name + suffix: col for name, col in right._cache.cols.items()},
+        new_select=left._cache.select + right._cache.select,
+    )
 
     return new
 

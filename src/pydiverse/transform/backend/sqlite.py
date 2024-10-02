@@ -4,6 +4,7 @@ import sqlalchemy as sqa
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend.sql import SqlImpl
+from pydiverse.transform.errors import NotSupportedError
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.col_expr import Cast
 from pydiverse.transform.util.warnings import warn_non_standard
@@ -12,9 +13,13 @@ from pydiverse.transform.util.warnings import warn_non_standard
 class SqliteImpl(SqlImpl):
     dialect_name = "sqlite"
 
-    INF = sqa.cast(sqa.literal("1e314"), sqa.Float)
-    NEG_INF = -INF
-    NAN = sqa.null()
+    @classmethod
+    def inf(cls):
+        return sqa.type_coerce(sqa.literal("1e314"), sqa.Double)
+
+    @classmethod
+    def nan(cls):
+        raise NotSupportedError("SQLite does not have `nan`, use `null` instead.")
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
@@ -22,9 +27,8 @@ class SqliteImpl(SqlImpl):
 
         if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
             return sqa.case(
-                (compiled_val == "inf", cls.INF),
-                (compiled_val == "-inf", cls.NEG_INF),
-                (compiled_val.in_(("nan", "-nan")), cls.NAN),
+                (compiled_val == "inf", cls.inf()),
+                (compiled_val == "-inf", -cls.inf()),
                 else_=sqa.cast(
                     compiled_val,
                     cls.sqa_type(cast.target_type),
@@ -36,8 +40,8 @@ class SqliteImpl(SqlImpl):
 
         elif cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
             return sqa.case(
-                (compiled_val == cls.INF, "inf"),
-                (compiled_val == cls.NEG_INF, "-inf"),
+                (compiled_val == cls.inf(), "inf"),
+                (compiled_val == -cls.inf(), "-inf"),
                 else_=sqa.cast(compiled_val, sqa.String),
             )
 
@@ -46,7 +50,7 @@ class SqliteImpl(SqlImpl):
 
 with SqliteImpl.op(ops.Round()) as op:
 
-    @op.auto
+    @op("decimal -> decimal")
     def _round(x, decimals=0):
         if decimals >= 0:
             return sqa.func.ROUND(x, decimals, type_=x.type)
@@ -149,3 +153,25 @@ with SqliteImpl.op(ops.StrToDate()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.type_coerce(x, sqa.Date)
+
+
+with SqliteImpl.op(ops.Floor()) as op:
+    # the SQLite floor function is cursed... it throws if you pass in a large value
+    # like 1e19. surprisingly, 1e18 works... what a coincidence... :)
+    @op.auto
+    def _floor(x):
+        return -sqa.func.ceil(-x)
+
+
+with SqliteImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return False
+
+
+with SqliteImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return True

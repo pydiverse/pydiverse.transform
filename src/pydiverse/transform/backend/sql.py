@@ -35,10 +35,6 @@ from pydiverse.transform.tree.dtypes import Dtype
 class SqlImpl(TableImpl):
     Dialects: dict[str, type[TableImpl]] = {}
 
-    INF = sqa.cast(sqa.literal("inf"), sqa.Float())
-    NEG_INF = sqa.cast(sqa.literal("-inf"), sqa.Float())
-    NAN = sqa.cast(sqa.literal("nan"), sqa.Float())
-
     def __new__(cls, *args, **kwargs) -> SqlImpl:
         engine: str | sqa.Engine = (
             inspect.signature(cls.__init__)
@@ -100,6 +96,14 @@ class SqlImpl(TableImpl):
         )
 
     @classmethod
+    def inf(cls):
+        return sqa.cast(sqa.literal("inf"), sqa.Double)
+
+    @classmethod
+    def nan(cls):
+        return sqa.cast(sqa.literal("nan"), sqa.Double)
+
+    @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> sqa.Select:
         create_aliases(nd, {})
         nd, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
@@ -132,6 +136,16 @@ class SqlImpl(TableImpl):
             sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
         )
 
+    # some backends need to do casting to ensure the correct type
+    @classmethod
+    def compile_lit(cls, lit: LiteralCol):
+        if lit.dtype() == dtypes.Float64:
+            if math.isnan(lit.val):
+                return cls.nan()
+            elif math.isinf(lit.val):
+                return cls.inf() if lit.val > 0 else -cls.inf()
+        return sqa.literal(lit.val, type_=cls.sqa_type(lit.dtype()))
+
     @classmethod
     def compile_order(
         cls, order: Order, sqa_col: dict[str, sqa.Label]
@@ -154,18 +168,20 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_col_expr(
-        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label]
+        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], compile_literals=True
     ) -> sqa.ColumnElement:
         if isinstance(expr, Col):
             return sqa_col[expr._uuid]
 
         elif isinstance(expr, ColFn):
-            args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(arg, sqa_col) for arg in expr.args
-            ]
             impl = cls.registry.get_impl(
                 expr.name, tuple(arg.dtype() for arg in expr.args)
             )
+
+            args: list[sqa.ColumnElement] = [
+                cls.compile_col_expr(arg, sqa_col, not impl_arg.const)
+                for arg, impl_arg in zip(expr.args, impl.impl.signature)
+            ]
 
             partition_by = expr.context_kwargs.get("partition_by")
             if partition_by is not None:
@@ -194,9 +210,11 @@ class SqlImpl(TableImpl):
                 value = window_impl(*args, partition_by=partition_by, order_by=order_by)
 
             else:
-                value: sqa.ColumnElement = impl(*args)
+                value: sqa.ColumnElement = impl(*args, _Impl=cls)
                 if partition_by is not None or order_by is not None:
-                    value = value.over(partition_by=partition_by, order_by=order_by)
+                    value = sqa.over(
+                        value, partition_by=partition_by, order_by=order_by
+                    )
 
             return value
 
@@ -217,12 +235,7 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(expr, LiteralCol):
-            if isinstance(expr.val, float):
-                if math.isnan(expr.val):
-                    return cls.NAN
-                elif math.isinf(expr.val):
-                    return cls.INF if expr.val > 0 else cls.NEG_INF
-            return expr.val
+            return cls.compile_lit(expr) if compile_literals else expr.val
 
         elif isinstance(expr, Cast):
             return cls.compile_cast(expr, sqa_col)
@@ -469,10 +482,16 @@ class SqlImpl(TableImpl):
 
         elif isinstance(nd, SqlImpl):
             table = nd.table
-            query = Query([sqa.Label(col.name, col) for col in nd.table.columns])
+            cols = [
+                sqa.type_coerce(col, cls.sqa_type(nd.cols[col.name].dtype())).label(
+                    col.name
+                )
+                for col in nd.table.columns
+            ]
+            query = Query(cols)
             sqa_col = {
-                col._uuid: sqa.label(col.name, nd.table.columns[col.name])
-                for col in nd.cols.values()
+                nd.cols[table_col.name]._uuid: col
+                for table_col, col in zip(nd.table.columns, cols)
             }
 
         if isinstance(nd, verbs.Verb):
@@ -488,25 +507,25 @@ class SqlImpl(TableImpl):
         return table, query, sqa_col
 
     @classmethod
-    def sqa_type(cls, t: Dtype) -> sqa.types.TypeEngine:
+    def sqa_type(cls, t: Dtype) -> type[sqa.types.TypeEngine]:
         if isinstance(t, dtypes.Int64):
-            return sqa.BigInteger()
+            return sqa.BigInteger
         elif isinstance(t, dtypes.Float64):
-            return sqa.Double()
+            return sqa.Double
         elif isinstance(t, dtypes.Decimal):
-            return sqa.DECIMAL()
+            return sqa.DECIMAL
         elif isinstance(t, dtypes.String):
-            return sqa.String()
+            return sqa.String
         elif isinstance(t, dtypes.Bool):
-            return sqa.Boolean()
+            return sqa.Boolean
         elif isinstance(t, dtypes.DateTime):
-            return sqa.DateTime()
+            return sqa.DateTime
         elif isinstance(t, dtypes.Date):
-            return sqa.Date()
+            return sqa.Date
         elif isinstance(t, dtypes.Duration):
-            return sqa.Interval()
+            return sqa.Interval
         elif isinstance(t, dtypes.NoneDtype):
-            return sqa.types.NullType()
+            return sqa.types.NullType
 
         raise AssertionError
 
@@ -888,7 +907,7 @@ with SqlImpl.op(ops.Sum()) as op:
 with SqlImpl.op(ops.Any()) as op:
 
     @op.auto
-    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+    def _any(x):
         return sqa.func.coalesce(sqa.func.max(x), sqa.null())
 
     @op.auto(variant="window")
@@ -935,7 +954,7 @@ with SqlImpl.op(ops.Shift()) as op:
 
     @op.auto
     def _shift():
-        raise RuntimeError("This is a stub")
+        raise AssertionError
 
     @op.auto(variant="window")
     def _shift(
@@ -990,13 +1009,7 @@ with SqlImpl.op(ops.Log()) as op:
 
     @op.auto
     def _log(x):
-        # TODO: we still need to handle inf / -inf / nan
-        return sqa.case(
-            (x > 0, sqa.func.ln(x)),
-            (x < 0, sqa.literal("nan")),
-            (x.is_(sqa.null()), None),
-            else_=sqa.literal("-inf"),
-        )
+        return sqa.func.ln(x)
 
 
 with SqlImpl.op(ops.Floor()) as op:
@@ -1025,3 +1038,17 @@ with SqlImpl.op(ops.StrToDate()) as op:
     @op.auto
     def _str_to_datetime(x):
         return sqa.cast(x, sqa.Date)
+
+
+with SqlImpl.op(ops.IsInf()) as op:
+
+    @op.auto
+    def _is_inf(x, *, _Impl):
+        return x == _Impl.inf()
+
+
+with SqlImpl.op(ops.IsNotInf()) as op:
+
+    @op.auto
+    def _is_not_inf(x, *, _Impl):
+        return x != _Impl.inf()

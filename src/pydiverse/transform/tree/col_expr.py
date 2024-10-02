@@ -98,15 +98,16 @@ class Col(ColExpr):
         super().__init__(_dtype, _ftype)
 
     def __repr__(self) -> str:
-        return f"<{self._ast.name}.{self.name}" f"({self.dtype()})>"
+        dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
+        return f"{self._ast.name}.{self.name}{dtype_str}"
 
     def __str__(self) -> str:
         try:
+            from pydiverse.transform.backend.polars import PolarsImpl
             from pydiverse.transform.backend.targets import Polars
-            from pydiverse.transform.pipe.verbs import export, select
 
-            df = self.table >> select(self) >> export(Polars())
-            return str(df)
+            df = PolarsImpl.export(self._ast, Polars(lazy=False), [self])
+            return str(df.get_column(df.columns[0]))
         except Exception as e:
             return (
                 repr(self)
@@ -128,7 +129,8 @@ class ColName(ColExpr):
         super().__init__(dtype, ftype)
 
     def __repr__(self) -> str:
-        return f"<C.{self.name}" f"{f" ({self.dtype()})" if self.dtype() else ""}>"
+        dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
+        return f"C.{self.name}{dtype_str}"
 
 
 class LiteralCol(ColExpr):
@@ -141,7 +143,7 @@ class LiteralCol(ColExpr):
         super().__init__(dtype, Ftype.EWISE)
 
     def __repr__(self):
-        return f"<{self.val} ({self.dtype()})>"
+        return f"lit({self.val}, {self.dtype()})"
 
 
 class ColFn(ColExpr):
@@ -309,7 +311,7 @@ class FnAttr:
         )
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {self.name}({self.arg})>"
+        return f"{self.__class__.__name__}({self.name}, {self.arg})"
 
 
 @dataclasses.dataclass(slots=True)
@@ -321,7 +323,7 @@ class WhenClause:
         return CaseExpr((*self.cases, (self.cond, wrap_literal(value))))
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} {self.cond}>"
+        return f"when_clause({self.cond})"
 
 
 class CaseExpr(ColExpr):
@@ -343,11 +345,11 @@ class CaseExpr(ColExpr):
 
     def __repr__(self) -> str:
         return (
-            "<case "
+            "case_when( "
             + functools.reduce(
                 operator.add, (f"{cond} -> {val}, " for cond, val in self.cases), ""
             )
-            + f"default={self.default_val}>"
+            + f"default={self.default_val})"
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -427,6 +429,7 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             raise TypeError("cannot call `when` on a closed case expression after")
 
+        condition = wrap_literal(condition)
         if condition.dtype() is not None and not isinstance(
             condition.dtype(), dtypes.Bool
         ):
@@ -569,5 +572,10 @@ def wrap_literal(expr: Any) -> Any:
         return expr.__class__(wrap_literal(elem) for elem in expr)
     elif isinstance(expr, Generator):
         return (wrap_literal(elem) for elem in expr)
+    elif isinstance(expr, FnAttr):
+        raise TypeError(
+            "invalid usage of a column function as an expression.\n"
+            "hint: Maybe you forgot to put parentheses `()` after the function?"
+        )
     else:
         return LiteralCol(expr)

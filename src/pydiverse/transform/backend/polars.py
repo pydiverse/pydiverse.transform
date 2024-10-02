@@ -24,7 +24,7 @@ from pydiverse.transform.tree.col_expr import (
 
 class PolarsImpl(TableImpl):
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
-        self.df = df
+        self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
         super().__init__(
             name,
             {
@@ -42,7 +42,7 @@ class PolarsImpl(TableImpl):
         lf, _, select, _ = compile_ast(nd)
         lf = lf.select(select)
         if isinstance(target, Polars):
-            if not target.lazy and isinstance(lf, pl.LazyFrame):
+            if not target.lazy:
                 lf = lf.collect()
             lf.name = nd.name
             return lf
@@ -61,27 +61,33 @@ class PolarsImpl(TableImpl):
 
 # merges descending and null_last markers into the ordering expression
 def merge_desc_nulls_last(
-    order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool]
+    order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool | None]
 ) -> list[pl.Expr]:
-    with_signs: list[pl.Expr] = []
-    for ord, desc in zip(order_by, descending):
-        numeric = ord.rank("dense").cast(pl.Int64)
-        with_signs.append(-numeric if desc else numeric)
-    return [
-        expr.fill_null(
-            pl.len().cast(pl.Int64) + 1 if nl else -(pl.len().cast(pl.Int64) + 1)
-        )
-        for expr, nl in zip(with_signs, nulls_last)
-    ]
+    merged = []
+    for ord, desc, nl in zip(order_by, descending, nulls_last):
+        # try to avoid this workaround whenever possible
+        if nl is not None or desc:
+            numeric = ord.rank("dense").cast(pl.Int64)
+            if desc:
+                numeric = -numeric
+            if nl is True:
+                numeric = numeric.fill_null(pl.len().cast(pl.Int64) + 1)
+            elif nl is False:
+                numeric = numeric.fill_null(-pl.len().cast(pl.Int64) - 1)
+            merged.append(numeric)
+        else:
+            merged.append(ord)
+
+    return merged
 
 
 def compile_order(
     order: Order, name_in_df: dict[UUID, str]
-) -> tuple[pl.Expr, bool, bool]:
+) -> tuple[pl.Expr, bool, bool | None]:
     return (
         compile_col_expr(order.order_by, name_in_df),
         order.descending,
-        order.nulls_last if order.nulls_last is not None else False,
+        order.nulls_last,
     )
 
 
@@ -110,16 +116,15 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         # Otherwise, `over` would be used for sorting, but we cannot pass descending /
         # nulls_last there and the required workaround is probably slower than polars`s
         # native `sort_by`.
-        if arrange and not partition_by:
+        if arrange and not partition_by and len(args) > 0:
             # order the args. if the table is grouped by group_by or
             # partition_by=, the groups will be sorted via over(order_by=)
             # anyways so it need not be done here.
-            args = [
-                arg.sort_by(by=order_by, descending=descending, nulls_last=nulls_last)
-                if isinstance(arg, pl.Expr)
-                else arg
-                for arg in args
-            ]
+            args[0] = args[0].sort_by(
+                by=order_by,
+                descending=descending,
+                nulls_last=[nl if nl is not None else False for nl in nulls_last],
+            )
 
         if op.name in ("rank", "dense_rank"):
             assert len(expr.args) == 0
@@ -161,7 +166,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
                 by=order_by,
                 descending=descending,
-                nulls_last=nulls_last,
+                nulls_last=[nl if nl is not None else False for nl in nulls_last],
             )
             value = value.sort_by(inv_permutation)
 
@@ -181,9 +186,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        if expr.dtype() == dtypes.String:
-            return pl.lit(expr.val)  # polars interprets strings as column names
-        return expr.val
+        return pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
@@ -272,7 +275,7 @@ def compile_ast(
         df = df.sort(
             order_by,
             descending=descending,
-            nulls_last=nulls_last,
+            nulls_last=[False if nl is None else nl for nl in nulls_last],
             maintain_order=True,
         )
 
@@ -456,63 +459,63 @@ with PolarsImpl.op(ops.DtYear()) as op:
 
     @op.auto
     def _dt_year(x):
-        return x.dt.year()
+        return x.dt.year().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtMonth()) as op:
 
     @op.auto
     def _dt_month(x):
-        return x.dt.month()
+        return x.dt.month().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDay()) as op:
 
     @op.auto
     def _dt_day(x):
-        return x.dt.day()
+        return x.dt.day().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtHour()) as op:
 
     @op.auto
     def _dt_hour(x):
-        return x.dt.hour()
+        return x.dt.hour().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtMinute()) as op:
 
     @op.auto
     def _dt_minute(x):
-        return x.dt.minute()
+        return x.dt.minute().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtSecond()) as op:
 
     @op.auto
     def _dt_second(x):
-        return x.dt.second()
+        return x.dt.second().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _dt_millisecond(x):
-        return x.dt.millisecond()
+        return x.dt.millisecond().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _dt_day_of_week(x):
-        return x.dt.weekday()
+        return x.dt.weekday().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDayOfYear()) as op:
 
     @op.auto
     def _dt_day_of_year(x):
-        return x.dt.ordinal_day()
+        return x.dt.ordinal_day().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDays()) as op:
@@ -682,7 +685,7 @@ with PolarsImpl.op(ops.Count()) as op:
 
     @op.auto
     def _count(x=None):
-        return pl.len() if x is None else x.count()
+        return pl.len().cast(pl.Int64) if x is None else x.count().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.Greatest()) as op:
@@ -746,3 +749,49 @@ with PolarsImpl.op(ops.StrToDate()) as op:
     @op.auto
     def _str_to_date(x):
         return x.str.to_date()
+
+
+with PolarsImpl.op(ops.FloorDiv()) as op:
+
+    @op.auto
+    def _floordiv(lhs, rhs):
+        result_sign = (lhs < 0) ^ (rhs < 0)
+        return (abs(lhs) // abs(rhs)) * pl.when(result_sign).then(-1).otherwise(1)
+        # TODO: test some alternatives if this is too slow
+
+
+with PolarsImpl.op(ops.Mod()) as op:
+
+    @op.auto
+    def _mod(lhs, rhs):
+        return lhs % (abs(rhs) * pl.when(lhs >= 0).then(1).otherwise(-1))
+        # TODO: see whether the following is faster:
+        # pl.when(lhs >= 0).then(lhs % abs(rhs)).otherwise(lhs % -abs(rhs))
+
+
+with PolarsImpl.op(ops.IsInf()) as op:
+
+    @op.auto
+    def _is_inf(x):
+        return x.is_infinite()
+
+
+with PolarsImpl.op(ops.IsNotInf()) as op:
+
+    @op.auto
+    def _is_not_inf(x):
+        return x.is_finite()
+
+
+with PolarsImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return x.is_nan()
+
+
+with PolarsImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return x.is_not_nan()

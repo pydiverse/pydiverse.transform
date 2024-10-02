@@ -26,7 +26,7 @@ class TableImpl(AstNode):
     Base class from which all table backend implementations are derived from.
     """
 
-    registry = OperatorRegistry("TableImpl")
+    registry: OperatorRegistry
 
     def __init__(self, name: str, schema: dict[str, Dtype]):
         self.name = name
@@ -46,7 +46,7 @@ class TableImpl(AstNode):
             if hasattr(super_cls, "registry"):
                 super_reg = super_cls.registry
                 break
-        cls.registry = OperatorRegistry(cls.__name__, super_reg)
+        cls.registry = OperatorRegistry(cls, super_reg)
 
     def iter_subtree(self) -> Iterable[AstNode]:
         yield self
@@ -69,6 +69,8 @@ class TableImpl(AstNode):
     def op(cls, operator: Operator, **kwargs) -> OperatorRegistrationContextManager:
         return OperatorRegistrationContextManager(cls.registry, operator, **kwargs)
 
+
+TableImpl.registry = OperatorRegistry(TableImpl)
 
 with TableImpl.op(ops.NullsFirst()) as op:
 

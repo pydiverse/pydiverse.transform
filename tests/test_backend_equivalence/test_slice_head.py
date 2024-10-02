@@ -151,8 +151,8 @@ def test_with_group_by(df3):
         >> arrange(C.col1, *t)
         >> slice_head(6, offset=1)
         >> group_by(C.col1)
-        >> select()
-        >> mutate(x=C.col4.mean()),
+        >> mutate(x=C.col4.mean())
+        >> select(C.x),
     )
 
     assert_result_equal(

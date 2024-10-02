@@ -5,6 +5,7 @@ import datetime as dt
 import polars as pl
 import pytest
 
+import pydiverse.transform as pdt
 from pydiverse.transform import C
 from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.pipeable import verb
@@ -164,13 +165,13 @@ class TestPolarsLazyImpl:
         )
 
         # # Check proper column referencing
-        t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2) >> select()
+        t = tbl1 >> mutate(col2=tbl1.col1, col1=tbl1.col2)
         assert_equal(
-            t >> mutate(x=t.col1, y=t.col2),
+            t >> select() >> mutate(x=t.col1, y=t.col2),
             tbl1 >> select() >> mutate(x=tbl1.col2, y=tbl1.col1),
         )
         assert_equal(
-            t >> mutate(x=tbl1.col1, y=tbl1.col2),
+            t >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
             tbl1 >> select() >> mutate(x=tbl1.col1, y=tbl1.col2),
         )
 
@@ -214,18 +215,18 @@ class TestPolarsLazyImpl:
             df_left.join(df_left, on="a", coalesce=False, suffix="_df_left"),
         )
 
-        # assert_equal(
-        #     tbl_right
-        #     >> inner_join(
-        #         tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
-        #     )
-        #     >> inner_join(
-        #         tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
-        #     ),
-        #     df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
-        #         df_right, "b", suffix="_df_right1", coalesce=False
-        #     ),
-        # )
+        assert_equal(
+            tbl_right
+            >> inner_join(
+                tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
+            )
+            >> inner_join(
+                tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
+            ),
+            df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
+                df_right, "b", suffix="_df_right_1", coalesce=False
+            ),
+        )
 
     def test_filter(self, tbl1, tbl2):
         # Simple filter expressions
@@ -384,8 +385,8 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> group_by(C.col2)
-                >> select()
                 >> mutate(x=f.row_number(arrange=[-C.col4]))
+                >> select(C.x)
             ),
             pl.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
         )
@@ -395,13 +396,13 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> group_by(C.col2)
-                >> select()
                 >> mutate(x=f.row_number(arrange=[-C.col4]))
+                >> select(C.x)
             ),
             (
                 tbl3
-                >> select()
                 >> mutate(x=f.row_number(arrange=[-C.col4], partition_by=[C.col2]))
+                >> select(C.x)
             ),
         )
 
@@ -435,7 +436,6 @@ class TestPolarsLazyImpl:
         assert_equal(
             (
                 tbl3
-                >> select()
                 >> mutate(
                     col1=f.when(C.col1 == 0)
                     .then(1)
@@ -445,6 +445,7 @@ class TestPolarsLazyImpl:
                     .then(3)
                     .otherwise(-1)
                 )
+                >> select(C.col1)
             ),
             (df3.select("col1") + 1),
         )
@@ -452,7 +453,6 @@ class TestPolarsLazyImpl:
         assert_equal(
             (
                 tbl3
-                >> select()
                 >> mutate(
                     x=f.when(C.col1 == C.col2)
                     .then(1)
@@ -460,6 +460,7 @@ class TestPolarsLazyImpl:
                     .then(2)
                     .otherwise(C.col4)
                 )
+                >> select(C.x)
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
         )
@@ -470,7 +471,7 @@ class TestPolarsLazyImpl:
 
         # Mutate
         assert_equal(
-            tbl1 >> mutate(a=tbl1.col1 * 2) >> select() >> mutate(b=C.a * 2),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> mutate(b=C.a * 2) >> select(C.b),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
@@ -485,9 +486,9 @@ class TestPolarsLazyImpl:
         # Join
         assert_equal(
             tbl1
-            >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == tbl2.col1, "left"),
+            >> join(tbl2, C.a == tbl2.col1, "left")
+            >> select(C.a, *tbl2),
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
@@ -531,11 +532,13 @@ class TestPolarsLazyImpl:
             tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
             df4.with_columns(pl.col("col3").fill_null(pl.col("col2")).alias("u")),
         )
-        # assert_equal(
-        #     tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
-        #     tbl4
-        #     >> mutate(u=f.case((tbl4.col3.is_null(), tbl4.col2), default=tbl4.col3)),
-        # )
+        assert_equal(
+            tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
+            tbl4
+            >> mutate(
+                u=pdt.when(tbl4.col3.is_null()).then(tbl4.col2).otherwise(tbl4.col3)
+            ),
+        )
 
     def test_datetime(self, tbl_dt):
         assert_equal(
@@ -571,7 +574,7 @@ class TestPrintAndRepr:
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
-        series = tbl1._impl.df.collect().get_column("col1")
+        series = tbl1._ast.df.collect().get_column("col1")
 
         assert str(series) in col1_str
         assert "exception" not in col1_str

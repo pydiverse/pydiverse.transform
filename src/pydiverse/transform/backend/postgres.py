@@ -141,3 +141,17 @@ with PostgresImpl.op(ops.All()) as op:
             ),
             sqa.null(),
         )
+
+
+with SqlImpl.op(ops.IsNan()) as op:
+
+    @op.auto
+    def _is_nan(x):
+        return x == PostgresImpl.nan()
+
+
+with SqlImpl.op(ops.IsNotNan()) as op:
+
+    @op.auto
+    def _is_not_nan(x):
+        return x != PostgresImpl.nan()

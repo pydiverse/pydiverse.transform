@@ -72,12 +72,12 @@ dataframes = {
             "c": [
                 "4352.0",
                 "-21",
-                "-nan",
+                "-1.121222",
                 "3.313",
                 None,
-                "-inf",
-                "inf",
-                "nan",
+                "-444",
+                "5.3",
+                "1.33333",
                 "-0.000",
                 "-0.0",
                 "0.0",
@@ -148,7 +148,7 @@ dataframes = {
     "df_num": pl.DataFrame(
         {
             "a": [0.4, -1.1, -0.0, 0.0, 9.0, 2.0, -344.0053, -1000.0],
-            "b": [None, 2, 0, -11, 4, 19, -5190, 2000000],
+            "b": [None, 2.0, 0.0, -11.0, 4.0, 19.0, -5190.0, 2000000.0],
             "c": [0.0, None, None, 2.9, -0.0, 10.0, -10.0, 3.1415926535],
             "d": [None, 2352.0230, 0.577, 901234, -6.0, 4.0, None, -99.0],
             "e": [1.0, 2.0, 3.0, 4.99, -442.0, 6.0, 7.0, 500.0],
@@ -158,21 +158,21 @@ dataframes = {
             "pos": [
                 1.123,
                 1297.324,
-                9192.9793,
                 7.5,
+                1e50 + 54356346912.332131,
                 912.097,
-                32.9,
-                2.712834,
+                1e-51,
+                0.12,
                 5002352.434,
             ],
             "neg": [
                 -9623.1,
                 -0.1,
                 -1.0,
-                -923737552.5,
+                -1e19 - 394734729923737552.5,
                 -5.5,
-                -0.12083,
-                -93.4,
+                -0.0001,
+                -1.2e-39,
                 -6699917733.1242,
             ],
             "null_s": [0.0, None, None, None, None, None, None, None],
@@ -182,6 +182,17 @@ dataframes = {
         {
             "a": [3, 1, 0, -12, 4, 5, 1 << 20, 5],
             "b": [-23, 18282, -42, 1729, None, -2323, 11, 1],
+            "pos": [1 << 31, (1 << 23) - 1, 2, 129879000, 233, 9223222, 1, 5],
+            "neg": [
+                -(1 << 22),
+                -(1 << 31),
+                -(1 << 26) + 1,
+                -1,
+                -234,
+                -3,
+                -22,
+                -23938333,
+            ],
             "null_s": [0] + [None] * 7,
         }
     ),
@@ -193,13 +204,14 @@ reference_backends = ["polars", "duckdb"]
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc):
-    pl.Config.set_tbl_cols(12)
+    pl.Config.set_tbl_cols(20)
     pl.Config.set_tbl_rows(40)
+    pl.Config.set_tbl_width_chars(160)
     # Parametrize tests based on `backends` and `skip_backends` mark.
 
     backends = dict.fromkeys(BACKEND_TABLES)
-    # if mark := metafunc.definition.get_closest_marker("backends"):
-    #     backends = dict.fromkeys(mark.args)
+    if mark := metafunc.definition.get_closest_marker("backends"):
+        backends = dict.fromkeys(mark.args)
     if mark := metafunc.definition.get_closest_marker("skip_backends"):
         for backend in mark.args:
             if backend in backends:
