@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import polars as pl
 import sqlalchemy as sqa
+from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
 from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
@@ -9,7 +10,7 @@ from pydiverse.transform.backend.sql import SqlImpl
 from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import Cast, Col
+from pydiverse.transform.tree.col_expr import Cast, Col, LiteralCol
 
 
 class DuckDbImpl(SqlImpl):
@@ -32,6 +33,12 @@ class DuckDbImpl(SqlImpl):
                 sqa.BigInteger()
             )
         return super().compile_cast(cast, sqa_col)
+
+    @classmethod
+    def compile_lit(cls, lit: LiteralCol) -> sqa.ColumnElement:
+        if lit.dtype() == dtypes.Int64:
+            return sqa.cast(lit.val, sqa.BigInteger)
+        return super().compile_lit(lit)
 
 
 with DuckDbImpl.op(ops.FloorDiv()) as op:

@@ -26,6 +26,8 @@ class TableImpl(AstNode):
     Base class from which all table backend implementations are derived from.
     """
 
+    registry: OperatorRegistry
+
     def __init__(self, name: str, schema: dict[str, Dtype]):
         self.name = name
         self.cols = {

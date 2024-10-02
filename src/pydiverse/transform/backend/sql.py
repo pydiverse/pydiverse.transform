@@ -136,6 +136,16 @@ class SqlImpl(TableImpl):
             sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
         )
 
+    # some backends need to do casting to ensure the correct type
+    @classmethod
+    def compile_lit(cls, lit: LiteralCol):
+        if lit.dtype() == dtypes.Float64:
+            if math.isnan(lit.val):
+                return cls.nan()
+            elif math.isinf(lit.val):
+                return cls.inf() if lit.val > 0 else -cls.inf()
+        return sqa.literal(lit.val, type_=cls.sqa_type(lit.dtype()))
+
     @classmethod
     def compile_order(
         cls, order: Order, sqa_col: dict[str, sqa.Label]
@@ -221,13 +231,7 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(expr, LiteralCol):
-            if isinstance(expr.val, float):
-                if math.isnan(expr.val):
-                    return cls.nan()
-                elif math.isinf(expr.val):
-                    return cls.inf() if expr.val > 0 else -cls.inf()
-                return sqa.type_coerce(expr.val, sqa.Double)
-            return expr.val
+            return cls.compile_lit(expr)
 
         elif isinstance(expr, Cast):
             return cls.compile_cast(expr, sqa_col)
@@ -475,14 +479,9 @@ class SqlImpl(TableImpl):
         elif isinstance(nd, SqlImpl):
             table = nd.table
             cols = [
-                (
-                    sqa.type_coerce(col, sqa_type)
-                    if not isinstance(
-                        col.type,
-                        (sqa_type := cls.sqa_type(nd.cols[col.name].dtype())),
-                    )
-                    else col
-                ).label(col.name)
+                sqa.type_coerce(col, cls.sqa_type(nd.cols[col.name].dtype())).label(
+                    col.name
+                )
                 for col in nd.table.columns
             ]
             query = Query(cols)
@@ -951,7 +950,7 @@ with SqlImpl.op(ops.Shift()) as op:
 
     @op.auto
     def _shift():
-        raise RuntimeError("This is a stub")
+        raise AssertionError
 
     @op.auto(variant="window")
     def _shift(
@@ -962,6 +961,10 @@ with SqlImpl.op(ops.Shift()) as op:
         partition_by=None,
         order_by=None,
     ):
+        # unwrap the sqlalchemy literals
+        by = by.effective_value
+        empty_value = empty_value.effective_value
+
         if by == 0:
             return x
         if by > 0:

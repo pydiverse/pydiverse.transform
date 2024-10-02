@@ -123,7 +123,6 @@ def assert_result_equal(
         assert_frame_equal(
             dfx,
             dfy,
-            check_dtypes=False,
             check_row_order=check_row_order,
             check_exact=False,
         )

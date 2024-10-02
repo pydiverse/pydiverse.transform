@@ -120,16 +120,11 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             # order the args. if the table is grouped by group_by or
             # partition_by=, the groups will be sorted via over(order_by=)
             # anyways so it need not be done here.
-            args = [
-                arg.sort_by(
-                    by=order_by,
-                    descending=descending,
-                    nulls_last=[nl if nl is not None else False for nl in nulls_last],
-                )
-                if isinstance(arg, pl.Expr)
-                else arg
-                for arg in args
-            ]
+            args[0] = args[0].sort_by(
+                by=order_by,
+                descending=descending,
+                nulls_last=[nl if nl is not None else False for nl in nulls_last],
+            )
 
         if op.name in ("rank", "dense_rank"):
             assert len(expr.args) == 0
@@ -191,9 +186,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        if expr.dtype() == dtypes.String:
-            return pl.lit(expr.val)  # polars interprets strings as column names
-        return expr.val
+        return pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
@@ -692,7 +685,7 @@ with PolarsImpl.op(ops.Count()) as op:
 
     @op.auto
     def _count(x=None):
-        return pl.len() if x is None else x.count()
+        return pl.len().cast(pl.Int64) if x is None else x.count().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.Greatest()) as op:
