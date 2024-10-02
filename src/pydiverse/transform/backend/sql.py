@@ -168,18 +168,20 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_col_expr(
-        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label]
+        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], compile_literals=True
     ) -> sqa.ColumnElement:
         if isinstance(expr, Col):
             return sqa_col[expr._uuid]
 
         elif isinstance(expr, ColFn):
-            args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(arg, sqa_col) for arg in expr.args
-            ]
             impl = cls.registry.get_impl(
                 expr.name, tuple(arg.dtype() for arg in expr.args)
             )
+
+            args: list[sqa.ColumnElement] = [
+                cls.compile_col_expr(arg, sqa_col, not impl_arg.const)
+                for arg, impl_arg in zip(expr.args, impl.impl.signature)
+            ]
 
             partition_by = expr.context_kwargs.get("partition_by")
             if partition_by is not None:
@@ -231,7 +233,7 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(expr, LiteralCol):
-            return cls.compile_lit(expr)
+            return cls.compile_lit(expr) if compile_literals else expr.val
 
         elif isinstance(expr, Cast):
             return cls.compile_cast(expr, sqa_col)
@@ -961,10 +963,6 @@ with SqlImpl.op(ops.Shift()) as op:
         partition_by=None,
         order_by=None,
     ):
-        # unwrap the sqlalchemy literals
-        by = by.effective_value
-        empty_value = empty_value.effective_value
-
         if by == 0:
             return x
         if by > 0:

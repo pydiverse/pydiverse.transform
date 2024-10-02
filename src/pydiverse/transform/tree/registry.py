@@ -382,6 +382,13 @@ class OperatorSignature:
             return False
         return self.args == other.args and self.rtype == other.rtype
 
+    def __iter__(self):
+        for arg in self.args:
+            if not arg.vararg:
+                yield arg
+            else:
+                yield from itertools.repeat(arg)
+
     @property
     def is_vararg(self) -> bool:
         if len(self.args) == 0:
