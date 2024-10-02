@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.backend.targets import Target
+from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.pipeable import builtin_verb
@@ -91,7 +91,11 @@ def alias(table: Table, new_name: str | None = None):
 
 
 @builtin_verb()
-def collect(table: Table) -> Table: ...
+def collect(table: Table, target: Target | None = None) -> Table:
+    df = table >> export(Polars(lazy=False))
+    if target is None:
+        target = Polars()
+    return Table(df, target)
 
 
 @builtin_verb()

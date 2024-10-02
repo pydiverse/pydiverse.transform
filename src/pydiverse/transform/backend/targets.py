@@ -12,7 +12,7 @@ class Target: ...
 
 
 class Polars(Target):
-    def __init__(self, *, lazy: bool = False) -> None:
+    def __init__(self, *, lazy: bool = True) -> None:
         self.lazy = lazy
 
 

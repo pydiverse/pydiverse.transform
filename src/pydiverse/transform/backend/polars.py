@@ -24,7 +24,7 @@ from pydiverse.transform.tree.col_expr import (
 
 class PolarsImpl(TableImpl):
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
-        self.df = df
+        self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
         super().__init__(
             name,
             {
@@ -42,7 +42,7 @@ class PolarsImpl(TableImpl):
         lf, _, select, _ = compile_ast(nd)
         lf = lf.select(select)
         if isinstance(target, Polars):
-            if not target.lazy and isinstance(lf, pl.LazyFrame):
+            if not target.lazy:
                 lf = lf.collect()
             lf.name = nd.name
             return lf
