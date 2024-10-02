@@ -3,9 +3,9 @@ name = "pydiverse-transform"
 version = "0.2.0"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
-    {name = "QuantCo, Inc."},
-    {name = "Nicolas Camenisch", email = "garnele007@gmail.com"},
-    {name = "Martin Trautmann", email = "windiana@users.sf.net"},
+  { name = "QuantCo, Inc." },
+  { name = "Nicolas Camenisch", email = "garnele007@gmail.com" },
+  { name = "Martin Trautmann", email = "windiana@users.sf.net" },
 ]
 license = "BSD-3-Clause"
 readme = "docs/package/README.md"
@@ -16,16 +16,10 @@ classifiers = [
   "Programming Language :: SQL",
   "Topic :: Database",
 ]
-requires-python = ">=3.9"
-dependencies = [
-  "numpy>=1.23.1",
-  "pandas>=1.4.3",
-  "SQLAlchemy>=1.4.27",
-]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.23.1", "pandas>=1.4.3", "SQLAlchemy>=1.4.27"]
 [project.optional-dependencies]
-pyarrow = [
-  "pyarrow>=11.0.0",
-]
+pyarrow = ["pyarrow>=11.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pydiverse"]
@@ -36,21 +30,12 @@ extend-exclude = ["docs/*"]
 fix = true
 
 [tool.ruff.lint]
-select = [
-    "F",
-    "E",
-    "UP",
-    "W",
-    "I001",
-    "I002",
-    "B",
-    "A",
-]
+select = ["F", "E", "UP", "W", "I001", "I002", "B", "A"]
 ignore = [
-    "B017",
-    "B028",
-    "A001",  # Keep while filter verb still is called filter
-    "A003",  # Keep while filter verb still is called filter
+  "B017",
+  "B028",
+  "A001", # Keep while filter verb still is called filter
+  "A003", # Keep while filter verb still is called filter
 ]
 ignore-init-module-imports = true
 
