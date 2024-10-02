@@ -169,7 +169,7 @@ def python_type_to_pdt(t: type) -> Dtype:
     elif t is type(None):
         return NoneDtype()
 
-    raise TypeError(f"invalid usage of type {t} in a column expression.")
+    raise TypeError(f"invalid usage of type {t} in a column expression")
 
 
 def dtype_from_string(t: str) -> Dtype:

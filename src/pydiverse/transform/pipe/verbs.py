@@ -5,6 +5,7 @@ import uuid
 from collections.abc import Iterable
 from typing import Any
 
+from pydiverse.transform import errors
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.errors import FunctionTypeError
@@ -92,9 +93,12 @@ def alias(table: Table, new_name: str | None = None):
 
 @builtin_verb()
 def collect(table: Table, target: Target | None = None) -> Table:
+    errors.check_arg_type(Target, "collect", "target", target)
+
     df = table >> export(Polars(lazy=False))
     if target is None:
         target = Polars()
+
     return Table(df, target)
 
 
@@ -125,9 +129,11 @@ def show_query(table: Table):
 
 
 @builtin_verb()
-def select(table: Table, *args: Col | ColName):
+def select(table: Table, *cols: Col | ColName):
+    errors.check_vararg_type(Col | ColName, "select", *cols)
+
     new = copy.copy(table)
-    new._ast = Select(table._ast, preprocess_arg(args, table))
+    new._ast = Select(table._ast, preprocess_arg(cols, table))
     new._cache = copy.copy(table._cache)
     # TODO: prevent selection of overwritten columns
     new._cache.update(new_select=new._ast.select)
@@ -135,8 +141,10 @@ def select(table: Table, *args: Col | ColName):
 
 
 @builtin_verb()
-def drop(table: Table, *args: Col | ColName):
-    dropped_uuids = {col._uuid for col in preprocess_arg(args, table)}
+def drop(table: Table, *cols: Col | ColName):
+    errors.check_vararg_type(Col | ColName, "drop", *cols)
+
+    dropped_uuids = {col._uuid for col in preprocess_arg(cols, table)}
     return select(
         table,
         *(col for col in table._cache.select if col._uuid not in dropped_uuids),
@@ -145,8 +153,7 @@ def drop(table: Table, *args: Col | ColName):
 
 @builtin_verb()
 def rename(table: Table, name_map: dict[str, str]):
-    if not isinstance(name_map, dict):
-        raise TypeError("`name_map` argument to `rename` must be a dict")
+    errors.check_arg_type(dict, "rename", "name_map", name_map)
     if len(name_map) == 0:
         return table
 
@@ -247,6 +254,8 @@ def group_by(table: Table, *cols: Col | ColName, add=False):
     if len(cols) == 0:
         return table
 
+    errors.check_vararg_type(Col | ColName, "group_by", *cols)
+
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, preprocess_arg(cols, table), add)
     new._cache = copy.copy(table._cache)
@@ -324,6 +333,9 @@ def summarise(table: Table, **kwargs: ColExpr):
 
 @builtin_verb()
 def slice_head(table: Table, n: int, *, offset: int = 0):
+    errors.check_arg_type(int, "slice_head", "n", n)
+    errors.check_arg_type(int, "slice_head", "offset", offset)
+
     if table._cache.partition_by:
         raise ValueError("cannot apply `slice_head` to a grouped table")
 
@@ -342,6 +354,9 @@ def join(
     validate: JoinValidate = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
+    errors.check_arg_type(Table, "join", "right", right)
+    errors.check_arg_type(str | None, "join", "suffix", suffix)
+
     if left._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
     elif right._cache.partition_by:
