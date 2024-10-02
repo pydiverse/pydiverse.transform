@@ -118,7 +118,7 @@ class Table:
 
             return (
                 f"Table: {self._ast.name}, backend: {type(self._ast).__name__}\n"
-                f"{self >> export(Polars())}"
+                f"{self >> export(Polars(lazy=False))}"
             )
         except Exception as e:
             return (

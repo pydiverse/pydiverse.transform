@@ -93,7 +93,7 @@ def alias(table: Table, new_name: str | None = None):
 
 @builtin_verb()
 def collect(table: Table, target: Target | None = None) -> Table:
-    errors.check_arg_type(Target, "collect", "target", target)
+    errors.check_arg_type(Target | None, "collect", "target", target)
 
     df = table >> export(Polars(lazy=False))
     if target is None:

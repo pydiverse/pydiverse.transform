@@ -106,7 +106,7 @@ class Col(ColExpr):
             from pydiverse.transform.backend.polars import PolarsImpl
             from pydiverse.transform.backend.targets import Polars
 
-            df = PolarsImpl.export(self._ast, Polars(), [self])
+            df = PolarsImpl.export(self._ast, Polars(lazy=False), [self])
             return str(df.get_column(df.columns[0]))
         except Exception as e:
             return (
