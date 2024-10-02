@@ -57,7 +57,7 @@ class ColExpr:
         return self._ftype
 
     def map(
-        self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr = None
+        self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr | None = None
     ) -> CaseExpr:
         return CaseExpr(
             (
@@ -69,7 +69,7 @@ class ColExpr:
                 )
                 for key, val in mapping.items()
             ),
-            wrap_literal(default),
+            wrap_literal(default) if default is not None else self,
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
