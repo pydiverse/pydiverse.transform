@@ -139,7 +139,7 @@ def test_filter_argument(df3, df4):
         df4, lambda t: t >> mutate(u=t.col2.mean(filter=~(t.col4 % 3 == 0)))
     )
 
-    assert_result_equal(df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=[t.col2])))
+    assert_result_equal(df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=t.col2)))
 
     assert_result_equal(
         df4,

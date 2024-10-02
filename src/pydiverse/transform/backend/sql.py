@@ -212,7 +212,9 @@ class SqlImpl(TableImpl):
             else:
                 value: sqa.ColumnElement = impl(*args, _Impl=cls)
                 if partition_by is not None or order_by is not None:
-                    value = value.over(partition_by=partition_by, order_by=order_by)
+                    value = sqa.over(
+                        value, partition_by=partition_by, order_by=order_by
+                    )
 
             return value
 
@@ -905,7 +907,7 @@ with SqlImpl.op(ops.Sum()) as op:
 with SqlImpl.op(ops.Any()) as op:
 
     @op.auto
-    def _any(x, *, _window_partition_by=None, _window_order_by=None):
+    def _any(x):
         return sqa.func.coalesce(sqa.func.max(x), sqa.null())
 
     @op.auto(variant="window")

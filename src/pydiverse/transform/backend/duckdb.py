@@ -8,9 +8,9 @@ from pydiverse.transform import ops
 from pydiverse.transform.backend import sql
 from pydiverse.transform.backend.sql import SqlImpl
 from pydiverse.transform.backend.targets import Polars, Target
-from pydiverse.transform.tree import dtypes
+from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import Cast, Col, LiteralCol
+from pydiverse.transform.tree.col_expr import Cast, Col, ColFn, LiteralCol
 
 
 class DuckDbImpl(SqlImpl):
@@ -18,6 +18,17 @@ class DuckDbImpl(SqlImpl):
 
     @classmethod
     def export(cls, nd: AstNode, target: Target, final_select: list[Col]):
+        # insert casts after sum() over integer columns (duckdb converts them to floats)
+        for desc in nd.iter_subtree():
+            if isinstance(desc, verbs.Verb):
+                desc.map_col_nodes(
+                    lambda u: Cast(u, dtypes.Int64())
+                    if isinstance(u, ColFn)
+                    and u.name == "sum"
+                    and u.dtype() == dtypes.Int64
+                    else u
+                )
+
         if isinstance(target, Polars):
             engine = sql.get_engine(nd)
             with engine.connect() as conn:

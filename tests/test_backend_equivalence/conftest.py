@@ -210,8 +210,8 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
     # Parametrize tests based on `backends` and `skip_backends` mark.
 
     backends = dict.fromkeys(BACKEND_TABLES)
-    # if mark := metafunc.definition.get_closest_marker("backends"):
-    #     backends = dict.fromkeys(mark.args)
+    if mark := metafunc.definition.get_closest_marker("backends"):
+        backends = dict.fromkeys(mark.args)
     if mark := metafunc.definition.get_closest_marker("skip_backends"):
         for backend in mark.args:
             if backend in backends:
