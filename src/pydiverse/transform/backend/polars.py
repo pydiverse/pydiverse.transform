@@ -116,7 +116,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         # Otherwise, `over` would be used for sorting, but we cannot pass descending /
         # nulls_last there and the required workaround is probably slower than polars`s
         # native `sort_by`.
-        if arrange and not partition_by:
+        if arrange and not partition_by and len(args) > 0:
             # order the args. if the table is grouped by group_by or
             # partition_by=, the groups will be sorted via over(order_by=)
             # anyways so it need not be done here.
@@ -459,63 +459,63 @@ with PolarsImpl.op(ops.DtYear()) as op:
 
     @op.auto
     def _dt_year(x):
-        return x.dt.year()
+        return x.dt.year().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtMonth()) as op:
 
     @op.auto
     def _dt_month(x):
-        return x.dt.month()
+        return x.dt.month().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDay()) as op:
 
     @op.auto
     def _dt_day(x):
-        return x.dt.day()
+        return x.dt.day().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtHour()) as op:
 
     @op.auto
     def _dt_hour(x):
-        return x.dt.hour()
+        return x.dt.hour().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtMinute()) as op:
 
     @op.auto
     def _dt_minute(x):
-        return x.dt.minute()
+        return x.dt.minute().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtSecond()) as op:
 
     @op.auto
     def _dt_second(x):
-        return x.dt.second()
+        return x.dt.second().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtMillisecond()) as op:
 
     @op.auto
     def _dt_millisecond(x):
-        return x.dt.millisecond()
+        return x.dt.millisecond().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDayOfWeek()) as op:
 
     @op.auto
     def _dt_day_of_week(x):
-        return x.dt.weekday()
+        return x.dt.weekday().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDayOfYear()) as op:
 
     @op.auto
     def _dt_day_of_year(x):
-        return x.dt.ordinal_day()
+        return x.dt.ordinal_day().cast(pl.Int64)
 
 
 with PolarsImpl.op(ops.DtDays()) as op:
