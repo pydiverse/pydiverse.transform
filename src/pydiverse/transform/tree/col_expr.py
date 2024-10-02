@@ -136,9 +136,10 @@ class ColName(ColExpr):
 class LiteralCol(ColExpr):
     __slots__ = ["val"]
 
-    def __init__(self, val: Any):
+    def __init__(self, val: Any, dtype: dtypes.Dtype | None = None):
         self.val = val
-        dtype = python_type_to_pdt(type(val))
+        if dtype is None:
+            dtype = python_type_to_pdt(type(val))
         dtype.const = True
         super().__init__(dtype, Ftype.EWISE)
 

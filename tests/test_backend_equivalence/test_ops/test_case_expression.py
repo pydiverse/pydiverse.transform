@@ -32,6 +32,17 @@ def test_mutate_case_ewise(df4):
         ),
     )
 
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            x=t.col1.map({0: 1}),
+            y=t.col4.map({2: 2}, default=-1),
+            z=t.col2.map({4: 3}, default=t.col1),
+            w=t.col3.map({2: 2, 1: 5}, default=pdt.lit(None)),
+        ),
+    )
+
 
 def test_mutate_case_window(df4):
     assert_result_equal(

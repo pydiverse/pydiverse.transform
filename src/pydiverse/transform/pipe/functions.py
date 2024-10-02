@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.col_expr import (
     ColExpr,
     ColFn,
+    LiteralCol,
     WhenClause,
     wrap_literal,
 )
@@ -26,6 +28,10 @@ def when(condition: ColExpr) -> WhenClause:
         )
 
     return WhenClause([], wrap_literal(condition))
+
+
+def lit(val: Any, dtype: dtypes.Dtype | None = None) -> LiteralCol:
+    return LiteralCol(val, dtype)
 
 
 def count(

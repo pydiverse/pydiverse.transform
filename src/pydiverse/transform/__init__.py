@@ -5,6 +5,7 @@ from pydiverse.transform.pipe.c import C
 from pydiverse.transform.pipe.functions import (
     count,
     dense_rank,
+    lit,
     max,
     min,
     rank,

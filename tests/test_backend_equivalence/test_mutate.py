@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pydiverse.transform as pdt
 from pydiverse.transform import C
 from pydiverse.transform.pipe.verbs import (
     mutate,
@@ -35,6 +36,7 @@ def test_literals(df1):
     assert_result_equal(df1, lambda t: t >> mutate(x=1.1))
     assert_result_equal(df1, lambda t: t >> mutate(x=True))
     assert_result_equal(df1, lambda t: t >> mutate(x="test"))
+    assert_result_equal(df1, lambda t: t >> mutate(u=pdt.lit(None)))
 
 
 def test_none(df4):
