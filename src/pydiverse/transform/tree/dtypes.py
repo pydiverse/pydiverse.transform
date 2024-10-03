@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 from abc import ABC, abstractmethod
 
-from pydiverse.transform._typing import T
 from pydiverse.transform.errors import DataTypeError
 
 
@@ -46,7 +45,7 @@ class Dtype(ABC):
     def name(self) -> str:
         pass
 
-    def without_modifiers(self: T) -> T:
+    def without_modifiers(self: Dtype) -> Dtype:
         """Returns a copy of `self` with all modifiers removed"""
         return type(self)()
 
@@ -127,7 +126,7 @@ class Template(Dtype):
         super().__init__(**kwargs)
         self.name = name
 
-    def without_modifiers(self: T) -> T:
+    def without_modifiers(self: Dtype) -> Dtype:
         return type(self)(self.name)
 
     def same_kind(self, other: Dtype) -> bool:
