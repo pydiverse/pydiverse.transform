@@ -10,10 +10,6 @@ from uuid import UUID
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import Col, ColExpr, Order
 
-JoinHow = Literal["inner", "left", "full"]
-
-JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
-
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Verb(AstNode):
@@ -177,8 +173,8 @@ class Ungroup(Verb): ...
 class Join(Verb):
     right: AstNode
     on: ColExpr
-    how: JoinHow
-    validate: JoinValidate
+    how: Literal["inner", "left", "full"]
+    validate: Literal["1:1", "1:m", "m:1", "m:m"]
     suffix: str
 
     def _clone(self) -> tuple[Join, dict[AstNode, AstNode], dict[UUID, UUID]]:

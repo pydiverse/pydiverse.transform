@@ -7,7 +7,7 @@ import itertools
 import math
 import operator
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import polars as pl
@@ -570,7 +570,7 @@ class Query:
 class SqlJoin:
     right: sqa.Subquery
     on: sqa.ColumnElement
-    how: verbs.JoinHow
+    how: Literal["inner", "left", "full"]
 
 
 # MSSQL complains about duplicates in ORDER BY.

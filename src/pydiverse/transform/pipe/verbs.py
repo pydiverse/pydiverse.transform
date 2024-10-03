@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import uuid
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Literal
 
 from pydiverse.transform import errors
 from pydiverse.transform.backend.table_impl import TableImpl
@@ -27,8 +27,6 @@ from pydiverse.transform.tree.verbs import (
     Filter,
     GroupBy,
     Join,
-    JoinHow,
-    JoinValidate,
     Mutate,
     Rename,
     Select,
@@ -349,9 +347,9 @@ def join(
     left: Table,
     right: Table,
     on: ColExpr,
-    how: JoinHow,
+    how: Literal["inner", "left", "full"],
     *,
-    validate: JoinValidate = "m:m",
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,  # appended to cols of the right table
 ):
     errors.check_arg_type(Table, "join", "right", right)
@@ -410,7 +408,7 @@ def inner_join(
     right: Table,
     on: ColExpr,
     *,
-    validate: JoinValidate = "m:m",
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
 ):
     return left >> join(right, on, "inner", validate=validate, suffix=suffix)
@@ -422,7 +420,7 @@ def left_join(
     right: Table,
     on: ColExpr,
     *,
-    validate: JoinValidate = "m:m",
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
 ):
     return left >> join(right, on, "left", validate=validate, suffix=suffix)
@@ -434,7 +432,7 @@ def full_join(
     right: Table,
     on: ColExpr,
     *,
-    validate: JoinValidate = "m:m",
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
 ):
     return left >> join(right, on, "full", validate=validate, suffix=suffix)
