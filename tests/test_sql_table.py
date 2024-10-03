@@ -181,7 +181,7 @@ class TestSqlTable:
         assert_equal(
             (
                 tbl_left
-                >> join(tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="_1729")
+                >> join(tbl_right, tbl_left.a == tbl_right.b, "full", suffix="_1729")
                 >> select(tbl_left.a, tbl_right.b)
             ),
             pl.DataFrame(
