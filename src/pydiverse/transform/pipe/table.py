@@ -112,19 +112,19 @@ class Table:
         )
 
     def __str__(self):
-        try:
-            from pydiverse.transform.backend.targets import Polars
-            from pydiverse.transform.pipe.verbs import export
+        from pydiverse.transform.backend.targets import Polars
+        from pydiverse.transform.pipe.verbs import export, get_backend
 
+        backend = get_backend(self._ast)
+        try:
             return (
-                f"Table: {self._ast.name}, backend: {type(self._ast).__name__}\n"
+                f"Table {self._ast.name}, backend: {backend.__name__}\n"
                 f"{self >> export(Polars(lazy=False))}"
             )
         except Exception as e:
             return (
-                f"Table: {self._ast.name}, backend: {type(self._ast).__name__}\n"
-                "failed to collect table due to an exception. "
-                f"{type(e).__name__}: {str(e)}"
+                f"Table {self._ast.name}, backend: {backend.__name__}\n"
+                f"Failed to collect table.\n{type(e).__name__}: {str(e)}"
             )
 
     def __dir__(self) -> list[str]:
@@ -143,7 +143,7 @@ class Table:
             html += (self >> export(Polars()))._repr_html_()
         except Exception as e:
             html += (
-                "</br><pre>Failed to collect table due to an exception:\n"
+                "</br><pre>Failed to collect table.\n"
                 f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
             )
         return html

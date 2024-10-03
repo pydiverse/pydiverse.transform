@@ -10,7 +10,7 @@ from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, Target
 from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.pipe.pipeable import builtin_verb
+from pydiverse.transform.pipe.pipeable import verb
 from pydiverse.transform.pipe.table import Table
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
@@ -59,7 +59,7 @@ __all__ = [
 ]
 
 
-@builtin_verb()
+@verb
 def alias(table: Table, new_name: str | None = None):
     if new_name is None:
         new_name = table._ast.name
@@ -89,7 +89,7 @@ def alias(table: Table, new_name: str | None = None):
     return new
 
 
-@builtin_verb()
+@verb
 def collect(table: Table, target: Target | None = None) -> Table:
     errors.check_arg_type(Target | None, "collect", "target", target)
 
@@ -100,7 +100,7 @@ def collect(table: Table, target: Target | None = None) -> Table:
     return Table(df, target)
 
 
-@builtin_verb()
+@verb
 def export(table: Table, target: Target):
     check_table_references(table._ast)
     table = table >> alias()
@@ -108,7 +108,7 @@ def export(table: Table, target: Target):
     return SourceBackend.export(table._ast, target, table._cache.select)
 
 
-@builtin_verb()
+@verb
 def build_query(table: Table) -> str:
     check_table_references(table._ast)
     table = table >> alias()
@@ -116,7 +116,7 @@ def build_query(table: Table) -> str:
     return SourceBackend.build_query(table._ast, table._cache.select)
 
 
-@builtin_verb()
+@verb
 def show_query(table: Table):
     if query := table >> build_query():
         print(query)
@@ -126,7 +126,7 @@ def show_query(table: Table):
     return table
 
 
-@builtin_verb()
+@verb
 def select(table: Table, *cols: Col | ColName):
     errors.check_vararg_type(Col | ColName, "select", *cols)
 
@@ -138,7 +138,7 @@ def select(table: Table, *cols: Col | ColName):
     return new
 
 
-@builtin_verb()
+@verb
 def drop(table: Table, *cols: Col | ColName):
     errors.check_vararg_type(Col | ColName, "drop", *cols)
 
@@ -149,7 +149,7 @@ def drop(table: Table, *cols: Col | ColName):
     )
 
 
-@builtin_verb()
+@verb
 def rename(table: Table, name_map: dict[str, str]):
     errors.check_arg_type(dict, "rename", "name_map", name_map)
     if len(name_map) == 0:
@@ -177,7 +177,7 @@ def rename(table: Table, name_map: dict[str, str]):
     return new
 
 
-@builtin_verb()
+@verb
 def mutate(table: Table, **kwargs: ColExpr):
     if len(kwargs) == 0:
         return table
@@ -215,7 +215,7 @@ def mutate(table: Table, **kwargs: ColExpr):
     return new
 
 
-@builtin_verb()
+@verb
 def filter(table: Table, *predicates: ColExpr):
     if len(predicates) == 0:
         return table
@@ -233,7 +233,7 @@ def filter(table: Table, *predicates: ColExpr):
     return new
 
 
-@builtin_verb()
+@verb
 def arrange(table: Table, *order_by: ColExpr):
     if len(order_by) == 0:
         return table
@@ -247,7 +247,7 @@ def arrange(table: Table, *order_by: ColExpr):
     return new
 
 
-@builtin_verb()
+@verb
 def group_by(table: Table, *cols: Col | ColName, add=False):
     if len(cols) == 0:
         return table
@@ -266,7 +266,7 @@ def group_by(table: Table, *cols: Col | ColName, add=False):
     return new
 
 
-@builtin_verb()
+@verb
 def ungroup(table: Table):
     new = copy.copy(table)
     new._ast = Ungroup(table._ast)
@@ -275,7 +275,7 @@ def ungroup(table: Table):
     return new
 
 
-@builtin_verb()
+@verb
 def summarise(table: Table, **kwargs: ColExpr):
     new = copy.copy(table)
     new._ast = Summarise(
@@ -330,7 +330,7 @@ def summarise(table: Table, **kwargs: ColExpr):
     return new
 
 
-@builtin_verb()
+@verb
 def slice_head(table: Table, n: int, *, offset: int = 0):
     errors.check_arg_type(int, "slice_head", "n", n)
     errors.check_arg_type(int, "slice_head", "offset", offset)
@@ -343,7 +343,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0):
     return new
 
 
-@builtin_verb()
+@verb
 def join(
     left: Table,
     right: Table,
@@ -410,7 +410,7 @@ def join(
 # We define the join variations explicitly instead of via functools.partial since vscode
 # gives functools.partial objects a different color than normal python functions which
 # looks very confusing.
-@builtin_verb()
+@verb
 def inner_join(
     left: Table,
     right: Table,
@@ -422,7 +422,7 @@ def inner_join(
     return left >> join(right, on, "inner", validate=validate, suffix=suffix)
 
 
-@builtin_verb()
+@verb
 def left_join(
     left: Table,
     right: Table,
@@ -434,7 +434,7 @@ def left_join(
     return left >> join(right, on, "left", validate=validate, suffix=suffix)
 
 
-@builtin_verb()
+@verb
 def full_join(
     left: Table,
     right: Table,
@@ -444,6 +444,12 @@ def full_join(
     suffix: str | None = None,
 ):
     return left >> join(right, on, "full", validate=validate, suffix=suffix)
+
+
+@verb
+def show(table: Table):
+    print(table)
+    return table
 
 
 def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:

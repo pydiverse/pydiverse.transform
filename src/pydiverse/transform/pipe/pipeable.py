@@ -43,11 +43,7 @@ class inverse_partial(partial):
 
     def __call__(self, /, *args, **keywords):
         keywords = {**self.keywords, **keywords}
-        #                   ↙ *args moved to front.
         return self.func(*args, *self.args, **keywords)
-
-
-# TODO: validate that the first arg is a table here
 
 
 def verb(fn):
@@ -56,14 +52,3 @@ def verb(fn):
         return Pipeable(inverse_partial(fn, *args, **kwargs))
 
     return wrapper
-
-
-def builtin_verb(backends=None):
-    def decorator(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            return Pipeable(inverse_partial(fn, *args, **kwargs))
-
-        return wrapper
-
-    return decorator
