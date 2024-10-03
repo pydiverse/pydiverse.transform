@@ -48,8 +48,8 @@ def check_arg_type(
             else " | ".join(t.__name__ for t in type_args)
         )
         raise TypeError(
-            f"argument `{param_name}` to `{fn}` must have type `{expected_type_str}`, "
-            f"found `{type(arg).__name__}` instead"
+            f"argument for parameter `{param_name}` of `{fn}` must have type "
+            f"`{expected_type_str}`, found `{type(arg).__name__}` instead"
         )
 
 
@@ -63,6 +63,14 @@ def check_vararg_type(expected_type: type, fn: str, *args: Any):
                 else " | ".join(t.__name__ for t in type_args)
             )
             raise TypeError(
-                f"arguemnts to `{fn}` must have type `{expected_type_str}`, found "
+                f"varargs to `{fn}` must have type `{expected_type_str}`, found "
                 f"`{type(arg).__name__}` instead"
             )
+
+
+def check_literal_type(allowed_vals: list[Any], fn: str, param_name: str, arg: Any):
+    if arg not in allowed_vals:
+        raise TypeError(
+            f"argument `{arg}` not allowed for parameter `{param_name}` of `{fn}`, "
+            "must be one of " + ", ".join(repr(val) for val in allowed_vals)
+        )

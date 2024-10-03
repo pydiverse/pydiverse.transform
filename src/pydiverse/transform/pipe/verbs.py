@@ -253,6 +253,7 @@ def group_by(table: Table, *cols: Col | ColName, add=False):
         return table
 
     errors.check_vararg_type(Col | ColName, "group_by", *cols)
+    errors.check_arg_type(bool, "group_by", "add", add)
 
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, preprocess_arg(cols, table), add)
@@ -350,10 +351,14 @@ def join(
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
-    suffix: str | None = None,  # appended to cols of the right table
+    suffix: str | None = None,
 ):
     errors.check_arg_type(Table, "join", "right", right)
     errors.check_arg_type(str | None, "join", "suffix", suffix)
+    errors.check_literal_type(["inner", "left", "full"], "join", "how", how)
+    errors.check_literal_type(
+        ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
+    )
 
     if left._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
@@ -402,6 +407,9 @@ def join(
     return new
 
 
+# We define the join variations explicitly instead of via functools.partial since vscode
+# gives functools.partial objects a different color than normal python functions which
+# looks very confusing.
 @builtin_verb()
 def inner_join(
     left: Table,
