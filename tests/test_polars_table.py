@@ -194,7 +194,7 @@ class TestPolarsLazyImpl:
 
         assert_equal(
             tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="42")
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "full", suffix="42")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame(
                 {

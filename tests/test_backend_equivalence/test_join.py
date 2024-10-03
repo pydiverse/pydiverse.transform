@@ -7,10 +7,10 @@ import pytest
 from pydiverse.transform.pipe.c import C
 from pydiverse.transform.pipe.verbs import (
     alias,
+    full_join,
     join,
     left_join,
     mutate,
-    outer_join,
     select,
 )
 from tests.util import assert_result_equal
@@ -22,7 +22,7 @@ from tests.util import assert_result_equal
         "inner",
         "left",
         pytest.param(
-            "outer",
+            "full",
             marks=pytest.mark.skipif(
                 sqlite3.sqlite_version < "3.39.0",
                 reason="SQLite version doesn't support OUTER JOIN",
@@ -43,7 +43,7 @@ def test_join(df1, df2, how):
         >> mutate(l=t.col2.str.len())
         >> left_join(v := u >> alias("v"), C.l == v.col2)
         >> mutate(k=v.col1 + C.l + u.col2)
-        >> outer_join(w := t >> alias("w"), (t.col1 == w.col1) & (C.k == w.col1)),
+        >> full_join(w := t >> alias("w"), (t.col1 == w.col1) & (C.k == w.col1)),
         check_row_order=False,
     )
 
@@ -54,7 +54,7 @@ def test_join(df1, df2, how):
         "inner",
         "left",
         pytest.param(
-            "outer",
+            "full",
             marks=pytest.mark.skipif(
                 sqlite3.sqlite_version < "3.39.0",
                 reason="SQLite version doesn't support OUTER JOIN",
@@ -83,7 +83,7 @@ def test_join_and_select(df1, df2, how):
         "inner",
         "left",
         pytest.param(
-            "outer",
+            "full",
             marks=pytest.mark.skipif(
                 sqlite3.sqlite_version < "3.39.0",
                 reason="SQLite version doesn't support OUTER JOIN",

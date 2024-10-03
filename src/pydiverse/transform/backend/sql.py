@@ -251,7 +251,7 @@ class SqlImpl(TableImpl):
                 j.right,
                 onclause=j.on,
                 isouter=j.how != "inner",
-                full=j.how == "outer",
+                full=j.how == "full",
             )
 
         if query.where:
@@ -471,9 +471,9 @@ class SqlImpl(TableImpl):
                 query.where.extend(right_query.where)
             elif nd.how == "left":
                 j.on = functools.reduce(operator.and_, (j.on, *right_query.where))
-            elif nd.how == "outer":
+            elif nd.how == "full":
                 if query.where or right_query.where:
-                    raise ValueError("invalid filter before outer join")
+                    raise ValueError("invalid filter before full join")
 
             query.join.append(j)
             query.select += [

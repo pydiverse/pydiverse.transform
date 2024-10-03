@@ -50,7 +50,7 @@ __all__ = [
     "join",
     "left_join",
     "inner_join",
-    "outer_join",
+    "full_join",
     "filter",
     "arrange",
     "group_by",
@@ -429,7 +429,7 @@ def left_join(
 
 
 @builtin_verb()
-def outer_join(
+def full_join(
     left: Table,
     right: Table,
     on: ColExpr,
@@ -437,7 +437,7 @@ def outer_join(
     validate: JoinValidate = "m:m",
     suffix: str | None = None,
 ):
-    return left >> join(right, on, "outer", validate=validate, suffix=suffix)
+    return left >> join(right, on, "full", validate=validate, suffix=suffix)
 
 
 def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:

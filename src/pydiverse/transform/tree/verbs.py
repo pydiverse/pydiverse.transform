@@ -10,7 +10,7 @@ from uuid import UUID
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import Col, ColExpr, Order
 
-JoinHow = Literal["inner", "left", "outer"]
+JoinHow = Literal["inner", "left", "full"]
 
 JoinValidate = Literal["1:1", "1:m", "m:1", "m:m"]
 
