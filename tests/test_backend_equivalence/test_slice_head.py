@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.verbs import (
     alias,
     arrange,
@@ -76,7 +76,8 @@ def test_with_join(df1, df2):
         lambda t, u: t
         >> arrange(*t)
         >> slice_head(3)
-        >> left_join(u, t.col1 == u.col1),
+        >> alias()
+        >> left_join(u, C.col1 == u.col1),
         check_row_order=False,
     )
 
@@ -101,7 +102,11 @@ def test_with_filter(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4, offset=2) >> filter(t.col1 == 1),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(4, offset=2)
+        >> alias()
+        >> filter(C.col1 == 1),
     )
 
     assert_result_equal(
@@ -110,7 +115,8 @@ def test_with_filter(df3):
         >> filter(t.col4 % 2 == 0)
         >> arrange(*t)
         >> slice_head(4, offset=2)
-        >> filter(t.col1 == 1),
+        >> alias()
+        >> filter(C.col1 == 1),
     )
 
 
@@ -129,7 +135,8 @@ def test_with_arrange(df3):
         >> mutate(x=(t.col1 * t.col2))
         >> arrange(*t)
         >> slice_head(4)
-        >> arrange(-C.x, C.col5),
+        >> alias()
+        >> (lambda _: arrange(-C.x, C.col5)),
     )
 
 
@@ -139,8 +146,9 @@ def test_with_group_by(df3):
         lambda t: t
         >> arrange(*t)
         >> slice_head(1)
+        >> alias()
         >> group_by(C.col1)
-        >> mutate(x=f.count()),
+        >> mutate(x=pdt.count()),
     )
 
     assert_result_equal(
@@ -148,6 +156,7 @@ def test_with_group_by(df3):
         lambda t: t
         >> arrange(C.col1, *t)
         >> slice_head(6, offset=1)
+        >> alias()
         >> group_by(C.col1)
         >> mutate(x=C.col4.mean())
         >> select(C.x),
@@ -159,18 +168,27 @@ def test_with_group_by(df3):
         >> mutate(key=C.col4 % (C.col3 + 1))
         >> arrange(C.key, *t)
         >> slice_head(4)
+        >> alias()
         >> group_by(C.key)
-        >> summarize(x=f.count()),
+        >> summarize(x=pdt.count()),
     )
 
 
 def test_with_summarize(df3):
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4) >> summarize(count=f.count()),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(4)
+        >> alias()
+        >> summarize(count=pdt.count()),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4) >> summarize(c3_mean=C.col3.mean()),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(4)
+        >> alias()
+        >> summarize(c3_mean=C.col3.mean()),
     )

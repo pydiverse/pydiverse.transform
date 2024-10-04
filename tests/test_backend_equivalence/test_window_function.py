@@ -1,18 +1,8 @@
 from __future__ import annotations
 
-from pydiverse.transform import C
-from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.pipe import functions as f
-from pydiverse.transform.pipe.verbs import (
-    arrange,
-    filter,
-    group_by,
-    join,
-    mutate,
-    select,
-    summarize,
-    ungroup,
-)
+import pydiverse.transform as pdt
+from pydiverse.transform.errors import FunctionTypeError, SubqueryError
+from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
 
@@ -46,11 +36,11 @@ def test_partition_by_argument(df3, df4):
         >> mutate(
             u=t.col1.min(partition_by=t.col3),
             v=t.col4.sum(partition_by=t.col2),
-            w=f.rank(
+            w=pdt.rank(
                 arrange=[t.col5.descending().nulls_last(), t.col4.nulls_first()],
                 partition_by=[t.col2],
             ),
-            x=f.row_number(
+            x=pdt.row_number(
                 arrange=[t.col4.nulls_last()], partition_by=[t.col1, t.col2]
             ),
         ),
@@ -100,6 +90,7 @@ def test_nested(df3):
         >> group_by(t.col1)
         >> mutate(range=t.col4.max() - 10)
         >> ungroup()
+        >> alias()
         >> mutate(range_mean=C.range.mean()),
     )
 
@@ -110,6 +101,8 @@ def test_nested(df3):
         >> mutate(y=C.x.min() * 1)
         >> mutate(z=C.y.mean())
         >> mutate(w=C.x / C.y),
+        may_throw=True,
+        exception=SubqueryError,
     )
 
     assert_result_equal(
@@ -126,6 +119,7 @@ def test_filter(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(mean3=t.col3.mean())
+        >> alias()
         >> filter(C.mean3 <= 2.0),
     )
 
@@ -180,6 +174,7 @@ def test_summarize(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(range=t.col4.max() - t.col4.min())
+        >> alias()
         >> summarize(mean_range=C.range.mean()),
     )
 
@@ -188,6 +183,7 @@ def test_summarize(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarize(range=t.col4.max() - t.col4.min())
+        >> alias()
         >> mutate(mean_range=C.range.mean()),
     )
 
@@ -198,7 +194,11 @@ def test_intermediate_select(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(x=t.col4.mean())
+        >> alias()
         >> mutate(y=C.x.min())
+        # TODO: technically, we could remove some window functions here and prevent
+        # subqueries
+        >> alias()
         >> mutate(z=(C.x - C.y).mean())
         >> select(C.z),
     )
@@ -218,7 +218,7 @@ def test_arrange_argument(df3):
         df3,
         lambda t: t
         >> group_by(t.col2)
-        >> mutate(x=f.row_number(arrange=C.col4.descending()))
+        >> mutate(x=pdt.row_number(arrange=C.col4.descending()))
         >> select(C.x),
     )
 
@@ -230,7 +230,7 @@ def test_arrange_argument(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(C.x),
+        lambda t: t >> mutate(x=pdt.row_number(arrange=[-C.col4])) >> select(C.x),
     )
 
 
@@ -240,11 +240,13 @@ def test_complex(df3):
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
-        >> mutate(mean3=t.col3.mean(), rn=f.row_number(arrange=[C.col1, C.col2]))
+        >> mutate(mean3=t.col3.mean(), rn=pdt.row_number(arrange=[C.col1, C.col2]))
+        >> alias()
         >> filter(C.mean3 > C.rn)
+        >> alias()
         >> summarize(meta_mean=C.mean3.mean())
-        >> filter(t.col1 >= C.meta_mean)
-        >> filter(t.col1 != 1)
+        >> filter(C.col1 >= C.meta_mean)
+        >> filter(C.col1 != 1)
         >> arrange(C.meta_mean),
     )
 
@@ -254,8 +256,10 @@ def test_complex(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarize(mean3=t.col3.mean())
+        >> alias()
         >> mutate(minM3=C.mean3.min(), maxM3=C.mean3.max())
         >> mutate(span=C.maxM3 - C.minM3)
+        >> alias()
         >> filter(C.span < 3)
         >> arrange(C.span),
     )
@@ -266,8 +270,10 @@ def test_complex(df3):
         >> group_by(t.col1, t.col2)
         >> summarize(mean3=t.col3.mean(), u=t.col4.max())
         >> group_by(C.u)
+        >> alias()
         >> mutate(minM3=C.mean3.min(), maxM3=C.mean3.max())
         >> mutate(span=C.maxM3 - C.minM3)
+        >> alias()
         >> filter(C.span < 3)
         >> arrange(C.span),
     )
@@ -319,8 +325,8 @@ def test_op_row_number(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            row_number1=f.row_number(arrange=[C.col4.descending().nulls_last()]),
-            row_number2=f.row_number(
+            row_number1=pdt.row_number(arrange=[C.col4.descending().nulls_last()]),
+            row_number2=pdt.row_number(
                 arrange=[C.col2.nulls_last(), C.col3.nulls_first(), t.col4.nulls_last()]
             ),
         ),
@@ -330,8 +336,8 @@ def test_op_row_number(df4):
         df4,
         lambda t: t
         >> mutate(
-            u=f.row_number(arrange=[C.col4.descending().nulls_last()]),
-            v=f.row_number(
+            u=pdt.row_number(arrange=[C.col4.descending().nulls_last()]),
+            v=pdt.row_number(
                 arrange=[t.col3.descending().nulls_first(), t.col4.nulls_first()]
             ),
         ),
@@ -344,12 +350,12 @@ def test_op_rank(df4):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            rank1=f.rank(arrange=[t.col1.nulls_last()]),
-            rank2=f.rank(arrange=[t.col2.nulls_first()]),
-            rank3=f.rank(arrange=[t.col2.nulls_last()]),
-            rank4=f.rank(arrange=[t.col5.nulls_first()]),
-            rank5=f.rank(arrange=[t.col5.descending().nulls_first()]),
-            rank_expr=f.rank(arrange=[(t.col3 - t.col2).nulls_last()]),
+            rank1=pdt.rank(arrange=[t.col1.nulls_last()]),
+            rank2=pdt.rank(arrange=[t.col2.nulls_first()]),
+            rank3=pdt.rank(arrange=[t.col2.nulls_last()]),
+            rank4=pdt.rank(arrange=[t.col5.nulls_first()]),
+            rank5=pdt.rank(arrange=[t.col5.descending().nulls_first()]),
+            rank_expr=pdt.rank(arrange=[(t.col3 - t.col2).nulls_last()]),
         ),
     )
 
@@ -360,14 +366,14 @@ def test_op_dense_rank(df3):
         lambda t: t
         >> group_by(t.col1)
         >> mutate(
-            rank1=f.dense_rank(arrange=[t.col5.nulls_first()]),
-            rank2=f.dense_rank(arrange=[t.col2.nulls_last()]),
-            rank3=f.dense_rank(arrange=[t.col2.nulls_last()]),
+            rank1=pdt.dense_rank(arrange=[t.col5.nulls_first()]),
+            rank2=pdt.dense_rank(arrange=[t.col2.nulls_last()]),
+            rank3=pdt.dense_rank(arrange=[t.col2.nulls_last()]),
         )
         >> ungroup()
         >> mutate(
-            rank4=f.dense_rank(arrange=[t.col4.nulls_first()], partition_by=[t.col2]),
-            rank5=f.dense_rank(
+            rank4=pdt.dense_rank(arrange=[t.col4.nulls_first()], partition_by=[t.col2]),
+            rank5=pdt.dense_rank(
                 arrange=[t.col5.descending().nulls_first()],
                 partition_by=[t.col2],
             ),

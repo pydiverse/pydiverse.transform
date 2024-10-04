@@ -1,15 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform import C
 from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.pipe.verbs import (
-    arrange,
-    filter,
-    group_by,
-    mutate,
-    select,
-    summarize,
-)
+from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
 
@@ -41,6 +33,7 @@ def test_chained_summarized(df3):
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> summarize(mean3=t.col3.mean())
+        >> alias()
         >> summarize(mean_of_mean3=C.mean3.mean()),
     )
 
@@ -50,6 +43,7 @@ def test_chained_summarized(df3):
         >> mutate(k=(C.col1 + C.col2) * C.col4)
         >> group_by(C.k)
         >> summarize(x=C.col4.mean())
+        >> alias()  # TODO: I think we could prevent a subquery here.
         >> summarize(y=C.k.mean()),
     )
 
