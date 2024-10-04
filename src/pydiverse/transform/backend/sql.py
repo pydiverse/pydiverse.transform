@@ -317,8 +317,7 @@ class SqlImpl(TableImpl):
                     for fn in nd.iter_col_nodes()
                     if (
                         isinstance(fn, ColFn)
-                        and SqlImpl.registry.get_op(fn.name).ftype
-                        in (Ftype.AGGREGATE, Ftype.WINDOW)
+                        and fn.op().ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
                     )
                 )
             )

@@ -247,7 +247,10 @@ def filter(table: Table, *predicates: ColExpr):
             )
 
         for fn in cond.iter_subtree():
-            if isinstance(fn, ColFn) and fn.ftype(agg_is_window=True) == Ftype.WINDOW:
+            if isinstance(fn, ColFn) and fn.op().ftype in (
+                Ftype.WINDOW,
+                Ftype.AGGREGATE,
+            ):
                 raise FunctionTypeError(
                     f"forbidden window function `{fn.name}` in `filter`\nhint: If you "
                     "want to filter by an expression containing a window / aggregation "
@@ -523,8 +526,6 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
             lambda col: col if not isinstance(col, ColName) else table[col.name]
         )
 
-        from pydiverse.transform.backend.polars import PolarsImpl
-
         for cexpr in arg.iter_subtree():
             if isinstance(cexpr, Col) and cexpr._ast not in table._cache.nodes:
                 raise ValueError(
@@ -536,10 +537,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
                 update_partition_by
                 and isinstance(cexpr, ColFn)
                 and "partition_by" not in cexpr.context_kwargs
-                and (
-                    PolarsImpl.registry.get_op(cexpr.name).ftype
-                    in (Ftype.WINDOW, Ftype.AGGREGATE)
-                )
+                and (cexpr.op().ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
             ):
                 cexpr.context_kwargs["partition_by"] = table._cache.partition_by
 

@@ -11,7 +11,7 @@ from typing import Any
 from uuid import UUID
 
 from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.ops.core import Ftype
+from pydiverse.transform.ops.core import Ftype, Operator
 from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.dtypes import Dtype, python_type_to_pdt
@@ -183,6 +183,12 @@ class ColFn(ColExpr):
         ]
         return f'{self.name}({", ".join(args)})'
 
+    def op(self) -> Operator:
+        # TODO: backend agnostic registry, make this an attribute?
+        from pydiverse.transform.backend.polars import PolarsImpl
+
+        return PolarsImpl.registry.get_op(self.name)
+
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
 
@@ -230,9 +236,7 @@ class ColFn(ColExpr):
         if None in ftypes:
             return None
 
-        from pydiverse.transform.backend.polars import PolarsImpl
-
-        op = PolarsImpl.registry.get_op(self.name)
+        op = self.op()
 
         actual_ftype = (
             Ftype.WINDOW if op.ftype == Ftype.AGGREGATE and agg_is_window else op.ftype
@@ -259,11 +263,8 @@ class ColFn(ColExpr):
                     node is not self
                     and isinstance(node, ColFn)
                     and (
-                        (desc_ftype := PolarsImpl.registry.get_op(node.name).ftype)
-                        in (
-                            Ftype.AGGREGATE,
-                            Ftype.WINDOW,
-                        )
+                        (desc_ftype := node.op().ftype)
+                        in (Ftype.AGGREGATE, Ftype.WINDOW)
                     )
                 ):
                     assert isinstance(self, ColFn)
