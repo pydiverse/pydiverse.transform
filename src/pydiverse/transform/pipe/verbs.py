@@ -12,7 +12,7 @@ from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.pipe.pipeable import verb
 from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree import dtypes, verbs
+from pydiverse.transform.tree import dtypes
 from pydiverse.transform.tree.ast import AstNode
 from pydiverse.transform.tree.col_expr import (
     Col,
@@ -68,6 +68,16 @@ def alias(table: Table, new_name: str | None = None):
     new._ast.name = new_name
     new._cache = copy.copy(table._cache)
 
+    # Why do we copy everything here? column UUIDs have to be rerolled => column
+    # expressions need to be rebuilt => verb nodes need to be rebuilt
+
+    # TODO: think about more efficient ways. We could e.g. just update the _cache UUIDs
+    # and do the UUID reroll on export (that we do anyway, currently, to allow the
+    # backends to rewrite the tree). Then each TableImpl would have to carry some hash
+    # for self-join detection.
+    # We could also do lazy alias, e.g. wait until a join happens and then only copy
+    # the common subtree.
+
     new._cache.partition_by = [
         Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
         for col in table._cache.partition_by
@@ -86,6 +96,8 @@ def alias(table: Table, new_name: str | None = None):
         },
     )
 
+    new._cache.nodes = set(new._ast.iter_subtree())
+
     return new
 
 
@@ -102,7 +114,6 @@ def collect(table: Table, target: Target | None = None) -> Table:
 
 @verb
 def export(table: Table, target: Target):
-    check_table_references(table._ast)
     table = table >> alias()
     SourceBackend: type[TableImpl] = get_backend(table._ast)
     return SourceBackend.export(table._ast, target, table._cache.select)
@@ -110,7 +121,6 @@ def export(table: Table, target: Target):
 
 @verb
 def build_query(table: Table) -> str:
-    check_table_references(table._ast)
     table = table >> alias()
     SourceBackend: type[TableImpl] = get_backend(table._ast)
     return SourceBackend.build_query(table._ast, table._cache.select)
@@ -135,6 +145,8 @@ def select(table: Table, *cols: Col | ColName):
     new._cache = copy.copy(table._cache)
     # TODO: prevent selection of overwritten columns
     new._cache.update(new_select=new._ast.select)
+    new._cache.nodes = table._cache.nodes | {new._ast}
+
     return new
 
 
@@ -173,6 +185,7 @@ def rename(table: Table, name_map: dict[str, str]):
         new_cols[replacement] = table._cache.cols[name]
 
     new._cache.update(new_cols=new_cols)
+    new._cache.nodes = table._cache.nodes | {new._ast}
 
     return new
 
@@ -211,6 +224,7 @@ def mutate(table: Table, **kwargs: ColExpr):
         + [new_cols[name] for name in new._ast.names],
         new_cols=new_cols,
     )
+    new._cache.nodes = table._cache.nodes | {new._ast}
 
     return new
 
@@ -230,6 +244,9 @@ def filter(table: Table, *predicates: ColExpr):
                 f"hint: {cond} is of type {cond.dtype()} instead."
             )
 
+    new._cache = copy.copy(table._cache)
+    new._cache.nodes = table._cache.nodes | {new._ast}
+
     return new
 
 
@@ -243,6 +260,8 @@ def arrange(table: Table, *order_by: ColExpr):
         table._ast,
         preprocess_arg((Order.from_col_expr(ord) for ord in order_by), table),
     )
+
+    new._cache.nodes = table._cache.nodes | {new._ast}
 
     return new
 
@@ -262,6 +281,8 @@ def group_by(table: Table, *cols: Col | ColName, add=False):
         new._cache.partition_by = table._cache.partition_by + new._ast.group_by
     else:
         new._cache.partition_by = new._ast.group_by
+
+    new._cache.nodes = table._cache.nodes | {new._ast}
 
     return new
 
@@ -326,6 +347,7 @@ def summarise(table: Table, **kwargs: ColExpr):
         new_cols=new_cols,
     )
     new._cache.partition_by = []
+    new._cache.nodes = table._cache.nodes | {new._ast}
 
     return new
 
@@ -340,6 +362,9 @@ def slice_head(table: Table, n: int, *, offset: int = 0):
 
     new = copy.copy(table)
     new._ast = SliceHead(table._ast, n, offset)
+    new._cache = copy.copy(table._cache)
+    new._cache.nodes = table._cache.nodes | {new._ast}
+
     return new
 
 
@@ -364,6 +389,13 @@ def join(
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
     elif right._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{right._ast.name}`")
+
+    if intersection := left._cache.nodes & right._cache.nodes:
+        raise ValueError(
+            f"table `{list(intersection)[0]}` occurs twice in the table "
+            "tree.\nhint: To join two tables derived from a common table, "
+            "apply `>> alias()` to one of them before the join."
+        )
 
     user_suffix = suffix
     if suffix is None and right._ast.name:
@@ -392,10 +424,10 @@ def join(
         if cnt > 0:
             suffix += f"_{cnt}"
 
+    # The arg preprocessing for join is a bit more complicated since we have to give the
+    # joined table to `preprocess_args` so that C.<right column> works.
     new = copy.copy(left)
-    new._ast = Join(
-        left._ast, right._ast, preprocess_arg(on, left), how, validate, suffix
-    )
+    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
 
     new._cache = copy.copy(left._cache)
     new._cache.update(
@@ -403,6 +435,8 @@ def join(
         | {name + suffix: col for name, col in right._cache.cols.items()},
         new_select=left._cache.select + right._cache.select,
     )
+    new._cache.nodes = left._cache.nodes | right._cache.nodes | {new._ast}
+    new._ast.on = preprocess_arg(new._ast.on, new, update_partition_by=False)
 
     return new
 
@@ -475,25 +509,29 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
         arg = wrap_literal(arg)
         assert isinstance(arg, ColExpr)
 
-        arg = arg.map_subtree(
+        arg: ColExpr = arg.map_subtree(
             lambda col: col if not isinstance(col, ColName) else table[col.name]
         )
 
-        if not update_partition_by:
-            return arg
-
         from pydiverse.transform.backend.polars import PolarsImpl
 
-        for desc in arg.iter_subtree():
+        for cexpr in arg.iter_subtree():
+            if isinstance(cexpr, Col) and cexpr._ast not in table._cache.nodes:
+                raise ValueError(
+                    f"table `{cexpr._ast.name}` used to reference the column "
+                    f"`{repr(cexpr)}` cannot be used at this point. The current table "
+                    "is not derived from it."
+                )
             if (
-                isinstance(desc, ColFn)
-                and "partition_by" not in desc.context_kwargs
+                update_partition_by
+                and isinstance(cexpr, ColFn)
+                and "partition_by" not in cexpr.context_kwargs
                 and (
-                    PolarsImpl.registry.get_op(desc.name).ftype
+                    PolarsImpl.registry.get_op(cexpr.name).ftype
                     in (Ftype.WINDOW, Ftype.AGGREGATE)
                 )
             ):
-                desc.context_kwargs["partition_by"] = table._cache.partition_by
+                cexpr.context_kwargs["partition_by"] = table._cache.partition_by
 
         return arg
 
@@ -503,37 +541,3 @@ def get_backend(nd: AstNode) -> type[TableImpl]:
         return get_backend(nd.child)
     assert isinstance(nd, TableImpl) and nd is not TableImpl
     return nd.__class__
-
-
-# checks whether there are duplicate tables and whether all cols used in expressions
-# are from descendants
-def check_table_references(nd: AstNode) -> set[AstNode]:
-    if isinstance(nd, verbs.Verb):
-        subtree = check_table_references(nd.child)
-
-        if isinstance(nd, verbs.Join):
-            right_tables = check_table_references(nd.right)
-            if intersection := subtree & right_tables:
-                raise ValueError(
-                    f"table `{list(intersection)[0]}` occurs twice in the table "
-                    "tree.\nhint: To join two tables derived from a common table, "
-                    "apply `>> alias()` to one of them before the join."
-                )
-
-            if len(right_tables) > len(subtree):
-                subtree, right_tables = right_tables, subtree
-            subtree |= right_tables
-
-        for col in nd.iter_col_nodes():
-            if isinstance(col, Col) and col._ast not in subtree:
-                raise ValueError(
-                    f"table `{col._ast.name}` referenced via column `{col}` cannot be "
-                    "used at this point. It The current table is not derived "
-                    "from it."
-                )
-
-        subtree.add(nd)
-        return subtree
-
-    else:
-        return {nd}

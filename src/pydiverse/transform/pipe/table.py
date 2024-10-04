@@ -46,7 +46,7 @@ class Table:
             if isinstance(backend, SqlAlchemy):
                 self._ast = SqlImpl(resource, backend, name)
 
-        if self._ast is None:
+        if not isinstance(self._ast, TableImpl):
             raise AssertionError
 
         self._cache = Cache(
@@ -54,6 +54,7 @@ class Table:
             list(self._ast.cols.values()),
             {col._uuid: col.name for col in self._ast.cols.values()},
             [],
+            {self._ast},
         )
 
     def __getitem__(self, key: str) -> Col:
@@ -117,15 +118,17 @@ class Table:
 
         backend = get_backend(self._ast)
         try:
-            return (
-                f"Table {self._ast.name}, backend: {backend.__name__}\n"
-                f"{self >> export(Polars(lazy=False))}"
-            )
+            df = self >> export(Polars(lazy=False))
         except Exception as e:
             return (
                 f"Table {self._ast.name}, backend: {backend.__name__}\n"
                 f"Failed to collect table.\n{type(e).__name__}: {str(e)}"
             )
+
+        table_str = f"Table {self._ast.name}, backend: {backend.__name__}\n{df}"
+        # TODO: cache the result for a polars backend
+
+        return table_str
 
     def __dir__(self) -> list[str]:
         return [name for name in self._cache.cols.keys() if self._cache.has_col(name)]
@@ -133,13 +136,15 @@ class Table:
     def _repr_html_(self) -> str | None:
         html = (
             f"Table <code>{self._ast.name}</code> using"
-            f" <code>{type(self._ast).__name__}</code> backend:</br>"
+            f" <code>{type(self._ast).__name__}</code> backend</br>"
         )
         try:
             from pydiverse.transform.backend.targets import Polars
             from pydiverse.transform.pipe.verbs import export
 
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
+            # TODO: also cache the table here for a polars backend. maybe we should call
+            # collect() and manage this there?
             html += (self >> export(Polars()))._repr_html_()
         except Exception as e:
             html += (
@@ -158,6 +163,7 @@ class Cache:
     select: list[Col]
     uuid_to_name: dict[UUID, str]  # only the selected UUIDs
     partition_by: list[Col]
+    nodes: set[AstNode]
 
     def has_col(self, col: str | Col | ColName) -> bool:
         if isinstance(col, Col):
