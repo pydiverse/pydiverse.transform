@@ -38,9 +38,12 @@ class Table:
             self._ast: AstNode = resource
         elif isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
             if name is None:
-                # TODO: we could look whether the df has a name attr set (which is the
-                # case if it was previously exported)
-                name = "?"
+                # If the data frame has be previously exported by transform, a
+                # name attribute was added.
+                if hasattr(resource, "name"):
+                    name = resource.name
+                else:
+                    name = "?"
             self._ast = PolarsImpl(name, resource)
         elif isinstance(resource, (str, sqa.Table)):
             if isinstance(backend, SqlAlchemy):
