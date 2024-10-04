@@ -246,6 +246,14 @@ def filter(table: Table, *predicates: ColExpr):
                 f"hint: {cond} is of type {cond.dtype()} instead."
             )
 
+        for fn in cond.iter_subtree():
+            if isinstance(fn, ColFn) and fn.ftype(agg_is_window=True) == Ftype.WINDOW:
+                raise FunctionTypeError(
+                    f"forbidden window function `{fn.name}` in `filter`\nhint: If you "
+                    "want to filter by an expression containing a window / aggregation "
+                    "function, first add the expression as a column via `mutate`."
+                )
+
     new._cache = copy.copy(table._cache)
     new._cache.nodes = table._cache.nodes | {new._ast}
 
