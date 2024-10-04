@@ -9,14 +9,11 @@ from pydiverse.transform.tree.col_expr import (
     ColFn,
     LiteralCol,
     WhenClause,
+    clean_kwargs,
     wrap_literal,
 )
 
 __all__ = ["count", "row_number", "rank", "when", "dense_rank", "min", "max"]
-
-
-def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
-    return {key: wrap_literal(val) for key, val in kwargs.items() if val is not None}
 
 
 def when(condition: ColExpr) -> WhenClause:

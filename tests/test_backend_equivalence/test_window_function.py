@@ -210,7 +210,7 @@ def test_arrange_argument(df3):
         df3,
         lambda t: t
         >> group_by(t.col1)
-        >> mutate(x=C.col4.shift(1, arrange=[-C.col3]))
+        >> mutate(x=C.col4.shift(1, arrange=C.col3.nulls_last()))
         >> select(C.x),
     )
 
@@ -218,7 +218,7 @@ def test_arrange_argument(df3):
         df3,
         lambda t: t
         >> group_by(t.col2)
-        >> mutate(x=f.row_number(arrange=[-C.col4]))
+        >> mutate(x=f.row_number(arrange=C.col4.descending()))
         >> select(C.x),
     )
 

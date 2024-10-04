@@ -153,16 +153,7 @@ class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
         self.args = list(args)
-        self.context_kwargs = {
-            key: [val] if not isinstance(val, Iterable) else list(val)
-            for key, val in kwargs.items()
-        }
-
-        if arrange := self.context_kwargs.get("arrange"):
-            self.context_kwargs["arrange"] = [
-                Order.from_col_expr(expr) if isinstance(expr, ColExpr) else expr
-                for expr in arrange
-            ]
+        self.context_kwargs = kwargs
 
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
@@ -306,9 +297,13 @@ class FnAttr:
 
         return ColFn(
             self.name,
-            wrap_literal(self.arg),
+            wrap_literal(self.arg)
+            # TODO: this is very hacky, but once we do code gen we don't have this
+            # problem anymore
+            if not isinstance(self.arg, ColFn) or self.arg.name not in MARKERS
+            else self.arg,
             *wrap_literal(args),
-            **wrap_literal(kwargs),
+            **clean_kwargs(**kwargs),
         )
 
     def __repr__(self) -> str:
@@ -505,6 +500,14 @@ class Cast(ColExpr):
         return g(Cast(self.val.map_subtree(g), self.target_type))
 
 
+MARKERS = (
+    "ascending",
+    "descending",
+    "nulls_first",
+    "nulls_last",
+)
+
+
 @dataclasses.dataclass(slots=True)
 class Order:
     order_by: ColExpr
@@ -531,7 +534,7 @@ class Order:
                 elif expr.name == "nulls_first":
                     nulls_last = False
 
-            if expr.name in ("descending", "ascending", "nulls_last", "nulls_first"):
+            if expr.name in MARKERS:
                 assert len(expr.args) == 1
                 assert len(expr.context_kwargs) == 0
                 expr = expr.args[0]
@@ -554,7 +557,7 @@ class Order:
 # doesn't call __getattr__ for dunder methods.
 def create_operator(op):
     def impl(*args, **kwargs):
-        return ColFn(op, *wrap_literal(args), **wrap_literal(kwargs))
+        return ColFn(op, *wrap_literal(args), **clean_kwargs(**kwargs))
 
     return impl
 
@@ -566,6 +569,18 @@ del create_operator
 
 def wrap_literal(expr: Any) -> Any:
     if isinstance(expr, ColExpr | Order):
+        if (
+            isinstance(expr, ColFn)
+            and expr.name in MARKERS
+            and (not isinstance(expr.args[0], ColFn) or expr.args[0].name in MARKERS)
+        ):
+            raise TypeError(
+                f"invalid usage of `.{expr.name}()` in a column expression.\n"
+                "note: This marker function can only be used in arguments to the "
+                "`arrange` verb or the `arrange=` keyword argument to window "
+                "functions. Furthermore, all markers have to be at the top of the "
+                "expression tree (i.e. cannot be nested inside a column function)."
+            )
         return expr
     elif isinstance(expr, dict):
         return {key: wrap_literal(val) for key, val in expr.items()}
@@ -580,3 +595,17 @@ def wrap_literal(expr: Any) -> Any:
         )
     else:
         return LiteralCol(expr)
+
+
+def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
+    kwargs = {
+        key: [val] if not isinstance(val, Iterable) else val
+        for key, val in kwargs.items()
+        if val is not None
+    }
+    return {
+        key: wrap_literal(
+            val if key != "arrange" else [Order.from_col_expr(ord) for ord in val]
+        )
+        for key, val in kwargs.items()
+    }
