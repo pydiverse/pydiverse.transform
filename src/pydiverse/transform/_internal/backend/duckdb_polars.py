@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import duckdb
 import duckdb_engine
 import polars as pl
@@ -13,6 +15,10 @@ from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col
 
 
+# TODO: we should move the engine of SqlImpl in the subclasses and let this thing
+# inherit from SqlImpl in order to make the usage of SqlImpl.compile_ast more clean.
+# Currently it works only since this class also has a table object, but it should be
+# enforced by inheritance.
 class DuckDbPolarsImpl(TableImpl):
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
@@ -34,13 +40,13 @@ class DuckDbPolarsImpl(TableImpl):
             ),
         )
 
-    @classmethod
+    @staticmethod
     def export(nd: AstNode, target: Target, final_select: list[Col]) -> pl.DataFrame:
         if isinstance(target, Polars):
             sel = DuckDbImpl.build_select(nd, final_select)
             query_str = str(
                 sel.compile(
-                    dialect=duckdb_engine.Dialect,
+                    dialect=duckdb_engine.Dialect(),
                     compile_kwargs={"literal_binds": True},
                 )
             )
@@ -53,3 +59,14 @@ class DuckDbPolarsImpl(TableImpl):
             return duckdb.sql(query_str).pl()
 
         raise AssertionError
+
+    def _clone(self) -> tuple[AstNode, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        cloned = DuckDbPolarsImpl(self.name, self.df)
+        return (
+            cloned,
+            {self: cloned},
+            {
+                self.cols[name]._uuid: cloned.cols[name]._uuid
+                for name in self.cols.keys()
+            },
+        )

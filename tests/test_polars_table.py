@@ -554,6 +554,15 @@ class TestPolarsLazyImpl:
             ),
         )
 
+    def test_duckdb_execution(self, tbl3):
+        assert_equal(
+            tbl3
+            >> mutate(u=tbl3.col1 * 2)
+            >> collect(DuckDb())
+            >> mutate(v=C.col3 + C.u),
+            tbl3 >> mutate(u=tbl3.col1 * 2) >> mutate(v=C.col3 + C.u),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

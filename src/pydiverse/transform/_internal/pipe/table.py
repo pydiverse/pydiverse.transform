@@ -29,6 +29,9 @@ class Table:
         import polars as pl
 
         from pydiverse.transform._internal.backend import (
+            DuckDb,
+            DuckDbPolarsImpl,
+            Polars,
             PolarsImpl,
             SqlAlchemy,
             SqlImpl,
@@ -44,7 +47,11 @@ class Table:
                     name = resource.name
                 else:
                     name = "?"
-            self._ast = PolarsImpl(name, resource)
+            if backend is None or isinstance(backend, Polars):
+                self._ast = PolarsImpl(name, resource)
+            elif isinstance(backend, DuckDb):
+                self._ast = DuckDbPolarsImpl(name, resource)
+
         elif isinstance(resource, (str, sqa.Table)):
             if isinstance(backend, SqlAlchemy):
                 self._ast = SqlImpl(resource, backend, name)
