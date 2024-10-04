@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.pipe.verbs import (
+from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.pipe.verbs import (
     group_by,
     mutate,
-    summarise,
+    summarize,
 )
 from tests.util import assert_result_equal
 
@@ -29,6 +29,17 @@ def test_mutate_case_ewise(df4):
             .when(C.col2 == C.col3)
             .then(2)
             .otherwise(C.col1 + C.col2),
+        ),
+    )
+
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            x=t.col1.map({0: 1}),
+            y=t.col4.map({2: 2}, default=-1),
+            z=t.col2.map({4: 3}, default=t.col1),
+            w=t.col3.map({2: 2, 1: 5}, default=pdt.lit(None)),
         ),
     )
 
@@ -87,14 +98,14 @@ def test_mutate_case_window(df4):
     )
 
 
-def test_summarise_case(df4):
+def test_summarize_case(df4):
     assert_result_equal(
         df4,
         lambda t: t
         >> group_by(
             C.col1,
         )
-        >> summarise(
+        >> summarize(
             x=C.col2.max().map(
                 {
                     0: C.col1.min(),
@@ -131,7 +142,7 @@ def test_invalid_ftype(df1):
     assert_result_equal(
         df1,
         lambda t: t
-        >> summarise(
+        >> summarize(
             x=pdt.rank(arrange=[C.col1]).map(
                 {
                     1: C.col1.max(),
@@ -145,7 +156,7 @@ def test_invalid_ftype(df1):
     assert_result_equal(
         df1,
         lambda t: t
-        >> summarise(
+        >> summarize(
             x=pdt.when(pdt.rank(arrange=[C.col1]) == 1).then(1).otherwise(None)
         ),
         exception=FunctionTypeError,

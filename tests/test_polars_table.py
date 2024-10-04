@@ -6,12 +6,7 @@ import polars as pl
 import pytest
 
 import pydiverse.transform as pdt
-from pydiverse.transform import C
-from pydiverse.transform.pipe import functions as f
-from pydiverse.transform.pipe.pipeable import verb
-from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.pipe.verbs import *
-from pydiverse.transform.tree import dtypes
+from pydiverse.transform.extended import *
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(
@@ -82,47 +77,47 @@ def dtype_backend(request):
 
 @pytest.fixture
 def tbl1():
-    return Table(df1, name="df1")
+    return pdt.Table(df1, name="df1")
 
 
 @pytest.fixture
 def tbl2():
-    return Table(df2, name="df2")
+    return pdt.Table(df2, name="df2")
 
 
 @pytest.fixture
 def tbl3():
-    return Table(df3, name="df3")
+    return pdt.Table(df3, name="df3")
 
 
 @pytest.fixture
 def tbl4():
-    return Table(df4, name="df4")
+    return pdt.Table(df4, name="df4")
 
 
 @pytest.fixture
 def tbl_left():
-    return Table(df_left, name="df_left")
+    return pdt.Table(df_left, name="df_left")
 
 
 @pytest.fixture
 def tbl_right():
-    return Table(df_right, name="df_right")
+    return pdt.Table(df_right, name="df_right")
 
 
 @pytest.fixture
 def tbl_dt():
-    return Table(df_dt)
+    return pdt.Table(df_dt)
 
 
 class TestPolarsLazyImpl:
     def test_dtype(self, tbl1, tbl2):
-        assert isinstance(tbl1.col1.dtype(), dtypes.Int64)
-        assert isinstance(tbl1.col2.dtype(), dtypes.String)
+        assert isinstance(tbl1.col1.dtype(), pdt.Int64)
+        assert isinstance(tbl1.col2.dtype(), pdt.String)
 
-        assert isinstance(tbl2.col1.dtype(), dtypes.Int64)
-        assert isinstance(tbl2.col2.dtype(), dtypes.Int64)
-        assert isinstance(tbl2.col3.dtype(), dtypes.Float64)
+        assert isinstance(tbl2.col1.dtype(), pdt.Int64)
+        assert isinstance(tbl2.col2.dtype(), pdt.Int64)
+        assert isinstance(tbl2.col3.dtype(), pdt.Float64)
 
         # test that column expression type errors are checked immediately
         with pytest.raises(TypeError):
@@ -194,7 +189,7 @@ class TestPolarsLazyImpl:
 
         assert_equal(
             tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "outer", suffix="42")
+            >> join(tbl_right, tbl_left.a == tbl_right.b, "full", suffix="42")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame(
                 {
@@ -297,21 +292,21 @@ class TestPolarsLazyImpl:
 
         assert_equal(tbl2 >> arrange(--tbl2.col3), tbl2 >> arrange(tbl2.col3))  # noqa: B002
 
-    def test_summarise(self, tbl3):
+    def test_summarize(self, tbl3):
         assert_equal(
-            tbl3 >> summarise(mean=tbl3.col1.mean(), max=tbl3.col4.max()),
+            tbl3 >> summarize(mean=tbl3.col1.mean(), max=tbl3.col4.max()),
             pl.DataFrame({"mean": [1.0], "max": [11]}),
             check_row_order=False,
         )
 
         assert_equal(
-            tbl3 >> group_by(tbl3.col1) >> summarise(mean=tbl3.col4.mean()),
+            tbl3 >> group_by(tbl3.col1) >> summarize(mean=tbl3.col4.mean()),
             pl.DataFrame({"col1": [0, 1, 2], "mean": [1.5, 5.5, 9.5]}),
             check_row_order=False,
         )
 
         assert_equal(
-            tbl3 >> summarise(mean=tbl3.col4.mean()) >> mutate(mean_2x=C.mean * 2),
+            tbl3 >> summarize(mean=tbl3.col4.mean()) >> mutate(mean_2x=C.mean * 2),
             pl.DataFrame({"mean": [5.5], "mean_2x": [11.0]}),
             check_row_order=False,
         )
@@ -320,8 +315,8 @@ class TestPolarsLazyImpl:
         # Grouping doesn't change the result
         assert_equal(tbl3 >> group_by(tbl3.col1), tbl3)
         assert_equal(
-            tbl3 >> summarise(mean4=tbl3.col4.mean()) >> group_by(C.mean4),
-            tbl3 >> summarise(mean4=tbl3.col4.mean()),
+            tbl3 >> summarize(mean4=tbl3.col4.mean()) >> group_by(C.mean4),
+            tbl3 >> summarize(mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
 
@@ -330,10 +325,10 @@ class TestPolarsLazyImpl:
             tbl3
             >> group_by(tbl3.col1)
             >> group_by(tbl3.col2, add=True)
-            >> summarise(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
+            >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
             tbl3
             >> group_by(tbl3.col1, tbl3.col2)
-            >> summarise(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
+            >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
 
@@ -341,9 +336,9 @@ class TestPolarsLazyImpl:
         assert_equal(
             tbl3
             >> group_by(tbl3.col1)
-            >> summarise(mean4=tbl3.col4.mean())
+            >> summarize(mean4=tbl3.col4.mean())
             >> ungroup(),
-            tbl3 >> group_by(tbl3.col1) >> summarise(mean4=tbl3.col4.mean()),
+            tbl3 >> group_by(tbl3.col1) >> summarize(mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
 
@@ -377,7 +372,7 @@ class TestPolarsLazyImpl:
     def test_window_functions(self, tbl3):
         # Everything else should stay the same
         assert_equal(
-            tbl3 >> mutate(x=f.row_number(arrange=[-C.col4])) >> select(*tbl3),
+            tbl3 >> mutate(x=row_number(arrange=[-C.col4])) >> select(*tbl3),
             df3,
         )
 
@@ -385,7 +380,7 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> group_by(C.col2)
-                >> mutate(x=f.row_number(arrange=[-C.col4]))
+                >> mutate(x=row_number(arrange=[-C.col4]))
                 >> select(C.x)
             ),
             pl.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
@@ -396,22 +391,22 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> group_by(C.col2)
-                >> mutate(x=f.row_number(arrange=[-C.col4]))
+                >> mutate(x=row_number(arrange=[-C.col4]))
                 >> select(C.x)
             ),
             (
                 tbl3
-                >> mutate(x=f.row_number(arrange=[-C.col4], partition_by=[C.col2]))
+                >> mutate(x=row_number(arrange=[-C.col4], partition_by=[C.col2]))
                 >> select(C.x)
             ),
         )
 
     def test_slice_head(self, tbl3):
-        @verb
-        def slice_head_custom(table: Table, n: int, *, offset: int = 0):
+        @pdt.verb
+        def slice_head_custom(table: pdt.Table, n: int, *, offset: int = 0):
             t = (
                 table
-                >> mutate(_n=f.row_number(arrange=[]))
+                >> mutate(_n=row_number(arrange=[]))
                 >> alias()
                 >> filter((offset < C._n) & (C._n <= (n + offset)))
             )
@@ -437,7 +432,7 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> mutate(
-                    col1=f.when(C.col1 == 0)
+                    col1=when(C.col1 == 0)
                     .then(1)
                     .when(C.col1 == 1)
                     .then(2)
@@ -454,7 +449,7 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> mutate(
-                    x=f.when(C.col1 == C.col2)
+                    x=when(C.col1 == C.col2)
                     .then(1)
                     .when(C.col1 == C.col3)
                     .then(2)
@@ -508,7 +503,7 @@ class TestPolarsLazyImpl:
         )
 
     def test_custom_verb(self, tbl1):
-        @verb
+        @pdt.verb
         def double_col1(table):
             table >>= mutate(col1=C.col1 * 2)
             return table
@@ -567,28 +562,29 @@ class TestPrintAndRepr:
         assert "df1" in tbl_str
         assert "PolarsImpl" in tbl_str
         assert str(df1) in tbl_str
+        tbl1 >> show()
 
     def test_table_repr_html(self, tbl1):
         # jupyter html
-        assert "exception" not in tbl1._repr_html_()
+        assert "Failed" not in tbl1._repr_html_()
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
         series = tbl1._ast.df.collect().get_column("col1")
 
         assert str(series) in col1_str
-        assert "exception" not in col1_str
+        assert "Failed" not in col1_str
 
     def test_col_html_repr(self, tbl1):
-        assert "exception" not in tbl1.col1._repr_html_()
+        assert "Failed" not in tbl1.col1._repr_html_()
 
     def test_expr_str(self, tbl1):
         expr_str = str(tbl1.col1 * 2)
-        assert "exception" not in expr_str
+        assert "Failed" not in expr_str
 
     def test_expr_html_repr(self, tbl1):
-        assert "exception" not in (tbl1.col1 * 2)._repr_html_()
+        assert "Failed" not in (tbl1.col1 * 2)._repr_html_()
 
     def test_lambda_str(self, tbl1):
-        assert "exception" not in str(C.col)
-        assert "exception" not in str(C.col1 + tbl1.col1)
+        assert "Failed" not in str(C.col)
+        assert "Failed" not in str(C.col1 + tbl1.col1)

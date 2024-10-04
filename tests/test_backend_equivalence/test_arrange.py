@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform import C
-from pydiverse.transform.pipe.verbs import (
+from pydiverse.transform._internal.pipe.verbs import (
     arrange,
     mutate,
 )

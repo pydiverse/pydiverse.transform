@@ -7,10 +7,10 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from pydiverse.transform import Table
-from pydiverse.transform.backend.targets import Polars
-from pydiverse.transform.errors import NonStandardWarning
-from pydiverse.transform.pipe.verbs import export, show_query
+from pydiverse.transform._internal.backend.targets import Polars
+from pydiverse.transform._internal.errors import NonStandardWarning
+from pydiverse.transform._internal.pipe.table import Table
+from pydiverse.transform._internal.pipe.verbs import export, show_query
 
 
 def assert_equal(left, right, check_dtypes=False, check_row_order=True):

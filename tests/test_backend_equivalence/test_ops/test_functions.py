@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform.pipe.verbs import mutate
-from pydiverse.transform.tree.col_expr import LiteralCol
+from pydiverse.transform._internal.pipe.verbs import mutate
+from pydiverse.transform._internal.tree.col_expr import LiteralCol
 from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 

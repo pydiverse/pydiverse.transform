@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform.ops import Operator
-from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.registry import (
+from pydiverse.transform._internal.ops import Operator
+from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree.registry import (
     OperatorRegistry,
     OperatorSignature,
 )

@@ -1,41 +1,11 @@
 from __future__ import annotations
 
-from pydiverse.transform.backend.targets import DuckDb, Polars, SqlAlchemy
-from pydiverse.transform.pipe.c import C
-from pydiverse.transform.pipe.functions import (
-    count,
-    dense_rank,
-    max,
-    min,
-    rank,
-    row_number,
-    when,
-)
-from pydiverse.transform.pipe.pipeable import verb
-from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree.dtypes import (
-    Bool,
-    Date,
-    DateTime,
-    Duration,
-    Float64,
-    Int64,
-    String,
-)
+from ._internal.pipe.pipeable import verb
+from ._internal.pipe.table import Table
+from ._internal.tree.col_expr import ColExpr
+from .extended import *
+from .extended import __all__ as __extended
+from .types import *
+from .types import __all__ as __types
 
-__all__ = [
-    "Polars",
-    "SqlAlchemy",
-    "DuckDb",
-    "Table",
-    "aligned",
-    "verb",
-    "C",
-    "Float64",
-    "Int64",
-    "String",
-    "Bool",
-    "DateTime",
-    "Date",
-    "Duration",
-]
+__all__ = __extended + __types + ["Table", "ColExpr", "verb"]

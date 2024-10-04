@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform.pipe import functions as f
-from pydiverse.transform.pipe.verbs import (
+from pydiverse.transform._internal.pipe.verbs import (
+    alias,
     arrange,
     filter,
     group_by,
@@ -10,7 +11,7 @@ from pydiverse.transform.pipe.verbs import (
     mutate,
     select,
     slice_head,
-    summarise,
+    summarize,
 )
 from tests.util import assert_result_equal
 
@@ -32,15 +33,20 @@ def test_simple(df3):
 def test_chained(df3):
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(1) >> arrange(*t) >> slice_head(1),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(1)
+        >> alias()
+        >> (lambda s: arrange(*s) >> slice_head(1)),
     )
+
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(10) >> arrange(*t) >> slice_head(5),
-    )
-    assert_result_equal(
-        df3,
-        lambda t: t >> arrange(*t) >> slice_head(100) >> arrange(*t) >> slice_head(5),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(10)
+        >> alias()
+        >> (lambda s: arrange(*s) >> slice_head(5)),
     )
 
     assert_result_equal(
@@ -48,16 +54,8 @@ def test_chained(df3):
         lambda t: t
         >> arrange(*t)
         >> slice_head(2, offset=5)
-        >> arrange(*t)
-        >> slice_head(2, offset=1),
-    )
-    assert_result_equal(
-        df3,
-        lambda t: t
-        >> arrange(*t)
-        >> slice_head(10, offset=8)
-        >> arrange(*t)
-        >> slice_head(10, offset=1),
+        >> alias()
+        >> (lambda s: arrange(*s) >> slice_head(2, offset=1)),
     )
 
 
@@ -78,7 +76,8 @@ def test_with_join(df1, df2):
         lambda t, u: t
         >> arrange(*t)
         >> slice_head(3)
-        >> left_join(u, t.col1 == u.col1),
+        >> alias()
+        >> left_join(u, C.col1 == u.col1),
         check_row_order=False,
     )
 
@@ -103,7 +102,11 @@ def test_with_filter(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4, offset=2) >> filter(t.col1 == 1),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(4, offset=2)
+        >> alias()
+        >> filter(C.col1 == 1),
     )
 
     assert_result_equal(
@@ -112,7 +115,8 @@ def test_with_filter(df3):
         >> filter(t.col4 % 2 == 0)
         >> arrange(*t)
         >> slice_head(4, offset=2)
-        >> filter(t.col1 == 1),
+        >> alias()
+        >> filter(C.col1 == 1),
     )
 
 
@@ -131,7 +135,8 @@ def test_with_arrange(df3):
         >> mutate(x=(t.col1 * t.col2))
         >> arrange(*t)
         >> slice_head(4)
-        >> arrange(-C.x, C.col5),
+        >> alias()
+        >> (lambda _: arrange(-C.x, C.col5)),
     )
 
 
@@ -141,8 +146,9 @@ def test_with_group_by(df3):
         lambda t: t
         >> arrange(*t)
         >> slice_head(1)
+        >> alias()
         >> group_by(C.col1)
-        >> mutate(x=f.count()),
+        >> mutate(x=pdt.count()),
     )
 
     assert_result_equal(
@@ -150,6 +156,7 @@ def test_with_group_by(df3):
         lambda t: t
         >> arrange(C.col1, *t)
         >> slice_head(6, offset=1)
+        >> alias()
         >> group_by(C.col1)
         >> mutate(x=C.col4.mean())
         >> select(C.x),
@@ -161,18 +168,27 @@ def test_with_group_by(df3):
         >> mutate(key=C.col4 % (C.col3 + 1))
         >> arrange(C.key, *t)
         >> slice_head(4)
+        >> alias()
         >> group_by(C.key)
-        >> summarise(x=f.count()),
+        >> summarize(x=pdt.count()),
     )
 
 
-def test_with_summarise(df3):
+def test_with_summarize(df3):
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4) >> summarise(count=f.count()),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(4)
+        >> alias()
+        >> summarize(count=pdt.count()),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4) >> summarise(c3_mean=C.col3.mean()),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(4)
+        >> alias()
+        >> summarize(c3_mean=C.col3.mean()),
     )

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform import C
-from pydiverse.transform.pipe import functions
-from pydiverse.transform.pipe.verbs import (
+from pydiverse.transform._internal.pipe import functions
+from pydiverse.transform._internal.pipe.verbs import (
     arrange,
     filter,
     group_by,
