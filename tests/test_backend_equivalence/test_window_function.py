@@ -10,7 +10,7 @@ from pydiverse.transform.pipe.verbs import (
     join,
     mutate,
     select,
-    summarise,
+    summarize,
     ungroup,
 )
 from tests.util import assert_result_equal
@@ -174,20 +174,20 @@ def test_arrange(df3):
     )
 
 
-def test_summarise(df3):
+def test_summarize(df3):
     assert_result_equal(
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(range=t.col4.max() - t.col4.min())
-        >> summarise(mean_range=C.range.mean()),
+        >> summarize(mean_range=C.range.mean()),
     )
 
     assert_result_equal(
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
-        >> summarise(range=t.col4.max() - t.col4.min())
+        >> summarize(range=t.col4.max() - t.col4.min())
         >> mutate(mean_range=C.range.mean()),
     )
 
@@ -235,25 +235,25 @@ def test_arrange_argument(df3):
 
 
 def test_complex(df3):
-    # Window function before summarise
+    # Window function before summarize
     assert_result_equal(
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
         >> mutate(mean3=t.col3.mean(), rn=f.row_number(arrange=[C.col1, C.col2]))
         >> filter(C.mean3 > C.rn)
-        >> summarise(meta_mean=C.mean3.mean())
+        >> summarize(meta_mean=C.mean3.mean())
         >> filter(t.col1 >= C.meta_mean)
         >> filter(t.col1 != 1)
         >> arrange(C.meta_mean),
     )
 
-    # Window function after summarise
+    # Window function after summarize
     assert_result_equal(
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
-        >> summarise(mean3=t.col3.mean())
+        >> summarize(mean3=t.col3.mean())
         >> mutate(minM3=C.mean3.min(), maxM3=C.mean3.max())
         >> mutate(span=C.maxM3 - C.minM3)
         >> filter(C.span < 3)
@@ -264,7 +264,7 @@ def test_complex(df3):
         df3,
         lambda t: t
         >> group_by(t.col1, t.col2)
-        >> summarise(mean3=t.col3.mean(), u=t.col4.max())
+        >> summarize(mean3=t.col3.mean(), u=t.col4.max())
         >> group_by(C.u)
         >> mutate(minM3=C.mean3.min(), maxM3=C.mean3.max())
         >> mutate(span=C.maxM3 - C.minM3)

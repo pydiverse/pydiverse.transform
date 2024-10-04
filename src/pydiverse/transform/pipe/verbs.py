@@ -32,7 +32,7 @@ from pydiverse.transform.tree.verbs import (
     Rename,
     Select,
     SliceHead,
-    Summarise,
+    Summarize,
     Ungroup,
     Verb,
 )
@@ -54,7 +54,7 @@ __all__ = [
     "arrange",
     "group_by",
     "ungroup",
-    "summarise",
+    "summarize",
     "slice_head",
     "export",
 ]
@@ -299,9 +299,9 @@ def ungroup(table: Table):
 
 
 @verb
-def summarise(table: Table, **kwargs: ColExpr):
+def summarize(table: Table, **kwargs: ColExpr):
     new = copy.copy(table)
-    new._ast = Summarise(
+    new._ast = Summarize(
         table._ast,
         list(kwargs.keys()),
         preprocess_arg(kwargs.values(), table, update_partition_by=False),
@@ -310,7 +310,7 @@ def summarise(table: Table, **kwargs: ColExpr):
 
     partition_by_uuids = {col._uuid for col in table._cache.partition_by}
 
-    def check_summarise_col_expr(expr: ColExpr, agg_fn_above: bool):
+    def check_summarize_col_expr(expr: ColExpr, agg_fn_above: bool):
         if (
             isinstance(expr, Col)
             and expr._uuid not in partition_by_uuids
@@ -324,16 +324,16 @@ def summarise(table: Table, **kwargs: ColExpr):
         elif isinstance(expr, ColFn):
             if expr.ftype(agg_is_window=False) == Ftype.WINDOW:
                 raise FunctionTypeError(
-                    f"forbidden window function `{expr.name}` in `summarise`"
+                    f"forbidden window function `{expr.name}` in `summarize`"
                 )
             elif expr.ftype(agg_is_window=False) == Ftype.AGGREGATE:
                 agg_fn_above = True
 
         for child in expr.iter_children():
-            check_summarise_col_expr(child, agg_fn_above)
+            check_summarize_col_expr(child, agg_fn_above)
 
     for root in new._ast.values:
-        check_summarise_col_expr(root, False)
+        check_summarize_col_expr(root, False)
 
     # TODO: handle duplicate column names
     new._cache = copy.copy(table._cache)

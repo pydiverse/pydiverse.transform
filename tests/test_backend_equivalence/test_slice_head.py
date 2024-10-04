@@ -11,7 +11,7 @@ from pydiverse.transform.pipe.verbs import (
     mutate,
     select,
     slice_head,
-    summarise,
+    summarize,
 )
 from tests.util import assert_result_equal
 
@@ -160,17 +160,17 @@ def test_with_group_by(df3):
         >> arrange(C.key, *t)
         >> slice_head(4)
         >> group_by(C.key)
-        >> summarise(x=f.count()),
+        >> summarize(x=f.count()),
     )
 
 
-def test_with_summarise(df3):
+def test_with_summarize(df3):
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4) >> summarise(count=f.count()),
+        lambda t: t >> arrange(*t) >> slice_head(4) >> summarize(count=f.count()),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(4) >> summarise(c3_mean=C.col3.mean()),
+        lambda t: t >> arrange(*t) >> slice_head(4) >> summarize(c3_mean=C.col3.mean()),
     )

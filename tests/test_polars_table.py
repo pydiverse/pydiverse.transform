@@ -292,21 +292,21 @@ class TestPolarsLazyImpl:
 
         assert_equal(tbl2 >> arrange(--tbl2.col3), tbl2 >> arrange(tbl2.col3))  # noqa: B002
 
-    def test_summarise(self, tbl3):
+    def test_summarize(self, tbl3):
         assert_equal(
-            tbl3 >> summarise(mean=tbl3.col1.mean(), max=tbl3.col4.max()),
+            tbl3 >> summarize(mean=tbl3.col1.mean(), max=tbl3.col4.max()),
             pl.DataFrame({"mean": [1.0], "max": [11]}),
             check_row_order=False,
         )
 
         assert_equal(
-            tbl3 >> group_by(tbl3.col1) >> summarise(mean=tbl3.col4.mean()),
+            tbl3 >> group_by(tbl3.col1) >> summarize(mean=tbl3.col4.mean()),
             pl.DataFrame({"col1": [0, 1, 2], "mean": [1.5, 5.5, 9.5]}),
             check_row_order=False,
         )
 
         assert_equal(
-            tbl3 >> summarise(mean=tbl3.col4.mean()) >> mutate(mean_2x=C.mean * 2),
+            tbl3 >> summarize(mean=tbl3.col4.mean()) >> mutate(mean_2x=C.mean * 2),
             pl.DataFrame({"mean": [5.5], "mean_2x": [11.0]}),
             check_row_order=False,
         )
@@ -315,8 +315,8 @@ class TestPolarsLazyImpl:
         # Grouping doesn't change the result
         assert_equal(tbl3 >> group_by(tbl3.col1), tbl3)
         assert_equal(
-            tbl3 >> summarise(mean4=tbl3.col4.mean()) >> group_by(C.mean4),
-            tbl3 >> summarise(mean4=tbl3.col4.mean()),
+            tbl3 >> summarize(mean4=tbl3.col4.mean()) >> group_by(C.mean4),
+            tbl3 >> summarize(mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
 
@@ -325,10 +325,10 @@ class TestPolarsLazyImpl:
             tbl3
             >> group_by(tbl3.col1)
             >> group_by(tbl3.col2, add=True)
-            >> summarise(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
+            >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
             tbl3
             >> group_by(tbl3.col1, tbl3.col2)
-            >> summarise(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
+            >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
 
@@ -336,9 +336,9 @@ class TestPolarsLazyImpl:
         assert_equal(
             tbl3
             >> group_by(tbl3.col1)
-            >> summarise(mean4=tbl3.col4.mean())
+            >> summarize(mean4=tbl3.col4.mean())
             >> ungroup(),
-            tbl3 >> group_by(tbl3.col1) >> summarise(mean4=tbl3.col4.mean()),
+            tbl3 >> group_by(tbl3.col1) >> summarize(mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
 

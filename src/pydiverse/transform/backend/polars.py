@@ -227,7 +227,7 @@ def compile_ast(
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
-    if isinstance(nd, (verbs.Mutate, verbs.Summarise)):
+    if isinstance(nd, (verbs.Mutate, verbs.Summarize)):
         overwritten = set(name for name in nd.names if name in set(select))
         if overwritten:
             # We rename overwritten cols to some unique dummy name
@@ -279,8 +279,8 @@ def compile_ast(
             maintain_order=True,
         )
 
-    elif isinstance(nd, verbs.Summarise):
-        # We support usage of aggregated columns in expressions in summarise, but polars
+    elif isinstance(nd, verbs.Summarize):
+        # We support usage of aggregated columns in expressions in summarize, but polars
         # creates arrays when doing that. Thus we unwrap the arrays when necessary.
         def has_path_to_leaf_without_agg(expr: ColExpr):
             if isinstance(expr, Col):

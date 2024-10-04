@@ -15,7 +15,7 @@ from .pipe.verbs import (
     rename,
     select,
     slice_head,
-    summarise,
+    summarize,
     ungroup,
 )
 
@@ -31,7 +31,7 @@ __all__ = __base + [
     "rename",
     "select",
     "slice_head",
-    "summarise",
+    "summarize",
     "ungroup",
     "DuckDb",
     "SqlAlchemy",

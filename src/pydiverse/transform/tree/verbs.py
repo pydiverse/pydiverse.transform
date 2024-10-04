@@ -116,7 +116,7 @@ class Filter(Verb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Summarise(Verb):
+class Summarize(Verb):
     names: list[str]
     values: list[ColExpr]
     uuids: list[UUID]
@@ -129,7 +129,7 @@ class Summarise(Verb):
 
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned, nd_map, uuid_map = Verb._clone(self)
-        assert isinstance(cloned, Summarise)
+        assert isinstance(cloned, Summarize)
         cloned.uuids = [uuid.uuid1() for _ in self.names]
         uuid_map.update(
             {old_uid: new_uid for old_uid, new_uid in zip(self.uuids, cloned.uuids)}

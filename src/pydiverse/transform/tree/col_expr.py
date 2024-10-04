@@ -239,8 +239,8 @@ class ColFn(ColExpr):
         )
 
         if actual_ftype == Ftype.EWISE:
-            # this assert is ok since window functions in `summarise` are already kicked
-            # out by the `Summarise` constructor.
+            # this assert is ok since window functions in `summarize` are already kicked
+            # out by the `summarize` constructor.
             assert not (Ftype.WINDOW in ftypes and Ftype.AGGREGATE in ftypes)
 
             if Ftype.WINDOW in ftypes:

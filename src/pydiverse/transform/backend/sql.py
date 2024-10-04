@@ -298,7 +298,7 @@ class SqlImpl(TableImpl):
                     nd,
                     (
                         verbs.Filter,
-                        verbs.Summarise,
+                        verbs.Summarize,
                         verbs.Arrange,
                         verbs.GroupBy,
                         verbs.Join,
@@ -315,7 +315,7 @@ class SqlImpl(TableImpl):
                 )
             )
             or (
-                isinstance(nd, verbs.Summarise)
+                isinstance(nd, verbs.Summarize)
                 and (
                     (
                         bool(query.group_by)
@@ -381,7 +381,7 @@ class SqlImpl(TableImpl):
                 ],
             )
 
-        if isinstance(nd, (verbs.Mutate, verbs.Summarise)):
+        if isinstance(nd, (verbs.Mutate, verbs.Summarize)):
             query.select = [lb for lb in query.select if lb.name not in set(nd.names)]
 
         if isinstance(nd, verbs.Select):
@@ -430,7 +430,7 @@ class SqlImpl(TableImpl):
                 )
             )
 
-        elif isinstance(nd, verbs.Summarise):
+        elif isinstance(nd, verbs.Summarize):
             query.group_by.extend(query.partition_by)
 
             for name, val, uid in zip(nd.names, nd.values, nd.uuids):
