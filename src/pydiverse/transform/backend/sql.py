@@ -307,11 +307,27 @@ class SqlImpl(TableImpl):
                 and query.limit is not None
             )
             or (
-                isinstance(nd, (verbs.Mutate, verbs.Filter))
+                isinstance(nd, verbs.Mutate)
                 and any(
-                    node.ftype(agg_is_window=True) == Ftype.WINDOW
-                    for node in nd.iter_col_nodes()
-                    if isinstance(node, Col)
+                    any(
+                        col.ftype(agg_is_window=True) in (Ftype.WINDOW, Ftype.AGGREGATE)
+                        for col in fn.iter_subtree()
+                        if isinstance(col, Col)
+                    )
+                    for fn in nd.iter_col_nodes()
+                    if (
+                        isinstance(fn, ColFn)
+                        and SqlImpl.registry.get_op(fn.name).ftype
+                        in (Ftype.AGGREGATE, Ftype.WINDOW)
+                    )
+                )
+            )
+            or (
+                isinstance(nd, verbs.Filter)
+                and any(
+                    col.ftype(agg_is_window=True) == Ftype.WINDOW
+                    for col in nd.iter_col_nodes()
+                    if isinstance(col, Col)
                 )
             )
             or (
