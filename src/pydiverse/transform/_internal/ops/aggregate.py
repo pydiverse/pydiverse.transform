@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import Aggregate, Unary
+from pydiverse.transform._internal.ops.core import Aggregate, Unary
 
 __all__ = [
     "Min",

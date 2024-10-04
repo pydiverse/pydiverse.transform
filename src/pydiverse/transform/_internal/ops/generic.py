@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import ElementWise
+from pydiverse.transform._internal.ops.core import ElementWise
 
 __all__ = [
     "Greatest",

@@ -4,21 +4,21 @@ import uuid
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
-from pydiverse.transform import ops
-from pydiverse.transform.backend.targets import Target
-from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import (
+from pydiverse.transform._internal import ops
+from pydiverse.transform._internal.backend.targets import Target
+from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import (
     Col,
 )
-from pydiverse.transform.tree.dtypes import Dtype
-from pydiverse.transform.tree.registry import (
+from pydiverse.transform._internal.tree.dtypes import Dtype
+from pydiverse.transform._internal.tree.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
 )
 
 if TYPE_CHECKING:
-    from pydiverse.transform.ops import Operator
+    from pydiverse.transform._internal.ops import Operator
 
 
 class TableImpl(AstNode):

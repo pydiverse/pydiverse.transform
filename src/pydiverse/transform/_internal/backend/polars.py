@@ -5,13 +5,13 @@ from uuid import UUID
 
 import polars as pl
 
-from pydiverse.transform import ops
-from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.backend.targets import Polars, Target
-from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.tree import dtypes, verbs
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import (
+from pydiverse.transform._internal import ops
+from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
     Cast,
     Col,

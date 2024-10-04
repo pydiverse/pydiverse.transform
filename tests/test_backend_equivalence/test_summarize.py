@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.errors import FunctionTypeError
+from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 

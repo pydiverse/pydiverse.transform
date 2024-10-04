@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.col_expr import (
+from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree.col_expr import (
     ColExpr,
     ColFn,
     LiteralCol,

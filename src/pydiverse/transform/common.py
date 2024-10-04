@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from .backend.targets import DuckDb, Polars, SqlAlchemy
-from .base import *  # noqa: F403
-from .base import __all__ as __base
-from .pipe.verbs import (
+from ._internal.backend.targets import DuckDb, Polars, SqlAlchemy
+from ._internal.pipe.verbs import (
     arrange,
     drop,
     full_join,
@@ -18,6 +16,8 @@ from .pipe.verbs import (
     summarize,
     ungroup,
 )
+from .base import *  # noqa: F403
+from .base import __all__ as __base
 
 __all__ = __base + [
     "arrange",

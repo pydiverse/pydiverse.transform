@@ -4,8 +4,8 @@ import functools
 
 import polars as pl
 
-from pydiverse.transform.backend.targets import SqlAlchemy
-from pydiverse.transform.pipe.table import Table
+from pydiverse.transform._internal.backend.targets import SqlAlchemy
+from pydiverse.transform._internal.pipe.table import Table
 
 
 def _cached_table(fn):

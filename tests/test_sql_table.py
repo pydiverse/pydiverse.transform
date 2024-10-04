@@ -5,10 +5,10 @@ import pytest
 import sqlalchemy as sqa
 
 from pydiverse.transform import C
-from pydiverse.transform.backend.targets import Polars, SqlAlchemy
-from pydiverse.transform.pipe import functions as f
-from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.pipe.verbs import *
+from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy
+from pydiverse.transform._internal.pipe import functions as f
+from pydiverse.transform._internal.pipe.table import Table
+from pydiverse.transform._internal.pipe.verbs import *
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(

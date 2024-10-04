@@ -4,8 +4,8 @@ import sqlite3
 
 import pytest
 
-from pydiverse.transform.pipe.c import C
-from pydiverse.transform.pipe.verbs import (
+from pydiverse.transform._internal.pipe.c import C
+from pydiverse.transform._internal.pipe.verbs import (
     alias,
     full_join,
     join,

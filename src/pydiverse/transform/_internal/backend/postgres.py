@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import sqlalchemy as sqa
 
-from pydiverse.transform import ops
-from pydiverse.transform.backend.sql import SqlImpl
-from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.col_expr import Cast
+from pydiverse.transform._internal import ops
+from pydiverse.transform._internal.backend.sql import SqlImpl
+from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree.col_expr import Cast
 
 
 class PostgresImpl(SqlImpl):

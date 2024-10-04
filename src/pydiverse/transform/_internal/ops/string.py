@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import ElementWise, OperatorExtension, Unary
-from pydiverse.transform.ops.logical import Logical
-from pydiverse.transform.ops.numeric import Add, RAdd
+from pydiverse.transform._internal.ops.core import ElementWise, OperatorExtension, Unary
+from pydiverse.transform._internal.ops.logical import Logical
+from pydiverse.transform._internal.ops.numeric import Add, RAdd
 
 __all__ = [
     "StrAdd",

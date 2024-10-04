@@ -7,13 +7,13 @@ from typing import Any
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import DATETIME2
 
-from pydiverse.transform import ops
-from pydiverse.transform.backend import sql
-from pydiverse.transform.backend.sql import SqlImpl
-from pydiverse.transform.errors import NotSupportedError
-from pydiverse.transform.tree import dtypes, verbs
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import (
+from pydiverse.transform._internal import ops
+from pydiverse.transform._internal.backend import sql
+from pydiverse.transform._internal.backend.sql import SqlImpl
+from pydiverse.transform._internal.errors import NotSupportedError
+from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
     Cast,
     Col,
@@ -22,7 +22,7 @@ from pydiverse.transform.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform.util.warnings import warn_non_standard
+from pydiverse.transform._internal.util.warnings import warn_non_standard
 
 
 class MsSqlImpl(SqlImpl):

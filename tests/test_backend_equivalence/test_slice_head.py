@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform.pipe.verbs import (
+from pydiverse.transform._internal.pipe.verbs import (
     alias,
     arrange,
     filter,

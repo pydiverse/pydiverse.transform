@@ -10,12 +10,12 @@ from collections.abc import Callable, Generator, Iterable
 from typing import Any
 from uuid import UUID
 
-from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.ops.core import Ftype, Operator
-from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.dtypes import Dtype, python_type_to_pdt
-from pydiverse.transform.tree.registry import OperatorRegistry
+from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.ops.core import Ftype, Operator
+from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.dtypes import Dtype, python_type_to_pdt
+from pydiverse.transform._internal.tree.registry import OperatorRegistry
 
 
 class ColExpr:
@@ -103,8 +103,8 @@ class Col(ColExpr):
 
     def __str__(self) -> str:
         try:
-            from pydiverse.transform.backend.polars import PolarsImpl
-            from pydiverse.transform.backend.targets import Polars
+            from pydiverse.transform._internal.backend.polars import PolarsImpl
+            from pydiverse.transform._internal.backend.targets import Polars
 
             df = PolarsImpl.export(self._ast, Polars(lazy=False), [self])
             return str(df.get_column(df.columns[0]))
@@ -185,7 +185,7 @@ class ColFn(ColExpr):
 
     def op(self) -> Operator:
         # TODO: backend agnostic registry, make this an attribute?
-        from pydiverse.transform.backend.polars import PolarsImpl
+        from pydiverse.transform._internal.backend.polars import PolarsImpl
 
         return PolarsImpl.registry.get_op(self.name)
 
@@ -210,7 +210,7 @@ class ColFn(ColExpr):
         if None in arg_dtypes:
             return None
 
-        from pydiverse.transform.backend import PolarsImpl
+        from pydiverse.transform._internal.backend import PolarsImpl
 
         self._dtype = PolarsImpl.registry.get_impl(self.name, arg_dtypes).return_type
         return self._dtype

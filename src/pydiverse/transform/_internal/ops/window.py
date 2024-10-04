@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import Nullary, Window
+from pydiverse.transform._internal.ops.core import Nullary, Window
 
 __all__ = [
     "Shift",

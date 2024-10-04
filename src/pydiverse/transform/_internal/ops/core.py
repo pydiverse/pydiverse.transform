@@ -5,7 +5,7 @@ from collections import ChainMap
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pydiverse.transform.tree.registry import OperatorSignature
+    from pydiverse.transform._internal.tree.registry import OperatorSignature
 
 __all__ = [
     "Ftype",

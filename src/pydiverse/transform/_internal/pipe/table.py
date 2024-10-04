@@ -9,10 +9,10 @@ from uuid import UUID
 
 import sqlalchemy as sqa
 
-from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.pipe.pipeable import Pipeable
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import Col, ColName
+from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.pipe.pipeable import Pipeable
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import Col, ColName
 
 
 class Table:
@@ -28,7 +28,7 @@ class Table:
     def __init__(self, resource, backend=None, *, name: str | None = None):
         import polars as pl
 
-        from pydiverse.transform.backend import (
+        from pydiverse.transform._internal.backend import (
             PolarsImpl,
             SqlAlchemy,
             SqlImpl,
@@ -113,8 +113,8 @@ class Table:
         )
 
     def __str__(self):
-        from pydiverse.transform.backend.targets import Polars
-        from pydiverse.transform.pipe.verbs import export, get_backend
+        from pydiverse.transform._internal.backend.targets import Polars
+        from pydiverse.transform._internal.pipe.verbs import export, get_backend
 
         backend = get_backend(self._ast)
         try:
@@ -139,8 +139,8 @@ class Table:
             f" <code>{type(self._ast).__name__}</code> backend</br>"
         )
         try:
-            from pydiverse.transform.backend.targets import Polars
-            from pydiverse.transform.pipe.verbs import export
+            from pydiverse.transform._internal.backend.targets import Polars
+            from pydiverse.transform._internal.pipe.verbs import export
 
             # TODO: For lazy backend only show preview (eg. take first 20 rows)
             # TODO: also cache the table here for a polars backend. maybe we should call

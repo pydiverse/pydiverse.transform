@@ -4,8 +4,8 @@ import polars as pl
 import pytest
 
 from pydiverse.transform import C, Table
-from pydiverse.transform.pipe.pipeable import Pipeable, inverse_partial, verb
-from pydiverse.transform.pipe.verbs import join, mutate, select
+from pydiverse.transform._internal.pipe.pipeable import Pipeable, inverse_partial, verb
+from pydiverse.transform._internal.pipe.verbs import join, mutate, select
 
 
 @pytest.fixture

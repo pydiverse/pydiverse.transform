@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import Marker
+from pydiverse.transform._internal.ops.core import Marker
 
 __all__ = ["NullsFirst", "NullsLast", "Ascending", "Descending"]
 

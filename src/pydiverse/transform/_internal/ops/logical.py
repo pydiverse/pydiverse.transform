@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import Binary, ElementWise, Operator, Unary
-from pydiverse.transform.tree import dtypes
+from pydiverse.transform._internal.ops.core import Binary, ElementWise, Operator, Unary
+from pydiverse.transform._internal.tree import dtypes
 
 __all__ = [
     "Equal",

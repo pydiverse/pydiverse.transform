@@ -5,16 +5,16 @@ import uuid
 from collections.abc import Iterable
 from typing import Any, Literal
 
-from pydiverse.transform import errors
-from pydiverse.transform.backend.table_impl import TableImpl
-from pydiverse.transform.backend.targets import Polars, Target
-from pydiverse.transform.errors import FunctionTypeError
-from pydiverse.transform.ops.core import Ftype
-from pydiverse.transform.pipe.pipeable import verb
-from pydiverse.transform.pipe.table import Table
-from pydiverse.transform.tree import dtypes
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import (
+from pydiverse.transform._internal import errors
+from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.pipe.pipeable import verb
+from pydiverse.transform._internal.pipe.table import Table
+from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
     ColFn,
@@ -22,7 +22,7 @@ from pydiverse.transform.tree.col_expr import (
     Order,
     wrap_literal,
 )
-from pydiverse.transform.tree.verbs import (
+from pydiverse.transform._internal.tree.verbs import (
     Alias,
     Arrange,
     Filter,

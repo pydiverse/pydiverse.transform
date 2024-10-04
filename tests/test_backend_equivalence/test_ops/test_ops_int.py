@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform.pipe.c import C
-from pydiverse.transform.pipe.verbs import mutate, summarize
+from pydiverse.transform._internal.pipe.c import C
+from pydiverse.transform._internal.pipe.verbs import mutate, summarize
 from tests.util.assertion import assert_result_equal
 
 

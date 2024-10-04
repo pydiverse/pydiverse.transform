@@ -4,13 +4,13 @@ import polars as pl
 import sqlalchemy as sqa
 from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
-from pydiverse.transform import ops
-from pydiverse.transform.backend import sql
-from pydiverse.transform.backend.sql import SqlImpl
-from pydiverse.transform.backend.targets import Polars, Target
-from pydiverse.transform.tree import dtypes, verbs
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import Cast, Col, ColFn, LiteralCol
+from pydiverse.transform._internal import ops
+from pydiverse.transform._internal.backend import sql
+from pydiverse.transform._internal.backend.sql import SqlImpl
+from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, LiteralCol
 
 
 class DuckDbImpl(SqlImpl):

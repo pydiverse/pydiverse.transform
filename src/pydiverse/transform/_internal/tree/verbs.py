@@ -7,8 +7,8 @@ from collections.abc import Callable, Iterable
 from typing import Literal
 from uuid import UUID
 
-from pydiverse.transform.tree.ast import AstNode
-from pydiverse.transform.tree.col_expr import Col, ColExpr, Order
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import Col, ColExpr, Order
 
 
 @dataclasses.dataclass(eq=False, slots=True)

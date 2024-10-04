@@ -9,10 +9,10 @@ from collections.abc import Iterable
 from functools import partial
 from typing import TYPE_CHECKING, Callable
 
-from pydiverse.transform.tree import dtypes
+from pydiverse.transform._internal.tree import dtypes
 
 if TYPE_CHECKING:
-    from pydiverse.transform.ops import Operator, OperatorExtension
+    from pydiverse.transform._internal.ops import Operator, OperatorExtension
 
 
 class OperatorImpl:

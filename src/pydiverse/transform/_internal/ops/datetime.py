@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform.ops.core import ElementWise, OperatorExtension, Unary
-from pydiverse.transform.ops.numeric import Add, RAdd, RSub, Sub
+from pydiverse.transform._internal.ops.core import ElementWise, OperatorExtension, Unary
+from pydiverse.transform._internal.ops.numeric import Add, RAdd, RSub, Sub
 
 __all__ = [
     "DtYear",

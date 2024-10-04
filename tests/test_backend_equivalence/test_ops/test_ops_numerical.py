@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pydiverse.transform as pdt
-from pydiverse.transform.pipe.c import C
-from pydiverse.transform.pipe.verbs import mutate, select
+from pydiverse.transform._internal.pipe.c import C
+from pydiverse.transform._internal.pipe.verbs import mutate, select
 from tests.fixtures.backend import skip_backends
 from tests.util.assertion import assert_result_equal
 

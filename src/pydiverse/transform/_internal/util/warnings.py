@@ -4,7 +4,7 @@ import inspect
 import sys
 import warnings as py_warnings
 
-from pydiverse.transform.errors import NonStandardWarning
+from pydiverse.transform._internal.errors import NonStandardWarning
 
 
 def warn(

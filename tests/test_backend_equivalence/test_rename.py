@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform.pipe.verbs import (
+from pydiverse.transform._internal.pipe.verbs import (
     rename,
 )
 from tests.util import assert_result_equal
