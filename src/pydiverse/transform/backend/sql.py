@@ -17,6 +17,7 @@ from pydiverse.transform import ops
 from pydiverse.transform.backend.polars import pdt_type_to_polars
 from pydiverse.transform.backend.table_impl import TableImpl
 from pydiverse.transform.backend.targets import Polars, SqlAlchemy, Target
+from pydiverse.transform.errors import SubqueryError
 from pydiverse.transform.ops.core import Ftype
 from pydiverse.transform.tree import dtypes, verbs
 from pydiverse.transform.tree.ast import AstNode
@@ -331,6 +332,15 @@ class SqlImpl(TableImpl):
                 )
             )
         ):
+            if not isinstance(nd.child, verbs.Alias):
+                raise SubqueryError(
+                    f"forbidden subquery required during compilation of `{repr(nd)}`\n"
+                    "hint: If you are sure you want to do a subquery, put an "
+                    "`>> alias()` before this verb. On the other hand, if you want to "
+                    "write out the table of the subquery, put `>> materialize()` "
+                    "before this verb."
+                )
+
             if needed_cols.keys().isdisjoint(sqa_col.keys()):
                 # We cannot select zero columns from a subquery. This happens when the
                 # user only 0-ary functions after the subquery, e.g. `count`.

@@ -52,6 +52,10 @@ class Verb(AstNode):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
+class Alias(Verb): ...
+
+
+@dataclasses.dataclass(eq=False, slots=True)
 class Select(Verb):
     select: list[Col]
 

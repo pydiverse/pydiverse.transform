@@ -23,6 +23,7 @@ from pydiverse.transform.tree.col_expr import (
     wrap_literal,
 )
 from pydiverse.transform.tree.verbs import (
+    Alias,
     Arrange,
     Filter,
     GroupBy,
@@ -66,6 +67,7 @@ def alias(table: Table, new_name: str | None = None):
     new = copy.copy(table)
     new._ast, nd_map, uuid_map = table._ast._clone()
     new._ast.name = new_name
+    new._ast = Alias(new._ast)
     new._cache = copy.copy(table._cache)
 
     # Why do we copy everything here? column UUIDs have to be rerolled => column

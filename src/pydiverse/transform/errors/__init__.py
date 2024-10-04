@@ -22,6 +22,13 @@ class NotSupportedError(Exception):
     """
 
 
+class SubqueryError(Exception):
+    """
+    Raised for subqueries that would be required on SQL but were not marked explicitly
+    by an `>> alias()`.
+    """
+
+
 class NonStandardWarning(UserWarning):
     """
     Category for when a specific backend deviates from

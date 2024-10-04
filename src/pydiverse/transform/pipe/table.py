@@ -159,6 +159,8 @@ class Table:
 
 @dataclasses.dataclass(slots=True)
 class Cache:
+    # TODO: think about what sets of columns are in the respective structures and
+    # write this here.
     cols: dict[str, Col]
     select: list[Col]
     uuid_to_name: dict[UUID, str]  # only the selected UUIDs

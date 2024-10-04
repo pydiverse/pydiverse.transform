@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydiverse.transform import C
 from pydiverse.transform.pipe import functions as f
 from pydiverse.transform.pipe.verbs import (
+    alias,
     arrange,
     filter,
     group_by,
@@ -32,15 +33,20 @@ def test_simple(df3):
 def test_chained(df3):
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(1) >> arrange(*t) >> slice_head(1),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(1)
+        >> alias()
+        >> (lambda s: arrange(*s) >> slice_head(1)),
     )
+
     assert_result_equal(
         df3,
-        lambda t: t >> arrange(*t) >> slice_head(10) >> arrange(*t) >> slice_head(5),
-    )
-    assert_result_equal(
-        df3,
-        lambda t: t >> arrange(*t) >> slice_head(100) >> arrange(*t) >> slice_head(5),
+        lambda t: t
+        >> arrange(*t)
+        >> slice_head(10)
+        >> alias()
+        >> (lambda s: arrange(*s) >> slice_head(5)),
     )
 
     assert_result_equal(
@@ -48,16 +54,8 @@ def test_chained(df3):
         lambda t: t
         >> arrange(*t)
         >> slice_head(2, offset=5)
-        >> arrange(*t)
-        >> slice_head(2, offset=1),
-    )
-    assert_result_equal(
-        df3,
-        lambda t: t
-        >> arrange(*t)
-        >> slice_head(10, offset=8)
-        >> arrange(*t)
-        >> slice_head(10, offset=1),
+        >> alias()
+        >> (lambda s: arrange(*s) >> slice_head(2, offset=1)),
     )
 
 
