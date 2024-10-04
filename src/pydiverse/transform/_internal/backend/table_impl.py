@@ -51,10 +51,10 @@ class TableImpl(AstNode):
     def iter_subtree(self) -> Iterable[AstNode]:
         yield self
 
-    @staticmethod
+    @classmethod
     def build_query(nd: AstNode, final_select: list[Col]) -> str | None: ...
 
-    @staticmethod
+    @classmethod
     def export(nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
 
     @classmethod
