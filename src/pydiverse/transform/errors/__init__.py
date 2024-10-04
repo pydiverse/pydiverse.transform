@@ -4,12 +4,6 @@ import typing
 from typing import Any
 
 
-class DataTypeError(Exception):
-    """
-    Exception related to invalid types in an expression
-    """
-
-
 class FunctionTypeError(Exception):
     """
     Exception related to function type

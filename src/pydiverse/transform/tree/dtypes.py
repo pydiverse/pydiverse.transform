@@ -3,8 +3,6 @@ from __future__ import annotations
 import datetime
 from abc import ABC, abstractmethod
 
-from pydiverse.transform.errors import DataTypeError
-
 
 class Dtype(ABC):
     def __init__(self, *, const: bool = False, vararg: bool = False):
@@ -240,6 +238,6 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
             promoted = dtype
             continue
 
-        raise DataTypeError(f"incompatible types {dtype} and {promoted}")
+        raise TypeError(f"incompatible types {dtype} and {promoted}")
 
     return promoted
