@@ -55,19 +55,13 @@ class DuckDbPolarsImpl(TableImpl):
                 )
             )
 
-            return eval(
-                "duckdb.sql(query_str).pl()",
-                {
-                    "duckdb": duckdb,
-                    "query_str": query_str,
-                    # put all the source dfs in current scope
-                    **{
-                        desc.table.name: desc.df
-                        for desc in nd.iter_subtree()
-                        if isinstance(desc, DuckDbPolarsImpl)
-                    },
-                },
-            )
+            # tell duckdb which table names in the SQL query correspond to which
+            # data frames
+            for desc in nd.iter_subtree():
+                if isinstance(desc, DuckDbPolarsImpl):
+                    duckdb.register(desc.table.name, desc.df)
+
+            return duckdb.sql(query_str).pl()
 
         raise AssertionError
 
