@@ -80,25 +80,27 @@ def alias(table: Table, new_name: str | None = None):
     # We could also do lazy alias, e.g. wait until a join happens and then only copy
     # the common subtree.
 
+    new._cache.all_cols = {
+        uuid_map[uid]: Col(
+            col.name, nd_map[col._ast], uuid_map[uid], col._dtype, col._ftype
+        )
+        for uid, col in table._cache.all_cols.items()
+    }
     new._cache.partition_by = [
-        Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
-        for col in table._cache.partition_by
+        new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.partition_by
     ]
 
     new._cache.update(
         new_select=[
-            Col(col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype)
-            for col in table._cache.select
+            new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
         ],
         new_cols={
-            name: Col(
-                name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
-            )
+            name: new._cache.all_cols[uuid_map[col._uuid]]
             for name, col in table._cache.cols.items()
         },
     )
 
-    new._cache.derived_from = {new._ast, new._ast.child}
+    new._cache.derived_from = set(new._ast.iter_subtree())
 
     return new
 
