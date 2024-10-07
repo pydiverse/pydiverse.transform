@@ -51,12 +51,19 @@ class DuckDbPolarsImpl(TableImpl):
                 )
             )
 
-            # put all the source dfs in global scope
-            for desc in nd.iter_subtree():
-                if isinstance(desc, DuckDbPolarsImpl):
-                    globals()[desc.table.name] = desc.df
-
-            return duckdb.sql(query_str).pl()
+            return eval(
+                "duckdb.sql(query_str).pl()",
+                {
+                    "duckdb": duckdb,
+                    "query_str": query_str,
+                    # put all the source dfs in current scope
+                    **{
+                        desc.table.name: desc.df
+                        for desc in nd.iter_subtree()
+                        if isinstance(desc, DuckDbPolarsImpl)
+                    },
+                },
+            )
 
         raise AssertionError
 

@@ -554,13 +554,30 @@ class TestPolarsLazyImpl:
             ),
         )
 
-    def test_duckdb_execution(self, tbl3):
+    def test_duckdb_execution(self, tbl2, tbl3):
         assert_equal(
             tbl3
             >> mutate(u=tbl3.col1 * 2)
             >> collect(DuckDb())
             >> mutate(v=C.col3 + C.u),
             tbl3 >> mutate(u=tbl3.col1 * 2) >> mutate(v=C.col3 + C.u),
+        )
+
+        assert_equal(
+            tbl3
+            >> collect(DuckDb())
+            >> left_join(
+                tbl2 >> collect(DuckDb()), C.col1 == C.col1_right, suffix="_right"
+            )
+            >> mutate(v=C.col3 + C.col2_right)
+            >> group_by(C.col2)
+            >> summarize(y=C.col3_right.sum()),
+            tbl3
+            >> left_join(tbl2, C.col1 == C.col1_right, suffix="_right")
+            >> mutate(v=C.col3 + C.col2_right)
+            >> group_by(C.col2)
+            >> summarize(y=C.col3_right.sum()),
+            check_row_order=False,
         )
 
 
