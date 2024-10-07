@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 (2024-10-07)
+
+- added some functions like exp / log
+- make a stable public api
+- casts
+- duckdb execution on polars
+- filter= arg for SQL
+- new case expression syntax
+- Date in SQL
+
 ## 0.2.0 (2024-08-31)
 
 - add polars backend
