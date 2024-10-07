@@ -41,6 +41,10 @@ class DuckDbPolarsImpl(TableImpl):
         )
 
     @staticmethod
+    def build_query(nd: AstNode, final_select: list[Col]) -> str | None:
+        return DuckDbImpl.build_query(nd, final_select)
+
+    @staticmethod
     def export(nd: AstNode, target: Target, final_select: list[Col]) -> pl.DataFrame:
         if isinstance(target, Polars):
             sel = DuckDbImpl.build_select(nd, final_select)
