@@ -98,7 +98,7 @@ def alias(table: Table, new_name: str | None = None):
         },
     )
 
-    new._cache.nodes = set(new._ast.iter_subtree())
+    new._cache.derived_from = {new._ast, new._ast.child}
 
     return new
 
@@ -107,11 +107,25 @@ def alias(table: Table, new_name: str | None = None):
 def collect(table: Table, target: Target | None = None) -> Table:
     errors.check_arg_type(Target | None, "collect", "target", target)
 
-    df = table >> export(Polars(lazy=False))
+    df = table >> select(*table._cache.all_cols.values()) >> export(Polars(lazy=False))
     if target is None:
         target = Polars()
 
-    return Table(df, target)
+    new = Table(
+        TableImpl.from_resource(
+            df,
+            target,
+            name=table._ast.name,
+            # preserve UUIDs and by this column references across collect()
+            uuids={name: col._uuid for name, col in table._cache.cols.items()},
+        )
+    )
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
+    new._cache.select = [preprocess_arg(col, new) for col in table._cache.select]
+    new._cache.partition_by = [
+        preprocess_arg(col, new) for col in table._cache.partition_by
+    ]
+    return new
 
 
 @verb
@@ -147,7 +161,7 @@ def select(table: Table, *cols: Col | ColName):
     new._cache = copy.copy(table._cache)
     # TODO: prevent selection of overwritten columns
     new._cache.update(new_select=new._ast.select)
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -187,7 +201,7 @@ def rename(table: Table, name_map: dict[str, str]):
         new_cols[replacement] = table._cache.cols[name]
 
     new._cache.update(new_cols=new_cols)
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -226,7 +240,7 @@ def mutate(table: Table, **kwargs: ColExpr):
         + [new_cols[name] for name in new._ast.names],
         new_cols=new_cols,
     )
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -258,7 +272,7 @@ def filter(table: Table, *predicates: ColExpr):
                 )
 
     new._cache = copy.copy(table._cache)
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -274,7 +288,7 @@ def arrange(table: Table, *order_by: ColExpr):
         preprocess_arg((Order.from_col_expr(ord) for ord in order_by), table),
     )
 
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -295,7 +309,7 @@ def group_by(table: Table, *cols: Col | ColName, add=False):
     else:
         new._cache.partition_by = new._ast.group_by
 
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -360,7 +374,7 @@ def summarize(table: Table, **kwargs: ColExpr):
         new_cols=new_cols,
     )
     new._cache.partition_by = []
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -376,7 +390,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0):
     new = copy.copy(table)
     new._ast = SliceHead(table._ast, n, offset)
     new._cache = copy.copy(table._cache)
-    new._cache.nodes = table._cache.nodes | {new._ast}
+    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -403,7 +417,7 @@ def join(
     elif right._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{right._ast.name}`")
 
-    if intersection := left._cache.nodes & right._cache.nodes:
+    if intersection := left._cache.derived_from & right._cache.derived_from:
         raise ValueError(
             f"table `{list(intersection)[0]}` occurs twice in the table "
             "tree.\nhint: To join two tables derived from a common table, "
@@ -448,7 +462,9 @@ def join(
         | {name + suffix: col for name, col in right._cache.cols.items()},
         new_select=left._cache.select + right._cache.select,
     )
-    new._cache.nodes = left._cache.nodes | right._cache.nodes | {new._ast}
+    new._cache.derived_from = (
+        left._cache.derived_from | right._cache.derived_from | {new._ast}
+    )
     new._ast.on = preprocess_arg(new._ast.on, new, update_partition_by=False)
 
     return new
@@ -522,24 +538,26 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
         arg = wrap_literal(arg)
         assert isinstance(arg, ColExpr)
 
-        arg: ColExpr = arg.map_subtree(
-            lambda col: col if not isinstance(col, ColName) else table[col.name]
-        )
-
-        for cexpr in arg.iter_subtree():
-            if isinstance(cexpr, Col) and cexpr._ast not in table._cache.nodes:
+        for expr in arg.iter_subtree():
+            if isinstance(expr, Col) and expr._ast not in table._cache.derived_from:
                 raise ValueError(
-                    f"table `{cexpr._ast.name}` used to reference the column "
-                    f"`{repr(cexpr)}` cannot be used at this point. The current table "
+                    f"table `{expr._ast.name}` used to reference the column "
+                    f"`{repr(expr)}` cannot be used at this point. The current table "
                     "is not derived from it."
                 )
             if (
                 update_partition_by
-                and isinstance(cexpr, ColFn)
-                and "partition_by" not in cexpr.context_kwargs
-                and (cexpr.op().ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
+                and isinstance(expr, ColFn)
+                and "partition_by" not in expr.context_kwargs
+                and (expr.op().ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
             ):
-                cexpr.context_kwargs["partition_by"] = table._cache.partition_by
+                expr.context_kwargs["partition_by"] = table._cache.partition_by
+
+        arg: ColExpr = arg.map_subtree(
+            lambda col: table[col.name]
+            if isinstance(col, ColName)
+            else (table._cache.all_cols[col._uuid] if isinstance(col, Col) else col)
+        )
 
         return arg
 

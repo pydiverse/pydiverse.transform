@@ -3,6 +3,10 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
+
+import polars as pl
+import sqlalchemy as sqa
 
 from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.targets import Target
@@ -48,14 +52,60 @@ class TableImpl(AstNode):
                 break
         cls.registry = OperatorRegistry(cls, super_reg)
 
+    @staticmethod
+    def from_resource(
+        resource: Any,
+        backend: Target | None = None,
+        *,
+        name: str | None = None,
+        uuids: dict[str, UUID] | None = None,
+    ) -> TableImpl:
+        from pydiverse.transform._internal.backend import (
+            DuckDb,
+            DuckDbPolarsImpl,
+            Polars,
+            PolarsImpl,
+            SqlAlchemy,
+            SqlImpl,
+        )
+
+        if isinstance(resource, TableImpl):
+            res = resource
+
+        elif isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
+            if name is None:
+                # If the data frame has be previously exported by transform, a
+                # name attribute was added.
+                if hasattr(resource, "name"):
+                    name = resource.name
+                else:
+                    name = "?"
+            if backend is None or isinstance(backend, Polars):
+                res = PolarsImpl(name, resource)
+            elif isinstance(backend, DuckDb):
+                res = DuckDbPolarsImpl(name, resource)
+
+        elif isinstance(resource, (str, sqa.Table)):
+            if isinstance(backend, SqlAlchemy):
+                res = SqlImpl(resource, backend, name)
+
+        else:
+            raise AssertionError
+
+        if uuids is not None:
+            for name, col in res.cols.items():
+                col._uuid = uuids[name]
+
+        return res
+
     def iter_subtree(self) -> Iterable[AstNode]:
         yield self
 
     @classmethod
-    def build_query(nd: AstNode, final_select: list[Col]) -> str | None: ...
+    def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None: ...
 
     @classmethod
-    def export(nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
+    def export(cls, nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
 
     @classmethod
     def _html_repr_expr(cls, expr):

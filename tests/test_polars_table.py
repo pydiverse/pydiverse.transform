@@ -559,7 +559,7 @@ class TestPolarsLazyImpl:
             tbl3
             >> mutate(u=tbl3.col1 * 2)
             >> collect(DuckDb())
-            >> mutate(v=C.col3 + C.u),
+            >> mutate(v=tbl3.col3 + C.u),
             tbl3 >> mutate(u=tbl3.col1 * 2) >> mutate(v=C.col3 + C.u),
         )
 
@@ -567,9 +567,9 @@ class TestPolarsLazyImpl:
             tbl3
             >> collect(DuckDb())
             >> left_join(
-                tbl2 >> collect(DuckDb()), C.col1 == C.col1_right, suffix="_right"
+                tbl2 >> collect(DuckDb()), tbl3.col1 == tbl2.col1, suffix="_right"
             )
-            >> mutate(v=C.col3 + C.col2_right)
+            >> mutate(v=tbl3.col3 + tbl2.col2)
             >> group_by(C.col2)
             >> summarize(y=C.col3_right.sum()),
             tbl3
