@@ -5,11 +5,11 @@ import dataclasses
 import inspect
 from collections.abc import Callable, Iterable
 from html import escape
+from typing import Any
 from uuid import UUID
 
-import sqlalchemy as sqa
-
 from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.pipe.pipeable import Pipeable
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col, ColName
@@ -25,36 +25,17 @@ class Table:
 
     # TODO: define exactly what can be given for the two and do type checks
     #       maybe call the second one execution_engine or similar?
-    def __init__(self, resource, backend=None, *, name: str | None = None):
-        import polars as pl
-
-        from pydiverse.transform._internal.backend import (
-            PolarsImpl,
-            SqlAlchemy,
-            SqlImpl,
-        )
-
-        if isinstance(resource, TableImpl):
-            self._ast: AstNode = resource
-        elif isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
-            if name is None:
-                # TODO: we could look whether the df has a name attr set (which is the
-                # case if it was previously exported)
-                name = "?"
-            self._ast = PolarsImpl(name, resource)
-        elif isinstance(resource, (str, sqa.Table)):
-            if isinstance(backend, SqlAlchemy):
-                self._ast = SqlImpl(resource, backend, name)
-
-        if not isinstance(self._ast, TableImpl):
-            raise AssertionError
-
+    def __init__(
+        self, resource: Any, backend: Target | None = None, *, name: str | None = None
+    ):
+        self._ast = TableImpl.from_resource(resource, backend, name=name)
         self._cache = Cache(
             self._ast.cols,
             list(self._ast.cols.values()),
             {col._uuid: col.name for col in self._ast.cols.values()},
             [],
             {self._ast},
+            {col._uuid: col for col in self._ast.cols.values()},
         )
 
     def __getitem__(self, key: str) -> Col:
@@ -165,7 +146,10 @@ class Cache:
     select: list[Col]
     uuid_to_name: dict[UUID, str]  # only the selected UUIDs
     partition_by: list[Col]
-    nodes: set[AstNode]
+    # all nodes that this table is derived from (it cannot be joined with another node
+    # having nonempty intersection of `derived_from`)
+    derived_from: set[AstNode]
+    all_cols: dict[UUID, Col]  # all columns in current scope (including unnamed ones)
 
     def has_col(self, col: str | Col | ColName) -> bool:
         if isinstance(col, Col):
@@ -184,6 +168,9 @@ class Cache:
             self.select = new_select
         if new_cols is not None:
             self.cols = new_cols
+            self.all_cols = self.all_cols | {
+                col._uuid: col for col in new_cols.values()
+            }
 
         if new_select is not None or new_cols is not None:
             selected_uuids = (

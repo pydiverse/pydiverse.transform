@@ -505,7 +505,7 @@ class SqlImpl(TableImpl):
                 sqa.Label(lb.name + nd.suffix, lb) for lb in right_query.select
             ]
 
-        elif isinstance(nd, SqlImpl):
+        elif isinstance(nd, TableImpl):
             table = nd.table
             cols = [
                 sqa.type_coerce(col, cls.sqa_type(nd.cols[col.name].dtype())).label(
@@ -627,7 +627,7 @@ def create_aliases(nd: AstNode, num_occurences: dict[str, int]) -> dict[str, int
         if isinstance(nd, verbs.Join):
             num_occurences = create_aliases(nd.right, num_occurences)
 
-    elif isinstance(nd, SqlImpl):
+    elif isinstance(nd, TableImpl):
         if cnt := num_occurences.get(nd.table.name):
             nd.table = nd.table.alias(f"{nd.table.name}_{cnt}")
         else:
