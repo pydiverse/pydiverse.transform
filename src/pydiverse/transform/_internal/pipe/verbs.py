@@ -224,7 +224,9 @@ def mutate(table: Table, **kwargs: ColExpr):
     new._cache = copy.copy(table._cache)
     new_cols = copy.copy(table._cache.cols)
 
-    for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids):
+    for name, val, uid in zip(
+        new._ast.names, new._ast.values, new._ast.uuids, strict=True
+    ):
         new_cols[name] = Col(
             name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=True)
         )
@@ -367,7 +369,9 @@ def summarize(table: Table, **kwargs: ColExpr):
 
     new_cols = table._cache.cols | {
         name: Col(name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=False))
-        for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids)
+        for name, val, uid in zip(
+            new._ast.names, new._ast.values, new._ast.uuids, strict=True
+        )
     }
 
     new._cache.update(

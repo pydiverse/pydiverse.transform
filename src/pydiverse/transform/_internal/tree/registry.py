@@ -5,9 +5,9 @@ import functools
 import inspect
 import itertools
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from functools import partial
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from pydiverse.transform._internal.tree import dtypes
 

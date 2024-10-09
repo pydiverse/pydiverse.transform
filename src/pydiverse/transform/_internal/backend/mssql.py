@@ -26,8 +26,6 @@ from pydiverse.transform._internal.util.warnings import warn_non_standard
 
 
 class MsSqlImpl(SqlImpl):
-    dialect_name = "mssql"
-
     @classmethod
     def inf():
         raise NotSupportedError("SQL Server does not support `inf`")
@@ -45,7 +43,7 @@ class MsSqlImpl(SqlImpl):
                     functools.partial(
                         convert_bool_bit,
                         wants_bool_as_bit=not isinstance(
-                            desc, (verbs.Filter, verbs.Join)
+                            desc, verbs.Filter | verbs.Join
                         ),
                     )
                 )
@@ -118,7 +116,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
     elif isinstance(expr, ColFn):
         op = MsSqlImpl.registry.get_op(expr.name)
         wants_bool_as_bit_input = not isinstance(
-            op, (ops.logical.BooleanBinary, ops.logical.Invert)
+            op, ops.logical.BooleanBinary | ops.logical.Invert
         )
 
         converted = copy.copy(expr)

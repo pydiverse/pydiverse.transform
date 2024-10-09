@@ -210,7 +210,7 @@ class ColFn(ColExpr):
         if None in arg_dtypes:
             return None
 
-        from pydiverse.transform._internal.backend import PolarsImpl
+        from pydiverse.transform._internal.backend.polars import PolarsImpl
 
         self._dtype = PolarsImpl.registry.get_impl(self.name, arg_dtypes).return_type
         return self._dtype
@@ -585,7 +585,7 @@ def wrap_literal(expr: Any) -> Any:
         return expr
     elif isinstance(expr, dict):
         return {key: wrap_literal(val) for key, val in expr.items()}
-    elif isinstance(expr, (list, tuple)):
+    elif isinstance(expr, list | tuple):
         return expr.__class__(wrap_literal(elem) for elem in expr)
     elif isinstance(expr, Generator):
         return (wrap_literal(elem) for elem in expr)

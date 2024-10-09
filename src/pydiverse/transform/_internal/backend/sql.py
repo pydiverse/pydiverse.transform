@@ -34,8 +34,6 @@ from pydiverse.transform._internal.tree.dtypes import Dtype
 
 
 class SqlImpl(TableImpl):
-    Dialects: dict[str, type[TableImpl]] = {}
-
     def __new__(cls, *args, **kwargs) -> SqlImpl:
         engine: str | sqa.Engine = (
             inspect.signature(cls.__init__)
@@ -50,7 +48,29 @@ class SqlImpl(TableImpl):
             else sqa.make_url(engine).get_dialect().name
         )
 
-        return super().__new__(SqlImpl.Dialects[dialect])
+        # We don't want to import any SQL impls we don't use, so the mapping
+        # name -> impl class is defined here.
+
+        if dialect == "sqlite":
+            from .sqlite import SqliteImpl
+
+            Impl = SqliteImpl
+        elif dialect == "mssql":
+            from .mssql import MsSqlImpl
+
+            Impl = MsSqlImpl
+
+        elif dialect == "postgresql":
+            from .postgres import PostgresImpl
+
+            Impl = PostgresImpl
+
+        elif dialect == "duckdb":
+            from .duckdb import DuckDbImpl
+
+            Impl = DuckDbImpl
+
+        return super().__new__(Impl)
 
     def __init__(self, table: str | sqa.Table, conf: SqlAlchemy, name: str | None):
         assert type(self) is not SqlImpl
@@ -74,10 +94,6 @@ class SqlImpl(TableImpl):
             name,
             {col.name: self.pdt_type(col.type) for col in self.table.columns},
         )
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        SqlImpl.Dialects[cls.dialect_name] = cls
 
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]
@@ -121,7 +137,9 @@ class SqlImpl(TableImpl):
                     connection=conn,
                     schema_overrides={
                         sql_col.name: pdt_type_to_polars(col.dtype())
-                        for sql_col, col in zip(sel.columns.values(), final_select)
+                        for sql_col, col in zip(
+                            sel.columns.values(), final_select, strict=True
+                        )
                     },
                 )
                 df.name = nd.name
@@ -181,7 +199,7 @@ class SqlImpl(TableImpl):
 
             args: list[sqa.ColumnElement] = [
                 cls.compile_col_expr(arg, sqa_col, not impl_arg.const)
-                for arg, impl_arg in zip(expr.args, impl.impl.signature)
+                for arg, impl_arg in zip(expr.args, impl.impl.signature, strict=False)
             ]
 
             partition_by = expr.context_kwargs.get("partition_by")
@@ -296,13 +314,11 @@ class SqlImpl(TableImpl):
             (
                 isinstance(
                     nd,
-                    (
-                        verbs.Filter,
-                        verbs.Summarize,
-                        verbs.Arrange,
-                        verbs.GroupBy,
-                        verbs.Join,
-                    ),
+                    verbs.Filter
+                    | verbs.Summarize
+                    | verbs.Arrange
+                    | verbs.GroupBy
+                    | verbs.Join,
                 )
                 and query.limit is not None
             )
@@ -396,7 +412,7 @@ class SqlImpl(TableImpl):
                 ],
             )
 
-        if isinstance(nd, (verbs.Mutate, verbs.Summarize)):
+        if isinstance(nd, verbs.Mutate | verbs.Summarize):
             query.select = [lb for lb in query.select if lb.name not in set(nd.names)]
 
         if isinstance(nd, verbs.Select):
@@ -423,7 +439,7 @@ class SqlImpl(TableImpl):
             )
 
         elif isinstance(nd, verbs.Mutate):
-            for name, val, uid in zip(nd.names, nd.values, nd.uuids):
+            for name, val, uid in zip(nd.names, nd.values, nd.uuids, strict=True):
                 sqa_col[uid] = sqa.label(name, cls.compile_col_expr(val, sqa_col))
                 query.select.append(sqa_col[uid])
 
@@ -448,7 +464,7 @@ class SqlImpl(TableImpl):
         elif isinstance(nd, verbs.Summarize):
             query.group_by.extend(query.partition_by)
 
-            for name, val, uid in zip(nd.names, nd.values, nd.uuids):
+            for name, val, uid in zip(nd.names, nd.values, nd.uuids, strict=True):
                 sqa_col[uid] = sqa.Label(name, cls.compile_col_expr(val, sqa_col))
 
             query.select = query.partition_by + [sqa_col[uid] for uid in nd.uuids]
@@ -516,7 +532,7 @@ class SqlImpl(TableImpl):
             query = Query(cols)
             sqa_col = {
                 nd.cols[table_col.name]._uuid: col
-                for table_col, col in zip(nd.table.columns, cols)
+                for table_col, col in zip(nd.table.columns, cols, strict=True)
             }
 
         if isinstance(nd, verbs.Verb):
@@ -560,7 +576,7 @@ class SqlImpl(TableImpl):
             return dtypes.Int64()
         elif isinstance(t, sqa.Float):
             return dtypes.Float64()
-        elif isinstance(t, (sqa.DECIMAL, sqa.NUMERIC)):
+        elif isinstance(t, sqa.DECIMAL | sqa.NUMERIC):
             return dtypes.Decimal()
         elif isinstance(t, sqa.String):
             return dtypes.String()

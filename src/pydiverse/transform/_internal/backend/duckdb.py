@@ -14,8 +14,6 @@ from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, Litera
 
 
 class DuckDbImpl(SqlImpl):
-    dialect_name = "duckdb"
-
     @classmethod
     def export(cls, nd: AstNode, target: Target, final_select: list[Col]):
         # insert casts after sum() over integer columns (duckdb converts them to floats)
