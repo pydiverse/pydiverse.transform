@@ -26,7 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 duckdb = ["duckdb>=0.8.1", "duckdb_engine>=0.9.1"]
-postgres = ["psycopg2>=2.9.3"]                     # TODO: psycopg 3 ??
+postgres = ["psycopg2>=2.9.3"]
 mssql = ["pyodbc>=4.0.35"]
 
 [tool.hatch.build.targets.wheel]
