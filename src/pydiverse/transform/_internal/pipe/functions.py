@@ -9,7 +9,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColFn,
     LiteralCol,
     WhenClause,
-    clean_kwargs,
     wrap_literal,
 )
 
@@ -31,15 +30,18 @@ def lit(val: Any, dtype: dtypes.Dtype | None = None) -> LiteralCol:
     return LiteralCol(val, dtype)
 
 
+# TODO: also do code gen for these
+
+
 def count(
     expr: ColExpr | None = None,
     *,
     filter: ColExpr | Iterable[ColExpr] | None = None,  # noqa: A002
 ):
     if expr is None:
-        return ColFn("count", **clean_kwargs(filter=filter))
+        return ColFn("count", filter=filter)
     else:
-        return ColFn("count", wrap_literal(expr))
+        return ColFn("count", expr)
 
 
 def row_number(
@@ -47,9 +49,7 @@ def row_number(
     arrange: ColExpr | Iterable[ColExpr],
     partition_by: ColExpr | list[ColExpr] | None = None,
 ):
-    return ColFn(
-        "row_number", **clean_kwargs(arrange=arrange, partition_by=partition_by)
-    )
+    return ColFn("row_number", arrange=arrange, partition_by=partition_by)
 
 
 def rank(
@@ -57,7 +57,7 @@ def rank(
     arrange: ColExpr | Iterable[ColExpr],
     partition_by: ColExpr | Iterable[ColExpr] | None = None,
 ):
-    return ColFn("rank", **clean_kwargs(arrange=arrange, partition_by=partition_by))
+    return ColFn("rank", arrange=arrange, partition_by=partition_by)
 
 
 def dense_rank(
@@ -65,14 +65,12 @@ def dense_rank(
     arrange: ColExpr | Iterable[ColExpr],
     partition_by: ColExpr | Iterable[ColExpr] | None = None,
 ):
-    return ColFn(
-        "dense_rank", **clean_kwargs(arrange=arrange, partition_by=partition_by)
-    )
+    return ColFn("dense_rank", arrange=arrange, partition_by=partition_by)
 
 
 def min(arg: ColExpr, *additional_args: ColExpr):
-    return ColFn("__least", wrap_literal(arg), *wrap_literal(additional_args))
+    return ColFn("__least", arg, *additional_args)
 
 
 def max(arg: ColExpr, *additional_args: ColExpr):
-    return ColFn("__greatest", wrap_literal(arg), *wrap_literal(additional_args))
+    return ColFn("__greatest", arg, *additional_args)

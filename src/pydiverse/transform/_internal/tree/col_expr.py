@@ -6,7 +6,7 @@ import functools
 import html
 import itertools
 import operator
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 from uuid import UUID
 
@@ -152,8 +152,9 @@ class ColFn(ColExpr):
 
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
-        self.args = list(args)
-        self.context_kwargs = kwargs
+        # While building the expression tree, we have to allow markers.
+        self.args = wrap_literal(args, allow_markers=True)
+        self.context_kwargs = clean_kwargs(**kwargs)
 
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
@@ -296,16 +297,7 @@ class FnAttr:
                 raise ValueError("`cast` does not take any keyword arguments")
             return Cast(self.arg, *args)
 
-        return ColFn(
-            self.name,
-            wrap_literal(self.arg)
-            # TODO: this is very hacky, but once we do code gen we don't have this
-            # problem anymore
-            if not isinstance(self.arg, ColFn) or self.arg.name not in MARKERS
-            else self.arg,
-            *wrap_literal(args),
-            **clean_kwargs(**kwargs),
-        )
+        return ColFn(self.name, self.arg, *args, **kwargs)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name}, {self.arg})"
@@ -558,7 +550,7 @@ class Order:
 # doesn't call __getattr__ for dunder methods.
 def create_operator(op):
     def impl(*args, **kwargs):
-        return ColFn(op, *wrap_literal(args), **clean_kwargs(**kwargs))
+        return ColFn(op, *args, **kwargs)
 
     return impl
 
@@ -568,32 +560,36 @@ for dunder in OperatorRegistry.SUPPORTED_DUNDER:
 del create_operator
 
 
-def wrap_literal(expr: Any) -> Any:
+def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
     if isinstance(expr, ColExpr | Order):
-        if (
-            isinstance(expr, ColFn)
-            and expr.name in MARKERS
-            and (not isinstance(expr.args[0], ColFn) or expr.args[0].name in MARKERS)
+        if isinstance(expr, ColFn) and (
+            (expr.name in MARKERS and not allow_markers)
+            or (
+                # markers can only be at the top of an expression tree
+                expr.name not in MARKERS
+                and any(
+                    isinstance(arg, ColFn) and arg.name in MARKERS for arg in expr.args
+                )
+            )
         ):
             raise TypeError(
-                f"invalid usage of `.{expr.name}()` in a column expression.\n"
+                f"invalid usage of `{expr.name}` in a column expression.\n"
                 "note: This marker function can only be used in arguments to the "
                 "`arrange` verb or the `arrange=` keyword argument to window "
                 "functions. Furthermore, all markers have to be at the top of the "
                 "expression tree (i.e. cannot be nested inside a column function)."
             )
         return expr
-    elif isinstance(expr, dict):
-        return {key: wrap_literal(val) for key, val in expr.items()}
-    elif isinstance(expr, (list, tuple)):
-        return expr.__class__(wrap_literal(elem) for elem in expr)
-    elif isinstance(expr, Generator):
-        return (wrap_literal(elem) for elem in expr)
+
+    elif isinstance(expr, Iterable) and not isinstance(expr, str):
+        return [wrap_literal(elem, allow_markers=allow_markers) for elem in expr]
+
     elif isinstance(expr, FnAttr):
         raise TypeError(
             "invalid usage of a column function as an expression.\n"
             "hint: Maybe you forgot to put parentheses `()` after the function?"
         )
+
     else:
         return LiteralCol(expr)
 
