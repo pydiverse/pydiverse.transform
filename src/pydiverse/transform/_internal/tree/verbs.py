@@ -99,7 +99,10 @@ class Mutate(Verb):
         assert isinstance(cloned, Mutate)
         cloned.uuids = [uuid.uuid1() for _ in self.names]
         uuid_map.update(
-            {old_uid: new_uid for old_uid, new_uid in zip(self.uuids, cloned.uuids)}
+            {
+                old_uid: new_uid
+                for old_uid, new_uid in zip(self.uuids, cloned.uuids, strict=True)
+            }
         )
         return cloned, nd_map, uuid_map
 
@@ -132,7 +135,10 @@ class Summarize(Verb):
         assert isinstance(cloned, Summarize)
         cloned.uuids = [uuid.uuid1() for _ in self.names]
         uuid_map.update(
-            {old_uid: new_uid for old_uid, new_uid in zip(self.uuids, cloned.uuids)}
+            {
+                old_uid: new_uid
+                for old_uid, new_uid in zip(self.uuids, cloned.uuids, strict=True)
+            }
         )
         return cloned, nd_map, uuid_map
 
