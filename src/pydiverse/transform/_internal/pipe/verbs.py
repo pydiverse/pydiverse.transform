@@ -224,7 +224,9 @@ def mutate(table: Table, **kwargs: ColExpr):
     new._cache = copy.copy(table._cache)
     new_cols = copy.copy(table._cache.cols)
 
-    for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids):
+    for name, val, uid in zip(
+        new._ast.names, new._ast.values, new._ast.uuids, strict=False
+    ):
         new_cols[name] = Col(
             name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=True)
         )
@@ -367,7 +369,9 @@ def summarize(table: Table, **kwargs: ColExpr):
 
     new_cols = table._cache.cols | {
         name: Col(name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=False))
-        for name, val, uid in zip(new._ast.names, new._ast.values, new._ast.uuids)
+        for name, val, uid in zip(
+            new._ast.names, new._ast.values, new._ast.uuids, strict=False
+        )
     }
 
     new._cache.update(
@@ -523,11 +527,15 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
             key: preprocess_arg(val, table, update_partition_by=update_partition_by)
             for key, val in arg.items()
         }
+
+    # TODO: Be more strict in what is allowed here. Preferably, make the iteration the
+    # responsibility of the caller, otherwise error messages could get bad.
     if isinstance(arg, Iterable) and not isinstance(arg, str):
         return [
             preprocess_arg(elem, table, update_partition_by=update_partition_by)
             for elem in arg
         ]
+
     if isinstance(arg, Order):
         return Order(
             preprocess_arg(
@@ -536,6 +544,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
             arg.descending,
             arg.nulls_last,
         )
+
     else:
         arg = wrap_literal(arg)
         assert isinstance(arg, ColExpr)

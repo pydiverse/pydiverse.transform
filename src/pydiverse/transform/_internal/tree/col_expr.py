@@ -63,7 +63,11 @@ class ColExpr:
             (
                 (
                     self.isin(
-                        *wrap_literal(key if isinstance(key, Iterable) else (key,))
+                        *(
+                            (wrap_literal(elem) for elem in key)
+                            if isinstance(key, Iterable)
+                            else (wrap_literal(key),)
+                        ),
                     ),
                     wrap_literal(val),
                 )
@@ -153,7 +157,7 @@ class ColFn(ColExpr):
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
         # While building the expression tree, we have to allow markers.
-        self.args = wrap_literal(args, allow_markers=True)
+        self.args = [wrap_literal(arg, allow_markers=True) for arg in args]
         self.context_kwargs = clean_kwargs(**kwargs)
 
         if filters := self.context_kwargs.get("filter"):
@@ -581,9 +585,6 @@ def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
             )
         return expr
 
-    elif isinstance(expr, Iterable) and not isinstance(expr, str):
-        return [wrap_literal(elem, allow_markers=allow_markers) for elem in expr]
-
     elif isinstance(expr, FnAttr):
         raise TypeError(
             "invalid usage of a column function as an expression.\n"
@@ -600,9 +601,6 @@ def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
         for key, val in kwargs.items()
         if val is not None
     }
-    return {
-        key: wrap_literal(
-            val if key != "arrange" else [Order.from_col_expr(ord) for ord in val]
-        )
-        for key, val in kwargs.items()
-    }
+    if (arrange := kwargs.get("arrange")) is not None:
+        kwargs["arrange"] = [Order.from_col_expr(ord) for ord in arrange]
+    return {key: [wrap_literal(val) for val in arr] for key, arr in kwargs.items()}
