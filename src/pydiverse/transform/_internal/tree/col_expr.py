@@ -89,6 +89,108 @@ class ColExpr:
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
 
+    def nulls_first(self, *args, **kwargs):
+        return ColFn("nulls_first", self, *args, **kwargs)
+
+    def __invert__(self, *args, **kwargs):
+        return ColFn("__invert__", self, *args, **kwargs)
+
+    def __pow__(self, *args, **kwargs):
+        return ColFn("__pow__", self, *args, **kwargs)
+
+    def ascending(self, *args, **kwargs):
+        return ColFn("ascending", self, *args, **kwargs)
+
+    def __lt__(self, *args, **kwargs):
+        return ColFn("__lt__", self, *args, **kwargs)
+
+    def __and__(self, *args, **kwargs):
+        return ColFn("__and__", self, *args, **kwargs)
+
+    def __mul__(self, *args, **kwargs):
+        return ColFn("__mul__", self, *args, **kwargs)
+
+    def __radd__(self, *args, **kwargs):
+        return ColFn("__radd__", self, *args, **kwargs)
+
+    def __pos__(self, *args, **kwargs):
+        return ColFn("__pos__", self, *args, **kwargs)
+
+    def __ror__(self, *args, **kwargs):
+        return ColFn("__ror__", self, *args, **kwargs)
+
+    def __xor__(self, *args, **kwargs):
+        return ColFn("__xor__", self, *args, **kwargs)
+
+    def __neg__(self, *args, **kwargs):
+        return ColFn("__neg__", self, *args, **kwargs)
+
+    def __le__(self, *args, **kwargs):
+        return ColFn("__le__", self, *args, **kwargs)
+
+    def __rxor__(self, *args, **kwargs):
+        return ColFn("__rxor__", self, *args, **kwargs)
+
+    def __add__(self, *args, **kwargs):
+        return ColFn("__add__", self, *args, **kwargs)
+
+    def descending(self, *args, **kwargs):
+        return ColFn("descending", self, *args, **kwargs)
+
+    def __ge__(self, *args, **kwargs):
+        return ColFn("__ge__", self, *args, **kwargs)
+
+    def __rfloordiv__(self, *args, **kwargs):
+        return ColFn("__rfloordiv__", self, *args, **kwargs)
+
+    def __rmod__(self, *args, **kwargs):
+        return ColFn("__rmod__", self, *args, **kwargs)
+
+    def __or__(self, *args, **kwargs):
+        return ColFn("__or__", self, *args, **kwargs)
+
+    def __rpow__(self, *args, **kwargs):
+        return ColFn("__rpow__", self, *args, **kwargs)
+
+    def __truediv__(self, *args, **kwargs):
+        return ColFn("__truediv__", self, *args, **kwargs)
+
+    def __eq__(self, *args, **kwargs):
+        return ColFn("__eq__", self, *args, **kwargs)
+
+    def __rtruediv__(self, *args, **kwargs):
+        return ColFn("__rtruediv__", self, *args, **kwargs)
+
+    def __rand__(self, *args, **kwargs):
+        return ColFn("__rand__", self, *args, **kwargs)
+
+    def nulls_last(self, *args, **kwargs):
+        return ColFn("nulls_last", self, *args, **kwargs)
+
+    def __gt__(self, *args, **kwargs):
+        return ColFn("__gt__", self, *args, **kwargs)
+
+    def __floordiv__(self, *args, **kwargs):
+        return ColFn("__floordiv__", self, *args, **kwargs)
+
+    def __rmul__(self, *args, **kwargs):
+        return ColFn("__rmul__", self, *args, **kwargs)
+
+    def __rsub__(self, *args, **kwargs):
+        return ColFn("__rsub__", self, *args, **kwargs)
+
+    def __sub__(self, *args, **kwargs):
+        return ColFn("__sub__", self, *args, **kwargs)
+
+    def __mod__(self, *args, **kwargs):
+        return ColFn("__mod__", self, *args, **kwargs)
+
+    def __abs__(self, *args, **kwargs):
+        return ColFn("__abs__", self, *args, **kwargs)
+
+    def __ne__(self, *args, **kwargs):
+        return ColFn("__ne__", self, *args, **kwargs)
+
 
 class Col(ColExpr):
     __slots__ = ["name", "_ast", "_uuid"]

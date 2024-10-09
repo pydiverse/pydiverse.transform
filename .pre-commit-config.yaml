@@ -1,4 +1,13 @@
 repos:
+  - repo: local
+    hooks:
+      - id: generate-col-ops
+        name: generate-col-ops
+        language: system
+        entry: pixi run python generate_col_ops.py
+        types: [python]
+        pass_filenames: false
+
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: v0.5.7
     hooks:
