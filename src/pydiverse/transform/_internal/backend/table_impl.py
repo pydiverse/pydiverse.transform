@@ -12,9 +12,7 @@ from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.ops.core import Ftype
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import (
-    Col,
-)
+from pydiverse.transform._internal.tree.col_expr import Col
 from pydiverse.transform._internal.tree.dtypes import Dtype
 from pydiverse.transform._internal.tree.registry import (
     OperatorRegistrationContextManager,
@@ -60,19 +58,16 @@ class TableImpl(AstNode):
         name: str | None = None,
         uuids: dict[str, UUID] | None = None,
     ) -> TableImpl:
-        from pydiverse.transform._internal.backend import (
+        from pydiverse.transform._internal.backend.targets import (
             DuckDb,
-            DuckDbPolarsImpl,
             Polars,
-            PolarsImpl,
             SqlAlchemy,
-            SqlImpl,
         )
 
         if isinstance(resource, TableImpl):
             res = resource
 
-        elif isinstance(resource, (pl.DataFrame, pl.LazyFrame)):
+        elif isinstance(resource, pl.DataFrame | pl.LazyFrame):
             if name is None:
                 # If the data frame has be previously exported by transform, a
                 # name attribute was added.
@@ -81,12 +76,20 @@ class TableImpl(AstNode):
                 else:
                     name = "?"
             if backend is None or isinstance(backend, Polars):
+                from pydiverse.transform._internal.backend.polars import PolarsImpl
+
                 res = PolarsImpl(name, resource)
             elif isinstance(backend, DuckDb):
+                from pydiverse.transform._internal.backend.duckdb_polars import (
+                    DuckDbPolarsImpl,
+                )
+
                 res = DuckDbPolarsImpl(name, resource)
 
-        elif isinstance(resource, (str, sqa.Table)):
+        elif isinstance(resource, str | sqa.Table):
             if isinstance(backend, SqlAlchemy):
+                from pydiverse.transform._internal.backend.sql import SqlImpl
+
                 res = SqlImpl(resource, backend, name)
 
         else:

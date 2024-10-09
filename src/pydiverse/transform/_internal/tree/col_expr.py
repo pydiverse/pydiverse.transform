@@ -215,7 +215,7 @@ class ColFn(ColExpr):
         if None in arg_dtypes:
             return None
 
-        from pydiverse.transform._internal.backend import PolarsImpl
+        from pydiverse.transform._internal.backend.polars import PolarsImpl
 
         self._dtype = PolarsImpl.registry.get_impl(self.name, arg_dtypes).return_type
         return self._dtype

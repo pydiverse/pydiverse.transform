@@ -1,6 +1,6 @@
 [project]
 name = "pydiverse-transform"
-version = "0.2.1"
+version = "0.2.2"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
   { name = "QuantCo, Inc." },
@@ -26,7 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 duckdb = ["duckdb>=0.8.1", "duckdb_engine>=0.9.1"]
-postgres = ["psycopg2>=2.9.3"]                     # TODO: psycopg 3 ??
+postgres = ["psycopg2>=2.9.3"]
 mssql = ["pyodbc>=4.0.35"]
 
 [tool.hatch.build.targets.wheel]
