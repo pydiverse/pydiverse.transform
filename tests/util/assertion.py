@@ -62,9 +62,9 @@ def assert_result_equal(
     may_throw: bool = False,
     xfail_warnings: bool = True,
 ):
-    if not isinstance(input_tables[0], (tuple, list)):
+    if not isinstance(input_tables[0], tuple | list):
         input_tables = (input_tables,)
-    x, y = zip(*input_tables)
+    x, y = zip(*input_tables, strict=True)
 
     if exception and not may_throw:
         with pytest.raises(exception):

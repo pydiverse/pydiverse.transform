@@ -47,7 +47,7 @@ def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict | None = N
         _sql_engine_cache[url] = engine
 
     sql_dtypes = {}
-    for col, dtype in zip(df.columns, df.dtypes):
+    for col, dtype in zip(df.columns, df.dtypes, strict=True):
         if dtype in dtypes_map:
             sql_dtypes[col] = dtypes_map[dtype]
 

@@ -64,7 +64,7 @@ def merge_desc_nulls_last(
     order_by: list[pl.Expr], descending: list[bool], nulls_last: list[bool | None]
 ) -> list[pl.Expr]:
     merged = []
-    for ord, desc, nl in zip(order_by, descending, nulls_last):
+    for ord, desc, nl in zip(order_by, descending, nulls_last, strict=True):
         # try to avoid this workaround whenever possible
         if nl is not None or desc:
             numeric = ord.rank("dense").cast(pl.Int64)
@@ -109,7 +109,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         arrange = expr.context_kwargs.get("arrange")
         if arrange:
             order_by, descending, nulls_last = zip(
-                *[compile_order(order, name_in_df) for order in arrange]
+                *[compile_order(order, name_in_df) for order in arrange], strict=True
             )
 
         # The following `if` block is absolutely unecessary and just an optimization.
@@ -227,7 +227,7 @@ def compile_ast(
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
-    if isinstance(nd, (verbs.Mutate, verbs.Summarize)):
+    if isinstance(nd, verbs.Mutate | verbs.Summarize):
         overwritten = set(name for name in nd.names if name in set(select))
         if overwritten:
             # We rename overwritten cols to some unique dummy name
@@ -258,11 +258,13 @@ def compile_ast(
         df = df.with_columns(
             **{
                 name: compile_col_expr(value, name_in_df)
-                for name, value in zip(nd.names, nd.values)
+                for name, value in zip(nd.names, nd.values, strict=True)
             }
         )
 
-        name_in_df.update({uid: name for uid, name in zip(nd.uuids, nd.names)})
+        name_in_df.update(
+            {uid: name for uid, name in zip(nd.uuids, nd.names, strict=True)}
+        )
         select += nd.names
 
     elif isinstance(nd, verbs.Filter):
@@ -270,7 +272,7 @@ def compile_ast(
 
     elif isinstance(nd, verbs.Arrange):
         order_by, descending, nulls_last = zip(
-            *[compile_order(order, name_in_df) for order in nd.order_by]
+            *[compile_order(order, name_in_df) for order in nd.order_by], strict=True
         )
         df = df.sort(
             order_by,
@@ -292,7 +294,7 @@ def compile_ast(
             )
 
         aggregations = {}
-        for name, val in zip(nd.names, nd.values):
+        for name, val in zip(nd.names, nd.values, strict=True):
             compiled = compile_col_expr(val, name_in_df)
             if has_path_to_leaf_without_agg(val):
                 compiled = compiled.first()
@@ -305,7 +307,9 @@ def compile_ast(
         else:
             df = df.select(**aggregations)
 
-        name_in_df.update({uid: name for name, uid in zip(nd.names, nd.uuids)})
+        name_in_df.update(
+            {uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)}
+        )
         select = [*(name_in_df[uid] for uid in partition_by), *nd.names]
         partition_by = []
 
@@ -324,7 +328,7 @@ def compile_ast(
         name_in_df.update(
             {uid: name + nd.suffix for uid, name in right_name_in_df.items()}
         )
-        left_on, right_on = zip(*compile_join_cond(nd.on, name_in_df))
+        left_on, right_on = zip(*compile_join_cond(nd.on, name_in_df), strict=True)
 
         assert len(partition_by) == 0
         select += [col_name + nd.suffix for col_name in right_select]
@@ -369,7 +373,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
 
 
 def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
-    if isinstance(t, (dtypes.Float64, dtypes.Decimal)):
+    if isinstance(t, dtypes.Float64 | dtypes.Decimal):
         return pl.Float64()
     elif isinstance(t, dtypes.Int64):
         return pl.Int64()

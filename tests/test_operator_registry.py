@@ -15,7 +15,7 @@ def assert_signature(
 ):
     assert len(s.args) == len(args)
 
-    for actual, expected in zip(s.args, args):
+    for actual, expected in zip(s.args, args, strict=True):
         assert expected.same_kind(actual)
 
     assert rtype.same_kind(s.rtype)

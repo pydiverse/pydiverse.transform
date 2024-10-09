@@ -9,8 +9,6 @@ from pydiverse.transform._internal.tree.col_expr import Cast
 
 
 class PostgresImpl(SqlImpl):
-    dialect_name = "postgresql"
-
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)

@@ -27,7 +27,7 @@ def skip_backends(*backends):
 
 def flatten(it):
     """Flatten an iterable"""
-    if isinstance(it, (list, tuple)):
+    if isinstance(it, list | tuple):
         yield from chain(*map(flatten, it))
     else:
         yield it

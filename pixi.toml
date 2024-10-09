@@ -5,9 +5,8 @@ platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 [dependencies]
 python = ">=3.10"
-numpy = ">=1.23.1"
-pandas = ">=1.4.3"
-SQLAlchemy = ">=1.4.27"
+pandas = ">=2.0.0"     # only required for SQL writing
+SQLAlchemy = ">=2.0.0"
 pyarrow = ">=11.0.0"
 polars = ">=1.6.0"
 
