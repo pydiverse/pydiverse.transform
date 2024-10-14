@@ -7,7 +7,6 @@ from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.ops import classes
 from pydiverse.transform._internal.tree import dtypes, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, LiteralCol

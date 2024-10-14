@@ -18,7 +18,6 @@ from pydiverse.transform._internal.backend.polars import pdt_type_to_polars
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
-from pydiverse.transform._internal.ops import classes
 from pydiverse.transform._internal.ops.operator import Ftype
 from pydiverse.transform._internal.tree import dtypes, verbs
 from pydiverse.transform._internal.tree.ast import AstNode

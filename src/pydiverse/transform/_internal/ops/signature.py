@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterable, Sequence
+import itertools
 import textwrap
+from collections.abc import Iterable, Sequence
 from types import EllipsisType
-from typing import Any
+from typing import Any, TypeVar
 
 from pydiverse.transform._internal.ops.operator import Operator
+from pydiverse.transform._internal.tree import dtypes
 from pydiverse.transform._internal.tree.dtypes import Dtype
 
 
@@ -60,7 +62,9 @@ class SignatureTrie:
         assert node.data is None
         node.data = data
 
-    def get_node(self, sig: Sequence[type[Dtype]], create_missing: bool = True):
+    def get_node(
+        self, sig: Sequence[type[Dtype]], create_missing: bool = True
+    ) -> TrieNode:
         node = self.root
         for dtype in sig:
             for child in node.children:
@@ -68,12 +72,10 @@ class SignatureTrie:
                     node = child
                     break
             else:
-                if create_missing:
-                    new_node = self.TrieNode(dtype, None, [])
-                    node.children.append(new_node)
-                    node = new_node
-                else:
-                    return None
+                assert create_missing
+                new_node = self.TrieNode(dtype, [])
+                node.children.append(new_node)
+                node = new_node
 
         return node
 
@@ -84,10 +86,10 @@ class SignatureTrie:
             return None
 
         # Find best matching template.
-        best_match = None
+        best_match: SignatureTrie.TrieNode | None = None
         best_score = ((0x7FFFFFFF,), (0x7FFFFFFF,))
 
-        for match, templates, type_promotion_indices in matches:
+        for match, type_promotion_indices in matches:
             score = (
                 # Prefer operators that didn't need any type promotion
                 tuple(-i for i in type_promotion_indices),
@@ -95,33 +97,31 @@ class SignatureTrie:
                 match.operator._precedence,
             )
             if score < best_score:
-                best_match = (match, templates)
+                best_match = match
                 best_score = score
 
-        rtype = best_match[0].operator.signature.rtype
-        if isinstance(rtype, dtypes.Template):
-            # If rtype is a template -> Translate
-            rtype = best_match[1][rtype.name]
-
-        return TypedOperatorImpl.from_operator_impl(best_match[0].operator, rtype)
+        assert best_match is not None
+        return best_match
 
     def all_matches(
         self, sig: Sequence[type[Dtype]]
-    ) -> Iterable[TrieNode, dict[str, Dtype, tuple[int, ...]]]:
+    ) -> Iterable[tuple[TrieNode, tuple[int, ...]]]:
         """Yield all operators that match the input signature"""
 
         # Case 0 arguments:
-        if len(signature) == 0:
-            yield self.root, dict(), tuple()
+        if len(sig) == 0:
+            yield self.root, tuple()
             return
 
         # Case 1+ args:
         def does_match(
-            dtype: dtypes.Dtype,
+            dtype: Dtype,
             node: SignatureTrie.TrieNode,
         ) -> bool:
-            if isinstance(node.value, dtypes.Template):
-                return node.value.modifiers_compatible(dtype)
+            if issubclass(node.value, DtypeVar):
+                return not (
+                    issubclass(node.value, Const) and not issubclass(dtype, Const)
+                )
             return dtype.can_promote_to(node.value)
 
         stack: list[tuple[SignatureTrie.TrieNode, int, dict, tuple[int, ...]]] = [
@@ -130,12 +130,12 @@ class SignatureTrie:
 
         while stack:
             node, s_i, templates, type_promotion_indices = stack.pop()
-            dtype = signature[s_i]
+            dtype = sig[s_i]
 
             if not does_match(dtype, node):
                 continue
 
-            if isinstance(node.value, dtypes.Template):
+            if issubclass(node.value, DtypeVar):
                 templates = templates.copy()
                 if node.value.name not in templates:
                     templates[node.value.name] = [dtype.without_modifiers()]
@@ -149,7 +149,7 @@ class SignatureTrie:
                 # -> (uint > int64) wouldn't be preferred over (uint > int64 > float64)
                 type_promotion_indices = (*type_promotion_indices, s_i)
 
-            if s_i + 1 == len(signature):
+            if s_i + 1 == len(sig):
                 if node.operator is not None:
                     # Find compatible type for templates
                     try:
@@ -157,7 +157,7 @@ class SignatureTrie:
                             name: dtypes.promote_dtypes(types_)
                             for name, types_ in templates.items()
                         }
-                        yield node, templates, type_promotion_indices
+                        yield node, type_promotion_indices
                     except TypeError:
                         print(f"Can't promote: {templates}")
                         pass
@@ -170,30 +170,6 @@ class SignatureTrie:
 
             for child in children:
                 stack.append((child, s_i + 1, templates, type_promotion_indices))
-
-
-def match_signature(
-    sig: Signature | Sequence[Dtype], against: Sequence[Signature]
-) -> Signature:
-    assert len(against) > 0
-    best_match = None
-    best_score = ((0x7FFFFFFF,), (0x7FFFFFFF,))
-
-    for match, templates, type_promotion_indices in against:
-        score = (
-            # Prefer operators that didn't need any type promotion
-            tuple(-i for i in type_promotion_indices),
-            # And then match according to signature
-            match.operator._precedence,
-        )
-        if score < best_score:
-            best_match = (match, templates)
-            best_score = score
-
-    rtype = best_match[0].operator.signature.rtype
-    if isinstance(rtype, dtypes.Template):
-        # If rtype is a template -> Translate
-        rtype = best_match[1][rtype.name]
 
 
 class Const: ...
