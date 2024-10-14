@@ -11,11 +11,12 @@ from typing import Any
 from uuid import UUID
 
 from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops.core import Ftype, Operator
+from pydiverse.transform._internal.ops.operator import Ftype
+from pydiverse.transform._internal.ops.registry import OpRegistry
 from pydiverse.transform._internal.tree import dtypes
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.dtypes import Dtype, python_type_to_pdt
-from pydiverse.transform._internal.tree.registry import OperatorRegistry
+from pydiverse.transform._internal.tree.registry import ImplStore
 
 
 class ColExpr:
@@ -89,29 +90,71 @@ class ColExpr:
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
 
-    def nulls_first(self, *args, **kwargs):
-        return ColFn("nulls_first", self, *args, **kwargs)
+    def __abs__(self, *args, **kwargs):
+        return ColFn("__abs__", self, *args, **kwargs)
+
+    def __rand__(self, *args, **kwargs):
+        return ColFn("__rand__", self, *args, **kwargs)
 
     def __invert__(self, *args, **kwargs):
         return ColFn("__invert__", self, *args, **kwargs)
 
+    def __le__(self, *args, **kwargs):
+        return ColFn("__le__", self, *args, **kwargs)
+
+    def __eq__(self, *args, **kwargs):
+        return ColFn("__eq__", self, *args, **kwargs)
+
+    def __radd__(self, *args, **kwargs):
+        return ColFn("__radd__", self, *args, **kwargs)
+
+    def __rmul__(self, *args, **kwargs):
+        return ColFn("__rmul__", self, *args, **kwargs)
+
+    def __sub__(self, *args, **kwargs):
+        return ColFn("__sub__", self, *args, **kwargs)
+
+    def __floordiv__(self, *args, **kwargs):
+        return ColFn("__floordiv__", self, *args, **kwargs)
+
+    def __ne__(self, *args, **kwargs):
+        return ColFn("__ne__", self, *args, **kwargs)
+
+    def __rtruediv__(self, *args, **kwargs):
+        return ColFn("__rtruediv__", self, *args, **kwargs)
+
+    def __rfloordiv__(self, *args, **kwargs):
+        return ColFn("__rfloordiv__", self, *args, **kwargs)
+
+    def __rpow__(self, *args, **kwargs):
+        return ColFn("__rpow__", self, *args, **kwargs)
+
+    def __rsub__(self, *args, **kwargs):
+        return ColFn("__rsub__", self, *args, **kwargs)
+
+    def __gt__(self, *args, **kwargs):
+        return ColFn("__gt__", self, *args, **kwargs)
+
+    def descending(self, *args, **kwargs):
+        return ColFn("descending", self, *args, **kwargs)
+
     def __pow__(self, *args, **kwargs):
         return ColFn("__pow__", self, *args, **kwargs)
+
+    def __rxor__(self, *args, **kwargs):
+        return ColFn("__rxor__", self, *args, **kwargs)
 
     def ascending(self, *args, **kwargs):
         return ColFn("ascending", self, *args, **kwargs)
 
-    def __lt__(self, *args, **kwargs):
-        return ColFn("__lt__", self, *args, **kwargs)
+    def __rmod__(self, *args, **kwargs):
+        return ColFn("__rmod__", self, *args, **kwargs)
 
     def __and__(self, *args, **kwargs):
         return ColFn("__and__", self, *args, **kwargs)
 
-    def __mul__(self, *args, **kwargs):
-        return ColFn("__mul__", self, *args, **kwargs)
-
-    def __radd__(self, *args, **kwargs):
-        return ColFn("__radd__", self, *args, **kwargs)
+    def __xor__(self, *args, **kwargs):
+        return ColFn("__xor__", self, *args, **kwargs)
 
     def __pos__(self, *args, **kwargs):
         return ColFn("__pos__", self, *args, **kwargs)
@@ -119,77 +162,35 @@ class ColExpr:
     def __ror__(self, *args, **kwargs):
         return ColFn("__ror__", self, *args, **kwargs)
 
-    def __xor__(self, *args, **kwargs):
-        return ColFn("__xor__", self, *args, **kwargs)
-
-    def __neg__(self, *args, **kwargs):
-        return ColFn("__neg__", self, *args, **kwargs)
-
-    def __le__(self, *args, **kwargs):
-        return ColFn("__le__", self, *args, **kwargs)
-
-    def __rxor__(self, *args, **kwargs):
-        return ColFn("__rxor__", self, *args, **kwargs)
-
-    def __add__(self, *args, **kwargs):
-        return ColFn("__add__", self, *args, **kwargs)
-
-    def descending(self, *args, **kwargs):
-        return ColFn("descending", self, *args, **kwargs)
-
-    def __ge__(self, *args, **kwargs):
-        return ColFn("__ge__", self, *args, **kwargs)
-
-    def __rfloordiv__(self, *args, **kwargs):
-        return ColFn("__rfloordiv__", self, *args, **kwargs)
-
-    def __rmod__(self, *args, **kwargs):
-        return ColFn("__rmod__", self, *args, **kwargs)
-
-    def __or__(self, *args, **kwargs):
-        return ColFn("__or__", self, *args, **kwargs)
-
-    def __rpow__(self, *args, **kwargs):
-        return ColFn("__rpow__", self, *args, **kwargs)
-
     def __truediv__(self, *args, **kwargs):
         return ColFn("__truediv__", self, *args, **kwargs)
 
-    def __eq__(self, *args, **kwargs):
-        return ColFn("__eq__", self, *args, **kwargs)
-
-    def __rtruediv__(self, *args, **kwargs):
-        return ColFn("__rtruediv__", self, *args, **kwargs)
-
-    def __rand__(self, *args, **kwargs):
-        return ColFn("__rand__", self, *args, **kwargs)
+    def nulls_first(self, *args, **kwargs):
+        return ColFn("nulls_first", self, *args, **kwargs)
 
     def nulls_last(self, *args, **kwargs):
         return ColFn("nulls_last", self, *args, **kwargs)
 
-    def __gt__(self, *args, **kwargs):
-        return ColFn("__gt__", self, *args, **kwargs)
+    def __ge__(self, *args, **kwargs):
+        return ColFn("__ge__", self, *args, **kwargs)
 
-    def __floordiv__(self, *args, **kwargs):
-        return ColFn("__floordiv__", self, *args, **kwargs)
+    def __add__(self, *args, **kwargs):
+        return ColFn("__add__", self, *args, **kwargs)
 
-    def __rmul__(self, *args, **kwargs):
-        return ColFn("__rmul__", self, *args, **kwargs)
-
-    def __rsub__(self, *args, **kwargs):
-        return ColFn("__rsub__", self, *args, **kwargs)
-
-    def __sub__(self, *args, **kwargs):
-        return ColFn("__sub__", self, *args, **kwargs)
+    def __mul__(self, *args, **kwargs):
+        return ColFn("__mul__", self, *args, **kwargs)
 
     def __mod__(self, *args, **kwargs):
         return ColFn("__mod__", self, *args, **kwargs)
 
-    def __abs__(self, *args, **kwargs):
-        return ColFn("__abs__", self, *args, **kwargs)
+    def __lt__(self, *args, **kwargs):
+        return ColFn("__lt__", self, *args, **kwargs)
 
-    def __ne__(self, *args, **kwargs):
-        return ColFn("__ne__", self, *args, **kwargs)
+    def __neg__(self, *args, **kwargs):
+        return ColFn("__neg__", self, *args, **kwargs)
+
+    def __or__(self, *args, **kwargs):
+        return ColFn("__or__", self, *args, **kwargs)
 
 
 class Col(ColExpr):
@@ -254,10 +255,10 @@ class LiteralCol(ColExpr):
 
 
 class ColFn(ColExpr):
-    __slots__ = ["name", "args", "context_kwargs"]
+    __slots__ = ["op", "args", "context_kwargs"]
 
-    def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
-        self.name = name
+    def __init__(self, op_name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
+        self.op = OpRegistry.op_by_name(op_name)
         # While building the expression tree, we have to allow markers.
         self.args = [wrap_literal(arg, allow_markers=True) for arg in args]
         self.context_kwargs = clean_kwargs(**kwargs)
@@ -268,6 +269,8 @@ class ColFn(ColExpr):
                 self.args = [LiteralCol(0)]
 
             # TODO: check that this is an aggregation
+            # TODO: check that only context kwargs are supplied that the current op
+            # needs / can handle.
 
             assert len(self.args) == 1
             self.args[0] = CaseExpr(
@@ -289,12 +292,6 @@ class ColFn(ColExpr):
             f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
         ]
         return f'{self.name}({", ".join(args)})'
-
-    def op(self) -> Operator:
-        # TODO: backend agnostic registry, make this an attribute?
-        from pydiverse.transform._internal.backend.polars import PolarsImpl
-
-        return PolarsImpl.registry.get_op(self.name)
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -319,7 +316,7 @@ class ColFn(ColExpr):
 
         from pydiverse.transform._internal.backend.polars import PolarsImpl
 
-        self._dtype = PolarsImpl.registry.get_impl(self.name, arg_dtypes).return_type
+        self._dtype = PolarsImpl.impl_store.get_impl(self.name, arg_dtypes).return_type
         return self._dtype
 
     def ftype(self, *, agg_is_window: bool):
@@ -343,10 +340,10 @@ class ColFn(ColExpr):
         if None in ftypes:
             return None
 
-        op = self.op()
-
         actual_ftype = (
-            Ftype.WINDOW if op.ftype == Ftype.AGGREGATE and agg_is_window else op.ftype
+            Ftype.WINDOW
+            if self.op.ftype == Ftype.AGGREGATE and agg_is_window
+            else self.op.ftype
         )
 
         if actual_ftype == Ftype.EWISE:
@@ -370,8 +367,7 @@ class ColFn(ColExpr):
                     node is not self
                     and isinstance(node, ColFn)
                     and (
-                        (desc_ftype := node.op().ftype)
-                        in (Ftype.AGGREGATE, Ftype.WINDOW)
+                        (desc_ftype := node.op.ftype) in (Ftype.AGGREGATE, Ftype.WINDOW)
                     )
                 ):
                     assert isinstance(self, ColFn)
@@ -561,10 +557,10 @@ class Cast(ColExpr):
                 (dtypes.String, dtypes.Int64),
                 (dtypes.String, dtypes.Float64),
                 (dtypes.Float64, dtypes.Int64),
-                (dtypes.DateTime, dtypes.Date),
+                (dtypes.Datetime, dtypes.Date),
                 (dtypes.Int64, dtypes.String),
                 (dtypes.Float64, dtypes.String),
-                (dtypes.DateTime, dtypes.String),
+                (dtypes.Datetime, dtypes.String),
                 (dtypes.Date, dtypes.String),
             }
 
@@ -574,7 +570,7 @@ class Cast(ColExpr):
             ) not in valid_casts:
                 hint = ""
                 if self.val.dtype() == dtypes.String and self.target_type in (
-                    dtypes.DateTime,
+                    dtypes.Datetime,
                     dtypes.Date,
                 ):
                     hint = (
@@ -661,7 +657,7 @@ def create_operator(op):
     return impl
 
 
-for dunder in OperatorRegistry.SUPPORTED_DUNDER:
+for dunder in ImplStore.SUPPORTED_DUNDER:
     setattr(ColExpr, dunder, create_operator(dunder))
 del create_operator
 

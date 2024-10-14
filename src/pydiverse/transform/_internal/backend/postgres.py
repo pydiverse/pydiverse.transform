@@ -91,7 +91,7 @@ with PostgresImpl.op(ops.DtMillisecond()) as op:
         )
 
 
-with PostgresImpl.op(ops.Greatest()) as op:
+with PostgresImpl.op(ops.HorizontalMax()) as op:
 
     @op("str... -> str")
     def _greatest(*x):
@@ -99,7 +99,7 @@ with PostgresImpl.op(ops.Greatest()) as op:
         return sqa.func.GREATEST(*(sqa.collate(e, "POSIX") for e in x))
 
 
-with PostgresImpl.op(ops.Least()) as op:
+with PostgresImpl.op(ops.HorizontalMin()) as op:
 
     @op("str... -> str")
     def _least(*x):
@@ -110,35 +110,15 @@ with PostgresImpl.op(ops.Least()) as op:
 with PostgresImpl.op(ops.Any()) as op:
 
     @op.auto
-    def _any(x, *, _window_partition_by=None, _window_order_by=None):
-        return sqa.func.coalesce(sqa.func.BOOL_OR(x, type_=sqa.Boolean()), sqa.null())
-
-    @op.auto(variant="window")
-    def _any(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.BOOL_OR(x, type_=sqa.Boolean()).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
+    def _any(x):
+        return sqa.func.BOOL_OR(x, type_=sqa.Boolean())
 
 
 with PostgresImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
-        return sqa.func.coalesce(sqa.func.BOOL_AND(x, type_=sqa.Boolean()), sqa.null())
-
-    @op.auto(variant="window")
-    def _all(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.BOOL_AND(x, type_=sqa.Boolean()).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
+        return sqa.func.BOOL_AND(x, type_=sqa.Boolean())
 
 
 with SqlImpl.op(ops.IsNan()) as op:

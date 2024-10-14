@@ -10,17 +10,17 @@ import sqlalchemy as sqa
 
 from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.targets import Target
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.ops.operator import Ftype, Operator
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col
 from pydiverse.transform._internal.tree.dtypes import Dtype
 from pydiverse.transform._internal.tree.registry import (
-    OperatorRegistrationContextManager,
-    OperatorRegistry,
+    ImplStore,
+    OpRegistrationCM,
 )
 
 if TYPE_CHECKING:
-    from pydiverse.transform._internal.ops import Operator
+    from pydiverse.transform._internal.ops.classes import Operator
 
 
 class TableImpl(AstNode):
@@ -28,7 +28,7 @@ class TableImpl(AstNode):
     Base class from which all table backend implementations are derived from.
     """
 
-    registry: OperatorRegistry
+    impl_store: ImplStore
 
     def __init__(self, name: str, schema: dict[str, Dtype]):
         self.name = name
@@ -45,10 +45,10 @@ class TableImpl(AstNode):
         # to check for potential operation definitions in the parent classes.
         super_reg = None
         for super_cls in cls.__mro__:
-            if hasattr(super_cls, "registry"):
-                super_reg = super_cls.registry
+            if hasattr(super_cls, "impl_store"):
+                super_reg = super_cls.impl_stores
                 break
-        cls.registry = OperatorRegistry(cls, super_reg)
+        cls.impl_store = ImplStore(cls, super_reg)
 
     @staticmethod
     def from_resource(
@@ -119,11 +119,11 @@ class TableImpl(AstNode):
         return repr(expr)
 
     @classmethod
-    def op(cls, operator: Operator, **kwargs) -> OperatorRegistrationContextManager:
-        return OperatorRegistrationContextManager(cls.registry, operator, **kwargs)
+    def op(cls, operator: Operator, **kwargs) -> OpRegistrationCM:
+        return OpRegistrationCM(cls.impl_store, operator, **kwargs)
 
 
-TableImpl.registry = OperatorRegistry(TableImpl)
+TableImpl.impl_store = ImplStore(TableImpl)
 
 with TableImpl.op(ops.NullsFirst()) as op:
 
@@ -159,33 +159,11 @@ with TableImpl.op(ops.Add()) as op:
     def _add(lhs, rhs):
         return lhs + rhs
 
-    @op.extension(ops.StrAdd)
-    def _str_add(lhs, rhs):
-        return lhs + rhs
-
-
-with TableImpl.op(ops.RAdd()) as op:
-
-    @op.auto
-    def _radd(rhs, lhs):
-        return lhs + rhs
-
-    @op.extension(ops.StrRAdd)
-    def _str_radd(lhs, rhs):
-        return lhs + rhs
-
 
 with TableImpl.op(ops.Sub()) as op:
 
     @op.auto
     def _sub(lhs, rhs):
-        return lhs - rhs
-
-
-with TableImpl.op(ops.RSub()) as op:
-
-    @op.auto
-    def _rsub(rhs, lhs):
         return lhs - rhs
 
 
@@ -196,24 +174,10 @@ with TableImpl.op(ops.Mul()) as op:
         return lhs * rhs
 
 
-with TableImpl.op(ops.RMul()) as op:
-
-    @op.auto
-    def _rmul(rhs, lhs):
-        return lhs * rhs
-
-
 with TableImpl.op(ops.TrueDiv()) as op:
 
     @op.auto
     def _truediv(lhs, rhs):
-        return lhs / rhs
-
-
-with TableImpl.op(ops.RTrueDiv()) as op:
-
-    @op.auto
-    def _rtruediv(rhs, lhs):
         return lhs / rhs
 
 
@@ -224,24 +188,10 @@ with TableImpl.op(ops.FloorDiv()) as op:
         return lhs // rhs
 
 
-with TableImpl.op(ops.RFloorDiv()) as op:
-
-    @op.auto
-    def _rfloordiv(rhs, lhs):
-        return lhs // rhs
-
-
 with TableImpl.op(ops.Pow()) as op:
 
     @op.auto
     def _pow(lhs, rhs):
-        return lhs**rhs
-
-
-with TableImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
         return lhs**rhs
 
 
@@ -287,13 +237,6 @@ with TableImpl.op(ops.And()) as op:
         return lhs & rhs
 
 
-with TableImpl.op(ops.RAnd()) as op:
-
-    @op.auto
-    def _rand(rhs, lhs):
-        return lhs & rhs
-
-
 with TableImpl.op(ops.Or()) as op:
 
     @op.auto
@@ -301,24 +244,10 @@ with TableImpl.op(ops.Or()) as op:
         return lhs | rhs
 
 
-with TableImpl.op(ops.ROr()) as op:
-
-    @op.auto
-    def _ror(rhs, lhs):
-        return lhs | rhs
-
-
 with TableImpl.op(ops.Xor()) as op:
 
     @op.auto
     def _xor(lhs, rhs):
-        return lhs ^ rhs
-
-
-with TableImpl.op(ops.RXor()) as op:
-
-    @op.auto
-    def _rxor(rhs, lhs):
         return lhs ^ rhs
 
 

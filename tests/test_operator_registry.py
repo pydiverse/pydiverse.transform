@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform._internal.ops import Operator
+from pydiverse.transform._internal.ops.classes import Operator
 from pydiverse.transform._internal.tree import dtypes
 from pydiverse.transform._internal.tree.registry import (
-    OperatorRegistry,
+    ImplStore,
     OperatorSignature,
 )
 
@@ -99,7 +99,7 @@ class TestOperatorRegistry:
         op1 = self.Op1()
         op2 = self.Op2()
 
-        reg = OperatorRegistry("TestRegistry")
+        reg = ImplStore("TestRegistry")
         reg.register_op(op1)
         reg.register_op(op2)
 
@@ -131,7 +131,7 @@ class TestOperatorRegistry:
         assert reg.get_impl("op1", tuple())() == 100
 
     def test_template(self):
-        reg = OperatorRegistry("TestRegistry")
+        reg = ImplStore("TestRegistry")
 
         op1 = self.Op1()
         op2 = self.Op2()
@@ -197,7 +197,7 @@ class TestOperatorRegistry:
         )
 
     def test_vararg(self):
-        reg = OperatorRegistry("TestRegistry")
+        reg = ImplStore("TestRegistry")
 
         op1 = self.Op1()
         reg.register_op(op1)
@@ -227,7 +227,7 @@ class TestOperatorRegistry:
     def test_variant(self):
         op1 = self.Op1()
 
-        reg = OperatorRegistry("TestRegistry")
+        reg = ImplStore("TestRegistry")
         reg.register_op(op1)
 
         with pytest.raises(ValueError):

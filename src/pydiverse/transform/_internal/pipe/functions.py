@@ -69,8 +69,8 @@ def dense_rank(
 
 
 def min(arg: ColExpr, *additional_args: ColExpr):
-    return ColFn("__least", arg, *additional_args)
+    return ColFn("horizontal_min", arg, *additional_args)
 
 
 def max(arg: ColExpr, *additional_args: ColExpr):
-    return ColFn("__greatest", arg, *additional_args)
+    return ColFn("horizontal_max", arg, *additional_args)

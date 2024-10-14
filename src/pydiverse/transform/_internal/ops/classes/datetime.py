@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import ElementWise, OperatorExtension, Unary
-from pydiverse.transform._internal.ops.numeric import Add, RAdd, RSub, Sub
+from pydiverse.transform._internal.ops.classes.numeric import Add, Sub
+from pydiverse.transform._internal.ops.operator import (
+    ElementWise,
+    Unary,
+)
+from pydiverse.transform._internal.ops.signature import Signature
+from pydiverse.transform._internal.tree.dtypes import Date, Datetime, Duration, Int64
 
 __all__ = [
     "DtYear",
@@ -18,19 +23,18 @@ __all__ = [
     "DtMinutes",
     "DtSeconds",
     "DtMilliseconds",
-    "DtSub",
-    "DtRSub",
-    "DtDurAdd",
-    "DtDurRAdd",
 ]
 
 
 class DtExtract(ElementWise, Unary):
-    signatures = ["datetime -> int64"]
+    signatures = [Signature(Datetime, returns=Int64)]
 
 
 class DateExtract(ElementWise, Unary):
-    signatures = ["datetime -> int64", "date -> int64"]
+    signatures = [
+        Signature(Datetime, returns=Int64),
+        Signature(Date, returns=Int64),
+    ]
 
 
 class DtYear(DateExtract):
@@ -70,7 +74,7 @@ class DtDayOfYear(DateExtract):
 
 
 class DurationToUnit(ElementWise, Unary):
-    signatures = ["duration -> int64"]
+    signatures = [Signature(Duration, returns=Int64)]
 
 
 class DtDays(DurationToUnit):
@@ -93,31 +97,13 @@ class DtMilliseconds(DurationToUnit):
     name = "dt.milliseconds"
 
 
-class DtSub(OperatorExtension):
-    operator = Sub
-    signatures = [
-        "datetime, datetime -> duration",
-        "datetime, date -> duration",
-        "date, datetime -> duration",
-        "date, date -> duration",
+Sub.signatures.extend(
+    [
+        Signature(Datetime, Datetime, returns=Duration),
+        Signature(Datetime, Date, returns=Duration),
+        Signature(Date, Datetime, returns=Duration),
+        Signature(Date, Date, returns=Duration),
     ]
+)
 
-
-class DtRSub(OperatorExtension):
-    operator = RSub
-    signatures = [
-        "datetime, datetime -> duration",
-        "datetime, date -> duration",
-        "date, datetime -> duration",
-        "date, date -> duration",
-    ]
-
-
-class DtDurAdd(OperatorExtension):
-    operator = Add
-    signatures = ["duration, duration -> duration"]
-
-
-class DtDurRAdd(OperatorExtension):
-    operator = RAdd
-    signatures = ["duration, duration -> duration"]
+Add.signatures.append(Signature(Duration, Duration, returns=Duration))

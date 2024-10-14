@@ -18,7 +18,8 @@ from pydiverse.transform._internal.backend.polars import pdt_type_to_polars
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.ops import classes
+from pydiverse.transform._internal.ops.operator import Ftype
 from pydiverse.transform._internal.tree import dtypes, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
@@ -193,7 +194,7 @@ class SqlImpl(TableImpl):
             return sqa_col[expr._uuid]
 
         elif isinstance(expr, ColFn):
-            impl = cls.registry.get_impl(
+            impl = cls.impl_store.get_impl(
                 expr.name, tuple(arg.dtype() for arg in expr.args)
             )
 
@@ -221,19 +222,9 @@ class SqlImpl(TableImpl):
             else:
                 order_by = None
 
-            # we need this since some backends cannot do `any` / `all` as a window
-            # function, so we need to emulate it via `max` / `min`.
-            if (partition_by is not None or order_by is not None) and (
-                window_impl := impl.get_variant("window")
-            ):
-                value = window_impl(*args, partition_by=partition_by, order_by=order_by)
-
-            else:
-                value: sqa.ColumnElement = impl(*args, _Impl=cls)
-                if partition_by is not None or order_by is not None:
-                    value = sqa.over(
-                        value, partition_by=partition_by, order_by=order_by
-                    )
+            value: sqa.ColumnElement = impl(*args, _Impl=cls)
+            if partition_by is not None or order_by is not None:
+                value = sqa.over(value, partition_by=partition_by, order_by=order_by)
 
             return value
 
@@ -333,7 +324,7 @@ class SqlImpl(TableImpl):
                     for fn in nd.iter_col_nodes()
                     if (
                         isinstance(fn, ColFn)
-                        and fn.op().ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
+                        and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
                     )
                 )
             )
@@ -559,7 +550,7 @@ class SqlImpl(TableImpl):
             return sqa.String
         elif isinstance(t, dtypes.Bool):
             return sqa.Boolean
-        elif isinstance(t, dtypes.DateTime):
+        elif isinstance(t, dtypes.Datetime):
             return sqa.DateTime
         elif isinstance(t, dtypes.Date):
             return sqa.Date
@@ -583,7 +574,7 @@ class SqlImpl(TableImpl):
         elif isinstance(t, sqa.Boolean):
             return dtypes.Bool()
         elif isinstance(t, sqa.DateTime):
-            return dtypes.DateTime()
+            return dtypes.Datetime()
         elif isinstance(t, sqa.Date):
             return dtypes.Date()
         elif isinstance(t, sqa.Interval):
@@ -672,7 +663,7 @@ def get_engine(nd: AstNode) -> sqa.Engine:
     return engine
 
 
-with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
+with SqlImpl.op(ops.FloorDiv()) as op:
     if sqa.__version__ < "2":
 
         @op.auto
@@ -684,13 +675,6 @@ with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
         @op.auto
         def _floordiv(lhs, rhs):
             return lhs // rhs
-
-
-with SqlImpl.op(ops.RFloorDiv(), check_super=False) as op:
-
-    @op.auto
-    def _rfloordiv(rhs, lhs):
-        return _floordiv(lhs, rhs)
 
 
 with SqlImpl.op(ops.Pow()) as op:
@@ -705,13 +689,6 @@ with SqlImpl.op(ops.Pow()) as op:
             type_ = sqa.Double()
 
         return sqa.func.POW(lhs, rhs, type_=type_)
-
-
-with SqlImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
-        return _pow(lhs, rhs)
 
 
 with SqlImpl.op(ops.Xor()) as op:
@@ -897,7 +874,7 @@ with SqlImpl.op(ops.DtDayOfYear()) as op:
         return sqa.extract("doy", x)
 
 
-with SqlImpl.op(ops.Greatest()) as op:
+with SqlImpl.op(ops.HorizontalMax()) as op:
 
     @op.auto
     def _greatest(*x):
@@ -905,7 +882,7 @@ with SqlImpl.op(ops.Greatest()) as op:
         return sqa.func.GREATEST(*x)
 
 
-with SqlImpl.op(ops.Least()) as op:
+with SqlImpl.op(ops.HorizontalMin()) as op:
 
     @op.auto
     def _least(*x):
@@ -949,34 +926,14 @@ with SqlImpl.op(ops.Any()) as op:
 
     @op.auto
     def _any(x):
-        return sqa.func.coalesce(sqa.func.max(x), sqa.null())
-
-    @op.auto(variant="window")
-    def _any(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.max(x).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
+        return sqa.func.max(x)
 
 
 with SqlImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
-        return sqa.func.coalesce(sqa.func.min(x), sqa.null())
-
-    @op.auto(variant="window")
-    def _all(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.min(x).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
+        return sqa.func.min(x)
 
 
 with SqlImpl.op(ops.Count()) as op:
@@ -993,29 +950,15 @@ with SqlImpl.op(ops.Count()) as op:
 
 with SqlImpl.op(ops.Shift()) as op:
 
-    @op.auto
-    def _shift():
-        raise AssertionError
-
-    @op.auto(variant="window")
     def _shift(
         x,
         by,
         empty_value=None,
-        *,
-        partition_by=None,
-        order_by=None,
     ):
-        if by == 0:
-            return x
-        if by > 0:
-            return sqa.func.LAG(x, by, empty_value, type_=x.type).over(
-                partition_by=partition_by, order_by=order_by
-            )
+        if by >= 0:
+            return sqa.func.LAG(x, by, empty_value, type_=x.type)
         if by < 0:
-            return sqa.func.LEAD(x, -by, empty_value, type_=x.type).over(
-                partition_by=partition_by, order_by=order_by
-            )
+            return sqa.func.LEAD(x, -by, empty_value, type_=x.type)
 
 
 with SqlImpl.op(ops.RowNumber()) as op:

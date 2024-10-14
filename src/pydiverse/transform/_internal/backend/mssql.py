@@ -11,6 +11,7 @@ from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.errors import NotSupportedError
+from pydiverse.transform._internal.ops import classes
 from pydiverse.transform._internal.tree import dtypes, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
@@ -65,7 +66,7 @@ class MsSqlImpl(SqlImpl):
 
     @classmethod
     def sqa_type(cls, t: dtypes.Dtype):
-        if isinstance(t, dtypes.DateTime):
+        if isinstance(t, dtypes.Datetime):
             return DATETIME2
 
         return super().sqa_type(t)
@@ -114,9 +115,9 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         return expr
 
     elif isinstance(expr, ColFn):
-        op = MsSqlImpl.registry.get_op(expr.name)
+        op = MsSqlImpl.impl_store.get_op(expr.name)
         wants_bool_as_bit_input = not isinstance(
-            op, ops.logical.BooleanBinary | ops.logical.Invert
+            op, classes.logical.BooleanBinary | classes.logical.Invert
         )
 
         converted = copy.copy(expr)
@@ -128,12 +129,12 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
             for key, arr in expr.context_kwargs.items()
         }
 
-        impl = MsSqlImpl.registry.get_impl(
+        impl = MsSqlImpl.impl_store.get_impl(
             expr.name, tuple(arg.dtype() for arg in expr.args)
         )
 
         if isinstance(impl.return_type, dtypes.Bool):
-            returns_bool_as_bit = not isinstance(op, ops.logical.Logical)
+            returns_bool_as_bit = not isinstance(op, classes.logical.Logical)
 
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr(
@@ -242,13 +243,6 @@ with MsSqlImpl.op(ops.Pow()) as op:
         # a lot of precision if the exponent is <= 1
         # https://learn.microsoft.com/en-us/sql/t-sql/functions/power-transact-sql?view=sql-server-ver16
         return sqa.func.POWER(sqa.cast(lhs, sqa.Double()), rhs, type_=sqa.Double())
-
-
-with MsSqlImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
-        return _pow(lhs, rhs)
 
 
 with MsSqlImpl.op(ops.StrLen()) as op:

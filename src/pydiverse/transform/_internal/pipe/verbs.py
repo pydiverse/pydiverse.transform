@@ -9,7 +9,7 @@ from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.ops.operator import Ftype
 from pydiverse.transform._internal.pipe.pipeable import verb
 from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree import dtypes
@@ -265,7 +265,7 @@ def filter(table: Table, *predicates: ColExpr):
             )
 
         for fn in cond.iter_subtree():
-            if isinstance(fn, ColFn) and fn.op().ftype in (
+            if isinstance(fn, ColFn) and fn.op.ftype in (
                 Ftype.WINDOW,
                 Ftype.AGGREGATE,
             ):
@@ -560,7 +560,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
                 update_partition_by
                 and isinstance(expr, ColFn)
                 and "partition_by" not in expr.context_kwargs
-                and (expr.op().ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
+                and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
             ):
                 expr.context_kwargs["partition_by"] = table._cache.partition_by
 

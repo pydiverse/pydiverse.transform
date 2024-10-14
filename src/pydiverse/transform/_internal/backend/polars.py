@@ -8,7 +8,8 @@ import polars as pl
 from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.ops import classes
+from pydiverse.transform._internal.ops.operator import Ftype
 from pydiverse.transform._internal.tree import dtypes, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
@@ -96,9 +97,8 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
-        op = PolarsImpl.registry.get_op(expr.name)
         args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
-        impl = PolarsImpl.registry.get_impl(
+        impl = PolarsImpl.impl_store.get_impl(
             expr.name,
             tuple(arg.dtype() for arg in expr.args),
         )
@@ -126,7 +126,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
                 nulls_last=[nl if nl is not None else False for nl in nulls_last],
             )
 
-        if op.name in ("rank", "dense_rank"):
+        if expr.op.name in ("rank", "dense_rank"):
             assert len(expr.args) == 0
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
@@ -136,7 +136,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         # TODO: currently, count is the only aggregation function where we don't want
         # to return null for cols containing only null values. If this happens for more
         # aggregation functions, make this configurable in e.g. the operator spec.
-        if op.ftype == Ftype.AGGREGATE and op.name != "count":
+        if expr.op.ftype == Ftype.AGGREGATE and expr.op.name != "count":
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -156,10 +156,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             value = value.over(partition_by, order_by=order_by)
 
         elif arrange:
-            if op.ftype == Ftype.AGGREGATE:
-                # TODO: don't fail, but give a warning that `arrange` is useless
-                # here
-                ...
+            assert expr.op.ftype == Ftype.WINDOW
 
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
@@ -287,7 +284,7 @@ def compile_ast(
         def has_path_to_leaf_without_agg(expr: ColExpr):
             if isinstance(expr, Col):
                 return True
-            if isinstance(expr, ColFn) and expr.op().ftype == Ftype.AGGREGATE:
+            if isinstance(expr, ColFn) and expr.op.ftype == Ftype.AGGREGATE:
                 return False
             return any(
                 has_path_to_leaf_without_agg(child) for child in expr.iter_children()
@@ -361,7 +358,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     elif isinstance(t, pl.String):
         return dtypes.String()
     elif isinstance(t, pl.Datetime):
-        return dtypes.DateTime()
+        return dtypes.Datetime()
     elif isinstance(t, pl.Date):
         return dtypes.Date()
     elif isinstance(t, pl.Duration):
@@ -381,7 +378,7 @@ def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
         return pl.Boolean()
     elif isinstance(t, dtypes.String):
         return pl.String()
-    elif isinstance(t, dtypes.DateTime):
+    elif isinstance(t, dtypes.Datetime):
         return pl.Datetime()
     elif isinstance(t, dtypes.Date):
         return pl.Date()
@@ -556,29 +553,15 @@ with PolarsImpl.op(ops.DtMilliseconds()) as op:
 
 with PolarsImpl.op(ops.Sub()) as op:
 
-    @op.extension(ops.DtSub)
+    @op.extension(classes.DtSub)
     def _dt_sub(lhs, rhs):
-        return lhs - rhs
-
-
-with PolarsImpl.op(ops.RSub()) as op:
-
-    @op.extension(ops.DtRSub)
-    def _dt_rsub(rhs, lhs):
         return lhs - rhs
 
 
 with PolarsImpl.op(ops.Add()) as op:
 
-    @op.extension(ops.DtDurAdd)
+    @op.extension(classes.DtDurAdd)
     def _dt_dur_add(lhs, rhs):
-        return lhs + rhs
-
-
-with PolarsImpl.op(ops.RAdd()) as op:
-
-    @op.extension(ops.DtDurRAdd)
-    def _dt_dur_radd(rhs, lhs):
         return lhs + rhs
 
 
@@ -689,14 +672,14 @@ with PolarsImpl.op(ops.Count()) as op:
         return pl.len().cast(pl.Int64) if x is None else x.count().cast(pl.Int64)
 
 
-with PolarsImpl.op(ops.Greatest()) as op:
+with PolarsImpl.op(ops.HorizontalMax()) as op:
 
     @op.auto
     def _greatest(*x):
         return pl.max_horizontal(*x)
 
 
-with PolarsImpl.op(ops.Least()) as op:
+with PolarsImpl.op(ops.HorizontalMin()) as op:
 
     @op.auto
     def _least(*x):
