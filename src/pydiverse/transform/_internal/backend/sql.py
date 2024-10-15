@@ -753,7 +753,10 @@ with SqlImpl.op(ops.IsIn()) as op:
 
     @op.auto
     def _isin(x, *values):
-        return functools.reduce(operator.or_, map(lambda v: x == v, values))
+        res = x.in_(v for v in values if not isinstance(v.type, sqa.types.NullType))
+        if any(isinstance(v.type, sqa.types.NullType) for v in values):
+            res = res | x.is_(sqa.null())
+        return res
 
 
 with SqlImpl.op(ops.IsNull()) as op:
