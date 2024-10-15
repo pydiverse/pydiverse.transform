@@ -17,10 +17,10 @@ jobs:
       - name: Checkout branch
         uses: actions/checkout@v4
 
-      - name: Install Python 3.10
-        uses: actions/setup-python@v5
+      - name: Setup Pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
         with:
-          python-version: "3.10"
+          environments: py310
 
       - name: Linting - Run pre-commit checks
         uses: pre-commit/action@v3.0.1
