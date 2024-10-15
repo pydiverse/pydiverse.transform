@@ -19,6 +19,12 @@ def format_param(name: str, dtype: Dtype) -> str:
     return name
 
 
+def type_annotation(param: Dtype) -> str:
+    if isinstance(param, Template):
+        return "ColExpr"
+    return f"ColExpr[{param.__class__.__name__}]"
+
+
 # TODO: generate the corresponding python type if a param is const
 def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
     assert len(sig.params) >= 1
@@ -31,11 +37,7 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
 
     annotated_args = ", ".join(
         f"{format_param(name, param)}: "
-        + (
-            f"ColExpr[{param.__class__.__name__}]"
-            if not isinstance(param, Template)
-            else "ColExpr"
-        )
+        + type_annotation(param)
         + (f" = {default_val}" if default_val is not ... else "")
         for param, name, default_val in zip(
             sig.params, op.arg_names, defaults, strict=True
@@ -59,7 +61,10 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
     else:
         annotated_kwargs = ""
 
-    return f"    def {name}({annotated_args}{annotated_kwargs}):\n"
+    return (
+        f"    def {name}({annotated_args}{annotated_kwargs}) "
+        f"-> {type_annotation(sig.return_type)}:\n"
+    )
 
 
 def generate_fn_body(op: Operator, sig: Signature, arg_names: list[str] | None = None):
