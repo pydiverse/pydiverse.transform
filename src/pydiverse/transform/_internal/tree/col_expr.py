@@ -9,7 +9,7 @@ import html
 import itertools
 import operator
 from collections.abc import Callable, Iterable
-from typing import Any, overload
+from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
 from pydiverse.transform._internal.errors import FunctionTypeError
@@ -29,8 +29,10 @@ from pydiverse.transform._internal.tree.dtypes import (
     python_type_to_pdt,
 )
 
+T = TypeVar("T")
 
-class ColExpr:
+
+class ColExpr(Generic[T]):
     __slots__ = ["_dtype", "_ftype"]
 
     __contains__ = None
