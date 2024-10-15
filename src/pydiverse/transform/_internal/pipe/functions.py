@@ -16,7 +16,7 @@ from pydiverse.transform._internal.tree.col_expr import (
 )
 from pydiverse.transform._internal.tree.dtypes import Bool, Dtype, Int64
 
-__all__ = ["count", "row_number", "rank", "when", "dense_rank", "min", "max"]
+__all__ = ["len", "row_number", "rank", "when", "dense_rank", "min", "max"]
 
 
 def when(condition: ColExpr) -> WhenClause:
@@ -32,17 +32,6 @@ def when(condition: ColExpr) -> WhenClause:
 
 def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
     return LiteralCol(val, dtype)
-
-
-def count(
-    x: ColExpr | None = None,
-    *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-) -> ColExpr[Int64]:
-    if x is None:
-        return ColFn("count", partition_by=partition_by, filter=filter)
-    return ColFn("count", x, partition_by=partition_by, filter=filter)
 
 
 def dense_rank(
@@ -62,6 +51,14 @@ def max(*args: ColExpr) -> ColExpr:
 
 def min(*args: ColExpr) -> ColExpr:
     return ColFn("hmin", *args)
+
+
+def len(
+    *,
+    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+) -> ColExpr[Int64]:
+    return ColFn("len", partition_by=partition_by, filter=filter)
 
 
 def rank(

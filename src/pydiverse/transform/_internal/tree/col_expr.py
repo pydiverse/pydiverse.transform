@@ -539,7 +539,7 @@ class ColExpr(Generic[T]):
         return ColFn("ceil", self)
 
     def count(
-        self: ColExpr = None,
+        self: ColExpr,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
@@ -958,21 +958,17 @@ class ColFn(ColExpr):
 
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
-                assert self.name == "count"
-                self.args = [LiteralCol(0)]
-
-            # TODO: check that this is an aggregation
-
-            assert len(self.args) == 1
-            self.args[0] = CaseExpr(
-                [
-                    (
-                        functools.reduce(operator.and_, (cond for cond in filters)),
-                        self.args[0],
-                    )
-                ]
-            )
-            del self.context_kwargs["filter"]
+                assert self.name == "len"
+            else:
+                self.args[0] = CaseExpr(
+                    [
+                        (
+                            functools.reduce(operator.and_, (cond for cond in filters)),
+                            self.args[0],
+                        )
+                    ]
+                )
+                del self.context_kwargs["filter"]
 
         super().__init__()
         # try to eagerly resolve the types to get a nicer stack trace on type errors

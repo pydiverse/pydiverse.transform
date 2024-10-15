@@ -126,7 +126,7 @@ def generate_overloads(
     if name is None:
         name = op.name if not in_namespace else op.name.split(".")[1]
 
-    has_overloads = op.name != "count" and len(op.signatures) > 1
+    has_overloads = len(op.signatures) > 1
     if has_overloads:
         for sig in op.signatures:
             res += (
@@ -224,7 +224,7 @@ with open(fns_path, "r+") as file:
 
     for line in file:
         new_file_contents += line
-        if line.startswith('    return ColFn("count"'):
+        if line.startswith("    return LiteralCol"):
             for op_name in sorted(PolarsImpl.registry.ALL_REGISTERED_OPS):
                 op = PolarsImpl.registry.get_op(op_name)
                 if not isinstance(op, NoExprMethod):

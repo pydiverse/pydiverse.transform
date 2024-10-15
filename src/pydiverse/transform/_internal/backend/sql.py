@@ -965,12 +965,14 @@ with SqlImpl.op(ops.Count()) as op:
 
     @op.auto
     def _count(x=None):
-        if x is None:
-            # Get the number of rows
-            return sqa.func.count()
-        else:
-            # Count non null values
-            return sqa.func.count(x)
+        return sqa.func.count(x)
+
+
+with SqlImpl.op(ops.Len()) as op:
+
+    @op.auto
+    def _len():
+        return sqa.func.count()
 
 
 with SqlImpl.op(ops.Shift()) as op:
