@@ -11,14 +11,14 @@ from pydiverse.transform._internal.tree.registry import (
 
 
 def assert_signature(
-    s: OperatorSignature, args: list[dtypes.Dtype], rtype: dtypes.Dtype
+    s: OperatorSignature, args: list[dtypes.Dtype], return_type: dtypes.Dtype
 ):
-    assert len(s.args) == len(args)
+    assert len(s.params) == len(args)
 
-    for actual, expected in zip(s.args, args, strict=True):
+    for actual, expected in zip(s.params, args, strict=True):
         assert expected.same_kind(actual)
 
-    assert rtype.same_kind(s.rtype)
+    assert return_type.same_kind(s.return_type)
 
 
 class TestOperatorSignature:
@@ -44,22 +44,22 @@ class TestOperatorSignature:
 
     def test_parse_template(self):
         s = OperatorSignature.parse("T, int64 -> int64")
-        assert isinstance(s.args[0], dtypes.Template)
+        assert isinstance(s.params[0], dtypes.Template)
 
         s = OperatorSignature.parse("T -> T")
-        assert isinstance(s.args[0], dtypes.Template)
-        assert isinstance(s.rtype, dtypes.Template)
+        assert isinstance(s.params[0], dtypes.Template)
+        assert isinstance(s.return_type, dtypes.Template)
 
         with pytest.raises(ValueError):
             OperatorSignature.parse("T, T -> U")
 
     def test_parse_varargs(self):
         s = OperatorSignature.parse("int64, str... -> int64")
-        assert not s.args[0].vararg
-        assert s.args[1].vararg
+        assert not s.params[0].vararg
+        assert s.params[1].vararg
 
         s = OperatorSignature.parse("int64... -> bool")
-        assert s.args[0].vararg
+        assert s.params[0].vararg
 
         with pytest.raises(ValueError):
             OperatorSignature.parse("int64..., str -> int64")
@@ -74,8 +74,8 @@ class TestOperatorSignature:
 
     def test_parse_const(self):
         s = OperatorSignature.parse("const int64 -> int64")
-        assert s.args[0].const
-        assert not s.rtype.const
+        assert s.params[0].const
+        assert not s.return_type.const
 
 
 def parse_dtypes(*strings):

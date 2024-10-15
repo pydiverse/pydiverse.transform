@@ -56,7 +56,7 @@ class OperatorImpl:
         templates_set = set()
         template_indices = []
         const_modifiers = []
-        for i, dtype in enumerate(signature.args):
+        for i, dtype in enumerate(signature.params):
             if isinstance(dtype, dtypes.Template):
                 num_templates += 1
                 templates_set.add(dtype.name)
@@ -72,7 +72,7 @@ class OperatorImpl:
             tuple(template_indices),
             tuple(const_modifiers),
             is_vararg,
-            -len(signature.args),
+            -len(signature.params),
             self.__id,
         )
 
@@ -290,11 +290,11 @@ class OperatorSignature:
     """
     Specification:
 
-        signature ::= arguments "->" rtype
+        signature ::= arguments "->" return_type
         arguments ::= (modifiers dtype ",")* terminal_arg
         terminal_arg ::= modifiers (dtype | vararg)
         vararg ::= dtype "..."
-        rtype ::= dtype
+        return_type ::= dtype
         dtype ::= template | "int64" | "float64" | "str" | "bool" | and others...
         modifiers ::= "const"?
         template ::= single uppercase character
@@ -313,13 +313,13 @@ class OperatorSignature:
 
     """
 
-    def __init__(self, args: list[dtypes.Dtype], rtype: dtypes.Dtype):
+    def __init__(self, params: list[dtypes.Dtype], return_type: dtypes.Dtype):
         """
         :param args: Tuple of argument types.
-        :param rtype: The return type.
+        :param return_type: The return type.
         """
-        self.args = args
-        self.rtype = rtype
+        self.params = params
+        self.return_type = return_type
 
     @classmethod
     def parse(cls, signature: str) -> OperatorSignature:
@@ -334,55 +334,55 @@ class OperatorSignature:
             raise ValueError("Invalid signature: arrow (->) missing.")
 
         arg_sig, r_sig = signature.split("->")
-        args = parse_cstypes(arg_sig)
-        rtype = parse_cstypes(r_sig)
+        params = parse_cstypes(arg_sig)
+        return_type = parse_cstypes(r_sig)
 
         # Validate Signature
-        if len(rtype) != 1:
+        if len(return_type) != 1:
             raise ValueError(
                 f"Invalid operator signature '{signature}'. Expected exactly one return"
                 " type."
             )
 
-        rtype = rtype[0]
+        return_type = return_type[0]
 
         # Validate Template
         # Output template must also occur in signature
-        if isinstance(rtype, dtypes.Template):
-            if rtype.name not in [arg.name for arg in args]:
+        if isinstance(return_type, dtypes.Template):
+            if return_type.name not in [arg.name for arg in params]:
                 raise ValueError(
-                    f"Template return type '{rtype}' must also occur in the"
+                    f"Template return type '{return_type}' must also occur in the"
                     " argument signature."
                 )
 
         # Validate vararg
         # Vararg can only occur for the very last element
-        for arg in args[:-1]:
+        for arg in params[:-1]:
             if arg.vararg:
                 raise ValueError("Only last argument can be a vararg.")
 
-        if rtype.vararg:
+        if return_type.vararg:
             raise ValueError("Return value can't be a vararg.")
 
         return OperatorSignature(
-            args=args,
-            rtype=rtype,
+            params=params,
+            return_type=return_type,
         )
 
     def __repr__(self):
-        args_str = ", ".join(str(arg) for arg in self.args)
-        return args_str + " -> " + str(self.rtype)
+        args_str = ", ".join(str(arg) for arg in self.params)
+        return args_str + " -> " + str(self.return_type)
 
     def __hash__(self):
-        return hash((self.args, self.rtype))
+        return hash((self.params, self.return_type))
 
     def __eq__(self, other):
         if not isinstance(other, OperatorSignature):
             return False
-        return self.args == other.args and self.rtype == other.rtype
+        return self.params == other.params and self.return_type == other.return_type
 
     def __iter__(self):
-        for arg in self.args:
+        for arg in self.params:
             if not arg.vararg:
                 yield arg
             else:
@@ -390,9 +390,9 @@ class OperatorSignature:
 
     @property
     def is_vararg(self) -> bool:
-        if len(self.args) == 0:
+        if len(self.params) == 0:
             return False
-        return self.args[-1].vararg
+        return self.params[-1].vararg
 
 
 class OperatorImplStore:
@@ -438,12 +438,14 @@ class OperatorImplStore:
                 " Make sure there is an exact match to add a variant."
             )
 
-        assert node.operator.signature.rtype.same_kind(operator.signature.rtype)
+        assert node.operator.signature.return_type.same_kind(
+            operator.signature.return_type
+        )
         node.operator.add_variant(name, operator.impl)
 
     def get_node(self, signature: OperatorSignature, create_missing: bool = True):
         node = self.root
-        for dtype in signature.args:
+        for dtype in signature.params:
             for child in node.children:
                 if child.value == dtype:
                     node = child
@@ -481,12 +483,12 @@ class OperatorImplStore:
                 best_match = (match, templates)
                 best_score = score
 
-        rtype = best_match[0].operator.signature.rtype
-        if isinstance(rtype, dtypes.Template):
-            # If rtype is a template -> Translate
-            rtype = best_match[1][rtype.name]
+        return_type = best_match[0].operator.signature.return_type
+        if isinstance(return_type, dtypes.Template):
+            # If return_type is a template -> Translate
+            return_type = best_match[1][return_type.name]
 
-        return TypedOperatorImpl.from_operator_impl(best_match[0].operator, rtype)
+        return TypedOperatorImpl.from_operator_impl(best_match[0].operator, return_type)
 
     def _find_matches(
         self, signature: tuple[dtypes.Dtype]

@@ -58,6 +58,7 @@ class Operator:
     ftype: Ftype = NotImplemented
     signatures: list[str] = None
     context_kwargs: set[str] = None
+    arg_names = None
 
     def __new__(cls, *args, **kwargs):
         if not getattr(cls, _OPERATOR_VALID, False):
@@ -114,7 +115,7 @@ class Arity(Operator):
     n_arguments: int = NotImplemented
 
     def validate_signature(self, signature):
-        assert len(signature.args) == self.n_arguments
+        assert len(signature.params) == self.n_arguments
         super().validate_signature(signature)
 
 
@@ -124,10 +125,12 @@ class Nullary(Arity):
 
 class Unary(Arity):
     n_arguments = 1
+    arg_names = ["self"]
 
 
 class Binary(Arity):
     n_arguments = 2
+    arg_names = ["self", "other"]
 
 
 # Base operator types
