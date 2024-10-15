@@ -4,19 +4,12 @@ from pydiverse.transform._internal.ops.core import Binary, ElementWise, Unary
 
 __all__ = [
     "Add",
-    "RAdd",
     "Sub",
-    "RSub",
     "Mul",
-    "RMul",
     "TrueDiv",
-    "RTrueDiv",
     "FloorDiv",
-    "RFloorDiv",
     "Pow",
-    "RPow",
     "Mod",
-    "RMod",
     "Neg",
     "Pos",
     "Abs",
@@ -41,10 +34,6 @@ class Add(ElementWise, Binary):
     ]
 
 
-class RAdd(Add):
-    name = "__radd__"
-
-
 class Sub(ElementWise, Binary):
     name = "__sub__"
     signatures = [
@@ -52,10 +41,6 @@ class Sub(ElementWise, Binary):
         "float64, float64 -> float64",
         "decimal, decimal -> decimal",
     ]
-
-
-class RSub(Sub):
-    name = "__rsub__"
 
 
 class Mul(ElementWise, Binary):
@@ -67,10 +52,6 @@ class Mul(ElementWise, Binary):
     ]
 
 
-class RMul(Mul):
-    name = "__rmul__"
-
-
 class TrueDiv(ElementWise, Binary):
     name = "__truediv__"
     signatures = [
@@ -80,19 +61,11 @@ class TrueDiv(ElementWise, Binary):
     ]
 
 
-class RTrueDiv(TrueDiv):
-    name = "__rtruediv__"
-
-
 class FloorDiv(ElementWise, Binary):
     name = "__floordiv__"
     signatures = [
         "int64, int64 -> int64",
     ]
-
-
-class RFloorDiv(FloorDiv):
-    name = "__rfloordiv__"
 
 
 class Pow(ElementWise, Binary):
@@ -102,11 +75,6 @@ class Pow(ElementWise, Binary):
         "float64, float64 -> float64",
         "decimal, decimal -> decimal",
     ]
-    arg_names = ["self", "exponent"]
-
-
-class RPow(Pow):
-    name = "__rpow__"
 
 
 class Mod(ElementWise, Binary):
@@ -114,10 +82,6 @@ class Mod(ElementWise, Binary):
     signatures = [
         "int64, int64 -> int64",
     ]
-
-
-class RMod(Mod):
-    name = "__rmod__"
 
 
 class Neg(ElementWise, Unary):

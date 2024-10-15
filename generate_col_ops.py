@@ -16,6 +16,18 @@ from pydiverse.transform._internal.tree.registry import Signature
 path = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 reg = PolarsImpl.registry
 namespaces = ["str", "dt"]
+rversions = {
+    "__add__",
+    "__sub__",
+    "__mul__",
+    "__truediv__",
+    "__floordiv__",
+    "__pow__",
+    "__mod__",
+    "__and__",
+    "__or__",
+    "__xor__",
+}
 
 
 def format_param(name: str, dtype: Dtype) -> str:
@@ -24,8 +36,8 @@ def format_param(name: str, dtype: Dtype) -> str:
     return name
 
 
-def type_annotation(param: Dtype) -> str:
-    if isinstance(param, Template):
+def type_annotation(param: Dtype, specialize_generic: bool) -> str:
+    if not specialize_generic or isinstance(param, Template):
         return "ColExpr"
     if param.const:
         python_type = pdt_type_to_python(param)
@@ -33,7 +45,9 @@ def type_annotation(param: Dtype) -> str:
     return f"ColExpr[{param.__class__.__name__}]"
 
 
-def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
+def generate_fn_decl(
+    op: Operator, sig: Signature, *, name=None, specialize_generic: bool = True
+) -> str:
     assert len(sig.params) >= 1
     if name is None:
         name = op.name
@@ -44,7 +58,7 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
 
     annotated_args = ", ".join(
         f"{format_param(name, param)}: "
-        + type_annotation(param)
+        + type_annotation(param, specialize_generic)
         + (f" = {default_val}" if default_val is not ... else "")
         for param, name, default_val in zip(
             sig.params, op.arg_names, defaults, strict=True
@@ -70,13 +84,24 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
 
     return (
         f"    def {name}({annotated_args}{annotated_kwargs}) "
-        f"-> {type_annotation(sig.return_type)}:\n"
+        f"-> {type_annotation(sig.return_type, specialize_generic)}:\n"
     )
 
 
-def generate_fn_body(op: Operator, sig: Signature, arg_names: list[str] | None = None):
+def generate_fn_body(
+    op: Operator,
+    sig: Signature,
+    arg_names: list[str] | None = None,
+    *,
+    rversion: bool = False,
+):
     if arg_names is None:
         arg_names = op.arg_names
+
+    if rversion:
+        assert len(arg_names) == 2
+        assert not any(param.vararg for param in sig.params)
+        arg_names = list(reversed(arg_names))
 
     args = "".join(
         f", {format_param(name, param)}"
@@ -89,6 +114,37 @@ def generate_fn_body(op: Operator, sig: Signature, arg_names: list[str] | None =
         kwargs = ""
 
     return f'        return ColFn("{op.name}"{args}{kwargs})\n\n'
+
+
+def generate_overloads(
+    op: Operator, *, name: str | None = None, rversion: bool = False
+):
+    res = ""
+    in_namespace = "." in op.name
+    if name is None:
+        name = op.name if not in_namespace else op.name.split(".")[1]
+
+    if op.name != "count" and len(op.signatures) > 1:
+        for sig in op.signatures:
+            res += (
+                "    @overload\n"
+                + generate_fn_decl(op, Signature.parse(sig), name=name)
+                + "        ...\n\n"
+            )
+
+    res += generate_fn_decl(
+        op,
+        Signature.parse(op.signatures[0]),
+        name=name,
+        specialize_generic=len(op.signatures) == 1,
+    ) + generate_fn_body(
+        op,
+        Signature.parse(op.signatures[0]),
+        ["self.arg"] + op.arg_names[1:] if in_namespace else None,
+        rversion=rversion,
+    )
+
+    return res
 
 
 with open(path, "r+") as file:
@@ -114,32 +170,16 @@ with open(path, "r+") as file:
                 if isinstance(op, NoExprMethod):
                     continue
 
-                op_definition = ""
-                in_namespace = "." in op.name
-                method_name = op.name if not in_namespace else op.name.split(".")[1]
+                op_overloads = generate_overloads(op)
+                if op_name in rversions:
+                    op_overloads += generate_overloads(
+                        op, name=f"__r{op_name[2:]}", rversion=True
+                    )
 
-                if op.name != "count":
-                    for sig in op.signatures[1:]:
-                        op_definition += (
-                            "    @overload\n"
-                            + generate_fn_decl(
-                                op, Signature.parse(sig), name=method_name
-                            )
-                            + "        ...\n\n"
-                        )
-
-                op_definition += generate_fn_decl(
-                    op, Signature.parse(op.signatures[0]), name=method_name
-                ) + generate_fn_body(
-                    op,
-                    Signature.parse(op.signatures[0]),
-                    ["self.arg"] + op.arg_names[1:] if in_namespace else None,
-                )
-
-                if in_namespace:
-                    namespace_contents[op.name.split(".")[0]] += op_definition
+                if "." in op.name:
+                    namespace_contents[op.name.split(".")[0]] += op_overloads
                 else:
-                    new_file_contents += op_definition
+                    new_file_contents += op_overloads
 
             for name in namespaces:
                 new_file_contents += (

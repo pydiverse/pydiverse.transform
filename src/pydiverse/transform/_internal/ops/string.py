@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.core import ElementWise, OperatorExtension, Unary
 from pydiverse.transform._internal.ops.logical import Logical
-from pydiverse.transform._internal.ops.numeric import Add, RAdd
+from pydiverse.transform._internal.ops.numeric import Add
 
 __all__ = [
     "StrAdd",
-    "StrRAdd",
     "StrStrip",
     "StrLen",
     "StrToUpper",
@@ -26,16 +25,6 @@ class StrAdd(OperatorExtension):
     signatures = [
         "str, str -> str",
     ]
-
-
-class StrRAdd(OperatorExtension):
-    operator = RAdd
-    signatures = [
-        "str, str -> str",
-    ]
-
-
-####
 
 
 class StrUnary(ElementWise, Unary):

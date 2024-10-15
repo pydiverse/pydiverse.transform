@@ -16,11 +16,8 @@ __all__ = [
     "FillNull",
     "IsIn",
     "And",
-    "RAnd",
     "Or",
-    "ROr",
     "Xor",
-    "RXor",
     "Invert",
 ]
 
@@ -98,9 +95,6 @@ class IsIn(ElementWise, Logical):
     arg_names = ["self", "args"]
 
 
-#### Boolean Operators ####
-
-
 class BooleanBinary(ElementWise, Binary, Logical):
     signatures = [
         "bool, bool -> bool",
@@ -122,24 +116,12 @@ class And(BooleanBinary):
     name = "__and__"
 
 
-class RAnd(BooleanBinary):
-    name = "__rand__"
-
-
 class Or(BooleanBinary):
     name = "__or__"
 
 
-class ROr(BooleanBinary):
-    name = "__ror__"
-
-
 class Xor(BooleanBinary):
     name = "__xor__"
-
-
-class RXor(BooleanBinary):
-    name = "__rxor__"
 
 
 class Invert(ElementWise, Unary, Logical):

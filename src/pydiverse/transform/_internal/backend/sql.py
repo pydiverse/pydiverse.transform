@@ -686,13 +686,6 @@ with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
             return lhs // rhs
 
 
-with SqlImpl.op(ops.RFloorDiv(), check_super=False) as op:
-
-    @op.auto
-    def _rfloordiv(rhs, lhs):
-        return _floordiv(lhs, rhs)
-
-
 with SqlImpl.op(ops.Pow()) as op:
 
     @op.auto
@@ -707,24 +700,10 @@ with SqlImpl.op(ops.Pow()) as op:
         return sqa.func.POW(lhs, rhs, type_=type_)
 
 
-with SqlImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
-        return _pow(lhs, rhs)
-
-
 with SqlImpl.op(ops.Xor()) as op:
 
     @op.auto
     def _xor(lhs, rhs):
-        return lhs != rhs
-
-
-with SqlImpl.op(ops.RXor()) as op:
-
-    @op.auto
-    def _rxor(rhs, lhs):
         return lhs != rhs
 
 

@@ -244,13 +244,6 @@ with MsSqlImpl.op(ops.Pow()) as op:
         return sqa.func.POWER(sqa.cast(lhs, sqa.Double()), rhs, type_=sqa.Double())
 
 
-with MsSqlImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
-        return _pow(lhs, rhs)
-
-
 with MsSqlImpl.op(ops.StrLen()) as op:
 
     @op.auto

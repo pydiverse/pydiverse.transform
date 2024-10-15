@@ -164,28 +164,10 @@ with TableImpl.op(ops.Add()) as op:
         return lhs + rhs
 
 
-with TableImpl.op(ops.RAdd()) as op:
-
-    @op.auto
-    def _radd(rhs, lhs):
-        return lhs + rhs
-
-    @op.extension(ops.StrRAdd)
-    def _str_radd(lhs, rhs):
-        return lhs + rhs
-
-
 with TableImpl.op(ops.Sub()) as op:
 
     @op.auto
     def _sub(lhs, rhs):
-        return lhs - rhs
-
-
-with TableImpl.op(ops.RSub()) as op:
-
-    @op.auto
-    def _rsub(rhs, lhs):
         return lhs - rhs
 
 
@@ -196,24 +178,10 @@ with TableImpl.op(ops.Mul()) as op:
         return lhs * rhs
 
 
-with TableImpl.op(ops.RMul()) as op:
-
-    @op.auto
-    def _rmul(rhs, lhs):
-        return lhs * rhs
-
-
 with TableImpl.op(ops.TrueDiv()) as op:
 
     @op.auto
     def _truediv(lhs, rhs):
-        return lhs / rhs
-
-
-with TableImpl.op(ops.RTrueDiv()) as op:
-
-    @op.auto
-    def _rtruediv(rhs, lhs):
         return lhs / rhs
 
 
@@ -224,13 +192,6 @@ with TableImpl.op(ops.FloorDiv()) as op:
         return lhs // rhs
 
 
-with TableImpl.op(ops.RFloorDiv()) as op:
-
-    @op.auto
-    def _rfloordiv(rhs, lhs):
-        return lhs // rhs
-
-
 with TableImpl.op(ops.Pow()) as op:
 
     @op.auto
@@ -238,24 +199,10 @@ with TableImpl.op(ops.Pow()) as op:
         return lhs**rhs
 
 
-with TableImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
-        return lhs**rhs
-
-
 with TableImpl.op(ops.Mod()) as op:
 
     @op.auto
     def _mod(lhs, rhs):
-        return lhs % rhs
-
-
-with TableImpl.op(ops.RMod()) as op:
-
-    @op.auto
-    def _rmod(rhs, lhs):
         return lhs % rhs
 
 
@@ -287,13 +234,6 @@ with TableImpl.op(ops.And()) as op:
         return lhs & rhs
 
 
-with TableImpl.op(ops.RAnd()) as op:
-
-    @op.auto
-    def _rand(rhs, lhs):
-        return lhs & rhs
-
-
 with TableImpl.op(ops.Or()) as op:
 
     @op.auto
@@ -301,24 +241,10 @@ with TableImpl.op(ops.Or()) as op:
         return lhs | rhs
 
 
-with TableImpl.op(ops.ROr()) as op:
-
-    @op.auto
-    def _ror(rhs, lhs):
-        return lhs | rhs
-
-
 with TableImpl.op(ops.Xor()) as op:
 
     @op.auto
     def _xor(lhs, rhs):
-        return lhs ^ rhs
-
-
-with TableImpl.op(ops.RXor()) as op:
-
-    @op.auto
-    def _rxor(rhs, lhs):
         return lhs ^ rhs
 
 

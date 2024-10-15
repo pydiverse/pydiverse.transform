@@ -151,42 +151,6 @@ class TypedOperatorImpl:
 
 
 class OperatorRegistry:
-    # It only makes sense to define some dunder methods.
-    # These are the ones which can be registered.
-    SUPPORTED_DUNDER = {
-        "__add__",
-        "__radd__",
-        "__sub__",
-        "__rsub__",
-        "__mul__",
-        "__rmul__",
-        "__truediv__",
-        "__rtruediv__",
-        "__floordiv__",
-        "__rfloordiv__",
-        "__pow__",
-        "__rpow__",
-        "__mod__",
-        "__rmod__",
-        "__round__",
-        "__pos__",
-        "__neg__",
-        "__abs__",
-        "__and__",
-        "__rand__",
-        "__or__",
-        "__ror__",
-        "__xor__",
-        "__rxor__",
-        "__invert__",
-        "__lt__",
-        "__le__",
-        "__eq__",
-        "__ne__",
-        "__gt__",
-        "__ge__",
-    }
-
     # Set containing all operator names that have been defined across all registries.
     # Used for __dir__ method of SymbolicExpression
     ALL_REGISTERED_OPS: set[str] = set()
@@ -206,9 +170,6 @@ class OperatorRegistry:
         """
 
         name = operator.name
-        if name.startswith("__") and name.endswith("__"):
-            if name not in OperatorRegistry.SUPPORTED_DUNDER:
-                raise ValueError(f"Dunder method {name} is not supported.")
 
         if operator in self.registered_ops:
             raise ValueError(

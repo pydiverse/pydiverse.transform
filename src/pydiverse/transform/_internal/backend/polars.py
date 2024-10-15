@@ -570,24 +570,10 @@ with PolarsImpl.op(ops.Sub()) as op:
         return lhs - rhs
 
 
-with PolarsImpl.op(ops.RSub()) as op:
-
-    @op.extension(ops.DtRSub)
-    def _dt_rsub(rhs, lhs):
-        return lhs - rhs
-
-
 with PolarsImpl.op(ops.Add()) as op:
 
     @op.extension(ops.DtDurAdd)
     def _dt_dur_add(lhs, rhs):
-        return lhs + rhs
-
-
-with PolarsImpl.op(ops.RAdd()) as op:
-
-    @op.extension(ops.DtDurRAdd)
-    def _dt_dur_radd(rhs, lhs):
         return lhs + rhs
 
 
