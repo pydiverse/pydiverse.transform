@@ -104,7 +104,7 @@ with SqliteImpl.op(ops.DtMillisecond()) as op:
         return sqa.cast((frac_seconds * _1000) % _1000, sqa.Integer())
 
 
-with SqliteImpl.op(ops.Greatest()) as op:
+with SqliteImpl.op(ops.HMax()) as op:
 
     @op.auto
     def _greatest(*x):
@@ -121,7 +121,7 @@ with SqliteImpl.op(ops.Greatest()) as op:
         return sqa.func.coalesce(sqa.func.MAX(left, right), left, right)
 
 
-with SqliteImpl.op(ops.Least()) as op:
+with SqliteImpl.op(ops.HMin()) as op:
 
     @op.auto
     def _least(*x):

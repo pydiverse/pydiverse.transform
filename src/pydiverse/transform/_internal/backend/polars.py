@@ -685,14 +685,14 @@ with PolarsImpl.op(ops.Count()) as op:
         return pl.len().cast(pl.Int64) if x is None else x.count().cast(pl.Int64)
 
 
-with PolarsImpl.op(ops.Greatest()) as op:
+with PolarsImpl.op(ops.HMax()) as op:
 
     @op.auto
     def _greatest(*x):
         return pl.max_horizontal(*x)
 
 
-with PolarsImpl.op(ops.Least()) as op:
+with PolarsImpl.op(ops.HMin()) as op:
 
     @op.auto
     def _least(*x):

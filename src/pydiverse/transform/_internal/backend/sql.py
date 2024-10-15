@@ -879,7 +879,7 @@ with SqlImpl.op(ops.DtDayOfYear()) as op:
         return sqa.extract("doy", x)
 
 
-with SqlImpl.op(ops.Greatest()) as op:
+with SqlImpl.op(ops.HMax()) as op:
 
     @op.auto
     def _greatest(*x):
@@ -887,7 +887,7 @@ with SqlImpl.op(ops.Greatest()) as op:
         return sqa.func.GREATEST(*x)
 
 
-with SqlImpl.op(ops.Least()) as op:
+with SqlImpl.op(ops.HMin()) as op:
 
     @op.auto
     def _least(*x):

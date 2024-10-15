@@ -3,16 +3,16 @@ from __future__ import annotations
 from pydiverse.transform._internal.ops.core import ElementWise, NoExprMethod
 
 __all__ = [
-    "Greatest",
-    "Least",
+    "HMax",
+    "HMin",
 ]
 
 
-class Greatest(ElementWise, NoExprMethod):
-    name = "__greatest"
+class HMax(ElementWise, NoExprMethod):
+    name = "hmax"
     signatures = ["T... -> T"]
 
 
-class Least(ElementWise, NoExprMethod):
-    name = "__least"
+class HMin(ElementWise, NoExprMethod):
+    name = "hmin"
     signatures = ["T... -> T"]
