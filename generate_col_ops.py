@@ -46,20 +46,26 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
         annotated_kwargs = "".join(
             f", {kwarg}: ColExpr | None = None" for kwarg in op.context_kwargs
         )
+
+        if not sig.params[-1].vararg:
+            annotated_kwargs = ", *" + annotated_kwargs
     else:
         annotated_kwargs = ""
 
     return f"    def {name}({annotated_args}{annotated_kwargs}):\n"
 
 
-def generate_fn_body(op: Operator, sig: Signature):
+def generate_fn_body(op: Operator, sig: Signature, arg_names: list[str] | None = None):
+    if arg_names is None:
+        arg_names = op.arg_names
+
     args = "".join(
         f", {format_param(name, param)}"
-        for param, name in zip(sig.params, op.arg_names, strict=True)
+        for param, name in zip(sig.params, arg_names, strict=True)
     )
 
     if op.context_kwargs is not None:
-        kwargs = "".join(f", {kwarg}" for kwarg in op.context_kwargs)
+        kwargs = "".join(f", {kwarg}={kwarg}" for kwarg in op.context_kwargs)
     else:
         kwargs = ""
 
@@ -72,9 +78,8 @@ with open(path, "r+") as file:
     in_generated_section = False
     namespace_contents: dict[str, str] = {
         name: (
-            "@dataclasses.dataclass()\n"
+            "@dataclasses.dataclass(slots=True)\n"
             f"class {name.title()}Namespace(FnNamespace):\n"
-            f'    name = "{name}"\n\n'
         )
         for name in namespaces
     }
@@ -90,7 +95,8 @@ with open(path, "r+") as file:
                     continue
 
                 op_definition = ""
-                method_name = op.name if "." not in op.name else op.name.split(".")[1]
+                in_namespace = "." in op.name
+                method_name = op.name if not in_namespace else op.name.split(".")[1]
 
                 if op.name != "count":
                     for sig in op.signatures[1:]:
@@ -104,9 +110,13 @@ with open(path, "r+") as file:
 
                 op_definition += generate_fn_decl(
                     op, Signature.parse(op.signatures[0]), name=method_name
-                ) + generate_fn_body(op, Signature.parse(op.signatures[0]))
+                ) + generate_fn_body(
+                    op,
+                    Signature.parse(op.signatures[0]),
+                    ["self.arg"] + op.arg_names[1:] if in_namespace else None,
+                )
 
-                if "." in op.name:
+                if in_namespace:
                     namespace_contents[op.name.split(".")[0]] += op_definition
                 else:
                     new_file_contents += op_definition
@@ -119,10 +129,9 @@ with open(path, "r+") as file:
                 )
 
             new_file_contents += (
-                "@dataclasses.dataclass()\n"
+                "@dataclasses.dataclass(slots=True)\n"
                 "class FnNamespace:\n"
-                "    self: ColExpr\n"
-                "    name: str\n\n"
+                "    arg: ColExpr\n"
             )
 
             for name in namespaces:

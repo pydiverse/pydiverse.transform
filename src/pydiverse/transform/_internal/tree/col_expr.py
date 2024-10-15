@@ -155,17 +155,19 @@ class ColExpr:
 
     def all(
         self: ColExpr[Bool],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("all", self, partition_by, filter)
+        return ColFn("all", self, partition_by=partition_by, filter=filter)
 
     def any(
         self: ColExpr[Bool],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("any", self, partition_by, filter)
+        return ColFn("any", self, partition_by=partition_by, filter=filter)
 
     @overload
     def ceil(self: ColExpr[Decimal]): ...
@@ -175,10 +177,11 @@ class ColExpr:
 
     def count(
         self: ColExpr,
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("count", self, partition_by, filter)
+        return ColFn("count", self, partition_by=partition_by, filter=filter)
 
     def exp(self: ColExpr[Float64]):
         return ColFn("exp", self)
@@ -219,6 +222,7 @@ class ColExpr:
     @overload
     def max(
         self: ColExpr[Float64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
@@ -226,6 +230,7 @@ class ColExpr:
     @overload
     def max(
         self: ColExpr[String],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
@@ -233,6 +238,7 @@ class ColExpr:
     @overload
     def max(
         self: ColExpr[DateTime],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
@@ -240,34 +246,39 @@ class ColExpr:
     @overload
     def max(
         self: ColExpr[Date],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
 
     def max(
         self: ColExpr[Int64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("max", self, partition_by, filter)
+        return ColFn("max", self, partition_by=partition_by, filter=filter)
 
     @overload
     def mean(
         self: ColExpr[Float64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
 
     def mean(
         self: ColExpr[Int64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("mean", self, partition_by, filter)
+        return ColFn("mean", self, partition_by=partition_by, filter=filter)
 
     @overload
     def min(
         self: ColExpr[Float64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
@@ -275,6 +286,7 @@ class ColExpr:
     @overload
     def min(
         self: ColExpr[String],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
@@ -282,6 +294,7 @@ class ColExpr:
     @overload
     def min(
         self: ColExpr[DateTime],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
@@ -289,40 +302,53 @@ class ColExpr:
     @overload
     def min(
         self: ColExpr[Date],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
 
     def min(
         self: ColExpr[Int64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("min", self, partition_by, filter)
+        return ColFn("min", self, partition_by=partition_by, filter=filter)
 
     def shift(
         self: ColExpr,
         n: ColExpr[Int64],
         fill_value: ColExpr = None,
+        *,
         partition_by: ColExpr | None = None,
         arrange: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("shift", self, n, fill_value, partition_by, arrange, filter)
+        return ColFn(
+            "shift",
+            self,
+            n,
+            fill_value,
+            partition_by=partition_by,
+            arrange=arrange,
+            filter=filter,
+        )
 
     @overload
     def sum(
         self: ColExpr[Float64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ): ...
 
     def sum(
         self: ColExpr[Int64],
+        *,
         partition_by: ColExpr | None = None,
         filter: ColExpr | None = None,
     ):
-        return ColFn("sum", self, partition_by, filter)
+        return ColFn("sum", self, partition_by=partition_by, filter=filter)
 
     @property
     def str(self):
@@ -333,112 +359,107 @@ class ColExpr:
         return DtNamespace(self)
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(slots=True)
 class FnNamespace:
-    self: ColExpr
-    name: str
+    arg: ColExpr
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(slots=True)
 class StrNamespace(FnNamespace):
-    name = "str"
-
     def contains(self: ColExpr[String], substr: ColExpr[String]):
-        return ColFn("str.contains", self, substr)
+        return ColFn("str.contains", self.arg, substr)
 
     def ends_with(self: ColExpr[String], suffix: ColExpr[String]):
-        return ColFn("str.ends_with", self, suffix)
+        return ColFn("str.ends_with", self.arg, suffix)
 
     def len(self: ColExpr[String]):
-        return ColFn("str.len", self)
+        return ColFn("str.len", self.arg)
 
     def replace_all(
         self: ColExpr[String], substr: ColExpr[String], replacement: ColExpr[String]
     ):
-        return ColFn("str.replace_all", self, substr, replacement)
+        return ColFn("str.replace_all", self.arg, substr, replacement)
 
     def slice(self: ColExpr[String], offset: ColExpr[Int64], n: ColExpr[Int64]):
-        return ColFn("str.slice", self, offset, n)
+        return ColFn("str.slice", self.arg, offset, n)
 
     def starts_with(self: ColExpr[String], prefix: ColExpr[String]):
-        return ColFn("str.starts_with", self, prefix)
+        return ColFn("str.starts_with", self.arg, prefix)
 
     def strip(self: ColExpr[String]):
-        return ColFn("str.strip", self)
+        return ColFn("str.strip", self.arg)
 
     def to_date(self: ColExpr[String]):
-        return ColFn("str.to_date", self)
+        return ColFn("str.to_date", self.arg)
 
     def to_datetime(self: ColExpr[String]):
-        return ColFn("str.to_datetime", self)
+        return ColFn("str.to_datetime", self.arg)
 
     def to_lower(self: ColExpr[String]):
-        return ColFn("str.to_lower", self)
+        return ColFn("str.to_lower", self.arg)
 
     def to_upper(self: ColExpr[String]):
-        return ColFn("str.to_upper", self)
+        return ColFn("str.to_upper", self.arg)
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(slots=True)
 class DtNamespace(FnNamespace):
-    name = "dt"
-
     @overload
     def day(self: ColExpr[Date]): ...
 
     def day(self: ColExpr[DateTime]):
-        return ColFn("dt.day", self)
+        return ColFn("dt.day", self.arg)
 
     @overload
     def day_of_week(self: ColExpr[Date]): ...
 
     def day_of_week(self: ColExpr[DateTime]):
-        return ColFn("dt.day_of_week", self)
+        return ColFn("dt.day_of_week", self.arg)
 
     @overload
     def day_of_year(self: ColExpr[Date]): ...
 
     def day_of_year(self: ColExpr[DateTime]):
-        return ColFn("dt.day_of_year", self)
+        return ColFn("dt.day_of_year", self.arg)
 
     def days(self: ColExpr[Duration]):
-        return ColFn("dt.days", self)
+        return ColFn("dt.days", self.arg)
 
     def hour(self: ColExpr[DateTime]):
-        return ColFn("dt.hour", self)
+        return ColFn("dt.hour", self.arg)
 
     def hours(self: ColExpr[Duration]):
-        return ColFn("dt.hours", self)
+        return ColFn("dt.hours", self.arg)
 
     def millisecond(self: ColExpr[DateTime]):
-        return ColFn("dt.millisecond", self)
+        return ColFn("dt.millisecond", self.arg)
 
     def milliseconds(self: ColExpr[Duration]):
-        return ColFn("dt.milliseconds", self)
+        return ColFn("dt.milliseconds", self.arg)
 
     def minute(self: ColExpr[DateTime]):
-        return ColFn("dt.minute", self)
+        return ColFn("dt.minute", self.arg)
 
     def minutes(self: ColExpr[Duration]):
-        return ColFn("dt.minutes", self)
+        return ColFn("dt.minutes", self.arg)
 
     @overload
     def month(self: ColExpr[Date]): ...
 
     def month(self: ColExpr[DateTime]):
-        return ColFn("dt.month", self)
+        return ColFn("dt.month", self.arg)
 
     def second(self: ColExpr[DateTime]):
-        return ColFn("dt.second", self)
+        return ColFn("dt.second", self.arg)
 
     def seconds(self: ColExpr[Duration]):
-        return ColFn("dt.seconds", self)
+        return ColFn("dt.seconds", self.arg)
 
     @overload
     def year(self: ColExpr[Date]): ...
 
     def year(self: ColExpr[DateTime]):
-        return ColFn("dt.year", self)
+        return ColFn("dt.year", self.arg)
 
 
 class Col(ColExpr):
