@@ -4,7 +4,7 @@ import os
 from collections.abc import Iterable
 
 from pydiverse.transform._internal.backend.polars import PolarsImpl
-from pydiverse.transform._internal.ops.core import Nullary, Operator
+from pydiverse.transform._internal.ops.core import NoExprMethod, Operator
 from pydiverse.transform._internal.tree.dtypes import Dtype, Template
 from pydiverse.transform._internal.tree.registry import Signature
 
@@ -27,15 +27,17 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
         op.defaults if op.defaults is not None else (... for _ in op.arg_names)
     )
 
-    annotated_args = "".join(
-        f", {format_param(name, param)}: "
+    annotated_args = ", ".join(
+        f"{format_param(name, param)}: "
         + (
             f"ColExpr[{param.__class__.__name__}]"
             if not isinstance(param, Template)
             else "ColExpr"
         )
-        + (f" = {default}" if defaults is not ... else "")
-        for param, name, default in zip(sig.params, op.arg_names, defaults, strict=True)
+        + (f" = {default_val}" if default_val is not ... else "")
+        for param, name, default_val in zip(
+            sig.params, op.arg_names, defaults, strict=True
+        )
     )
 
     if op.context_kwargs is not None:
@@ -46,7 +48,7 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
     else:
         annotated_kwargs = ""
 
-    return f"    def {name}(self{annotated_args}{annotated_kwargs}):\n"
+    return f"    def {name}({annotated_args}{annotated_kwargs}):\n"
 
 
 def generate_fn_body(op: Operator, sig: Signature):
@@ -79,7 +81,7 @@ with open(path, "r+") as file:
             in_generated_section = True
         elif in_col_expr_class and not (line.isspace() or line.startswith("    ")):
             for op in reg.registered_ops:
-                if isinstance(op, Nullary):
+                if isinstance(op, NoExprMethod):
                     continue
                 new_file_contents += generate_fn_decl(
                     op, Signature.parse(op.signatures[0])
@@ -91,9 +93,9 @@ with open(path, "r+") as file:
 
                 for sig in op.signatures[1:]:
                     new_file_contents += (
-                        "@overload\n"
+                        "    @overload\n"
                         + generate_fn_decl(op, Signature.parse(sig))
-                        + "...\n\n"
+                        + "        ...\n\n"
                     )
 
             in_generated_section = False

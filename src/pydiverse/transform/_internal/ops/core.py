@@ -107,7 +107,7 @@ class OperatorExtension:
         return super().__new__(cls, *args, **kwargs)
 
 
-# Arity
+class NoExprMethod(Operator): ...
 
 
 class Arity(Operator):
@@ -120,7 +120,7 @@ class Arity(Operator):
         super().validate_signature(signature)
 
 
-class Nullary(Arity):
+class Nullary(Arity, NoExprMethod):
     n_arguments = 0
 
 

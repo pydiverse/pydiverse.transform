@@ -94,10 +94,8 @@ class GreaterEqual(Comparison):
 
 class IsIn(ElementWise, Logical):
     name = "isin"
-    signatures = [
-        # TODO: A signature like "T, const list[const T] -> bool" would be better
-        "T, T... -> bool",
-    ]
+    signatures = ["T, T... -> bool"]
+    arg_names = ["self", "args"]
 
 
 #### Boolean Operators ####
