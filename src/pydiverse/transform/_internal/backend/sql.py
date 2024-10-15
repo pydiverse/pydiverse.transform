@@ -565,7 +565,7 @@ class SqlImpl(TableImpl):
             return sqa.Date
         elif isinstance(t, dtypes.Duration):
             return sqa.Interval
-        elif isinstance(t, dtypes.NoneDtype):
+        elif isinstance(t, dtypes.NullType):
             return sqa.types.NullType
 
         raise AssertionError
@@ -589,7 +589,7 @@ class SqlImpl(TableImpl):
         elif isinstance(t, sqa.Interval):
             return dtypes.Duration()
         elif isinstance(t, sqa.Null):
-            return dtypes.NoneDtype()
+            return dtypes.NullType()
 
         raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
 

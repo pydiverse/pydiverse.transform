@@ -142,10 +142,10 @@ class Template(Dtype):
         return True
 
 
-class NoneDtype(Dtype):
+class NullType(Dtype):
     """DType used to represent the `None` value."""
 
-    name = "none"
+    name = "null"
 
 
 def python_type_to_pdt(t: type) -> Dtype:
@@ -164,7 +164,7 @@ def python_type_to_pdt(t: type) -> Dtype:
     elif t is datetime.timedelta:
         return Duration()
     elif t is type(None):
-        return NoneDtype()
+        return NullType()
 
     raise TypeError(f"invalid usage of type {t} in a column expression")
 
@@ -184,7 +184,7 @@ def pdt_type_to_python(t: Dtype) -> type:
         return datetime.date
     elif t == Duration:
         return datetime.timedelta
-    elif t == NoneDtype:
+    elif t == NullType:
         return type(None)
 
 
@@ -233,8 +233,8 @@ def dtype_from_string(t: str) -> Dtype:
         return DateTime(const=is_const, vararg=is_vararg)
     if base_type == "duration":
         return Duration(const=is_const, vararg=is_vararg)
-    if base_type == "none":
-        return NoneDtype(const=is_const, vararg=is_vararg)
+    if base_type == "null":
+        return NullType(const=is_const, vararg=is_vararg)
 
     raise ValueError(f"Unknown type '{base_type}'")
 
@@ -245,9 +245,9 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
 
     promoted = dtypes[0]
     for dtype in dtypes[1:]:
-        if isinstance(dtype, NoneDtype):
+        if isinstance(dtype, NullType):
             continue
-        if isinstance(promoted, NoneDtype):
+        if isinstance(promoted, NullType):
             promoted = dtype
             continue
 

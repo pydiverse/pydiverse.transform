@@ -376,7 +376,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     elif isinstance(t, pl.Duration):
         return dtypes.Duration()
     elif isinstance(t, pl.Null):
-        return dtypes.NoneDtype()
+        return dtypes.NullType()
 
     raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
 
@@ -396,7 +396,7 @@ def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
         return pl.Date()
     elif isinstance(t, dtypes.Duration):
         return pl.Duration()
-    elif isinstance(t, dtypes.NoneDtype):
+    elif isinstance(t, dtypes.NullType):
         return pl.Null()
 
     raise AssertionError
@@ -624,7 +624,7 @@ with PolarsImpl.op(ops.IsIn()) as op:
     @op.auto
     def _isin(x, *values, _pdt_args):
         return pl.any_horizontal(
-            (x == val if arg.dtype() != dtypes.NoneDtype else x.is_null())
+            (x == val if arg.dtype() != dtypes.NullType else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 
