@@ -187,7 +187,7 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_col_expr(
-        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], compile_literals=True
+        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], *, compile_literals=True
     ) -> sqa.ColumnElement:
         if isinstance(expr, Col):
             return sqa_col[expr._uuid]
@@ -198,7 +198,7 @@ class SqlImpl(TableImpl):
             )
 
             args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(arg, sqa_col, not impl_arg.const)
+                cls.compile_col_expr(arg, sqa_col, compile_literals=not impl_arg.const)
                 for arg, impl_arg in zip(expr.args, impl.impl.signature, strict=False)
             ]
 
