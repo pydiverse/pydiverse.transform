@@ -5,7 +5,7 @@ from collections import ChainMap
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pydiverse.transform._internal.tree.registry import OperatorSignature
+    from pydiverse.transform._internal.tree.registry import Signature
 
 __all__ = [
     "Ftype",
@@ -58,7 +58,7 @@ class Operator:
     ftype: Ftype = NotImplemented
     signatures: list[str] = None
     context_kwargs: set[str] = None
-    arg_names = None
+    arg_names: list[str] = None
 
     def __new__(cls, *args, **kwargs):
         if not getattr(cls, _OPERATOR_VALID, False):
@@ -83,7 +83,7 @@ class Operator:
     def __hash__(self):
         return hash(type(self))
 
-    def validate_signature(self, signature: OperatorSignature):
+    def validate_signature(self, signature: Signature):
         pass
 
 
@@ -142,18 +142,12 @@ class ElementWise(Operator):
 
 class Aggregate(Operator):
     ftype = Ftype.AGGREGATE
-    context_kwargs = {
-        "partition_by",  # list[Col]
-        "filter",  # SymbolicExpression (NOT a list)
-    }
+    context_kwargs = {"partition_by", "filter"}
 
 
 class Window(Operator):
     ftype = Ftype.WINDOW
-    context_kwargs = {
-        "arrange",  # list[Col]
-        "partition_by",
-    }
+    context_kwargs = {"arrange", "partition_by"}
 
 
 class Marker(Operator):

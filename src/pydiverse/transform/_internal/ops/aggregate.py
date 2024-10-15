@@ -68,6 +68,7 @@ class All(Aggregate, Unary):
 class Count(Aggregate):
     name = "count"
     signatures = [
-        "-> int64",
         "T -> int64",
+        "-> int64",
     ]
+    arg_names = ["self"]

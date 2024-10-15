@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.core import Binary, ElementWise, Operator, Unary
 from pydiverse.transform._internal.tree import dtypes
-from pydiverse.transform._internal.tree.registry import OperatorSignature
+from pydiverse.transform._internal.tree.registry import Signature
 
 __all__ = [
     "Equal",
@@ -46,7 +46,7 @@ class Comparison(ElementWise, Binary, Logical):
         "date, date -> bool",
     ]
 
-    def validate_signature(self, signature: OperatorSignature):
+    def validate_signature(self, signature: Signature):
         assert isinstance(signature.return_type, dtypes.Bool)
         super().validate_signature(signature)
 
@@ -108,7 +108,7 @@ class BooleanBinary(ElementWise, Binary, Logical):
         "bool, bool -> bool",
     ]
 
-    def validate_signature(self, signature: OperatorSignature):
+    def validate_signature(self, signature: Signature):
         assert len(signature.params) == 2
 
         for arg_dtype in signature.params:

@@ -6,13 +6,11 @@ from pydiverse.transform._internal.ops import Operator
 from pydiverse.transform._internal.tree import dtypes
 from pydiverse.transform._internal.tree.registry import (
     OperatorRegistry,
-    OperatorSignature,
+    Signature,
 )
 
 
-def assert_signature(
-    s: OperatorSignature, args: list[dtypes.Dtype], return_type: dtypes.Dtype
-):
+def assert_signature(s: Signature, args: list[dtypes.Dtype], return_type: dtypes.Dtype):
     assert len(s.params) == len(args)
 
     for actual, expected in zip(s.params, args, strict=True):
@@ -23,57 +21,57 @@ def assert_signature(
 
 class TestOperatorSignature:
     def test_parse_simple(self):
-        s = OperatorSignature.parse("int64, int64 -> int64")
+        s = Signature.parse("int64, int64 -> int64")
         assert_signature(s, [dtypes.Int64(), dtypes.Int64()], dtypes.Int64())
 
-        s = OperatorSignature.parse("bool->bool ")
+        s = Signature.parse("bool->bool ")
         assert_signature(s, [dtypes.Bool()], dtypes.Bool())
 
-        s = OperatorSignature.parse("-> int64")
+        s = Signature.parse("-> int64")
         assert_signature(s, [], dtypes.Int64())
 
         with pytest.raises(ValueError):
-            OperatorSignature.parse("int64, int64 -> ")
+            Signature.parse("int64, int64 -> ")
         with pytest.raises(ValueError):
-            OperatorSignature.parse("int64, int64 -> int64, int64")
+            Signature.parse("int64, int64 -> int64, int64")
 
         with pytest.raises(ValueError):
-            OperatorSignature.parse("o#r -> int64")
+            Signature.parse("o#r -> int64")
         with pytest.raises(ValueError):
-            OperatorSignature.parse("int64 -> a#")
+            Signature.parse("int64 -> a#")
 
     def test_parse_template(self):
-        s = OperatorSignature.parse("T, int64 -> int64")
+        s = Signature.parse("T, int64 -> int64")
         assert isinstance(s.params[0], dtypes.Template)
 
-        s = OperatorSignature.parse("T -> T")
+        s = Signature.parse("T -> T")
         assert isinstance(s.params[0], dtypes.Template)
         assert isinstance(s.return_type, dtypes.Template)
 
         with pytest.raises(ValueError):
-            OperatorSignature.parse("T, T -> U")
+            Signature.parse("T, T -> U")
 
     def test_parse_varargs(self):
-        s = OperatorSignature.parse("int64, str... -> int64")
+        s = Signature.parse("int64, str... -> int64")
         assert not s.params[0].vararg
         assert s.params[1].vararg
 
-        s = OperatorSignature.parse("int64... -> bool")
+        s = Signature.parse("int64... -> bool")
         assert s.params[0].vararg
 
         with pytest.raises(ValueError):
-            OperatorSignature.parse("int64..., str -> int64")
+            Signature.parse("int64..., str -> int64")
         with pytest.raises(ValueError):
-            OperatorSignature.parse("int64, str -> int64...")
+            Signature.parse("int64, str -> int64...")
 
-        s0 = OperatorSignature.parse("int64, str    -> int64")
-        s1 = OperatorSignature.parse("int64, str... -> int64")
+        s0 = Signature.parse("int64, str    -> int64")
+        s1 = Signature.parse("int64, str... -> int64")
 
         assert not s0.is_vararg
         assert s1.is_vararg
 
     def test_parse_const(self):
-        s = OperatorSignature.parse("const int64 -> int64")
+        s = Signature.parse("const int64 -> int64")
         assert s.params[0].const
         assert not s.return_type.const
 

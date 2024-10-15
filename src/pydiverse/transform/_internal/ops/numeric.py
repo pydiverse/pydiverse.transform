@@ -102,6 +102,7 @@ class Pow(ElementWise, Binary):
         "float64, float64 -> float64",
         "decimal, decimal -> decimal",
     ]
+    arg_names = ["self", "exponent"]
 
 
 class RPow(Pow):
@@ -149,16 +150,17 @@ class Abs(ElementWise, Unary):
 class Round(ElementWise):
     name = "__round__"
     signatures = [
-        "int64 -> int64",
-        "int64, const int64 -> int64",
-        "float64 -> float64",
         "float64, const int64 -> float64",
-        "decimal -> decimal",
+        "float64 -> float64",
         "decimal, const int64 -> decimal",
+        "decimal -> decimal",
+        "int64, const int64 -> int64",
+        "int64 -> int64",
     ]
+    arg_names = ["self", "decimals"]
 
 
-class Floor(ElementWise):
+class Floor(ElementWise, Unary):
     name = "floor"
     signatures = [
         "float64 -> float64",
@@ -170,7 +172,7 @@ class Ceil(Floor):
     name = "ceil"
 
 
-class Log(ElementWise):
+class Log(ElementWise, Unary):
     name = "log"
     signatures = ["float64 -> float64"]
 
@@ -180,7 +182,7 @@ class Exp(Log):
     signatures = ["float64 -> float64"]
 
 
-class IsInf(ElementWise):
+class IsInf(ElementWise, Unary):
     name = "is_inf"
     signatures = ["float64 -> bool"]
 
@@ -189,7 +191,7 @@ class IsNotInf(IsInf):
     name = "is_not_inf"
 
 
-class IsNan(ElementWise):
+class IsNan(ElementWise, Unary):
     name = "is_nan"
     signatures = ["float64 -> bool"]
 

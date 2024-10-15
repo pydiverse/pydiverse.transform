@@ -68,6 +68,7 @@ class StrReplaceAll(ElementWise):
     signatures = [
         "str, const str, const str -> str",
     ]
+    arg_names = ["self", "substr", "replacement"]
 
 
 class StrStartsWith(ElementWise, Logical):
@@ -75,6 +76,7 @@ class StrStartsWith(ElementWise, Logical):
     signatures = [
         "str, const str -> bool",
     ]
+    arg_names = ["self", "prefix"]
 
 
 class StrEndsWith(ElementWise, Logical):
@@ -82,6 +84,7 @@ class StrEndsWith(ElementWise, Logical):
     signatures = [
         "str, const str -> bool",
     ]
+    arg_names = ["self", "suffix"]
 
 
 class StrContains(ElementWise, Logical):
@@ -89,18 +92,20 @@ class StrContains(ElementWise, Logical):
     signatures = [
         "str, const str -> bool",
     ]
+    arg_names = ["self", "substr"]
 
 
 class StrSlice(ElementWise):
     name = "str.slice"
     signatures = ["str, int64, int64 -> str"]
+    arg_names = ["self", "offset", "n"]
 
 
-class StrToDateTime(ElementWise):
+class StrToDateTime(ElementWise, Unary):
     name = "str.to_datetime"
     signatures = ["str -> datetime"]
 
 
-class StrToDate(ElementWise):
+class StrToDate(ElementWise, Unary):
     name = "str.to_date"
     signatures = ["str -> date"]

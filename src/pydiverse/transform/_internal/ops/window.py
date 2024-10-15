@@ -13,9 +13,10 @@ __all__ = [
 class Shift(Window):
     name = "shift"
     signatures = [
-        "T, const int64 -> T",
         "T, const int64, const T -> T",
+        "T, const int64 -> T",
     ]
+    arg_names = ["self", "n", "fill_value"]
 
 
 class RowNumber(Window, Nullary):

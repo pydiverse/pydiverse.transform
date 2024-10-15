@@ -31,7 +31,7 @@ class OperatorImpl:
         self,
         operator: Operator,
         impl: Callable,
-        signature: OperatorSignature,
+        signature: Signature,
     ):
         self.operator = operator
         self.impl = impl
@@ -250,7 +250,7 @@ class OperatorRegistry:
                 f" operator registry `{self.impl_class.__name__}` yet"
             )
 
-        signature = OperatorSignature.parse(signature)
+        signature = Signature.parse(signature)
         operator.validate_signature(signature)
 
         impl_store = self.implementations[operator.name]
@@ -286,7 +286,7 @@ class OperatorRegistry:
         return self.super_registry.get_impl(name, args_signature)
 
 
-class OperatorSignature:
+class Signature:
     """
     Specification:
 
@@ -322,7 +322,7 @@ class OperatorSignature:
         self.return_type = return_type
 
     @classmethod
-    def parse(cls, signature: str) -> OperatorSignature:
+    def parse(cls, signature: str) -> Signature:
         def parse_cstypes(cst: str):
             # cstypes = comma seperated types
             types = cst.split(",")
@@ -364,7 +364,7 @@ class OperatorSignature:
         if return_type.vararg:
             raise ValueError("Return value can't be a vararg.")
 
-        return OperatorSignature(
+        return Signature(
             params=params,
             return_type=return_type,
         )
@@ -377,7 +377,7 @@ class OperatorSignature:
         return hash((self.params, self.return_type))
 
     def __eq__(self, other):
-        if not isinstance(other, OperatorSignature):
+        if not isinstance(other, Signature):
             return False
         return self.params == other.params and self.return_type == other.return_type
 
@@ -443,7 +443,7 @@ class OperatorImplStore:
         )
         node.operator.add_variant(name, operator.impl)
 
-    def get_node(self, signature: OperatorSignature, create_missing: bool = True):
+    def get_node(self, signature: Signature, create_missing: bool = True):
         node = self.root
         for dtype in signature.params:
             for child in node.children:

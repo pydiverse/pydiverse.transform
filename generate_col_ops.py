@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 
 from pydiverse.transform._internal.backend.polars import PolarsImpl
-from pydiverse.transform._internal.ops.core import Operator
-from pydiverse.transform._internal.tree.dtypes import Dtype
-from pydiverse.transform._internal.tree.registry import OperatorSignature
+from pydiverse.transform._internal.ops.core import Nullary, Operator
+from pydiverse.transform._internal.tree.dtypes import Dtype, Template
+from pydiverse.transform._internal.tree.registry import Signature
 
 path = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 reg = PolarsImpl.registry
@@ -17,17 +17,23 @@ def format_param(name: str, dtype: Dtype) -> str:
     return name
 
 
-def generate_fn_decl(op: Operator, sig: OperatorSignature, *, name=None) -> str:
+def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
+    assert len(sig.params) >= 1
     if name is None:
         name = op.name
 
-    annotated_args = sum(
-        f", {format_param(name, param)}: ColExpr[{param.__name__}]"
+    annotated_args = "".join(
+        f", {format_param(name, param)}: "
+        + (
+            f"ColExpr[{param.__class__.__name__}]"
+            if not isinstance(param, Template)
+            else "ColExpr"
+        )
         for param, name in zip(sig.params, op.arg_names, strict=True)
     )
 
     if op.context_kwargs is not None:
-        annotated_kwargs = sum(
+        annotated_kwargs = "".join(
             f", {kwarg}: ColExpr | None = None" for kwarg in op.context_kwargs
         )
     else:
@@ -36,14 +42,14 @@ def generate_fn_decl(op: Operator, sig: OperatorSignature, *, name=None) -> str:
     return f"    def {name}(self{annotated_args}{annotated_kwargs}):\n"
 
 
-def generate_fn_body(op: Operator, sig: OperatorSignature):
-    args = sum(
+def generate_fn_body(op: Operator, sig: Signature):
+    args = "".join(
         f", {format_param(name, param)}"
         for param, name in zip(sig.params, op.arg_names, strict=True)
     )
 
     if op.context_kwargs is not None:
-        kwargs = sum(f", {kwarg}" for kwarg in op.context_kwargs)
+        kwargs = "".join(f", {kwarg}" for kwarg in op.context_kwargs)
     else:
         kwargs = ""
 
@@ -66,9 +72,22 @@ with open(path, "r+") as file:
             in_generated_section = True
         elif in_col_expr_class and not (line.isspace() or line.startswith("    ")):
             for op in reg.registered_ops:
+                if isinstance(op, Nullary):
+                    continue
                 new_file_contents += generate_fn_decl(
-                    op, OperatorSignature.parse(op.signatures[0])
-                ) + generate_fn_body(op, OperatorSignature.parse(op.signatures[0]))
+                    op, Signature.parse(op.signatures[0])
+                ) + generate_fn_body(op, Signature.parse(op.signatures[0]))
+
+                if op.name == "count":
+                    # skip the nullary version of `count`
+                    continue
+
+                for sig in op.signatures[1:]:
+                    new_file_contents += (
+                        "@overload\n"
+                        + generate_fn_decl(op, Signature.parse(sig))
+                        + "...\n\n"
+                    )
 
             in_generated_section = False
             in_col_expr_class = False
