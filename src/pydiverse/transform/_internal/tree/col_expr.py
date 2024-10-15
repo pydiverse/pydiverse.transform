@@ -407,16 +407,16 @@ class ColExpr:
     def all(
         self: ColExpr[Bool],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn("all", self, partition_by=partition_by, filter=filter)
 
     def any(
         self: ColExpr[Bool],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn("any", self, partition_by=partition_by, filter=filter)
 
@@ -432,8 +432,8 @@ class ColExpr:
     def count(
         self: ColExpr,
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn("count", self, partition_by=partition_by, filter=filter)
 
@@ -480,39 +480,39 @@ class ColExpr:
     def max(
         self: ColExpr[Float64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     @overload
     def max(
         self: ColExpr[String],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     @overload
     def max(
         self: ColExpr[DateTime],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     @overload
     def max(
         self: ColExpr[Date],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     def max(
         self: ColExpr[Int64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn("max", self, partition_by=partition_by, filter=filter)
 
@@ -520,15 +520,15 @@ class ColExpr:
     def mean(
         self: ColExpr[Float64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     def mean(
         self: ColExpr[Int64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn("mean", self, partition_by=partition_by, filter=filter)
 
@@ -536,39 +536,39 @@ class ColExpr:
     def min(
         self: ColExpr[Float64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     @overload
     def min(
         self: ColExpr[String],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     @overload
     def min(
         self: ColExpr[DateTime],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     @overload
     def min(
         self: ColExpr[Date],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     def min(
         self: ColExpr[Int64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn("min", self, partition_by=partition_by, filter=filter)
 
@@ -583,9 +583,9 @@ class ColExpr:
         n: ColExpr[Int64],
         fill_value: ColExpr = None,
         *,
-        partition_by: ColExpr | None = None,
-        arrange: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn(
             "shift",
@@ -601,15 +601,15 @@ class ColExpr:
     def sum(
         self: ColExpr[Float64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ): ...
 
     def sum(
         self: ColExpr[Int64],
         *,
-        partition_by: ColExpr | None = None,
-        filter: ColExpr | None = None,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ):
         return ColFn("sum", self, partition_by=partition_by, filter=filter)
 

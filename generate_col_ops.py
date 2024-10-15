@@ -43,9 +43,15 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
     )
 
     if op.context_kwargs is not None:
-        # TODO: partition_by can only be col / col name, filter must be bool
+        context_kwarg_annotation = {
+            "partition_by": "Col | ColName | Iterable[Col | ColName]",
+            "arrange": "ColExpr | Iterable[ColExpr]",
+            "filter": "ColExpr[Bool] | Iterable[ColExpr[Bool]]",
+        }
+
         annotated_kwargs = "".join(
-            f", {kwarg}: ColExpr | None = None" for kwarg in op.context_kwargs
+            f", {kwarg}: {context_kwarg_annotation[kwarg]} | None = None"
+            for kwarg in op.context_kwargs
         )
 
         if not sig.params[-1].vararg:
