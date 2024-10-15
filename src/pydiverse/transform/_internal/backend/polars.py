@@ -370,7 +370,7 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     elif isinstance(t, pl.String):
         return dtypes.String()
     elif isinstance(t, pl.Datetime):
-        return dtypes.DateTime()
+        return dtypes.Datetime()
     elif isinstance(t, pl.Date):
         return dtypes.Date()
     elif isinstance(t, pl.Duration):
@@ -390,7 +390,7 @@ def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
         return pl.Boolean()
     elif isinstance(t, dtypes.String):
         return pl.String()
-    elif isinstance(t, dtypes.DateTime):
+    elif isinstance(t, dtypes.Datetime):
         return pl.Datetime()
     elif isinstance(t, dtypes.Date):
         return pl.Date()

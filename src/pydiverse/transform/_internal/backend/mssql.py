@@ -65,7 +65,7 @@ class MsSqlImpl(SqlImpl):
 
     @classmethod
     def sqa_type(cls, t: dtypes.Dtype):
-        if isinstance(t, dtypes.DateTime):
+        if isinstance(t, dtypes.Datetime):
             return DATETIME2
 
         return super().sqa_type(t)

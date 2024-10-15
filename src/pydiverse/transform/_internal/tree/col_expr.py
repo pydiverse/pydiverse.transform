@@ -19,7 +19,7 @@ from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.dtypes import (
     Bool,
     Date,
-    DateTime,
+    Datetime,
     Decimal,
     Dtype,
     Duration,
@@ -138,13 +138,13 @@ class ColExpr(Generic[T]):
     def __eq__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     @overload
-    def __eq__(self: ColExpr[DateTime], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __eq__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __eq__(self: ColExpr[DateTime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+    def __eq__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
-    def __eq__(self: ColExpr[Date], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __eq__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
     def __eq__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -165,13 +165,13 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[DateTime], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __ge__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[DateTime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+    def __ge__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[Date], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __ge__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
     def __ge__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -189,13 +189,13 @@ class ColExpr(Generic[T]):
     def __gt__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[DateTime], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __gt__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[DateTime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+    def __gt__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[Date], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __gt__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
     def __gt__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -216,13 +216,13 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[DateTime], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __le__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[DateTime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+    def __le__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[Date], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __le__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
     def __le__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -240,13 +240,13 @@ class ColExpr(Generic[T]):
     def __lt__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[DateTime], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __lt__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[DateTime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+    def __lt__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[Date], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __lt__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
     def __lt__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -280,13 +280,13 @@ class ColExpr(Generic[T]):
     def __ne__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ne__(self: ColExpr[DateTime], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __ne__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ne__(self: ColExpr[DateTime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+    def __ne__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ne__(self: ColExpr[Date], other: ColExpr[DateTime]) -> ColExpr[Bool]: ...
+    def __ne__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
     def __ne__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -536,11 +536,11 @@ class ColExpr(Generic[T]):
 
     @overload
     def max(
-        self: ColExpr[DateTime],
+        self: ColExpr[Datetime],
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[DateTime]: ...
+    ) -> ColExpr[Datetime]: ...
 
     @overload
     def max(
@@ -592,11 +592,11 @@ class ColExpr(Generic[T]):
 
     @overload
     def min(
-        self: ColExpr[DateTime],
+        self: ColExpr[Datetime],
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[DateTime]: ...
+    ) -> ColExpr[Datetime]: ...
 
     @overload
     def min(
@@ -699,7 +699,7 @@ class StrNamespace(FnNamespace):
     def to_date(self: ColExpr[String]) -> ColExpr[Date]:
         return ColFn("str.to_date", self.arg)
 
-    def to_datetime(self: ColExpr[String]) -> ColExpr[DateTime]:
+    def to_datetime(self: ColExpr[String]) -> ColExpr[Datetime]:
         return ColFn("str.to_datetime", self.arg)
 
     def to_lower(self: ColExpr[String]) -> ColExpr[String]:
@@ -714,37 +714,37 @@ class DtNamespace(FnNamespace):
     @overload
     def day(self: ColExpr[Date]) -> ColExpr[Int64]: ...
 
-    def day(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def day(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.day", self.arg)
 
     @overload
     def day_of_week(self: ColExpr[Date]) -> ColExpr[Int64]: ...
 
-    def day_of_week(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def day_of_week(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.day_of_week", self.arg)
 
     @overload
     def day_of_year(self: ColExpr[Date]) -> ColExpr[Int64]: ...
 
-    def day_of_year(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def day_of_year(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.day_of_year", self.arg)
 
     def days(self: ColExpr[Duration]) -> ColExpr[Int64]:
         return ColFn("dt.days", self.arg)
 
-    def hour(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def hour(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.hour", self.arg)
 
     def hours(self: ColExpr[Duration]) -> ColExpr[Int64]:
         return ColFn("dt.hours", self.arg)
 
-    def millisecond(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def millisecond(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.millisecond", self.arg)
 
     def milliseconds(self: ColExpr[Duration]) -> ColExpr[Int64]:
         return ColFn("dt.milliseconds", self.arg)
 
-    def minute(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def minute(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.minute", self.arg)
 
     def minutes(self: ColExpr[Duration]) -> ColExpr[Int64]:
@@ -753,10 +753,10 @@ class DtNamespace(FnNamespace):
     @overload
     def month(self: ColExpr[Date]) -> ColExpr[Int64]: ...
 
-    def month(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def month(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.month", self.arg)
 
-    def second(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def second(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.second", self.arg)
 
     def seconds(self: ColExpr[Duration]) -> ColExpr[Int64]:
@@ -765,7 +765,7 @@ class DtNamespace(FnNamespace):
     @overload
     def year(self: ColExpr[Date]) -> ColExpr[Int64]: ...
 
-    def year(self: ColExpr[DateTime]) -> ColExpr[Int64]:
+    def year(self: ColExpr[Datetime]) -> ColExpr[Int64]:
         return ColFn("dt.year", self.arg)
 
 
@@ -1138,10 +1138,10 @@ class Cast(ColExpr):
                 (dtypes.String, dtypes.Int64),
                 (dtypes.String, dtypes.Float64),
                 (dtypes.Float64, dtypes.Int64),
-                (dtypes.DateTime, dtypes.Date),
+                (dtypes.Datetime, dtypes.Date),
                 (dtypes.Int64, dtypes.String),
                 (dtypes.Float64, dtypes.String),
-                (dtypes.DateTime, dtypes.String),
+                (dtypes.Datetime, dtypes.String),
                 (dtypes.Date, dtypes.String),
             }
 
@@ -1151,7 +1151,7 @@ class Cast(ColExpr):
             ) not in valid_casts:
                 hint = ""
                 if self.val.dtype() == dtypes.String and self.target_type in (
-                    dtypes.DateTime,
+                    dtypes.Datetime,
                     dtypes.Date,
                 ):
                     hint = (

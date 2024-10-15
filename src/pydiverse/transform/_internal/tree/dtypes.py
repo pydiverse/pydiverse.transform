@@ -105,7 +105,7 @@ class Bool(Dtype):
     name = "bool"
 
 
-class DateTime(Dtype):
+class Datetime(Dtype):
     name = "datetime"
 
 
@@ -158,7 +158,7 @@ def python_type_to_pdt(t: type) -> Dtype:
     elif t is str:
         return String()
     elif t is datetime.datetime:
-        return DateTime()
+        return Datetime()
     elif t is datetime.date:
         return Date()
     elif t is datetime.timedelta:
@@ -178,7 +178,7 @@ def pdt_type_to_python(t: Dtype) -> type:
         return bool
     elif t == String:
         return str
-    elif t == DateTime:
+    elif t == Datetime:
         return datetime.datetime
     elif t == Date:
         return datetime.date
@@ -230,7 +230,7 @@ def dtype_from_string(t: str) -> Dtype:
     if base_type == "date":
         return Date(const=is_const, vararg=is_vararg)
     if base_type == "datetime":
-        return DateTime(const=is_const, vararg=is_vararg)
+        return Datetime(const=is_const, vararg=is_vararg)
     if base_type == "duration":
         return Duration(const=is_const, vararg=is_vararg)
     if base_type == "null":

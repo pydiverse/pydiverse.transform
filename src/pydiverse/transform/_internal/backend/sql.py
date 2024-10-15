@@ -559,7 +559,7 @@ class SqlImpl(TableImpl):
             return sqa.String
         elif isinstance(t, dtypes.Bool):
             return sqa.Boolean
-        elif isinstance(t, dtypes.DateTime):
+        elif isinstance(t, dtypes.Datetime):
             return sqa.DateTime
         elif isinstance(t, dtypes.Date):
             return sqa.Date
@@ -583,7 +583,7 @@ class SqlImpl(TableImpl):
         elif isinstance(t, sqa.Boolean):
             return dtypes.Bool()
         elif isinstance(t, sqa.DateTime):
-            return dtypes.DateTime()
+            return dtypes.Datetime()
         elif isinstance(t, sqa.Date):
             return dtypes.Date()
         elif isinstance(t, sqa.Interval):

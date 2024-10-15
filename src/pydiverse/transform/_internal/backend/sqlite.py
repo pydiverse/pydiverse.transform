@@ -33,7 +33,7 @@ class SqliteImpl(SqlImpl):
                 ),
             )
 
-        elif cast.val.dtype() == dtypes.DateTime and cast.target_type == dtypes.Date:
+        elif cast.val.dtype() == dtypes.Datetime and cast.target_type == dtypes.Date:
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
 
         elif cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
