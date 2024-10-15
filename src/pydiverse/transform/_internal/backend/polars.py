@@ -91,17 +91,22 @@ def compile_order(
     )
 
 
-def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
+def compile_col_expr(
+    expr: ColExpr, name_in_df: dict[UUID, str], *, compile_literals: bool = True
+) -> pl.Expr:
     if isinstance(expr, Col):
         return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.registry.get_op(expr.name)
-        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
         impl = PolarsImpl.registry.get_impl(
             expr.name,
             tuple(arg.dtype() for arg in expr.args),
         )
+        args: list[pl.Expr] = [
+            compile_col_expr(arg, name_in_df, compile_literals=not param.const)
+            for arg, param in zip(expr.args, impl.impl.signature, strict=False)
+        ]
 
         if (partition_by := expr.context_kwargs.get("partition_by")) is not None:
             partition_by = [compile_col_expr(pb, name_in_df) for pb in partition_by]
@@ -131,7 +136,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
 
-        value: pl.Expr = impl(*args)
+        value: pl.Expr = impl(*args, _pdt_args=expr.args)
 
         # TODO: currently, count is the only aggregation function where we don't want
         # to return null for cols containing only null values. If this happens for more
@@ -186,7 +191,11 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
+        return (
+            pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
+            if compile_literals
+            else expr.val
+        )
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
@@ -613,9 +622,10 @@ with PolarsImpl.op(ops.Shift()) as op:
 with PolarsImpl.op(ops.IsIn()) as op:
 
     @op.auto
-    def _isin(x, *values):
+    def _isin(x, *values, _pdt_args):
         return pl.any_horizontal(
-            (x == v if v is not None else x.is_null()) for v in values
+            (x == val if arg.dtype() != dtypes.NoneDtype else x.is_null())
+            for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 
 

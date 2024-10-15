@@ -198,8 +198,8 @@ class SqlImpl(TableImpl):
             )
 
             args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(arg, sqa_col, compile_literals=not impl_arg.const)
-                for arg, impl_arg in zip(expr.args, impl.impl.signature, strict=False)
+                cls.compile_col_expr(arg, sqa_col, compile_literals=not param.const)
+                for arg, param in zip(expr.args, impl.impl.signature, strict=False)
             ]
 
             partition_by = expr.context_kwargs.get("partition_by")
