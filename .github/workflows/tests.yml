@@ -23,7 +23,7 @@ jobs:
           environments: py310
 
       - name: Linting - Run pre-commit checks
-        uses: pre-commit/action@v3.0.1
+        run: pre-commit run
 
   test:
     name: pytest
