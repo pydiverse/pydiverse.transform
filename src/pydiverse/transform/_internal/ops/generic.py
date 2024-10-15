@@ -8,11 +8,15 @@ __all__ = [
 ]
 
 
-class HMax(ElementWise, NoExprMethod):
+class Horizontal(ElementWise, NoExprMethod):
+    arg_names = ["args"]
+
+
+class HMax(Horizontal):
     name = "hmax"
     signatures = ["T... -> T"]
 
 
-class HMin(ElementWise, NoExprMethod):
+class HMin(Horizontal):
     name = "hmin"
     signatures = ["T... -> T"]

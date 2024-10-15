@@ -539,11 +539,11 @@ class ColExpr(Generic[T]):
         return ColFn("ceil", self)
 
     def count(
-        self: ColExpr,
+        self: ColExpr = None,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr:
+    ) -> ColExpr[Int64]:
         return ColFn("count", self, partition_by=partition_by, filter=filter)
 
     def descending(self: ColExpr) -> ColExpr:

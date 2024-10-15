@@ -13,7 +13,8 @@ from pydiverse.transform._internal.tree.dtypes import (
 )
 from pydiverse.transform._internal.tree.registry import Signature
 
-path = "./src/pydiverse/transform/_internal/tree/col_expr.py"
+col_expr_path = "./src/pydiverse/transform/_internal/tree/col_expr.py"
+fns_path = "./src/pydiverse/transform/_internal/pipe/functions.py"
 reg = PolarsImpl.registry
 namespaces = ["str", "dt"]
 rversions = {
@@ -48,7 +49,6 @@ def type_annotation(param: Dtype, specialize_generic: bool) -> str:
 def generate_fn_decl(
     op: Operator, sig: Signature, *, name=None, specialize_generic: bool = True
 ) -> str:
-    assert len(sig.params) >= 1
     if name is None:
         name = op.name
 
@@ -77,13 +77,15 @@ def generate_fn_decl(
             for kwarg in op.context_kwargs
         )
 
-        if not sig.params[-1].vararg:
-            annotated_kwargs = ", *" + annotated_kwargs
+        if len(sig.params) == 0 or not sig.params[-1].vararg:
+            annotated_kwargs = "*" + annotated_kwargs
+            if len(sig.params) > 0:
+                annotated_kwargs = ", " + annotated_kwargs
     else:
         annotated_kwargs = ""
 
     return (
-        f"    def {name}({annotated_args}{annotated_kwargs}) "
+        f"def {name}({annotated_args}{annotated_kwargs}) "
         f"-> {type_annotation(sig.return_type, specialize_generic)}:\n"
     )
 
@@ -113,7 +115,7 @@ def generate_fn_body(
     else:
         kwargs = ""
 
-    return f'        return ColFn("{op.name}"{args}{kwargs})\n\n'
+    return f'    return ColFn("{op.name}"{args}{kwargs})\n\n'
 
 
 def generate_overloads(
@@ -127,9 +129,9 @@ def generate_overloads(
     if op.name != "count" and len(op.signatures) > 1:
         for sig in op.signatures:
             res += (
-                "    @overload\n"
+                "@overload\n"
                 + generate_fn_decl(op, Signature.parse(sig), name=name)
-                + "        ...\n\n"
+                + "    ...\n\n"
             )
 
     res += generate_fn_decl(
@@ -147,7 +149,11 @@ def generate_overloads(
     return res
 
 
-with open(path, "r+") as file:
+def indent(s: str, by: int) -> str:
+    return "".join(" " * by + line + "\n" for line in s.split("\n"))
+
+
+with open(col_expr_path, "r+") as file:
     new_file_contents = ""
     in_col_expr_class = False
     in_generated_section = False
@@ -175,6 +181,8 @@ with open(path, "r+") as file:
                     op_overloads += generate_overloads(
                         op, name=f"__r{op_name[2:]}", rversion=True
                     )
+
+                op_overloads = indent(op_overloads, 4)
 
                 if "." in op.name:
                     namespace_contents[op.name.split(".")[0]] += op_overloads
@@ -207,4 +215,27 @@ with open(path, "r+") as file:
     file.write(new_file_contents)
     file.truncate()
 
-os.system(f"ruff format {path}")
+os.system(f"ruff format {col_expr_path}")
+
+with open(fns_path, "r+") as file:
+    new_file_contents = ""
+    display_name = {"hmin": "min", "hmax": "max"}
+
+    for line in file:
+        new_file_contents += line
+        if line.startswith("    return LiteralCol"):
+            for op_name in sorted(PolarsImpl.registry.ALL_REGISTERED_OPS):
+                op = PolarsImpl.registry.get_op(op_name)
+                if not isinstance(op, NoExprMethod) and op_name != "count":
+                    continue
+
+                new_file_contents += generate_overloads(
+                    op, name=display_name.get(op_name)
+                )
+            break
+
+    file.seek(0)
+    file.write(new_file_contents)
+    file.truncate()
+
+os.system(f"ruff format {fns_path}")

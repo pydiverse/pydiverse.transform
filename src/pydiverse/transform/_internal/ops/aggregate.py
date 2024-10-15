@@ -69,6 +69,6 @@ class Count(Aggregate):
     name = "count"
     signatures = [
         "T -> int64",
-        "-> int64",
     ]
     arg_names = ["self"]
+    defaults = [None]

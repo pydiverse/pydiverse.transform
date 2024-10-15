@@ -121,6 +121,7 @@ class Arity(Operator):
 
 class Nullary(Arity, NoExprMethod):
     n_arguments = 0
+    arg_names = []
 
 
 class Unary(Arity):
