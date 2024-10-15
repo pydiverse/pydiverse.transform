@@ -10,6 +10,7 @@ from pydiverse.transform._internal.tree.registry import Signature
 
 path = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 reg = PolarsImpl.registry
+namespaces = ["str", "dt"]
 
 
 def format_param(name: str, dtype: Dtype) -> str:
@@ -62,41 +63,70 @@ def generate_fn_body(op: Operator, sig: Signature):
     else:
         kwargs = ""
 
-    return f'        return ColFn("{op.name}", self{args}{kwargs})\n\n'
+    return f'        return ColFn("{op.name}"{args}{kwargs})\n\n'
 
 
 with open(path, "r+") as file:
     new_file_contents = ""
     in_col_expr_class = False
     in_generated_section = False
+    namespace_contents: dict[str, str] = {
+        name: (
+            "@dataclasses.dataclass()\n"
+            f"class {name.title()}Namespace(FnNamespace):\n"
+            f'    name = "{name}"\n\n'
+        )
+        for name in namespaces
+    }
 
     for line in file:
         if line.startswith("class ColExpr"):
             in_col_expr_class = True
-        elif (
-            not in_generated_section
-            and len(line) > 8
-            and any(line[4:].startswith(f"def {op.name}") for op in reg.registered_ops)
-        ):
+        elif not in_generated_section and line.startswith("    @overload"):
             in_generated_section = True
-        elif in_col_expr_class and not (line.isspace() or line.startswith("    ")):
-            for op in reg.registered_ops:
+        elif in_col_expr_class and line.startswith("class Col"):
+            for op in sorted(reg.registered_ops, key=lambda op: op.name):
                 if isinstance(op, NoExprMethod):
                     continue
-                new_file_contents += generate_fn_decl(
-                    op, Signature.parse(op.signatures[0])
+
+                op_definition = ""
+                method_name = op.name if "." not in op.name else op.name.split(".")[1]
+
+                if op.name != "count":
+                    for sig in op.signatures[1:]:
+                        op_definition += (
+                            "    @overload\n"
+                            + generate_fn_decl(
+                                op, Signature.parse(sig), name=method_name
+                            )
+                            + "        ...\n\n"
+                        )
+
+                op_definition += generate_fn_decl(
+                    op, Signature.parse(op.signatures[0]), name=method_name
                 ) + generate_fn_body(op, Signature.parse(op.signatures[0]))
 
-                if op.name == "count":
-                    # skip the nullary version of `count`
-                    continue
+                if "." in op.name:
+                    namespace_contents[op.name.split(".")[0]] += op_definition
+                else:
+                    new_file_contents += op_definition
 
-                for sig in op.signatures[1:]:
-                    new_file_contents += (
-                        "    @overload\n"
-                        + generate_fn_decl(op, Signature.parse(sig))
-                        + "        ...\n\n"
-                    )
+            for name in namespaces:
+                new_file_contents += (
+                    "    @property\n"
+                    f"    def {name}(self):\n"
+                    f"        return {name.title()}Namespace(self)\n\n"
+                )
+
+            new_file_contents += (
+                "@dataclasses.dataclass()\n"
+                "class FnNamespace:\n"
+                "    self: ColExpr\n"
+                "    name: str\n\n"
+            )
+
+            for name in namespaces:
+                new_file_contents += namespace_contents[name]
 
             in_generated_section = False
             in_col_expr_class = False

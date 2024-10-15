@@ -57,7 +57,7 @@ class Operator:
     name: str = NotImplemented
     ftype: Ftype = NotImplemented
     signatures: list[str] = None
-    context_kwargs: set[str] = None
+    context_kwargs: list[str] = None
     arg_names: list[str] = None
     defaults: list | None = None  # `...` signifies that the param must be specified
 
@@ -143,12 +143,12 @@ class ElementWise(Operator):
 
 class Aggregate(Operator):
     ftype = Ftype.AGGREGATE
-    context_kwargs = {"partition_by", "filter"}
+    context_kwargs = ["partition_by", "filter"]
 
 
 class Window(Operator):
     ftype = Ftype.WINDOW
-    context_kwargs = {"arrange", "partition_by"}
+    context_kwargs = ["partition_by", "arrange", "filter"]
 
 
 class Marker(Operator):
