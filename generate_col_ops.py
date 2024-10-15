@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable
+from types import NoneType
 
 from pydiverse.transform._internal.backend.polars import PolarsImpl
 from pydiverse.transform._internal.ops.core import NoExprMethod, Operator
-from pydiverse.transform._internal.tree.dtypes import Dtype, Template
+from pydiverse.transform._internal.tree.dtypes import (
+    Dtype,
+    Template,
+    pdt_type_to_python,
+)
 from pydiverse.transform._internal.tree.registry import Signature
 
 path = "./src/pydiverse/transform/_internal/tree/col_expr.py"
@@ -22,10 +27,12 @@ def format_param(name: str, dtype: Dtype) -> str:
 def type_annotation(param: Dtype) -> str:
     if isinstance(param, Template):
         return "ColExpr"
+    if param.const:
+        python_type = pdt_type_to_python(param)
+        return python_type.__name__ if python_type is not NoneType else "None"
     return f"ColExpr[{param.__class__.__name__}]"
 
 
-# TODO: generate the corresponding python type if a param is const
 def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
     assert len(sig.params) >= 1
     if name is None:

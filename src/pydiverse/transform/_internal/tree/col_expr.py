@@ -367,18 +367,12 @@ class ColExpr(Generic[T]):
         return ColFn("__ror__", self, other)
 
     @overload
-    def __round__(
-        self: ColExpr[Decimal], decimals: ColExpr[Int64] = 0
-    ) -> ColExpr[Decimal]: ...
+    def __round__(self: ColExpr[Decimal], decimals: int = 0) -> ColExpr[Decimal]: ...
 
     @overload
-    def __round__(
-        self: ColExpr[Int64], decimals: ColExpr[Int64] = 0
-    ) -> ColExpr[Int64]: ...
+    def __round__(self: ColExpr[Int64], decimals: int = 0) -> ColExpr[Int64]: ...
 
-    def __round__(
-        self: ColExpr[Float64], decimals: ColExpr[Int64] = 0
-    ) -> ColExpr[Float64]:
+    def __round__(self: ColExpr[Float64], decimals: int = 0) -> ColExpr[Float64]:
         return ColFn("__round__", self, decimals)
 
     @overload
@@ -628,7 +622,7 @@ class ColExpr(Generic[T]):
 
     def shift(
         self: ColExpr,
-        n: ColExpr[Int64],
+        n: int,
         fill_value: ColExpr = None,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
@@ -677,17 +671,17 @@ class FnNamespace:
 
 @dataclasses.dataclass(slots=True)
 class StrNamespace(FnNamespace):
-    def contains(self: ColExpr[String], substr: ColExpr[String]) -> ColExpr[Bool]:
+    def contains(self: ColExpr[String], substr: str) -> ColExpr[Bool]:
         return ColFn("str.contains", self.arg, substr)
 
-    def ends_with(self: ColExpr[String], suffix: ColExpr[String]) -> ColExpr[Bool]:
+    def ends_with(self: ColExpr[String], suffix: str) -> ColExpr[Bool]:
         return ColFn("str.ends_with", self.arg, suffix)
 
     def len(self: ColExpr[String]) -> ColExpr[Int64]:
         return ColFn("str.len", self.arg)
 
     def replace_all(
-        self: ColExpr[String], substr: ColExpr[String], replacement: ColExpr[String]
+        self: ColExpr[String], substr: str, replacement: str
     ) -> ColExpr[String]:
         return ColFn("str.replace_all", self.arg, substr, replacement)
 
@@ -696,7 +690,7 @@ class StrNamespace(FnNamespace):
     ) -> ColExpr[String]:
         return ColFn("str.slice", self.arg, offset, n)
 
-    def starts_with(self: ColExpr[String], prefix: ColExpr[String]) -> ColExpr[Bool]:
+    def starts_with(self: ColExpr[String], prefix: str) -> ColExpr[Bool]:
         return ColFn("str.starts_with", self.arg, prefix)
 
     def strip(self: ColExpr[String]) -> ColExpr[String]:

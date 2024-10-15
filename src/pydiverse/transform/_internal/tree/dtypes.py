@@ -169,6 +169,25 @@ def python_type_to_pdt(t: type) -> Dtype:
     raise TypeError(f"invalid usage of type {t} in a column expression")
 
 
+def pdt_type_to_python(t: Dtype) -> type:
+    if t == Int64:
+        return int
+    elif t == Float64:
+        return float
+    elif t == Bool:
+        return bool
+    elif t == String:
+        return str
+    elif t == DateTime:
+        return datetime.datetime
+    elif t == Date:
+        return datetime.date
+    elif t == Duration:
+        return datetime.timedelta
+    elif t == NoneDtype:
+        return type(None)
+
+
 def dtype_from_string(t: str) -> Dtype:
     parts = [part for part in t.split(" ") if part]
 
