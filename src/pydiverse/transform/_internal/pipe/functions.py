@@ -35,12 +35,14 @@ def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
 
 
 def count(
-    self: ColExpr = None,
+    x: ColExpr | None = None,
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
 ) -> ColExpr[Int64]:
-    return ColFn("count", self, partition_by=partition_by, filter=filter)
+    if x is None:
+        return ColFn("count", partition_by=partition_by, filter=filter)
+    return ColFn("count", x, partition_by=partition_by, filter=filter)
 
 
 def dense_rank(
