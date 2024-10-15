@@ -19,6 +19,7 @@ def format_param(name: str, dtype: Dtype) -> str:
     return name
 
 
+# TODO: generate the corresponding python type if a param is const
 def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
     assert len(sig.params) >= 1
     if name is None:
@@ -90,7 +91,8 @@ with open(path, "r+") as file:
         elif not in_generated_section and line.startswith("    @overload"):
             in_generated_section = True
         elif in_col_expr_class and line.startswith("class Col"):
-            for op in sorted(reg.registered_ops, key=lambda op: op.name):
+            for op_name in sorted(PolarsImpl.registry.ALL_REGISTERED_OPS):
+                op = PolarsImpl.registry.get_op(op_name)
                 if isinstance(op, NoExprMethod):
                     continue
 

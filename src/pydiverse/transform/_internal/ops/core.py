@@ -18,7 +18,6 @@ __all__ = [
     "ElementWise",
     "Aggregate",
     "Window",
-    "Marker",
 ]
 
 
@@ -149,7 +148,3 @@ class Aggregate(Operator):
 class Window(Operator):
     ftype = Ftype.WINDOW
     context_kwargs = ["partition_by", "arrange", "filter"]
-
-
-class Marker(Operator):
-    ftype = None

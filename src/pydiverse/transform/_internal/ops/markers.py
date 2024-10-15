@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import Marker
+from pydiverse.transform._internal.ops.core import Unary
 
 __all__ = ["NullsFirst", "NullsLast", "Ascending", "Descending"]
+
+
+class Marker(Unary):
+    ftype = None
 
 
 class NullsFirst(Marker):
