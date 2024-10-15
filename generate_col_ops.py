@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 
 from pydiverse.transform._internal.backend.polars import PolarsImpl
 from pydiverse.transform._internal.ops.core import Nullary, Operator
@@ -22,6 +23,10 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
     if name is None:
         name = op.name
 
+    defaults: Iterable = (
+        op.defaults if op.defaults is not None else (... for _ in op.arg_names)
+    )
+
     annotated_args = "".join(
         f", {format_param(name, param)}: "
         + (
@@ -29,10 +34,12 @@ def generate_fn_decl(op: Operator, sig: Signature, *, name=None) -> str:
             if not isinstance(param, Template)
             else "ColExpr"
         )
-        for param, name in zip(sig.params, op.arg_names, strict=True)
+        + (f" = {default}" if defaults is not ... else "")
+        for param, name, default in zip(sig.params, op.arg_names, defaults, strict=True)
     )
 
     if op.context_kwargs is not None:
+        # TODO: partition_by can only be col / col name, filter must be bool
         annotated_kwargs = "".join(
             f", {kwarg}: ColExpr | None = None" for kwarg in op.context_kwargs
         )

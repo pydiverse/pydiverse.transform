@@ -151,13 +151,11 @@ class Round(ElementWise):
     name = "__round__"
     signatures = [
         "float64, const int64 -> float64",
-        "float64 -> float64",
         "decimal, const int64 -> decimal",
-        "decimal -> decimal",
         "int64, const int64 -> int64",
-        "int64 -> int64",
     ]
     arg_names = ["self", "decimals"]
+    defaults = [..., 0]
 
 
 class Floor(ElementWise, Unary):

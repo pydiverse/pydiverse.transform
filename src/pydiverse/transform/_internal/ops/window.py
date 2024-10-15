@@ -14,9 +14,9 @@ class Shift(Window):
     name = "shift"
     signatures = [
         "T, const int64, const T -> T",
-        "T, const int64 -> T",
     ]
     arg_names = ["self", "n", "fill_value"]
+    defaults = [..., ..., None]
 
 
 class RowNumber(Window, Nullary):

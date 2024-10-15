@@ -59,6 +59,7 @@ class Operator:
     signatures: list[str] = None
     context_kwargs: set[str] = None
     arg_names: list[str] = None
+    defaults: list | None = None  # `...` signifies that the param must be specified
 
     def __new__(cls, *args, **kwargs):
         if not getattr(cls, _OPERATOR_VALID, False):
