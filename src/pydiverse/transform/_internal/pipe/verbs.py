@@ -527,11 +527,15 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
             key: preprocess_arg(val, table, update_partition_by=update_partition_by)
             for key, val in arg.items()
         }
+
+    # TODO: Be more strict in what is allowed here. Preferably, make the iteration the
+    # responsibility of the caller, otherwise error messages could get bad.
     if isinstance(arg, Iterable) and not isinstance(arg, str):
         return [
             preprocess_arg(elem, table, update_partition_by=update_partition_by)
             for elem in arg
         ]
+
     if isinstance(arg, Order):
         return Order(
             preprocess_arg(
@@ -540,6 +544,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
             arg.descending,
             arg.nulls_last,
         )
+
     else:
         arg = wrap_literal(arg)
         assert isinstance(arg, ColExpr)

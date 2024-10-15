@@ -5,7 +5,7 @@ from collections import ChainMap
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pydiverse.transform._internal.tree.registry import OperatorSignature
+    from pydiverse.transform._internal.tree.registry import Signature
 
 __all__ = [
     "Ftype",
@@ -18,7 +18,6 @@ __all__ = [
     "ElementWise",
     "Aggregate",
     "Window",
-    "Marker",
 ]
 
 
@@ -57,7 +56,9 @@ class Operator:
     name: str = NotImplemented
     ftype: Ftype = NotImplemented
     signatures: list[str] = None
-    context_kwargs: set[str] = None
+    context_kwargs: list[str] = None
+    arg_names: list[str] = None
+    defaults: list | None = None  # `...` signifies that the param must be specified
 
     def __new__(cls, *args, **kwargs):
         if not getattr(cls, _OPERATOR_VALID, False):
@@ -82,7 +83,7 @@ class Operator:
     def __hash__(self):
         return hash(type(self))
 
-    def validate_signature(self, signature: OperatorSignature):
+    def validate_signature(self, signature: Signature):
         pass
 
 
@@ -105,7 +106,7 @@ class OperatorExtension:
         return super().__new__(cls, *args, **kwargs)
 
 
-# Arity
+class NoExprMethod(Operator): ...
 
 
 class Arity(Operator):
@@ -114,20 +115,23 @@ class Arity(Operator):
     n_arguments: int = NotImplemented
 
     def validate_signature(self, signature):
-        assert len(signature.args) == self.n_arguments
+        assert len(signature.params) == self.n_arguments
         super().validate_signature(signature)
 
 
-class Nullary(Arity):
+class Nullary(Arity, NoExprMethod):
     n_arguments = 0
+    arg_names = []
 
 
 class Unary(Arity):
     n_arguments = 1
+    arg_names = ["self"]
 
 
 class Binary(Arity):
     n_arguments = 2
+    arg_names = ["self", "other"]
 
 
 # Base operator types
@@ -139,19 +143,9 @@ class ElementWise(Operator):
 
 class Aggregate(Operator):
     ftype = Ftype.AGGREGATE
-    context_kwargs = {
-        "partition_by",  # list[Col]
-        "filter",  # SymbolicExpression (NOT a list)
-    }
+    context_kwargs = ["partition_by", "filter"]
 
 
 class Window(Operator):
     ftype = Ftype.WINDOW
-    context_kwargs = {
-        "arrange",  # list[Col]
-        "partition_by",
-    }
-
-
-class Marker(Operator):
-    ftype = None
+    context_kwargs = ["partition_by", "arrange", "filter"]

@@ -1,3 +1,5 @@
+# ruff: noqa: A002
+
 from __future__ import annotations
 
 import copy
@@ -6,19 +8,31 @@ import functools
 import html
 import itertools
 import operator
-from collections.abc import Callable, Generator, Iterable
-from typing import Any
+from collections.abc import Callable, Iterable
+from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops.core import Ftype, Operator
 from pydiverse.transform._internal.tree import dtypes
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.dtypes import Dtype, python_type_to_pdt
-from pydiverse.transform._internal.tree.registry import OperatorRegistry
+from pydiverse.transform._internal.tree.dtypes import (
+    Bool,
+    Date,
+    Datetime,
+    Decimal,
+    Dtype,
+    Duration,
+    Float64,
+    Int64,
+    String,
+    python_type_to_pdt,
+)
+
+T = TypeVar("T")
 
 
-class ColExpr:
+class ColExpr(Generic[T]):
     __slots__ = ["_dtype", "_ftype"]
 
     __contains__ = None
@@ -63,7 +77,11 @@ class ColExpr:
             (
                 (
                     self.isin(
-                        *wrap_literal(key if isinstance(key, Iterable) else (key,))
+                        *(
+                            (wrap_literal(elem) for elem in key)
+                            if isinstance(key, Iterable)
+                            else (wrap_literal(key),)
+                        ),
                     ),
                     wrap_literal(val),
                 )
@@ -84,6 +102,788 @@ class ColExpr:
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
+
+    @overload
+    def __abs__(self: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __abs__(self: ColExpr[Float64]) -> ColExpr[Float64]: ...
+
+    @overload
+    def __abs__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    def __abs__(self: ColExpr) -> ColExpr:
+        return ColFn("__abs__", self)
+
+    @overload
+    def __add__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __add__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __add__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __add__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__add__", self, other)
+
+    @overload
+    def __radd__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __radd__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __radd__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __radd__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__add__", other, self)
+
+    def __and__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]:
+        return ColFn("__and__", self, other)
+
+    def __rand__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]:
+        return ColFn("__and__", other, self)
+
+    @overload
+    def __eq__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __eq__(self: ColExpr[Float64], other: ColExpr[Float64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __eq__(self: ColExpr[String], other: ColExpr[String]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __eq__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __eq__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __eq__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __eq__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __eq__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    def __eq__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__eq__", self, other)
+
+    def __floordiv__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]:
+        return ColFn("__floordiv__", self, other)
+
+    def __rfloordiv__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]:
+        return ColFn("__floordiv__", other, self)
+
+    @overload
+    def __ge__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Float64], other: ColExpr[Float64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[String], other: ColExpr[String]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    def __ge__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__ge__", self, other)
+
+    @overload
+    def __gt__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Float64], other: ColExpr[Float64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[String], other: ColExpr[String]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    def __gt__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__gt__", self, other)
+
+    def __invert__(self: ColExpr[Bool]) -> ColExpr[Bool]:
+        return ColFn("__invert__", self)
+
+    @overload
+    def __le__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Float64], other: ColExpr[Float64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[String], other: ColExpr[String]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    def __le__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__le__", self, other)
+
+    @overload
+    def __lt__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Float64], other: ColExpr[Float64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[String], other: ColExpr[String]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    def __lt__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__lt__", self, other)
+
+    def __mod__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]:
+        return ColFn("__mod__", self, other)
+
+    def __rmod__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]:
+        return ColFn("__mod__", other, self)
+
+    @overload
+    def __mul__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __mul__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __mul__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __mul__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__mul__", self, other)
+
+    @overload
+    def __rmul__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __rmul__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __rmul__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __rmul__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__mul__", other, self)
+
+    @overload
+    def __ne__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ne__(self: ColExpr[Float64], other: ColExpr[Float64]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ne__(self: ColExpr[String], other: ColExpr[String]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ne__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ne__(self: ColExpr[Datetime], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ne__(self: ColExpr[Datetime], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ne__(self: ColExpr[Date], other: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ne__(self: ColExpr[Date], other: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    def __ne__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__ne__", self, other)
+
+    @overload
+    def __neg__(self: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __neg__(self: ColExpr[Float64]) -> ColExpr[Float64]: ...
+
+    @overload
+    def __neg__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    def __neg__(self: ColExpr) -> ColExpr:
+        return ColFn("__neg__", self)
+
+    def __or__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]:
+        return ColFn("__or__", self, other)
+
+    def __ror__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]:
+        return ColFn("__or__", other, self)
+
+    @overload
+    def __pos__(self: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __pos__(self: ColExpr[Float64]) -> ColExpr[Float64]: ...
+
+    @overload
+    def __pos__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    def __pos__(self: ColExpr) -> ColExpr:
+        return ColFn("__pos__", self)
+
+    @overload
+    def __pow__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Float64]: ...
+
+    @overload
+    def __pow__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __pow__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __pow__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__pow__", self, other)
+
+    @overload
+    def __rpow__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Float64]: ...
+
+    @overload
+    def __rpow__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __rpow__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __rpow__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__pow__", other, self)
+
+    @overload
+    def __round__(self: ColExpr[Float64], decimals: int = 0) -> ColExpr[Float64]: ...
+
+    @overload
+    def __round__(self: ColExpr[Decimal], decimals: int = 0) -> ColExpr[Decimal]: ...
+
+    @overload
+    def __round__(self: ColExpr[Int64], decimals: int = 0) -> ColExpr[Int64]: ...
+
+    def __round__(self: ColExpr, decimals: ColExpr = 0) -> ColExpr:
+        return ColFn("__round__", self, decimals)
+
+    @overload
+    def __sub__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __sub__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __sub__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __sub__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__sub__", self, other)
+
+    @overload
+    def __rsub__(self: ColExpr[Int64], other: ColExpr[Int64]) -> ColExpr[Int64]: ...
+
+    @overload
+    def __rsub__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __rsub__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __rsub__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__sub__", other, self)
+
+    @overload
+    def __truediv__(
+        self: ColExpr[Int64], other: ColExpr[Int64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __truediv__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __truediv__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __truediv__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__truediv__", self, other)
+
+    @overload
+    def __rtruediv__(
+        self: ColExpr[Int64], other: ColExpr[Int64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __rtruediv__(
+        self: ColExpr[Float64], other: ColExpr[Float64]
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def __rtruediv__(
+        self: ColExpr[Decimal], other: ColExpr[Decimal]
+    ) -> ColExpr[Decimal]: ...
+
+    def __rtruediv__(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("__truediv__", other, self)
+
+    def __xor__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]:
+        return ColFn("__xor__", self, other)
+
+    def __rxor__(self: ColExpr[Bool], other: ColExpr[Bool]) -> ColExpr[Bool]:
+        return ColFn("__xor__", other, self)
+
+    def all(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Bool]:
+        return ColFn("all", self, partition_by=partition_by, filter=filter)
+
+    def any(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Bool]:
+        return ColFn("any", self, partition_by=partition_by, filter=filter)
+
+    def ascending(self: ColExpr) -> ColExpr:
+        return ColFn("ascending", self)
+
+    @overload
+    def ceil(self: ColExpr[Float64]) -> ColExpr[Float64]: ...
+
+    @overload
+    def ceil(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    def ceil(self: ColExpr) -> ColExpr:
+        return ColFn("ceil", self)
+
+    def count(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Int64]:
+        return ColFn("count", self, partition_by=partition_by, filter=filter)
+
+    def descending(self: ColExpr) -> ColExpr:
+        return ColFn("descending", self)
+
+    def exp(self: ColExpr[Float64]) -> ColExpr[Float64]:
+        return ColFn("exp", self)
+
+    def fill_null(self: ColExpr, other: ColExpr) -> ColExpr:
+        return ColFn("fill_null", self, other)
+
+    @overload
+    def floor(self: ColExpr[Float64]) -> ColExpr[Float64]: ...
+
+    @overload
+    def floor(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    def floor(self: ColExpr) -> ColExpr:
+        return ColFn("floor", self)
+
+    def is_inf(self: ColExpr[Float64]) -> ColExpr[Bool]:
+        return ColFn("is_inf", self)
+
+    def is_nan(self: ColExpr[Float64]) -> ColExpr[Bool]:
+        return ColFn("is_nan", self)
+
+    def is_not_inf(self: ColExpr[Float64]) -> ColExpr[Bool]:
+        return ColFn("is_not_inf", self)
+
+    def is_not_nan(self: ColExpr[Float64]) -> ColExpr[Bool]:
+        return ColFn("is_not_nan", self)
+
+    def is_not_null(self: ColExpr) -> ColExpr[Bool]:
+        return ColFn("is_not_null", self)
+
+    def is_null(self: ColExpr) -> ColExpr[Bool]:
+        return ColFn("is_null", self)
+
+    def isin(self: ColExpr, *args: ColExpr) -> ColExpr[Bool]:
+        return ColFn("isin", self, *args)
+
+    def log(self: ColExpr[Float64]) -> ColExpr[Float64]:
+        return ColFn("log", self)
+
+    @overload
+    def max(
+        self: ColExpr[Int64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Int64]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Float64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def max(
+        self: ColExpr[String],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[String]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Datetime],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Date],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Date]: ...
+
+    def max(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr:
+        return ColFn("max", self, partition_by=partition_by, filter=filter)
+
+    @overload
+    def mean(
+        self: ColExpr[Int64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def mean(
+        self: ColExpr[Float64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Float64]: ...
+
+    def mean(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr:
+        return ColFn("mean", self, partition_by=partition_by, filter=filter)
+
+    @overload
+    def min(
+        self: ColExpr[Int64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Int64]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Float64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Float64]: ...
+
+    @overload
+    def min(
+        self: ColExpr[String],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[String]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Datetime],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Date],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Date]: ...
+
+    def min(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr:
+        return ColFn("min", self, partition_by=partition_by, filter=filter)
+
+    def nulls_first(self: ColExpr) -> ColExpr:
+        return ColFn("nulls_first", self)
+
+    def nulls_last(self: ColExpr) -> ColExpr:
+        return ColFn("nulls_last", self)
+
+    def shift(
+        self: ColExpr,
+        n: int,
+        fill_value: ColExpr = None,
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr:
+        return ColFn(
+            "shift",
+            self,
+            n,
+            fill_value,
+            partition_by=partition_by,
+            arrange=arrange,
+            filter=filter,
+        )
+
+    @overload
+    def sum(
+        self: ColExpr[Int64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Int64]: ...
+
+    @overload
+    def sum(
+        self: ColExpr[Float64],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Float64]: ...
+
+    def sum(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr:
+        return ColFn("sum", self, partition_by=partition_by, filter=filter)
+
+    @property
+    def str(self):
+        return StrNamespace(self)
+
+    @property
+    def dt(self):
+        return DtNamespace(self)
+
+
+@dataclasses.dataclass(slots=True)
+class FnNamespace:
+    arg: ColExpr
+
+
+@dataclasses.dataclass(slots=True)
+class StrNamespace(FnNamespace):
+    def contains(self: ColExpr[String], substr: str) -> ColExpr[Bool]:
+        return ColFn("str.contains", self.arg, substr)
+
+    def ends_with(self: ColExpr[String], suffix: str) -> ColExpr[Bool]:
+        return ColFn("str.ends_with", self.arg, suffix)
+
+    def len(self: ColExpr[String]) -> ColExpr[Int64]:
+        return ColFn("str.len", self.arg)
+
+    def replace_all(
+        self: ColExpr[String], substr: str, replacement: str
+    ) -> ColExpr[String]:
+        return ColFn("str.replace_all", self.arg, substr, replacement)
+
+    def slice(
+        self: ColExpr[String], offset: ColExpr[Int64], n: ColExpr[Int64]
+    ) -> ColExpr[String]:
+        return ColFn("str.slice", self.arg, offset, n)
+
+    def starts_with(self: ColExpr[String], prefix: str) -> ColExpr[Bool]:
+        return ColFn("str.starts_with", self.arg, prefix)
+
+    def strip(self: ColExpr[String]) -> ColExpr[String]:
+        return ColFn("str.strip", self.arg)
+
+    def to_date(self: ColExpr[String]) -> ColExpr[Date]:
+        return ColFn("str.to_date", self.arg)
+
+    def to_datetime(self: ColExpr[String]) -> ColExpr[Datetime]:
+        return ColFn("str.to_datetime", self.arg)
+
+    def to_lower(self: ColExpr[String]) -> ColExpr[String]:
+        return ColFn("str.to_lower", self.arg)
+
+    def to_upper(self: ColExpr[String]) -> ColExpr[String]:
+        return ColFn("str.to_upper", self.arg)
+
+
+@dataclasses.dataclass(slots=True)
+class DtNamespace(FnNamespace):
+    @overload
+    def day(self: ColExpr[Datetime]) -> ColExpr[Int64]: ...
+
+    @overload
+    def day(self: ColExpr[Date]) -> ColExpr[Int64]: ...
+
+    def day(self: ColExpr) -> ColExpr:
+        return ColFn("dt.day", self.arg)
+
+    @overload
+    def day_of_week(self: ColExpr[Datetime]) -> ColExpr[Int64]: ...
+
+    @overload
+    def day_of_week(self: ColExpr[Date]) -> ColExpr[Int64]: ...
+
+    def day_of_week(self: ColExpr) -> ColExpr:
+        return ColFn("dt.day_of_week", self.arg)
+
+    @overload
+    def day_of_year(self: ColExpr[Datetime]) -> ColExpr[Int64]: ...
+
+    @overload
+    def day_of_year(self: ColExpr[Date]) -> ColExpr[Int64]: ...
+
+    def day_of_year(self: ColExpr) -> ColExpr:
+        return ColFn("dt.day_of_year", self.arg)
+
+    def days(self: ColExpr[Duration]) -> ColExpr[Int64]:
+        return ColFn("dt.days", self.arg)
+
+    def hour(self: ColExpr[Datetime]) -> ColExpr[Int64]:
+        return ColFn("dt.hour", self.arg)
+
+    def hours(self: ColExpr[Duration]) -> ColExpr[Int64]:
+        return ColFn("dt.hours", self.arg)
+
+    def millisecond(self: ColExpr[Datetime]) -> ColExpr[Int64]:
+        return ColFn("dt.millisecond", self.arg)
+
+    def milliseconds(self: ColExpr[Duration]) -> ColExpr[Int64]:
+        return ColFn("dt.milliseconds", self.arg)
+
+    def minute(self: ColExpr[Datetime]) -> ColExpr[Int64]:
+        return ColFn("dt.minute", self.arg)
+
+    def minutes(self: ColExpr[Duration]) -> ColExpr[Int64]:
+        return ColFn("dt.minutes", self.arg)
+
+    @overload
+    def month(self: ColExpr[Datetime]) -> ColExpr[Int64]: ...
+
+    @overload
+    def month(self: ColExpr[Date]) -> ColExpr[Int64]: ...
+
+    def month(self: ColExpr) -> ColExpr:
+        return ColFn("dt.month", self.arg)
+
+    def second(self: ColExpr[Datetime]) -> ColExpr[Int64]:
+        return ColFn("dt.second", self.arg)
+
+    def seconds(self: ColExpr[Duration]) -> ColExpr[Int64]:
+        return ColFn("dt.seconds", self.arg)
+
+    @overload
+    def year(self: ColExpr[Datetime]) -> ColExpr[Int64]: ...
+
+    @overload
+    def year(self: ColExpr[Date]) -> ColExpr[Int64]: ...
+
+    def year(self: ColExpr) -> ColExpr:
+        return ColFn("dt.year", self.arg)
 
 
 class Col(ColExpr):
@@ -152,26 +952,23 @@ class ColFn(ColExpr):
 
     def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.name = name
-        self.args = list(args)
-        self.context_kwargs = kwargs
+        # While building the expression tree, we have to allow markers.
+        self.args = [wrap_literal(arg, allow_markers=True) for arg in args]
+        self.context_kwargs = clean_kwargs(**kwargs)
 
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
-                assert self.name == "count"
-                self.args = [LiteralCol(0)]
-
-            # TODO: check that this is an aggregation
-
-            assert len(self.args) == 1
-            self.args[0] = CaseExpr(
-                [
-                    (
-                        functools.reduce(operator.and_, (cond for cond in filters)),
-                        self.args[0],
-                    )
-                ]
-            )
-            del self.context_kwargs["filter"]
+                assert self.name == "len"
+            else:
+                self.args[0] = CaseExpr(
+                    [
+                        (
+                            functools.reduce(operator.and_, (cond for cond in filters)),
+                            self.args[0],
+                        )
+                    ]
+                )
+                del self.context_kwargs["filter"]
 
         super().__init__()
         # try to eagerly resolve the types to get a nicer stack trace on type errors
@@ -296,16 +1093,7 @@ class FnAttr:
                 raise ValueError("`cast` does not take any keyword arguments")
             return Cast(self.arg, *args)
 
-        return ColFn(
-            self.name,
-            wrap_literal(self.arg)
-            # TODO: this is very hacky, but once we do code gen we don't have this
-            # problem anymore
-            if not isinstance(self.arg, ColFn) or self.arg.name not in MARKERS
-            else self.arg,
-            *wrap_literal(args),
-            **clean_kwargs(**kwargs),
-        )
+        return ColFn(self.name, self.arg, *args, **kwargs)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name}, {self.arg})"
@@ -463,10 +1251,10 @@ class Cast(ColExpr):
                 (dtypes.String, dtypes.Int64),
                 (dtypes.String, dtypes.Float64),
                 (dtypes.Float64, dtypes.Int64),
-                (dtypes.DateTime, dtypes.Date),
+                (dtypes.Datetime, dtypes.Date),
                 (dtypes.Int64, dtypes.String),
                 (dtypes.Float64, dtypes.String),
-                (dtypes.DateTime, dtypes.String),
+                (dtypes.Datetime, dtypes.String),
                 (dtypes.Date, dtypes.String),
             }
 
@@ -476,7 +1264,7 @@ class Cast(ColExpr):
             ) not in valid_casts:
                 hint = ""
                 if self.val.dtype() == dtypes.String and self.target_type in (
-                    dtypes.DateTime,
+                    dtypes.Datetime,
                     dtypes.Date,
                 ):
                     hint = (
@@ -554,46 +1342,33 @@ class Order:
         return Order(self.order_by.map_subtree(g), self.descending, self.nulls_last)
 
 
-# Add all supported dunder methods to `ColExpr`. This has to be done, because Python
-# doesn't call __getattr__ for dunder methods.
-def create_operator(op):
-    def impl(*args, **kwargs):
-        return ColFn(op, *wrap_literal(args), **clean_kwargs(**kwargs))
-
-    return impl
-
-
-for dunder in OperatorRegistry.SUPPORTED_DUNDER:
-    setattr(ColExpr, dunder, create_operator(dunder))
-del create_operator
-
-
-def wrap_literal(expr: Any) -> Any:
+def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
     if isinstance(expr, ColExpr | Order):
-        if (
-            isinstance(expr, ColFn)
-            and expr.name in MARKERS
-            and (not isinstance(expr.args[0], ColFn) or expr.args[0].name in MARKERS)
+        if isinstance(expr, ColFn) and (
+            (expr.name in MARKERS and not allow_markers)
+            or (
+                # markers can only be at the top of an expression tree
+                expr.name not in MARKERS
+                and any(
+                    isinstance(arg, ColFn) and arg.name in MARKERS for arg in expr.args
+                )
+            )
         ):
             raise TypeError(
-                f"invalid usage of `.{expr.name}()` in a column expression.\n"
+                f"invalid usage of `{expr.name}` in a column expression.\n"
                 "note: This marker function can only be used in arguments to the "
                 "`arrange` verb or the `arrange=` keyword argument to window "
                 "functions. Furthermore, all markers have to be at the top of the "
                 "expression tree (i.e. cannot be nested inside a column function)."
             )
         return expr
-    elif isinstance(expr, dict):
-        return {key: wrap_literal(val) for key, val in expr.items()}
-    elif isinstance(expr, list | tuple):
-        return expr.__class__(wrap_literal(elem) for elem in expr)
-    elif isinstance(expr, Generator):
-        return (wrap_literal(elem) for elem in expr)
+
     elif isinstance(expr, FnAttr):
         raise TypeError(
             "invalid usage of a column function as an expression.\n"
             "hint: Maybe you forgot to put parentheses `()` after the function?"
         )
+
     else:
         return LiteralCol(expr)
 
@@ -604,9 +1379,6 @@ def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
         for key, val in kwargs.items()
         if val is not None
     }
-    return {
-        key: wrap_literal(
-            val if key != "arrange" else [Order.from_col_expr(ord) for ord in val]
-        )
-        for key, val in kwargs.items()
-    }
+    if (arrange := kwargs.get("arrange")) is not None:
+        kwargs["arrange"] = [Order.from_col_expr(ord) for ord in arrange]
+    return {key: [wrap_literal(val) for val in arr] for key, arr in kwargs.items()}

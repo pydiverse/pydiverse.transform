@@ -65,7 +65,7 @@ class MsSqlImpl(SqlImpl):
 
     @classmethod
     def sqa_type(cls, t: dtypes.Dtype):
-        if isinstance(t, dtypes.DateTime):
+        if isinstance(t, dtypes.Datetime):
             return DATETIME2
 
         return super().sqa_type(t)
@@ -242,13 +242,6 @@ with MsSqlImpl.op(ops.Pow()) as op:
         # a lot of precision if the exponent is <= 1
         # https://learn.microsoft.com/en-us/sql/t-sql/functions/power-transact-sql?view=sql-server-ver16
         return sqa.func.POWER(sqa.cast(lhs, sqa.Double()), rhs, type_=sqa.Double())
-
-
-with MsSqlImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
-        return _pow(lhs, rhs)
 
 
 with MsSqlImpl.op(ops.StrLen()) as op:

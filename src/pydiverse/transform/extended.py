@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from ._internal.pipe.functions import (
-    count,
     dense_rank,
+    len,
     lit,
     max,
     min,
@@ -16,7 +16,7 @@ from .common import __all__ as __common
 
 __all__ = __common + [
     "filter",
-    "count",
+    "len",
     "dense_rank",
     "max",
     "min",

@@ -1,24 +1,27 @@
+# ruff: noqa: A002
+
 from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any
 
-from pydiverse.transform._internal.tree import dtypes
 from pydiverse.transform._internal.tree.col_expr import (
+    Col,
     ColExpr,
     ColFn,
+    ColName,
     LiteralCol,
     WhenClause,
-    clean_kwargs,
     wrap_literal,
 )
+from pydiverse.transform._internal.tree.dtypes import Bool, Dtype, Int64
 
-__all__ = ["count", "row_number", "rank", "when", "dense_rank", "min", "max"]
+__all__ = ["len", "row_number", "rank", "when", "dense_rank", "min", "max"]
 
 
 def when(condition: ColExpr) -> WhenClause:
     condition = wrap_literal(condition)
-    if condition.dtype() is not None and condition.dtype() != dtypes.Bool:
+    if condition.dtype() is not None and condition.dtype() != Bool:
         raise TypeError(
             "argument for `when` must be of boolean type, but has type "
             f"`{condition.dtype()}`"
@@ -27,52 +30,52 @@ def when(condition: ColExpr) -> WhenClause:
     return WhenClause([], wrap_literal(condition))
 
 
-def lit(val: Any, dtype: dtypes.Dtype | None = None) -> LiteralCol:
+def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
     return LiteralCol(val, dtype)
-
-
-def count(
-    expr: ColExpr | None = None,
-    *,
-    filter: ColExpr | Iterable[ColExpr] | None = None,  # noqa: A002
-):
-    if expr is None:
-        return ColFn("count", **clean_kwargs(filter=filter))
-    else:
-        return ColFn("count", wrap_literal(expr))
-
-
-def row_number(
-    *,
-    arrange: ColExpr | Iterable[ColExpr],
-    partition_by: ColExpr | list[ColExpr] | None = None,
-):
-    return ColFn(
-        "row_number", **clean_kwargs(arrange=arrange, partition_by=partition_by)
-    )
-
-
-def rank(
-    *,
-    arrange: ColExpr | Iterable[ColExpr],
-    partition_by: ColExpr | Iterable[ColExpr] | None = None,
-):
-    return ColFn("rank", **clean_kwargs(arrange=arrange, partition_by=partition_by))
 
 
 def dense_rank(
     *,
-    arrange: ColExpr | Iterable[ColExpr],
-    partition_by: ColExpr | Iterable[ColExpr] | None = None,
-):
+    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+) -> ColExpr[Int64]:
     return ColFn(
-        "dense_rank", **clean_kwargs(arrange=arrange, partition_by=partition_by)
+        "dense_rank", partition_by=partition_by, arrange=arrange, filter=filter
     )
 
 
-def min(arg: ColExpr, *additional_args: ColExpr):
-    return ColFn("__least", wrap_literal(arg), *wrap_literal(additional_args))
+def max(*args: ColExpr) -> ColExpr:
+    return ColFn("hmax", *args)
 
 
-def max(arg: ColExpr, *additional_args: ColExpr):
-    return ColFn("__greatest", wrap_literal(arg), *wrap_literal(additional_args))
+def min(*args: ColExpr) -> ColExpr:
+    return ColFn("hmin", *args)
+
+
+def len(
+    *,
+    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+) -> ColExpr[Int64]:
+    return ColFn("len", partition_by=partition_by, filter=filter)
+
+
+def rank(
+    *,
+    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+) -> ColExpr[Int64]:
+    return ColFn("rank", partition_by=partition_by, arrange=arrange, filter=filter)
+
+
+def row_number(
+    *,
+    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+) -> ColExpr[Int64]:
+    return ColFn(
+        "row_number", partition_by=partition_by, arrange=arrange, filter=filter
+    )

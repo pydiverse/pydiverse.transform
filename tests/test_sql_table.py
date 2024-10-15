@@ -354,12 +354,12 @@ class TestSqlTable:
 
     def test_select_without_tbl_ref(self, tbl2):
         assert_equal(
-            tbl2 >> summarize(count=f.count()),
-            tbl2 >> summarize(count=f.count(tbl2.col1)),
+            tbl2 >> summarize(count=f.len()),
+            tbl2 >> summarize(count=tbl2.col1.count()),
         )
 
         assert_equal(
-            tbl2 >> summarize(count=f.count()), pl.DataFrame({"count": [len(df2)]})
+            tbl2 >> summarize(count=f.len()), pl.DataFrame({"count": [len(df2)]})
         )
 
     def test_null_comparison(self, tbl4):

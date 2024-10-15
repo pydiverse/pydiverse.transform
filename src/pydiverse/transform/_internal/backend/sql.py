@@ -187,7 +187,7 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_col_expr(
-        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], compile_literals=True
+        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], *, compile_literals=True
     ) -> sqa.ColumnElement:
         if isinstance(expr, Col):
             return sqa_col[expr._uuid]
@@ -198,8 +198,8 @@ class SqlImpl(TableImpl):
             )
 
             args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(arg, sqa_col, not impl_arg.const)
-                for arg, impl_arg in zip(expr.args, impl.impl.signature, strict=False)
+                cls.compile_col_expr(arg, sqa_col, compile_literals=not param.const)
+                for arg, param in zip(expr.args, impl.impl.signature, strict=False)
             ]
 
             partition_by = expr.context_kwargs.get("partition_by")
@@ -559,13 +559,13 @@ class SqlImpl(TableImpl):
             return sqa.String
         elif isinstance(t, dtypes.Bool):
             return sqa.Boolean
-        elif isinstance(t, dtypes.DateTime):
+        elif isinstance(t, dtypes.Datetime):
             return sqa.DateTime
         elif isinstance(t, dtypes.Date):
             return sqa.Date
         elif isinstance(t, dtypes.Duration):
             return sqa.Interval
-        elif isinstance(t, dtypes.NoneDtype):
+        elif isinstance(t, dtypes.NullType):
             return sqa.types.NullType
 
         raise AssertionError
@@ -583,13 +583,13 @@ class SqlImpl(TableImpl):
         elif isinstance(t, sqa.Boolean):
             return dtypes.Bool()
         elif isinstance(t, sqa.DateTime):
-            return dtypes.DateTime()
+            return dtypes.Datetime()
         elif isinstance(t, sqa.Date):
             return dtypes.Date()
         elif isinstance(t, sqa.Interval):
             return dtypes.Duration()
         elif isinstance(t, sqa.Null):
-            return dtypes.NoneDtype()
+            return dtypes.NullType()
 
         raise TypeError(f"SQLAlchemy type {t} not supported by pydiverse.transform")
 
@@ -686,13 +686,6 @@ with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
             return lhs // rhs
 
 
-with SqlImpl.op(ops.RFloorDiv(), check_super=False) as op:
-
-    @op.auto
-    def _rfloordiv(rhs, lhs):
-        return _floordiv(lhs, rhs)
-
-
 with SqlImpl.op(ops.Pow()) as op:
 
     @op.auto
@@ -707,24 +700,10 @@ with SqlImpl.op(ops.Pow()) as op:
         return sqa.func.POW(lhs, rhs, type_=type_)
 
 
-with SqlImpl.op(ops.RPow()) as op:
-
-    @op.auto
-    def _rpow(rhs, lhs):
-        return _pow(lhs, rhs)
-
-
 with SqlImpl.op(ops.Xor()) as op:
 
     @op.auto
     def _xor(lhs, rhs):
-        return lhs != rhs
-
-
-with SqlImpl.op(ops.RXor()) as op:
-
-    @op.auto
-    def _rxor(rhs, lhs):
         return lhs != rhs
 
 
@@ -753,7 +732,10 @@ with SqlImpl.op(ops.IsIn()) as op:
 
     @op.auto
     def _isin(x, *values):
-        return functools.reduce(operator.or_, map(lambda v: x == v, values))
+        res = x.in_(v for v in values if not isinstance(v.type, sqa.types.NullType))
+        if any(isinstance(v.type, sqa.types.NullType) for v in values):
+            res = res | x.is_(sqa.null())
+        return res
 
 
 with SqlImpl.op(ops.IsNull()) as op:
@@ -897,7 +879,7 @@ with SqlImpl.op(ops.DtDayOfYear()) as op:
         return sqa.extract("doy", x)
 
 
-with SqlImpl.op(ops.Greatest()) as op:
+with SqlImpl.op(ops.HMax()) as op:
 
     @op.auto
     def _greatest(*x):
@@ -905,7 +887,7 @@ with SqlImpl.op(ops.Greatest()) as op:
         return sqa.func.GREATEST(*x)
 
 
-with SqlImpl.op(ops.Least()) as op:
+with SqlImpl.op(ops.HMin()) as op:
 
     @op.auto
     def _least(*x):
@@ -983,12 +965,14 @@ with SqlImpl.op(ops.Count()) as op:
 
     @op.auto
     def _count(x=None):
-        if x is None:
-            # Get the number of rows
-            return sqa.func.count()
-        else:
-            # Count non null values
-            return sqa.func.count(x)
+        return sqa.func.count(x)
+
+
+with SqlImpl.op(ops.Len()) as op:
+
+    @op.auto
+    def _len():
+        return sqa.func.count()
 
 
 with SqlImpl.op(ops.Shift()) as op:

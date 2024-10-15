@@ -4,19 +4,12 @@ from pydiverse.transform._internal.ops.core import Binary, ElementWise, Unary
 
 __all__ = [
     "Add",
-    "RAdd",
     "Sub",
-    "RSub",
     "Mul",
-    "RMul",
     "TrueDiv",
-    "RTrueDiv",
     "FloorDiv",
-    "RFloorDiv",
     "Pow",
-    "RPow",
     "Mod",
-    "RMod",
     "Neg",
     "Pos",
     "Abs",
@@ -41,10 +34,6 @@ class Add(ElementWise, Binary):
     ]
 
 
-class RAdd(Add):
-    name = "__radd__"
-
-
 class Sub(ElementWise, Binary):
     name = "__sub__"
     signatures = [
@@ -52,10 +41,6 @@ class Sub(ElementWise, Binary):
         "float64, float64 -> float64",
         "decimal, decimal -> decimal",
     ]
-
-
-class RSub(Sub):
-    name = "__rsub__"
 
 
 class Mul(ElementWise, Binary):
@@ -67,10 +52,6 @@ class Mul(ElementWise, Binary):
     ]
 
 
-class RMul(Mul):
-    name = "__rmul__"
-
-
 class TrueDiv(ElementWise, Binary):
     name = "__truediv__"
     signatures = [
@@ -80,19 +61,11 @@ class TrueDiv(ElementWise, Binary):
     ]
 
 
-class RTrueDiv(TrueDiv):
-    name = "__rtruediv__"
-
-
 class FloorDiv(ElementWise, Binary):
     name = "__floordiv__"
     signatures = [
         "int64, int64 -> int64",
     ]
-
-
-class RFloorDiv(FloorDiv):
-    name = "__rfloordiv__"
 
 
 class Pow(ElementWise, Binary):
@@ -104,19 +77,11 @@ class Pow(ElementWise, Binary):
     ]
 
 
-class RPow(Pow):
-    name = "__rpow__"
-
-
 class Mod(ElementWise, Binary):
     name = "__mod__"
     signatures = [
         "int64, int64 -> int64",
     ]
-
-
-class RMod(Mod):
-    name = "__rmod__"
 
 
 class Neg(ElementWise, Unary):
@@ -149,16 +114,15 @@ class Abs(ElementWise, Unary):
 class Round(ElementWise):
     name = "__round__"
     signatures = [
-        "int64 -> int64",
-        "int64, const int64 -> int64",
-        "float64 -> float64",
         "float64, const int64 -> float64",
-        "decimal -> decimal",
         "decimal, const int64 -> decimal",
+        "int64, const int64 -> int64",
     ]
+    arg_names = ["self", "decimals"]
+    defaults = [..., 0]
 
 
-class Floor(ElementWise):
+class Floor(ElementWise, Unary):
     name = "floor"
     signatures = [
         "float64 -> float64",
@@ -170,7 +134,7 @@ class Ceil(Floor):
     name = "ceil"
 
 
-class Log(ElementWise):
+class Log(ElementWise, Unary):
     name = "log"
     signatures = ["float64 -> float64"]
 
@@ -180,7 +144,7 @@ class Exp(Log):
     signatures = ["float64 -> float64"]
 
 
-class IsInf(ElementWise):
+class IsInf(ElementWise, Unary):
     name = "is_inf"
     signatures = ["float64 -> bool"]
 
@@ -189,7 +153,7 @@ class IsNotInf(IsInf):
     name = "is_not_inf"
 
 
-class IsNan(ElementWise):
+class IsNan(ElementWise, Unary):
     name = "is_nan"
     signatures = ["float64 -> bool"]
 

@@ -23,6 +23,7 @@ cd pydiverse.transform
 
 # Create the environment, activate it and install the pre-commit hooks
 pixi install
+pixi run postinstall
 pixi run pre-commit install
 ```
 

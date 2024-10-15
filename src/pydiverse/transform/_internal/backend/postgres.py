@@ -91,7 +91,7 @@ with PostgresImpl.op(ops.DtMillisecond()) as op:
         )
 
 
-with PostgresImpl.op(ops.Greatest()) as op:
+with PostgresImpl.op(ops.HMax()) as op:
 
     @op("str... -> str")
     def _greatest(*x):
@@ -99,7 +99,7 @@ with PostgresImpl.op(ops.Greatest()) as op:
         return sqa.func.GREATEST(*(sqa.collate(e, "POSIX") for e in x))
 
 
-with PostgresImpl.op(ops.Least()) as op:
+with PostgresImpl.op(ops.HMin()) as op:
 
     @op("str... -> str")
     def _least(*x):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.core import Binary, ElementWise, Operator, Unary
 from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree.registry import Signature
 
 __all__ = [
     "Equal",
@@ -15,11 +16,8 @@ __all__ = [
     "FillNull",
     "IsIn",
     "And",
-    "RAnd",
     "Or",
-    "ROr",
     "Xor",
-    "RXor",
     "Invert",
 ]
 
@@ -45,8 +43,8 @@ class Comparison(ElementWise, Binary, Logical):
         "date, date -> bool",
     ]
 
-    def validate_signature(self, signature):
-        assert isinstance(signature.rtype, dtypes.Bool)
+    def validate_signature(self, signature: Signature):
+        assert isinstance(signature.return_type, dtypes.Bool)
         super().validate_signature(signature)
 
 
@@ -93,13 +91,8 @@ class GreaterEqual(Comparison):
 
 class IsIn(ElementWise, Logical):
     name = "isin"
-    signatures = [
-        # TODO: A signature like "T, const list[const T] -> bool" would be better
-        "T, T... -> bool",
-    ]
-
-
-#### Boolean Operators ####
+    signatures = ["T, T... -> bool"]
+    arg_names = ["self", "args"]
 
 
 class BooleanBinary(ElementWise, Binary, Logical):
@@ -107,15 +100,15 @@ class BooleanBinary(ElementWise, Binary, Logical):
         "bool, bool -> bool",
     ]
 
-    def validate_signature(self, signature):
-        assert len(signature.args) == 2
+    def validate_signature(self, signature: Signature):
+        assert len(signature.params) == 2
 
-        for arg_dtype in signature.args:
+        for arg_dtype in signature.params:
             assert isinstance(arg_dtype, dtypes.Bool)
             assert not arg_dtype.vararg
             assert not arg_dtype.const
 
-        assert isinstance(signature.rtype, dtypes.Bool)
+        assert isinstance(signature.return_type, dtypes.Bool)
         super().validate_signature(signature)
 
 
@@ -123,24 +116,12 @@ class And(BooleanBinary):
     name = "__and__"
 
 
-class RAnd(BooleanBinary):
-    name = "__rand__"
-
-
 class Or(BooleanBinary):
     name = "__or__"
 
 
-class ROr(BooleanBinary):
-    name = "__ror__"
-
-
 class Xor(BooleanBinary):
     name = "__xor__"
-
-
-class RXor(BooleanBinary):
-    name = "__rxor__"
 
 
 class Invert(ElementWise, Unary, Logical):

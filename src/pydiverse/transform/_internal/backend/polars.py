@@ -91,17 +91,22 @@ def compile_order(
     )
 
 
-def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
+def compile_col_expr(
+    expr: ColExpr, name_in_df: dict[UUID, str], *, compile_literals: bool = True
+) -> pl.Expr:
     if isinstance(expr, Col):
         return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
         op = PolarsImpl.registry.get_op(expr.name)
-        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
         impl = PolarsImpl.registry.get_impl(
             expr.name,
             tuple(arg.dtype() for arg in expr.args),
         )
+        args: list[pl.Expr] = [
+            compile_col_expr(arg, name_in_df, compile_literals=not param.const)
+            for arg, param in zip(expr.args, impl.impl.signature, strict=False)
+        ]
 
         if (partition_by := expr.context_kwargs.get("partition_by")) is not None:
             partition_by = [compile_col_expr(pb, name_in_df) for pb in partition_by]
@@ -131,12 +136,12 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
 
-        value: pl.Expr = impl(*args)
+        value: pl.Expr = impl(*args, _pdt_args=expr.args)
 
         # TODO: currently, count is the only aggregation function where we don't want
         # to return null for cols containing only null values. If this happens for more
         # aggregation functions, make this configurable in e.g. the operator spec.
-        if op.ftype == Ftype.AGGREGATE and op.name != "count":
+        if op.ftype == Ftype.AGGREGATE and op.name != "len":
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -186,7 +191,11 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
+        return (
+            pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
+            if compile_literals
+            else expr.val
+        )
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
@@ -361,13 +370,13 @@ def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
     elif isinstance(t, pl.String):
         return dtypes.String()
     elif isinstance(t, pl.Datetime):
-        return dtypes.DateTime()
+        return dtypes.Datetime()
     elif isinstance(t, pl.Date):
         return dtypes.Date()
     elif isinstance(t, pl.Duration):
         return dtypes.Duration()
     elif isinstance(t, pl.Null):
-        return dtypes.NoneDtype()
+        return dtypes.NullType()
 
     raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
 
@@ -381,13 +390,13 @@ def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
         return pl.Boolean()
     elif isinstance(t, dtypes.String):
         return pl.String()
-    elif isinstance(t, dtypes.DateTime):
+    elif isinstance(t, dtypes.Datetime):
         return pl.Datetime()
     elif isinstance(t, dtypes.Date):
         return pl.Date()
     elif isinstance(t, dtypes.Duration):
         return pl.Duration()
-    elif isinstance(t, dtypes.NoneDtype):
+    elif isinstance(t, dtypes.NullType):
         return pl.Null()
 
     raise AssertionError
@@ -561,24 +570,10 @@ with PolarsImpl.op(ops.Sub()) as op:
         return lhs - rhs
 
 
-with PolarsImpl.op(ops.RSub()) as op:
-
-    @op.extension(ops.DtRSub)
-    def _dt_rsub(rhs, lhs):
-        return lhs - rhs
-
-
 with PolarsImpl.op(ops.Add()) as op:
 
     @op.extension(ops.DtDurAdd)
     def _dt_dur_add(lhs, rhs):
-        return lhs + rhs
-
-
-with PolarsImpl.op(ops.RAdd()) as op:
-
-    @op.extension(ops.DtDurRAdd)
-    def _dt_dur_radd(rhs, lhs):
         return lhs + rhs
 
 
@@ -613,9 +608,10 @@ with PolarsImpl.op(ops.Shift()) as op:
 with PolarsImpl.op(ops.IsIn()) as op:
 
     @op.auto
-    def _isin(x, *values):
+    def _isin(x, *values, _pdt_args):
         return pl.any_horizontal(
-            (x == v if v is not None else x.is_null()) for v in values
+            (x == val if arg.dtype() != dtypes.NullType else x.is_null())
+            for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 
 
@@ -685,18 +681,25 @@ with PolarsImpl.op(ops.StrSlice()) as op:
 with PolarsImpl.op(ops.Count()) as op:
 
     @op.auto
-    def _count(x=None):
-        return pl.len().cast(pl.Int64) if x is None else x.count().cast(pl.Int64)
+    def _count(x):
+        return x.count().cast(pl.Int64)
 
 
-with PolarsImpl.op(ops.Greatest()) as op:
+with PolarsImpl.op(ops.Len()) as op:
+
+    @op.auto
+    def _len():
+        return pl.len().cast(pl.Int64)
+
+
+with PolarsImpl.op(ops.HMax()) as op:
 
     @op.auto
     def _greatest(*x):
         return pl.max_horizontal(*x)
 
 
-with PolarsImpl.op(ops.Least()) as op:
+with PolarsImpl.op(ops.HMin()) as op:
 
     @op.auto
     def _least(*x):

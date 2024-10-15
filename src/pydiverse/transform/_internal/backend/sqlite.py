@@ -33,7 +33,7 @@ class SqliteImpl(SqlImpl):
                 ),
             )
 
-        elif cast.val.dtype() == dtypes.DateTime and cast.target_type == dtypes.Date:
+        elif cast.val.dtype() == dtypes.Datetime and cast.target_type == dtypes.Date:
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
 
         elif cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
@@ -104,7 +104,7 @@ with SqliteImpl.op(ops.DtMillisecond()) as op:
         return sqa.cast((frac_seconds * _1000) % _1000, sqa.Integer())
 
 
-with SqliteImpl.op(ops.Greatest()) as op:
+with SqliteImpl.op(ops.HMax()) as op:
 
     @op.auto
     def _greatest(*x):
@@ -121,7 +121,7 @@ with SqliteImpl.op(ops.Greatest()) as op:
         return sqa.func.coalesce(sqa.func.MAX(left, right), left, right)
 
 
-with SqliteImpl.op(ops.Least()) as op:
+with SqliteImpl.op(ops.HMin()) as op:
 
     @op.auto
     def _least(*x):

@@ -57,13 +57,6 @@ with DuckDbImpl.op(ops.FloorDiv()) as op:
         return sqa.func.divide(lhs, rhs)
 
 
-with DuckDbImpl.op(ops.RFloorDiv()) as op:
-
-    @op.auto
-    def _floordiv(rhs, lhs):
-        return sqa.func.divide(lhs, rhs)
-
-
 with DuckDbImpl.op(ops.IsInf()) as op:
 
     @op.auto

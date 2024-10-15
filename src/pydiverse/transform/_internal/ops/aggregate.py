@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import Aggregate, Unary
+from pydiverse.transform._internal.ops.core import Aggregate, Nullary, Unary
 
 __all__ = [
     "Min",
@@ -10,6 +10,7 @@ __all__ = [
     "Any",
     "All",
     "Count",
+    "Len",
 ]
 
 
@@ -65,9 +66,14 @@ class All(Aggregate, Unary):
     ]
 
 
-class Count(Aggregate):
+class Count(Aggregate, Unary):
     name = "count"
     signatures = [
-        "-> int64",
         "T -> int64",
     ]
+    arg_names = ["self"]
+
+
+class Len(Aggregate, Nullary):
+    name = "len"
+    signatures = ["-> int64"]
