@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterable
 from functools import partial
 from typing import TYPE_CHECKING
 
-from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree import types
 
 if TYPE_CHECKING:
     from pydiverse.transform._internal.ops import Operator, OperatorExtension
@@ -57,7 +57,7 @@ class OperatorImpl:
         template_indices = []
         const_modifiers = []
         for i, dtype in enumerate(signature.params):
-            if isinstance(dtype, dtypes.Template):
+            if isinstance(dtype, types.Template):
                 num_templates += 1
                 templates_set.add(dtype.name)
                 template_indices.append(-i)
@@ -111,10 +111,10 @@ class TypedOperatorImpl:
 
     operator: Operator
     impl: OperatorImpl
-    return_type: dtypes.Dtype
+    return_type: types.Dtype
 
     @classmethod
-    def from_operator_impl(cls, impl: OperatorImpl, return_type: dtypes.Dtype):
+    def from_operator_impl(cls, impl: OperatorImpl, return_type: types.Dtype):
         return cls(
             operator=impl.operator,
             impl=impl,
@@ -227,7 +227,7 @@ class OperatorRegistry:
             raise ValueError(f"operator named `{name}` does not exist")
 
         for dtype in args_signature:
-            if not isinstance(dtype, dtypes.Dtype):
+            if not isinstance(dtype, types.Dtype):
                 raise TypeError(
                     "expected elements of `args_signature` to be of type Dtype, "
                     f"found element of type {type(dtype).__name__} instead"
@@ -274,7 +274,7 @@ class Signature:
 
     """
 
-    def __init__(self, params: list[dtypes.Dtype], return_type: dtypes.Dtype):
+    def __init__(self, params: list[types.Dtype], return_type: types.Dtype):
         """
         :param args: Tuple of argument types.
         :param return_type: The return type.
@@ -286,10 +286,10 @@ class Signature:
     def parse(cls, signature: str) -> Signature:
         def parse_cstypes(cst: str):
             # cstypes = comma seperated types
-            types = cst.split(",")
-            types = [t.strip() for t in types]
-            types = [dtypes.dtype_from_string(t) for t in types if t]
-            return types
+            s = cst.split(",")
+            s = [t.strip() for t in s]
+            s = [types.dtype_from_string(t) for t in s if t]
+            return s
 
         if "->" not in signature:
             raise ValueError("Invalid signature: arrow (->) missing.")
@@ -309,7 +309,7 @@ class Signature:
 
         # Validate Template
         # Output template must also occur in signature
-        if isinstance(return_type, dtypes.Template):
+        if isinstance(return_type, types.Template):
             if return_type.name not in [arg.name for arg in params]:
                 raise ValueError(
                     f"Template return type '{return_type}' must also occur in the"
@@ -366,7 +366,7 @@ class OperatorImplStore:
     @dataclasses.dataclass
     class TrieNode:
         __slots__ = ("value", "operator", "children")
-        value: dtypes.Dtype
+        value: types.Dtype
         operator: OperatorImpl | None
         children: list[OperatorImplStore.TrieNode]
 
@@ -422,7 +422,7 @@ class OperatorImplStore:
         return node
 
     def find_best_match(
-        self, signature: tuple[dtypes.Dtype]
+        self, signature: tuple[types.Dtype]
     ) -> TypedOperatorImpl | None:
         matches = list(self._find_matches(signature))
 
@@ -445,15 +445,15 @@ class OperatorImplStore:
                 best_score = score
 
         return_type = best_match[0].operator.signature.return_type
-        if isinstance(return_type, dtypes.Template):
+        if isinstance(return_type, types.Template):
             # If return_type is a template -> Translate
             return_type = best_match[1][return_type.name]
 
         return TypedOperatorImpl.from_operator_impl(best_match[0].operator, return_type)
 
     def _find_matches(
-        self, signature: tuple[dtypes.Dtype]
-    ) -> Iterable[TrieNode, dict[str, dtypes.Dtype, tuple[int, ...]]]:
+        self, signature: tuple[types.Dtype]
+    ) -> Iterable[TrieNode, dict[str, types.Dtype, tuple[int, ...]]]:
         """Yield all operators that match the input signature"""
 
         # Case 0 arguments:
@@ -463,10 +463,10 @@ class OperatorImplStore:
 
         # Case 1+ args:
         def does_match(
-            dtype: dtypes.Dtype,
+            dtype: types.Dtype,
             node: OperatorImplStore.TrieNode,
         ) -> bool:
-            if isinstance(node.value, dtypes.Template):
+            if isinstance(node.value, types.Template):
                 return node.value.modifiers_compatible(dtype)
             return dtype.can_promote_to(node.value)
 
@@ -481,7 +481,7 @@ class OperatorImplStore:
             if not does_match(dtype, node):
                 continue
 
-            if isinstance(node.value, dtypes.Template):
+            if isinstance(node.value, types.Template):
                 templates = templates.copy()
                 if node.value.name not in templates:
                     templates[node.value.name] = [dtype.without_modifiers()]
@@ -500,7 +500,7 @@ class OperatorImplStore:
                     # Find compatible type for templates
                     try:
                         templates = {
-                            name: dtypes.promote_dtypes(types_)
+                            name: types.promote_dtypes(types_)
                             for name, types_ in templates.items()
                         }
                         yield node, templates, type_promotion_indices

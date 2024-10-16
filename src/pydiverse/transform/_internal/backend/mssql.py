@@ -11,7 +11,7 @@ from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.errors import NotSupportedError
-from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
@@ -64,8 +64,8 @@ class MsSqlImpl(SqlImpl):
         return cls.compile_query(table, query)
 
     @classmethod
-    def sqa_type(cls, pdt_type: dtypes.Dtype):
-        if isinstance(pdt_type, dtypes.Datetime):
+    def sqa_type(cls, pdt_type: types.Dtype):
+        if isinstance(pdt_type, types.Datetime):
             return DATETIME2
 
         return super().sqa_type(pdt_type)
@@ -109,7 +109,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         )
 
     elif isinstance(expr, Col):
-        if not wants_bool_as_bit and expr.dtype() == dtypes.Bool:
+        if not wants_bool_as_bit and expr.dtype() == types.Bool:
             return ColFn("__eq__", expr, LiteralCol(True))
         return expr
 
@@ -132,7 +132,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
             expr.name, tuple(arg.dtype() for arg in expr.args)
         )
 
-        if isinstance(impl.return_type, dtypes.Bool):
+        if isinstance(impl.return_type, types.Bool):
             returns_bool_as_bit = not isinstance(op, ops.logical.Logical)
 
             if wants_bool_as_bit and not returns_bool_as_bit:

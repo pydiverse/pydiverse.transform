@@ -22,6 +22,11 @@ class Dtype(ABC):
             return False
         return True
 
+    def __le__(self, rhs: Dtype):
+        if rhs.const and not self.const:
+            return False
+        return isinstance(self, type(rhs))
+
     def __ne__(self, rhs: object) -> bool:
         return not self.__eq__(rhs)
 
@@ -99,16 +104,26 @@ class Int16(Int): ...
 class Int8(Int): ...
 
 
+class Uint64(Int): ...
+
+
+class Uint32(Int): ...
+
+
+class Uint16(Int): ...
+
+
+class Uint8(Int): ...
+
+
 class Float(Dtype):
     name = "float"
 
 
-class Float64(Float):
-    name = "float"
+class Float64(Float): ...
 
 
-class Float32(Float):
-    name = "float32"
+class Float32(Float): ...
 
 
 class Decimal(Dtype):
@@ -135,6 +150,8 @@ class Duration(Dtype):
     name = "duration"
 
 
+# TODO: this shouldn't be a type. create a parameter class, pack vararg in there
+# and allow parameters of type template
 class Template(Dtype):
     name = None
 
@@ -278,3 +295,11 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
         raise TypeError(f"incompatible types {dtype} and {promoted}")
 
     return promoted
+
+
+def is_abstract(dtype: Dtype) -> bool:
+    return type(dtype) is Int or type(dtype) is Float
+
+
+def is_concrete(dtype: Dtype) -> bool:
+    return not is_abstract(dtype)

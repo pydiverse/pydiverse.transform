@@ -9,7 +9,7 @@ from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.ops.core import Ftype
-from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
@@ -27,7 +27,7 @@ class PolarsImpl(TableImpl):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
         super().__init__(
             name,
-            {name: polars_type(dtype) for name, dtype in df.collect_schema().items()},
+            {name: pdt_type(dtype) for name, dtype in df.collect_schema().items()},
         )
 
     @staticmethod
@@ -100,6 +100,11 @@ def compile_col_expr(
             expr.name,
             tuple(arg.dtype() for arg in expr.args),
         )
+        # TODO: technically, constness of our parameters has nothing to do with whether
+        # the polars function wants a pdt.lit or python type. We should rather specify
+        # this in the impl or always pass both the compiled and uncompiled args. But if
+        # we know a polars function can only take a python scalar, then our param also
+        # has to be const, so we can unwrap the python scalar from the compiled expr.
         args: list[pl.Expr] = [
             compile_col_expr(arg, name_in_df, compile_literals=not param.const)
             for arg, param in zip(expr.args, impl.impl.signature, strict=False)
@@ -188,18 +193,14 @@ def compile_col_expr(
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return (
-            pl.lit(expr.val, dtype=pdt_type(expr.dtype()))
-            if compile_literals
-            else expr.val
-        )
+        return pl.lit(expr.val) if compile_literals else expr.val
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
-            pdt_type(expr.target_type)
+            polars_type(expr.target_type)
         )
 
-        if expr.val.dtype() == dtypes.Float64 and expr.target_type == dtypes.String:
+        if expr.val.dtype() == types.Float64 and expr.target_type == types.String:
             compiled = compiled.replace("NaN", "nan")
 
         return compiled
@@ -357,43 +358,85 @@ def compile_ast(
     return df, name_in_df, select, partition_by
 
 
-def polars_type(pdt_type: pl.DataType) -> dtypes.Dtype:
-    if pdt_type.is_float():
-        return dtypes.Float64()
-    elif pdt_type.is_integer():
-        return dtypes.Int64()
-    elif isinstance(pdt_type, pl.Boolean):
-        return dtypes.Bool()
-    elif isinstance(pdt_type, pl.String):
-        return dtypes.String()
-    elif isinstance(pdt_type, pl.Datetime):
-        return dtypes.Datetime()
-    elif isinstance(pdt_type, pl.Date):
-        return dtypes.Date()
-    elif isinstance(pdt_type, pl.Duration):
-        return dtypes.Duration()
-    elif isinstance(pdt_type, pl.Null):
-        return dtypes.NullType()
+def pdt_type(pl_type: pl.DataType) -> types.Dtype:
+    if pl_type == pl.Float64():
+        return types.Float64()
+    elif pl_type == pl.Float32():
+        return types.Float32()
 
-    raise TypeError(f"polars type {pdt_type} is not supported by pydiverse.transform")
+    elif pl_type == pl.Int64():
+        return types.Int64()
+    elif pl_type == pl.Int32():
+        return types.Int32()
+    elif pl_type == pl.Int16():
+        return types.Int16()
+    elif pl_type == pl.Int8():
+        return types.Int8()
+
+    elif pl_type == pl.UInt64():
+        return types.Uint64()
+    elif pl_type == pl.UInt32():
+        return types.Uint32()
+    elif pl_type == pl.UInt16():
+        return types.Uint16()
+    elif pl_type == pl.UInt8():
+        return types.Uint8()
+
+    elif pl_type.is_decimal():
+        return types.Decimal()
+    elif isinstance(pl_type, pl.Boolean):
+        return types.Bool()
+    elif isinstance(pl_type, pl.String):
+        return types.String()
+    elif isinstance(pl_type, pl.Datetime):
+        return types.Datetime()
+    elif isinstance(pl_type, pl.Date):
+        return types.Date()
+    elif isinstance(pl_type, pl.Duration):
+        return types.Duration()
+    elif isinstance(pl_type, pl.Null):
+        return types.NullType()
+
+    raise TypeError(f"polars type {pl_type} is not supported by pydiverse.transform")
 
 
-def pdt_type(polars_type: dtypes.Dtype) -> pl.DataType:
-    if isinstance(polars_type, dtypes.Float64 | dtypes.Decimal):
+def polars_type(pdt_type: types.Dtype) -> pl.DataType:
+    assert types.is_concrete(pdt_type)
+
+    if pdt_type == types.Float64():
         return pl.Float64()
-    elif isinstance(polars_type, dtypes.Int64):
+    elif pdt_type == types.Float32():
+        return pl.Float32()
+
+    elif pdt_type == types.Int64():
         return pl.Int64()
-    elif isinstance(polars_type, dtypes.Bool):
+    elif pdt_type == types.Int32():
+        return pl.Int32()
+    elif pdt_type == types.Int16():
+        return pl.Int16()
+    elif pdt_type == types.Int8():
+        return pl.Int8()
+
+    elif pdt_type == types.Uint64():
+        return pl.UInt64()
+    elif pdt_type == types.Uint32():
+        return pl.UInt32()
+    elif pdt_type == types.Uint16():
+        return pl.UInt16()
+    elif pdt_type == types.Uint8():
+        return pl.UInt8()
+
+    elif pdt_type == types.Bool():
         return pl.Boolean()
-    elif isinstance(polars_type, dtypes.String):
+    elif pdt_type == types.String():
         return pl.String()
-    elif isinstance(polars_type, dtypes.Datetime):
+    elif pdt_type == types.Datetime():
         return pl.Datetime()
-    elif isinstance(polars_type, dtypes.Date):
+    elif pdt_type == types.Date():
         return pl.Date()
-    elif isinstance(polars_type, dtypes.Duration):
+    elif pdt_type == types.Duration():
         return pl.Duration()
-    elif isinstance(polars_type, dtypes.NullType):
+    elif pdt_type == types.NullType():
         return pl.Null()
 
     raise AssertionError
@@ -607,7 +650,7 @@ with PolarsImpl.op(ops.IsIn()) as op:
     @op.auto
     def _isin(x, *values, _pdt_args):
         return pl.any_horizontal(
-            (x == val if arg.dtype() != dtypes.NullType else x.is_null())
+            (x == val if arg.dtype() != types.NullType else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 

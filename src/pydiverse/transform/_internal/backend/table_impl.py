@@ -17,7 +17,7 @@ from pydiverse.transform._internal.ops.registry import (
 )
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col
-from pydiverse.transform._internal.tree.dtypes import Dtype
+from pydiverse.transform._internal.tree.types import Dtype
 
 if TYPE_CHECKING:
     from pydiverse.transform._internal.ops import Operator
@@ -33,7 +33,7 @@ class TableImpl(AstNode):
     def __init__(self, name: str, schema: dict[str, Dtype]):
         self.name = name
         self.cols = {
-            name: Col(name, self, uuid.uuid1(), dtype, Ftype.EWISE)
+            name: Col(name, self, uuid.uuid1(), dtype, Ftype.ELEMENT_WISE)
             for name, dtype in schema.items()
         }
 

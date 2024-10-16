@@ -7,7 +7,7 @@ from types import NoneType
 from pydiverse.transform._internal.backend.polars import PolarsImpl
 from pydiverse.transform._internal.ops.core import NoExprMethod, Operator
 from pydiverse.transform._internal.ops.registry import Signature
-from pydiverse.transform._internal.tree.dtypes import (
+from pydiverse.transform._internal.tree.types import (
     Dtype,
     Template,
     pdt_type_to_python,

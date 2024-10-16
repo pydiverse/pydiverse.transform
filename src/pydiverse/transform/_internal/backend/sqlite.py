@@ -5,7 +5,7 @@ import sqlalchemy as sqa
 from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.errors import NotSupportedError
-from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import Cast
 from pydiverse.transform._internal.util.warnings import warn_non_standard
 
@@ -23,7 +23,7 @@ class SqliteImpl(SqlImpl):
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
 
-        if cast.val.dtype() == dtypes.String and cast.target_type == dtypes.Float64:
+        if cast.val.dtype() == types.String and cast.target_type == types.Float64:
             return sqa.case(
                 (compiled_val == "inf", cls.inf()),
                 (compiled_val == "-inf", -cls.inf()),
@@ -33,10 +33,10 @@ class SqliteImpl(SqlImpl):
                 ),
             )
 
-        elif cast.val.dtype() == dtypes.Datetime and cast.target_type == dtypes.Date:
+        elif cast.val.dtype() == types.Datetime and cast.target_type == types.Date:
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
 
-        elif cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.String:
+        elif cast.val.dtype() == types.Float64 and cast.target_type == types.String:
             return sqa.case(
                 (compiled_val == cls.inf(), "inf"),
                 (compiled_val == -cls.inf(), "-inf"),

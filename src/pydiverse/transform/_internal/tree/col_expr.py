@@ -14,9 +14,9 @@ from uuid import UUID
 
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops.core import Ftype, Operator
-from pydiverse.transform._internal.tree import dtypes
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.dtypes import (
+from pydiverse.transform._internal.tree.types import (
     Bool,
     Date,
     Datetime,
@@ -936,12 +936,12 @@ class ColName(ColExpr):
 class LiteralCol(ColExpr):
     __slots__ = ["val"]
 
-    def __init__(self, val: Any, dtype: dtypes.Dtype | None = None):
+    def __init__(self, val: Any, dtype: types.Dtype | None = None):
         self.val = val
         if dtype is None:
             dtype = python_type_to_pdt(type(val))
         dtype.const = True
-        super().__init__(dtype, Ftype.EWISE)
+        super().__init__(dtype, Ftype.ELEMENT_WISE)
 
     def __repr__(self):
         return f"lit({self.val}, {self.dtype()})"
@@ -1039,7 +1039,7 @@ class ColFn(ColExpr):
             Ftype.WINDOW if op.ftype == Ftype.AGGREGATE and agg_is_window else op.ftype
         )
 
-        if actual_ftype == Ftype.EWISE:
+        if actual_ftype == Ftype.ELEMENT_WISE:
             # this assert is ok since window functions in `summarize` are already kicked
             # out by the `summarize` constructor.
             assert not (Ftype.WINDOW in ftypes and Ftype.AGGREGATE in ftypes)
@@ -1164,14 +1164,14 @@ class CaseExpr(ColExpr):
             if None in val_types:
                 return None
 
-            self._dtype = dtypes.promote_dtypes(
+            self._dtype = types.promote_dtypes(
                 [dtype.without_modifiers() for dtype in val_types]
             )
         except Exception as e:
             raise TypeError(f"invalid case expression: {e}") from e
 
         for cond, _ in self.cases:
-            if cond.dtype() is not None and cond.dtype() != dtypes.Bool:
+            if cond.dtype() is not None and cond.dtype() != types.Bool:
                 raise TypeError(
                     f"argument `{cond}` for `when` must be of boolean type, but has "
                     f"type `{cond.dtype()}`"
@@ -1184,6 +1184,8 @@ class CaseExpr(ColExpr):
             return self._ftype
 
         val_ftypes = set()
+        # TODO: does it actually matter if we add stuff that is const? it should be
+        # elemwise anyway...
         if self.default_val is not None and not self.default_val.dtype().const:
             val_ftypes.add(self.default_val.ftype(agg_is_window=agg_is_window))
 
@@ -1195,7 +1197,7 @@ class CaseExpr(ColExpr):
             return None
 
         if len(val_ftypes) == 0:
-            self._ftype = Ftype.EWISE
+            self._ftype = Ftype.ELEMENT_WISE
         elif len(val_ftypes) == 1:
             (self._ftype,) = val_ftypes
         elif Ftype.WINDOW in val_ftypes:
@@ -1216,7 +1218,7 @@ class CaseExpr(ColExpr):
 
         condition = wrap_literal(condition)
         if condition.dtype() is not None and not isinstance(
-            condition.dtype(), dtypes.Bool
+            condition.dtype(), types.Bool
         ):
             raise TypeError(
                 "argument for `when` must be of boolean type, but has type "
@@ -1248,14 +1250,14 @@ class Cast(ColExpr):
 
         if not self.val.dtype().can_promote_to(self.target_type):
             valid_casts = {
-                (dtypes.String, dtypes.Int64),
-                (dtypes.String, dtypes.Float64),
-                (dtypes.Float64, dtypes.Int64),
-                (dtypes.Datetime, dtypes.Date),
-                (dtypes.Int64, dtypes.String),
-                (dtypes.Float64, dtypes.String),
-                (dtypes.Datetime, dtypes.String),
-                (dtypes.Date, dtypes.String),
+                (types.String, types.Int64),
+                (types.String, types.Float64),
+                (types.Float64, types.Int64),
+                (types.Datetime, types.Date),
+                (types.Int64, types.String),
+                (types.Float64, types.String),
+                (types.Datetime, types.String),
+                (types.Date, types.String),
             }
 
             if (
@@ -1263,9 +1265,9 @@ class Cast(ColExpr):
                 self.target_type.__class__,
             ) not in valid_casts:
                 hint = ""
-                if self.val.dtype() == dtypes.String and self.target_type in (
-                    dtypes.Datetime,
-                    dtypes.Date,
+                if self.val.dtype() == types.String and self.target_type in (
+                    types.Datetime,
+                    types.Date,
                 ):
                     hint = (
                         "\nhint: to convert a str to datetime, call "

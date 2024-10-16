@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
@@ -14,7 +15,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     WhenClause,
     wrap_literal,
 )
-from pydiverse.transform._internal.tree.dtypes import Bool, Dtype, Int64
+from pydiverse.transform._internal.tree.types import Bool, Dtype, Int64
 
 __all__ = ["len", "row_number", "rank", "when", "dense_rank", "min", "max"]
 
@@ -31,6 +32,8 @@ def when(condition: ColExpr) -> WhenClause:
 
 
 def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
+    if types.is_concrete(dtype):
+        return LiteralCol(val, dtype).cast(dtype)
     return LiteralCol(val, dtype)
 
 

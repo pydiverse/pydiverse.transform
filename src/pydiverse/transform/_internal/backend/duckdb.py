@@ -8,7 +8,7 @@ from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, LiteralCol
 
@@ -20,10 +20,10 @@ class DuckDbImpl(SqlImpl):
         for desc in nd.iter_subtree():
             if isinstance(desc, verbs.Verb):
                 desc.map_col_nodes(
-                    lambda u: Cast(u, dtypes.Int64())
+                    lambda u: Cast(u, types.Int64())
                     if isinstance(u, ColFn)
                     and u.name == "sum"
-                    and u.dtype() == dtypes.Int64
+                    and u.dtype() == types.Int64
                     else u
                 )
 
@@ -37,7 +37,7 @@ class DuckDbImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        if cast.val.dtype() == dtypes.Float64 and cast.target_type == dtypes.Int64:
+        if cast.val.dtype() == types.Float64 and cast.target_type == types.Int64:
             return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
                 sqa.BigInteger()
             )
@@ -45,7 +45,7 @@ class DuckDbImpl(SqlImpl):
 
     @classmethod
     def compile_lit(cls, lit: LiteralCol) -> sqa.ColumnElement:
-        if lit.dtype() == dtypes.Int64:
+        if lit.dtype() == types.Int64:
             return sqa.cast(lit.val, sqa.BigInteger)
         return super().compile_lit(lit)
 

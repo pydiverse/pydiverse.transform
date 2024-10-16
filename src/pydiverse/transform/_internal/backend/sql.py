@@ -14,12 +14,12 @@ import polars as pl
 import sqlalchemy as sqa
 
 from pydiverse.transform._internal import ops
-from pydiverse.transform._internal.backend.polars import pdt_type
+from pydiverse.transform._internal.backend.polars import polars_type
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
 from pydiverse.transform._internal.ops.core import Ftype
-from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
@@ -30,7 +30,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.dtypes import Dtype
+from pydiverse.transform._internal.tree.types import Dtype
 
 
 class SqlImpl(TableImpl):
@@ -136,7 +136,7 @@ class SqlImpl(TableImpl):
                     sel,
                     connection=conn,
                     schema_overrides={
-                        sql_col.name: pdt_type(col.dtype())
+                        sql_col.name: polars_type(col.dtype())
                         for sql_col, col in zip(
                             sel.columns.values(), final_select, strict=True
                         )
@@ -158,7 +158,7 @@ class SqlImpl(TableImpl):
     # some backends need to do casting to ensure the correct type
     @classmethod
     def compile_lit(cls, lit: LiteralCol):
-        if lit.dtype() == dtypes.Float64:
+        if lit.dtype() == types.Float64:
             if math.isnan(lit.val):
                 return cls.nan()
             elif math.isinf(lit.val):
@@ -549,47 +549,65 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def sqa_type(cls, pdt_type: Dtype) -> type[sqa.types.TypeEngine]:
-        if isinstance(pdt_type, dtypes.Int64):
+        assert types.is_concrete(pdt_type)
+
+        if pdt_type <= types.Int64():
             return sqa.BigInteger
-        elif isinstance(pdt_type, dtypes.Float64):
+        elif pdt_type <= types.Int32():
+            return sqa.Integer
+        elif pdt_type <= types.Int16():
+            return sqa.SmallInteger
+
+        elif pdt_type <= types.Float64():
             return sqa.Double
-        elif isinstance(pdt_type, dtypes.Decimal):
+        elif pdt_type <= types.Float32():
+            return sqa.Float
+
+        elif pdt_type <= types.Decimal():
             return sqa.DECIMAL
-        elif isinstance(pdt_type, dtypes.String):
+        elif pdt_type == types.String():
             return sqa.String
-        elif isinstance(pdt_type, dtypes.Bool):
+        elif pdt_type == types.Bool():
             return sqa.Boolean
-        elif isinstance(pdt_type, dtypes.Datetime):
+        elif pdt_type == types.Datetime():
             return sqa.DateTime
-        elif isinstance(pdt_type, dtypes.Date):
+        elif pdt_type == types.Date():
             return sqa.Date
-        elif isinstance(pdt_type, dtypes.Duration):
+        elif pdt_type == types.Duration():
             return sqa.Interval
-        elif isinstance(pdt_type, dtypes.NullType):
+        elif pdt_type == types.NullType():
             return sqa.types.NullType
 
         raise AssertionError
 
     @classmethod
     def pdt_type(cls, sqa_type: sqa.types.TypeEngine) -> Dtype:
+        if isinstance(sqa_type, sqa.BigInteger):
+            return types.Int64()
+        if isinstance(sqa_type, sqa.SmallInteger):
+            return types.Int16()
         if isinstance(sqa_type, sqa.Integer):
-            return dtypes.Int64()
+            return types.Int32()
+
+        elif isinstance(sqa_type, sqa.Double):
+            return types.Float64()
         elif isinstance(sqa_type, sqa.Float):
-            return dtypes.Float64()
+            return types.Float32()
+
         elif isinstance(sqa_type, sqa.DECIMAL | sqa.NUMERIC):
-            return dtypes.Decimal()
+            return types.Decimal()
         elif isinstance(sqa_type, sqa.String):
-            return dtypes.String()
+            return types.String()
         elif isinstance(sqa_type, sqa.Boolean):
-            return dtypes.Bool()
+            return types.Bool()
         elif isinstance(sqa_type, sqa.DateTime):
-            return dtypes.Datetime()
+            return types.Datetime()
         elif isinstance(sqa_type, sqa.Date):
-            return dtypes.Date()
+            return types.Date()
         elif isinstance(sqa_type, sqa.Interval):
-            return dtypes.Duration()
+            return types.Duration()
         elif isinstance(sqa_type, sqa.Null):
-            return dtypes.NullType()
+            return types.NullType()
 
         raise TypeError(
             f"SQLAlchemy type {sqa_type} not supported by pydiverse.transform"

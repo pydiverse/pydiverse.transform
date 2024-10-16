@@ -22,7 +22,7 @@ __all__ = [
 
 
 class Ftype(enum.IntEnum):
-    EWISE = 1
+    ELEMENT_WISE = 1
     AGGREGATE = 2
     WINDOW = 3
 
@@ -138,7 +138,7 @@ class Binary(Arity):
 
 
 class ElementWise(Operator):
-    ftype = Ftype.EWISE
+    ftype = Ftype.ELEMENT_WISE
 
 
 class Aggregate(Operator):
