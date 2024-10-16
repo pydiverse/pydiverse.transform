@@ -110,35 +110,15 @@ with PostgresImpl.op(ops.HMin()) as op:
 with PostgresImpl.op(ops.Any()) as op:
 
     @op.auto
-    def _any(x, *, _window_partition_by=None, _window_order_by=None):
-        return sqa.func.coalesce(sqa.func.BOOL_OR(x, type_=sqa.Boolean()), sqa.null())
-
-    @op.auto(variant="window")
-    def _any(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.BOOL_OR(x, type_=sqa.Boolean()).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
+    def _any(x):
+        return sqa.func.BOOL_OR(x, type_=sqa.Boolean())
 
 
 with PostgresImpl.op(ops.All()) as op:
 
     @op.auto
     def _all(x):
-        return sqa.func.coalesce(sqa.func.BOOL_AND(x, type_=sqa.Boolean()), sqa.null())
-
-    @op.auto(variant="window")
-    def _all(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.BOOL_AND(x, type_=sqa.Boolean()).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
+        return sqa.func.BOOL_AND(x, type_=sqa.Boolean())
 
 
 with SqlImpl.op(ops.IsNan()) as op:

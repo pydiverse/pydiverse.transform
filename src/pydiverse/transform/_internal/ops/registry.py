@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
-import functools
 import inspect
 import itertools
 import textwrap
 from collections.abc import Callable, Iterable
-from functools import partial
 from typing import TYPE_CHECKING
 
 from pydiverse.transform._internal.tree import types
@@ -36,13 +34,11 @@ class OperatorImpl:
         self.operator = operator
         self.impl = impl
         self.signature = signature
-        self.variants: dict[str, Callable] = {}
 
         self.__id = next(OperatorImpl.id_)
 
         # Inspect impl signature to get internal kwargs
         self.internal_kwargs = self._compute_internal_kwargs(impl)
-        self.variant_internal_kwargs = {}
 
         # Calculate Ordering Key
         # - Find match with the least number templates in the signature
@@ -75,15 +71,6 @@ class OperatorImpl:
             -len(signature.params),
             self.__id,
         )
-
-    def add_variant(self, name: str, impl: Callable):
-        if name in self.variants:
-            raise ValueError(
-                f"Already added a variant with name '{name}'"
-                f" to operator {self.operator}."
-            )
-        self.variants[name] = impl
-        self.variant_internal_kwargs[name] = self._compute_internal_kwargs(impl)
 
     @staticmethod
     def _compute_internal_kwargs(impl: Callable):
@@ -124,24 +111,8 @@ class TypedOperatorImpl:
     def __call__(self, *args, **kwargs):
         return self.impl.impl(*args, **self.__clean_kwargs(kwargs))
 
-    def has_variant(self, name: str) -> bool:
-        return name in self.impl.variants
-
-    def get_variant(self, name: str) -> Callable | None:
-        variant = self.impl.variants.get(name)
-        if variant is None:
-            return None
-
-        @functools.wraps(variant)
-        def variant_wrapper(*args, **kwargs):
-            return variant(*args, **self.__clean_kwargs(kwargs, variant=name))
-
-        return variant_wrapper
-
-    def __clean_kwargs(self, kwargs, variant=None):
+    def __clean_kwargs(self, kwargs):
         internal_kwargs = self.impl.internal_kwargs
-        if variant:
-            internal_kwargs = self.impl.variant_internal_kwargs[variant]
 
         return {
             k: v
@@ -203,7 +174,6 @@ class OperatorRegistry:
         operator: Operator,
         impl: Callable,
         signature: str,
-        variant: str | None = None,
     ):
         if operator not in self.registered_ops:
             raise ValueError(
@@ -216,11 +186,7 @@ class OperatorRegistry:
 
         impl_store = self.implementations[operator.name]
         op_impl = OperatorImpl(operator, impl, signature)
-
-        if variant:
-            impl_store.add_variant(variant, op_impl)
-        else:
-            impl_store.add_impl(op_impl)
+        impl_store.add_impl(op_impl)
 
     def get_impl(self, name, args_signature) -> TypedOperatorImpl:
         if name not in self.ALL_REGISTERED_OPS:
@@ -391,19 +357,6 @@ class OperatorImplStore:
 
         node.operator = operator
 
-    def add_variant(self, name: str, operator: OperatorImpl):
-        node = self.get_node(operator.signature, create_missing=False)
-        if node is None or node.operator is None:
-            raise ValueError(
-                f"No implementation for signature {operator.signature} found."
-                " Make sure there is an exact match to add a variant."
-            )
-
-        assert node.operator.signature.return_type.same_kind(
-            operator.signature.return_type
-        )
-        node.operator.add_variant(name, operator.impl)
-
     def get_node(self, signature: Signature, create_missing: bool = True):
         node = self.root
         for dtype in signature.params:
@@ -537,7 +490,7 @@ class OperatorRegistrationContextManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def __call__(self, signature: str, *, variant: str = None):
+    def __call__(self, signature: str):
         if not isinstance(signature, str):
             raise TypeError("Signature must be of type str.")
 
@@ -546,16 +499,12 @@ class OperatorRegistrationContextManager:
                 self.operator,
                 func,
                 signature,
-                variant,
             )
             return func
 
         return decorator
 
-    def auto(self, func: Callable = None, *, variant: str = None):
-        if func is None:
-            return partial(self.auto, variant=variant)
-
+    def auto(self, func: Callable = None):
         if not self.operator.signatures:
             raise ValueError(f"Operator {self.operator} has not default signatures.")
 
@@ -564,12 +513,11 @@ class OperatorRegistrationContextManager:
                 self.operator,
                 func,
                 signature,
-                variant,
             )
 
         return func
 
-    def extension(self, extension: type[OperatorExtension], variant: str = None):
+    def extension(self, extension: type[OperatorExtension]):
         if extension.operator != type(self.operator):  # noqa: E721
             raise ValueError(
                 f"Operator extension for '{extension.operator.__name__}' can't "
@@ -578,7 +526,7 @@ class OperatorRegistrationContextManager:
 
         def decorator(func):
             for sig in extension.signatures:
-                self.registry.add_impl(self.operator, func, sig, variant)
+                self.registry.add_impl(self.operator, func, sig)
             return func
 
         return decorator
