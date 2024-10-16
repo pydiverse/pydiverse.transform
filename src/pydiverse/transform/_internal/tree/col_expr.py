@@ -42,12 +42,6 @@ class ColExpr(Generic[T]):
         self._dtype = _dtype
         self._ftype = _ftype
 
-    def __getattr__(self, name: str) -> FnAttr:
-        if name.startswith("_") and name.endswith("_"):
-            # that hasattr works correctly
-            raise AttributeError(f"`ColExpr` has no attribute `{name}`")
-        return FnAttr(name, self)
-
     def __bool__(self):
         raise TypeError(
             "cannot call __bool__() on a ColExpr. hint: A ColExpr cannot be "
@@ -89,6 +83,9 @@ class ColExpr(Generic[T]):
             ),
             wrap_literal(default) if default is not None else self,
         )
+
+    def cast(self, target_type: Dtype) -> Cast:
+        return Cast(self, target_type)
 
     def iter_children(self) -> Iterable[ColExpr]:
         return iter(())
@@ -1056,26 +1053,6 @@ class ColFn(ColExpr):
 
 
 @dataclasses.dataclass(slots=True)
-class FnAttr:
-    name: str
-    arg: ColExpr
-
-    def __getattr__(self, name) -> FnAttr:
-        return FnAttr(f"{self.name}.{name}", self.arg)
-
-    def __call__(self, *args, **kwargs) -> ColExpr:
-        if self.name == "cast":
-            if len(kwargs) > 0:
-                raise ValueError("`cast` does not take any keyword arguments")
-            return Cast(self.arg, *args)
-
-        return ColFn(self.name, self.arg, *args, **kwargs)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.name}, {self.arg})"
-
-
-@dataclasses.dataclass(slots=True)
 class WhenClause:
     cases: list[tuple[ColExpr, ColExpr]]
     cond: ColExpr
@@ -1340,12 +1317,6 @@ def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
                 "expression tree (i.e. cannot be nested inside a column function)."
             )
         return expr
-
-    elif isinstance(expr, FnAttr):
-        raise TypeError(
-            "invalid usage of a column function as an expression.\n"
-            "hint: Maybe you forgot to put parentheses `()` after the function?"
-        )
 
     else:
         return LiteralCol(expr)
