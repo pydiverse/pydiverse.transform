@@ -40,7 +40,7 @@ class StrStrip(StrUnary):
 class StrLen(StrUnary):
     name = "str.len"
     signatures = [
-        "str -> int64",
+        "str -> int",
     ]
 
 
@@ -86,7 +86,7 @@ class StrContains(ElementWise, Logical):
 
 class StrSlice(ElementWise):
     name = "str.slice"
-    signatures = ["str, int64, int64 -> str"]
+    signatures = ["str, int, int -> str"]
     arg_names = ["self", "offset", "n"]
 
 

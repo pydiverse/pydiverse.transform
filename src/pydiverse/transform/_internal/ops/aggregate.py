@@ -17,8 +17,8 @@ __all__ = [
 class Min(Aggregate, Unary):
     name = "min"
     signatures = [
-        "int64 -> int64",
-        "float64 -> float64",
+        "int -> int",
+        "float -> float",
         "str -> str",
         "datetime -> datetime",
         "date -> date",
@@ -28,8 +28,8 @@ class Min(Aggregate, Unary):
 class Max(Aggregate, Unary):
     name = "max"
     signatures = [
-        "int64 -> int64",
-        "float64 -> float64",
+        "int -> int",
+        "float -> float",
         "str -> str",
         "datetime -> datetime",
         "date -> date",
@@ -39,16 +39,16 @@ class Max(Aggregate, Unary):
 class Mean(Aggregate, Unary):
     name = "mean"
     signatures = [
-        "int64 -> float64",
-        "float64 -> float64",
+        "int -> float",
+        "float -> float",
     ]
 
 
 class Sum(Aggregate, Unary):
     name = "sum"
     signatures = [
-        "int64 -> int64",
-        "float64 -> float64",
+        "int -> int",
+        "float -> float",
     ]
 
 
@@ -69,11 +69,11 @@ class All(Aggregate, Unary):
 class Count(Aggregate, Unary):
     name = "count"
     signatures = [
-        "T -> int64",
+        "T -> int",
     ]
     arg_names = ["self"]
 
 
 class Len(Aggregate, Nullary):
     name = "len"
-    signatures = ["-> int64"]
+    signatures = ["-> int"]

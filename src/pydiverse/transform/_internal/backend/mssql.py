@@ -64,11 +64,11 @@ class MsSqlImpl(SqlImpl):
         return cls.compile_query(table, query)
 
     @classmethod
-    def sqa_type(cls, t: dtypes.Dtype):
-        if isinstance(t, dtypes.Datetime):
+    def sqa_type(cls, pdt_type: dtypes.Dtype):
+        if isinstance(pdt_type, dtypes.Datetime):
             return DATETIME2
 
-        return super().sqa_type(t)
+        return super().sqa_type(pdt_type)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:

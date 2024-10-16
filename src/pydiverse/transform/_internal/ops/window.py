@@ -13,7 +13,7 @@ __all__ = [
 class Shift(Window):
     name = "shift"
     signatures = [
-        "T, const int64, const T -> T",
+        "T, const int, const T -> T",
     ]
     arg_names = ["self", "n", "fill_value"]
     defaults = [..., ..., None]
@@ -22,19 +22,19 @@ class Shift(Window):
 class RowNumber(Window, Nullary):
     name = "row_number"
     signatures = [
-        "-> int64",
+        "-> int",
     ]
 
 
 class Rank(Window, Nullary):
     name = "rank"
     signatures = [
-        "-> int64",
+        "-> int",
     ]
 
 
 class DenseRank(Window, Nullary):
     name = "dense_rank"
     signatures = [
-        "-> int64",
+        "-> int",
     ]

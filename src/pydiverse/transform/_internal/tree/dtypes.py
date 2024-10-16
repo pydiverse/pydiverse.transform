@@ -69,17 +69,18 @@ class Dtype(ABC):
         return other.same_kind(self)
 
 
-class Int64(Dtype):
-    name = "int64"
+class Int(Dtype):
+    name = "int"
 
-    MIN = -(1 << 63)
-    MAX = (1 << 63) - 1
+
+class Int64(Dtype):
+    name = "int"
 
     def can_promote_to(self, other: Dtype) -> bool:
         if super().can_promote_to(other):
             return True
 
-        # int64 can be promoted to float64
+        # int can be promoted to float
         if Float64().same_kind(other):
             if other.const and not self.const:
                 return False
@@ -89,8 +90,25 @@ class Int64(Dtype):
         return False
 
 
-class Float64(Dtype):
-    name = "float64"
+class Int32(Int): ...
+
+
+class Int16(Int): ...
+
+
+class Int8(Int): ...
+
+
+class Float(Dtype):
+    name = "float"
+
+
+class Float64(Float):
+    name = "float"
+
+
+class Float32(Float):
+    name = "float32"
 
 
 class Decimal(Dtype):
@@ -217,9 +235,9 @@ def dtype_from_string(t: str) -> Dtype:
     if is_template:
         return Template(base_type, const=is_const, vararg=is_vararg)
 
-    if base_type == "int64":
+    if base_type == "int":
         return Int64(const=is_const, vararg=is_vararg)
-    if base_type == "float64":
+    if base_type == "float":
         return Float64(const=is_const, vararg=is_vararg)
     if base_type == "decimal":
         return Decimal(const=is_const, vararg=is_vararg)

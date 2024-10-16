@@ -27,10 +27,7 @@ class PolarsImpl(TableImpl):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
         super().__init__(
             name,
-            {
-                name: polars_type_to_pdt(dtype)
-                for name, dtype in df.collect_schema().items()
-            },
+            {name: polars_type(dtype) for name, dtype in df.collect_schema().items()},
         )
 
     @staticmethod
@@ -192,14 +189,14 @@ def compile_col_expr(
 
     elif isinstance(expr, LiteralCol):
         return (
-            pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
+            pl.lit(expr.val, dtype=pdt_type(expr.dtype()))
             if compile_literals
             else expr.val
         )
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
-            pdt_type_to_polars(expr.target_type)
+            pdt_type(expr.target_type)
         )
 
         if expr.val.dtype() == dtypes.Float64 and expr.target_type == dtypes.String:
@@ -360,43 +357,43 @@ def compile_ast(
     return df, name_in_df, select, partition_by
 
 
-def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
-    if t.is_float():
+def polars_type(pdt_type: pl.DataType) -> dtypes.Dtype:
+    if pdt_type.is_float():
         return dtypes.Float64()
-    elif t.is_integer():
+    elif pdt_type.is_integer():
         return dtypes.Int64()
-    elif isinstance(t, pl.Boolean):
+    elif isinstance(pdt_type, pl.Boolean):
         return dtypes.Bool()
-    elif isinstance(t, pl.String):
+    elif isinstance(pdt_type, pl.String):
         return dtypes.String()
-    elif isinstance(t, pl.Datetime):
+    elif isinstance(pdt_type, pl.Datetime):
         return dtypes.Datetime()
-    elif isinstance(t, pl.Date):
+    elif isinstance(pdt_type, pl.Date):
         return dtypes.Date()
-    elif isinstance(t, pl.Duration):
+    elif isinstance(pdt_type, pl.Duration):
         return dtypes.Duration()
-    elif isinstance(t, pl.Null):
+    elif isinstance(pdt_type, pl.Null):
         return dtypes.NullType()
 
-    raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
+    raise TypeError(f"polars type {pdt_type} is not supported by pydiverse.transform")
 
 
-def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
-    if isinstance(t, dtypes.Float64 | dtypes.Decimal):
+def pdt_type(polars_type: dtypes.Dtype) -> pl.DataType:
+    if isinstance(polars_type, dtypes.Float64 | dtypes.Decimal):
         return pl.Float64()
-    elif isinstance(t, dtypes.Int64):
+    elif isinstance(polars_type, dtypes.Int64):
         return pl.Int64()
-    elif isinstance(t, dtypes.Bool):
+    elif isinstance(polars_type, dtypes.Bool):
         return pl.Boolean()
-    elif isinstance(t, dtypes.String):
+    elif isinstance(polars_type, dtypes.String):
         return pl.String()
-    elif isinstance(t, dtypes.Datetime):
+    elif isinstance(polars_type, dtypes.Datetime):
         return pl.Datetime()
-    elif isinstance(t, dtypes.Date):
+    elif isinstance(polars_type, dtypes.Date):
         return pl.Date()
-    elif isinstance(t, dtypes.Duration):
+    elif isinstance(polars_type, dtypes.Duration):
         return pl.Duration()
-    elif isinstance(t, dtypes.NullType):
+    elif isinstance(polars_type, dtypes.NullType):
         return pl.Null()
 
     raise AssertionError

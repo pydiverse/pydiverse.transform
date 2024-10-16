@@ -21,27 +21,27 @@ def assert_signature(s: Signature, args: list[dtypes.Dtype], return_type: dtypes
 
 class TestOperatorSignature:
     def test_parse_simple(self):
-        s = Signature.parse("int64, int64 -> int64")
+        s = Signature.parse("int, int -> int")
         assert_signature(s, [dtypes.Int64(), dtypes.Int64()], dtypes.Int64())
 
         s = Signature.parse("bool->bool ")
         assert_signature(s, [dtypes.Bool()], dtypes.Bool())
 
-        s = Signature.parse("-> int64")
+        s = Signature.parse("-> int")
         assert_signature(s, [], dtypes.Int64())
 
         with pytest.raises(ValueError):
-            Signature.parse("int64, int64 -> ")
+            Signature.parse("int, int -> ")
         with pytest.raises(ValueError):
-            Signature.parse("int64, int64 -> int64, int64")
+            Signature.parse("int, int -> int, int")
 
         with pytest.raises(ValueError):
-            Signature.parse("o#r -> int64")
+            Signature.parse("o#r -> int")
         with pytest.raises(ValueError):
-            Signature.parse("int64 -> a#")
+            Signature.parse("int -> a#")
 
     def test_parse_template(self):
-        s = Signature.parse("T, int64 -> int64")
+        s = Signature.parse("T, int -> int")
         assert isinstance(s.params[0], dtypes.Template)
 
         s = Signature.parse("T -> T")
@@ -52,26 +52,26 @@ class TestOperatorSignature:
             Signature.parse("T, T -> U")
 
     def test_parse_varargs(self):
-        s = Signature.parse("int64, str... -> int64")
+        s = Signature.parse("int, str... -> int")
         assert not s.params[0].vararg
         assert s.params[1].vararg
 
-        s = Signature.parse("int64... -> bool")
+        s = Signature.parse("int... -> bool")
         assert s.params[0].vararg
 
         with pytest.raises(ValueError):
-            Signature.parse("int64..., str -> int64")
+            Signature.parse("int..., str -> int")
         with pytest.raises(ValueError):
-            Signature.parse("int64, str -> int64...")
+            Signature.parse("int, str -> int...")
 
-        s0 = Signature.parse("int64, str    -> int64")
-        s1 = Signature.parse("int64, str... -> int64")
+        s0 = Signature.parse("int, str    -> int")
+        s1 = Signature.parse("int, str... -> int")
 
         assert not s0.is_vararg
         assert s1.is_vararg
 
     def test_parse_const(self):
-        s = Signature.parse("const int64 -> int64")
+        s = Signature.parse("const int -> int")
         assert s.params[0].const
         assert not s.return_type.const
 
@@ -101,31 +101,31 @@ class TestOperatorRegistry:
         reg.register_op(op1)
         reg.register_op(op2)
 
-        reg.add_impl(op1, lambda: 1, "int64, int64 -> int64")
+        reg.add_impl(op1, lambda: 1, "int, int -> int")
         reg.add_impl(op1, lambda: 2, "str, str -> str")
 
-        reg.add_impl(op2, lambda: 10, "int64, int64 -> int64")
+        reg.add_impl(op2, lambda: 10, "int, int -> int")
         reg.add_impl(op2, lambda: 20, "str, str -> str")
 
-        assert reg.get_impl("op1", parse_dtypes("int64", "int64"))() == 1
+        assert reg.get_impl("op1", parse_dtypes("int", "int"))() == 1
         assert isinstance(
-            reg.get_impl("op1", parse_dtypes("int64", "int64")).return_type,
+            reg.get_impl("op1", parse_dtypes("int", "int")).return_type,
             dtypes.Int64,
         )
-        assert reg.get_impl("op2", parse_dtypes("int64", "int64"))() == 10
+        assert reg.get_impl("op2", parse_dtypes("int", "int"))() == 10
 
         assert reg.get_impl("op1", parse_dtypes("str", "str"))() == 2
         assert reg.get_impl("op2", parse_dtypes("str", "str"))() == 20
 
         with pytest.raises(TypeError):
-            reg.get_impl("op1", parse_dtypes("int64", "str"))
+            reg.get_impl("op1", parse_dtypes("int", "str"))
         with pytest.raises(ValueError):
             reg.get_impl(
                 "not_implemented",
-                parse_dtypes("int64"),
+                parse_dtypes("int"),
             )
 
-        reg.add_impl(op1, lambda: 100, "-> int64")
+        reg.add_impl(op1, lambda: 100, "-> int")
         assert reg.get_impl("op1", tuple())() == 100
 
     def test_template(self):
@@ -145,52 +145,52 @@ class TestOperatorRegistry:
         with pytest.raises(ValueError, match="already defined"):
             reg.add_impl(op1, lambda: 3, "T, U -> U")
 
-        assert reg.get_impl("op1", parse_dtypes("int64", "int64"))() == 1
-        assert reg.get_impl("op1", parse_dtypes("int64", "str"))() == 2
-        # int64 can be promoted to float; results in "float, float -> bool" signature
-        assert reg.get_impl("op1", parse_dtypes("int64", "float64"))() == 1
-        assert reg.get_impl("op1", parse_dtypes("float64", "int64"))() == 1
+        assert reg.get_impl("op1", parse_dtypes("int", "int"))() == 1
+        assert reg.get_impl("op1", parse_dtypes("int", "str"))() == 2
+        # int can be promoted to float; results in "float, float -> bool" signature
+        assert reg.get_impl("op1", parse_dtypes("int", "float"))() == 1
+        assert reg.get_impl("op1", parse_dtypes("float", "int"))() == 1
 
         # More template matching... Also check matching precedence
-        reg.add_impl(op2, lambda: 1, "int64, int64, int64 -> int64")
-        reg.add_impl(op2, lambda: 2, "int64, str, T -> int64")
-        reg.add_impl(op2, lambda: 3, "int64, T, str -> int64")
-        reg.add_impl(op2, lambda: 4, "int64, T, T -> int64")
-        reg.add_impl(op2, lambda: 5, "T, T, T -> int64")
-        reg.add_impl(op2, lambda: 6, "A, T, T -> int64")
+        reg.add_impl(op2, lambda: 1, "int, int, int -> int")
+        reg.add_impl(op2, lambda: 2, "int, str, T -> int")
+        reg.add_impl(op2, lambda: 3, "int, T, str -> int")
+        reg.add_impl(op2, lambda: 4, "int, T, T -> int")
+        reg.add_impl(op2, lambda: 5, "T, T, T -> int")
+        reg.add_impl(op2, lambda: 6, "A, T, T -> int")
 
-        assert reg.get_impl("op2", parse_dtypes("int64", "int64", "int64"))() == 1
-        assert reg.get_impl("op2", parse_dtypes("int64", "str", "str"))() == 2
-        assert reg.get_impl("op2", parse_dtypes("int64", "int64", "str"))() == 3
-        assert reg.get_impl("op2", parse_dtypes("int64", "bool", "bool"))() == 4
+        assert reg.get_impl("op2", parse_dtypes("int", "int", "int"))() == 1
+        assert reg.get_impl("op2", parse_dtypes("int", "str", "str"))() == 2
+        assert reg.get_impl("op2", parse_dtypes("int", "int", "str"))() == 3
+        assert reg.get_impl("op2", parse_dtypes("int", "bool", "bool"))() == 4
         assert reg.get_impl("op2", parse_dtypes("str", "str", "str"))() == 5
-        assert reg.get_impl("op2", parse_dtypes("float64", "str", "str"))() == 6
+        assert reg.get_impl("op2", parse_dtypes("float", "str", "str"))() == 6
 
         with pytest.raises(TypeError):
-            reg.get_impl("op2", parse_dtypes("int64", "bool", "float64"))
+            reg.get_impl("op2", parse_dtypes("int", "bool", "float"))
 
         # Return type
         reg.add_impl(op3, lambda: 1, "T -> T")
-        reg.add_impl(op3, lambda: 2, "int64, T, U -> T")
+        reg.add_impl(op3, lambda: 2, "int, T, U -> T")
         reg.add_impl(op3, lambda: 3, "str, T, U -> U")
 
         with pytest.raises(ValueError, match="already defined."):
-            reg.add_impl(op3, lambda: 4, "int64, T, U -> U")
+            reg.add_impl(op3, lambda: 4, "int, T, U -> U")
 
         assert isinstance(
             reg.get_impl("op3", parse_dtypes("str")).return_type,
             dtypes.String,
         )
         assert isinstance(
-            reg.get_impl("op3", parse_dtypes("int64")).return_type,
+            reg.get_impl("op3", parse_dtypes("int")).return_type,
             dtypes.Int64,
         )
         assert isinstance(
-            reg.get_impl("op3", parse_dtypes("int64", "int64", "float64")).return_type,
+            reg.get_impl("op3", parse_dtypes("int", "int", "float")).return_type,
             dtypes.Int64,
         )
         assert isinstance(
-            reg.get_impl("op3", parse_dtypes("str", "int64", "float64")).return_type,
+            reg.get_impl("op3", parse_dtypes("str", "int", "float")).return_type,
             dtypes.Float64,
         )
 
@@ -200,25 +200,25 @@ class TestOperatorRegistry:
         op1 = self.Op1()
         reg.register_op(op1)
 
-        reg.add_impl(op1, lambda: 1, "int64... -> int64")
-        reg.add_impl(op1, lambda: 2, "int64, int64... -> int64")
-        reg.add_impl(op1, lambda: 3, "int64, T... -> T")
+        reg.add_impl(op1, lambda: 1, "int... -> int")
+        reg.add_impl(op1, lambda: 2, "int, int... -> int")
+        reg.add_impl(op1, lambda: 3, "int, T... -> T")
 
         assert (
             reg.get_impl(
                 "op1",
                 parse_dtypes(
-                    "int64",
+                    "int",
                 ),
             )()
             == 1
         )
-        assert reg.get_impl("op1", parse_dtypes("int64", "int64"))() == 2
-        assert reg.get_impl("op1", parse_dtypes("int64", "int64", "int64"))() == 2
-        assert reg.get_impl("op1", parse_dtypes("int64", "str", "str"))() == 3
+        assert reg.get_impl("op1", parse_dtypes("int", "int"))() == 2
+        assert reg.get_impl("op1", parse_dtypes("int", "int", "int"))() == 2
+        assert reg.get_impl("op1", parse_dtypes("int", "str", "str"))() == 3
 
         assert isinstance(
-            reg.get_impl("op1", parse_dtypes("int64", "str", "str")).return_type,
+            reg.get_impl("op1", parse_dtypes("int", "str", "str")).return_type,
             dtypes.String,
         )
 
@@ -229,13 +229,13 @@ class TestOperatorRegistry:
         reg.register_op(op1)
 
         with pytest.raises(ValueError):
-            reg.add_impl(op1, lambda: 2, "-> int64", variant="VAR")
+            reg.add_impl(op1, lambda: 2, "-> int", variant="VAR")
 
-        reg.add_impl(op1, lambda: 1, "-> int64")
-        reg.add_impl(op1, lambda: 2, "-> int64", variant="VAR")
+        reg.add_impl(op1, lambda: 1, "-> int")
+        reg.add_impl(op1, lambda: 2, "-> int", variant="VAR")
 
         assert reg.get_impl("op1", tuple())() == 1
         assert reg.get_impl("op1", tuple()).get_variant("VAR")() == 2
 
         with pytest.raises(ValueError):
-            reg.add_impl(op1, lambda: 2, "-> int64", variant="VAR")
+            reg.add_impl(op1, lambda: 2, "-> int", variant="VAR")

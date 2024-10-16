@@ -33,8 +33,8 @@ class Logical(Operator):
 
 class Comparison(ElementWise, Binary, Logical):
     signatures = [
-        "int64, int64 -> bool",
-        "float64, float64 -> bool",
+        "int, int -> bool",
+        "float, float -> bool",
         "str, str -> bool",
         "bool, bool -> bool",
         "datetime, datetime -> bool",

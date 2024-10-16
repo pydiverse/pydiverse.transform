@@ -28,8 +28,8 @@ __all__ = [
 class Add(ElementWise, Binary):
     name = "__add__"
     signatures = [
-        "int64, int64 -> int64",
-        "float64, float64 -> float64",
+        "int, int -> int",
+        "float, float -> float",
         "decimal, decimal -> decimal",
     ]
 
@@ -37,8 +37,8 @@ class Add(ElementWise, Binary):
 class Sub(ElementWise, Binary):
     name = "__sub__"
     signatures = [
-        "int64, int64 -> int64",
-        "float64, float64 -> float64",
+        "int, int -> int",
+        "float, float -> float",
         "decimal, decimal -> decimal",
     ]
 
@@ -46,8 +46,8 @@ class Sub(ElementWise, Binary):
 class Mul(ElementWise, Binary):
     name = "__mul__"
     signatures = [
-        "int64, int64 -> int64",
-        "float64, float64 -> float64",
+        "int, int -> int",
+        "float, float -> float",
         "decimal, decimal -> decimal",
     ]
 
@@ -55,8 +55,8 @@ class Mul(ElementWise, Binary):
 class TrueDiv(ElementWise, Binary):
     name = "__truediv__"
     signatures = [
-        "int64, int64 -> float64",
-        "float64, float64 -> float64",
+        "int, int -> float",
+        "float, float -> float",
         "decimal, decimal -> decimal",
     ]
 
@@ -64,15 +64,15 @@ class TrueDiv(ElementWise, Binary):
 class FloorDiv(ElementWise, Binary):
     name = "__floordiv__"
     signatures = [
-        "int64, int64 -> int64",
+        "int, int -> int",
     ]
 
 
 class Pow(ElementWise, Binary):
     name = "__pow__"
     signatures = [
-        "int64, int64 -> float64",
-        "float64, float64 -> float64",
+        "int, int -> float",
+        "float, float -> float",
         "decimal, decimal -> decimal",
     ]
 
@@ -80,15 +80,15 @@ class Pow(ElementWise, Binary):
 class Mod(ElementWise, Binary):
     name = "__mod__"
     signatures = [
-        "int64, int64 -> int64",
+        "int, int -> int",
     ]
 
 
 class Neg(ElementWise, Unary):
     name = "__neg__"
     signatures = [
-        "int64 -> int64",
-        "float64 -> float64",
+        "int -> int",
+        "float -> float",
         "decimal -> decimal",
     ]
 
@@ -96,8 +96,8 @@ class Neg(ElementWise, Unary):
 class Pos(ElementWise, Unary):
     name = "__pos__"
     signatures = [
-        "int64 -> int64",
-        "float64 -> float64",
+        "int -> int",
+        "float -> float",
         "decimal -> decimal",
     ]
 
@@ -105,8 +105,8 @@ class Pos(ElementWise, Unary):
 class Abs(ElementWise, Unary):
     name = "__abs__"
     signatures = [
-        "int64 -> int64",
-        "float64 -> float64",
+        "int -> int",
+        "float -> float",
         "decimal -> decimal",
     ]
 
@@ -114,9 +114,9 @@ class Abs(ElementWise, Unary):
 class Round(ElementWise):
     name = "__round__"
     signatures = [
-        "float64, const int64 -> float64",
-        "decimal, const int64 -> decimal",
-        "int64, const int64 -> int64",
+        "float, const int -> float",
+        "decimal, const int -> decimal",
+        "int, const int -> int",
     ]
     arg_names = ["self", "decimals"]
     defaults = [..., 0]
@@ -125,7 +125,7 @@ class Round(ElementWise):
 class Floor(ElementWise, Unary):
     name = "floor"
     signatures = [
-        "float64 -> float64",
+        "float -> float",
         "decimal -> decimal",
     ]
 
@@ -136,17 +136,17 @@ class Ceil(Floor):
 
 class Log(ElementWise, Unary):
     name = "log"
-    signatures = ["float64 -> float64"]
+    signatures = ["float -> float"]
 
 
 class Exp(Log):
     name = "exp"
-    signatures = ["float64 -> float64"]
+    signatures = ["float -> float"]
 
 
 class IsInf(ElementWise, Unary):
     name = "is_inf"
-    signatures = ["float64 -> bool"]
+    signatures = ["float -> bool"]
 
 
 class IsNotInf(IsInf):
@@ -155,7 +155,7 @@ class IsNotInf(IsInf):
 
 class IsNan(ElementWise, Unary):
     name = "is_nan"
-    signatures = ["float64 -> bool"]
+    signatures = ["float -> bool"]
 
 
 class IsNotNan(IsNan):
