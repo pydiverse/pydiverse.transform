@@ -15,7 +15,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     WhenClause,
     wrap_literal,
 )
-from pydiverse.transform._internal.tree.types import Bool, Dtype, Int64
+from pydiverse.transform._internal.tree.types import Bool, Dtype, Int
 
 __all__ = ["len", "row_number", "rank", "when", "dense_rank", "min", "max"]
 
@@ -42,7 +42,7 @@ def dense_rank(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     arrange: ColExpr | Iterable[ColExpr] | None = None,
     filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-) -> ColExpr[Int64]:
+) -> ColExpr[Int]:
     return ColFn(
         "dense_rank", partition_by=partition_by, arrange=arrange, filter=filter
     )
@@ -60,7 +60,7 @@ def len(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-) -> ColExpr[Int64]:
+) -> ColExpr[Int]:
     return ColFn("len", partition_by=partition_by, filter=filter)
 
 
@@ -69,7 +69,7 @@ def rank(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     arrange: ColExpr | Iterable[ColExpr] | None = None,
     filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-) -> ColExpr[Int64]:
+) -> ColExpr[Int]:
     return ColFn("rank", partition_by=partition_by, arrange=arrange, filter=filter)
 
 
@@ -78,7 +78,7 @@ def row_number(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     arrange: ColExpr | Iterable[ColExpr] | None = None,
     filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-) -> ColExpr[Int64]:
+) -> ColExpr[Int]:
     return ColFn(
         "row_number", partition_by=partition_by, arrange=arrange, filter=filter
     )

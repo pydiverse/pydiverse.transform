@@ -403,40 +403,40 @@ def pdt_type(pl_type: pl.DataType) -> types.Dtype:
 def polars_type(pdt_type: types.Dtype) -> pl.DataType:
     assert types.is_concrete(pdt_type)
 
-    if pdt_type == types.Float64():
+    if pdt_type <= types.Float64():
         return pl.Float64()
-    elif pdt_type == types.Float32():
+    elif pdt_type <= types.Float32():
         return pl.Float32()
 
-    elif pdt_type == types.Int64():
+    elif pdt_type <= types.Int64():
         return pl.Int64()
-    elif pdt_type == types.Int32():
+    elif pdt_type <= types.Int32():
         return pl.Int32()
-    elif pdt_type == types.Int16():
+    elif pdt_type <= types.Int16():
         return pl.Int16()
-    elif pdt_type == types.Int8():
+    elif pdt_type <= types.Int8():
         return pl.Int8()
 
-    elif pdt_type == types.Uint64():
+    elif pdt_type <= types.Uint64():
         return pl.UInt64()
-    elif pdt_type == types.Uint32():
+    elif pdt_type <= types.Uint32():
         return pl.UInt32()
-    elif pdt_type == types.Uint16():
+    elif pdt_type <= types.Uint16():
         return pl.UInt16()
-    elif pdt_type == types.Uint8():
+    elif pdt_type <= types.Uint8():
         return pl.UInt8()
 
-    elif pdt_type == types.Bool():
+    elif pdt_type <= types.Bool():
         return pl.Boolean()
-    elif pdt_type == types.String():
+    elif pdt_type <= types.String():
         return pl.String()
-    elif pdt_type == types.Datetime():
+    elif pdt_type <= types.Datetime():
         return pl.Datetime()
-    elif pdt_type == types.Date():
+    elif pdt_type <= types.Date():
         return pl.Date()
-    elif pdt_type == types.Duration():
+    elif pdt_type <= types.Duration():
         return pl.Duration()
-    elif pdt_type == types.NullType():
+    elif pdt_type <= types.NullType():
         return pl.Null()
 
     raise AssertionError

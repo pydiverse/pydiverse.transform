@@ -468,7 +468,7 @@ class OperatorImplStore:
         ) -> bool:
             if isinstance(node.value, types.Template):
                 return node.value.modifiers_compatible(dtype)
-            return dtype.can_promote_to(node.value)
+            return dtype.can_convert_to(node.value)
 
         stack: list[tuple[OperatorImplStore.TrieNode, int, dict, tuple[int, ...]]] = [
             (child, 0, dict(), tuple()) for child in self.root.children

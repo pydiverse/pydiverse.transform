@@ -14,7 +14,6 @@ import polars as pl
 import sqlalchemy as sqa
 
 from pydiverse.transform._internal import ops
-from pydiverse.transform._internal.backend.polars import polars_type
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
@@ -135,12 +134,12 @@ class SqlImpl(TableImpl):
                 df = pl.read_database(
                     sel,
                     connection=conn,
-                    schema_overrides={
-                        sql_col.name: polars_type(col.dtype())
-                        for sql_col, col in zip(
-                            sel.columns.values(), final_select, strict=True
-                        )
-                    },
+                    # schema_overrides={
+                    #     sql_col.name: polars_type(col.dtype())
+                    #     for sql_col, col in zip(
+                    #         sel.columns.values(), final_select, strict=True
+                    #     )
+                    # },
                 )
                 df.name = nd.name
                 return df
@@ -565,17 +564,17 @@ class SqlImpl(TableImpl):
 
         elif pdt_type <= types.Decimal():
             return sqa.DECIMAL
-        elif pdt_type == types.String():
+        elif pdt_type <= types.String():
             return sqa.String
-        elif pdt_type == types.Bool():
+        elif pdt_type <= types.Bool():
             return sqa.Boolean
-        elif pdt_type == types.Datetime():
+        elif pdt_type <= types.Datetime():
             return sqa.DateTime
-        elif pdt_type == types.Date():
+        elif pdt_type <= types.Date():
             return sqa.Date
-        elif pdt_type == types.Duration():
+        elif pdt_type <= types.Duration():
             return sqa.Interval
-        elif pdt_type == types.NullType():
+        elif pdt_type <= types.NullType():
             return sqa.types.NullType
 
         raise AssertionError

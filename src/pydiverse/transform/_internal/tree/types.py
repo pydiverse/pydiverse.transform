@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import datetime
-from abc import ABC, abstractmethod
 
 
-class Dtype(ABC):
+class Dtype:
+    implicit_conversions: tuple[Dtype] = ()
+
     def __init__(self, *, const: bool = False, vararg: bool = False):
         self.const = const
         self.vararg = vararg
@@ -37,16 +38,11 @@ class Dtype(ABC):
         dtype_str = ""
         if self.const:
             dtype_str += "const "
-        dtype_str += self.name
+        dtype_str += self.__class__.__name__
         if self.vararg:
             dtype_str += "..."
 
         return dtype_str
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
 
     def without_modifiers(self: Dtype) -> Dtype:
         """Returns a copy of `self` with all modifiers removed"""
@@ -70,29 +66,41 @@ class Dtype(ABC):
 
         return True
 
-    def can_promote_to(self, other: Dtype) -> bool:
-        return other.same_kind(self)
+    def can_convert_to(self, other: Dtype) -> bool:
+        if other.const and not self.const:
+            return False
+        if other.vararg and not self.vararg:
+            return False
+
+        conversions = type(self).__mro__[:-1] + (
+            type(self).__bases__[0].implicit_conversions
+            if is_concrete(self) and not is_abstract(self)
+            else type(self).implicit_conversions
+        )
+        return type(other) in conversions
+
+
+class Float(Dtype):
+    name = "float"
+
+
+class Float64(Float): ...
+
+
+class Float32(Float): ...
+
+
+class Decimal(Dtype):
+    name = "decimal"
 
 
 class Int(Dtype):
+    implicit_conversions = (Float, Decimal)
     name = "int"
 
 
-class Int64(Dtype):
+class Int64(Int):
     name = "int"
-
-    def can_promote_to(self, other: Dtype) -> bool:
-        if super().can_promote_to(other):
-            return True
-
-        # int can be promoted to float
-        if Float64().same_kind(other):
-            if other.const and not self.const:
-                return False
-
-            return True
-
-        return False
 
 
 class Int32(Int): ...
@@ -114,20 +122,6 @@ class Uint16(Int): ...
 
 
 class Uint8(Int): ...
-
-
-class Float(Dtype):
-    name = "float"
-
-
-class Float64(Float): ...
-
-
-class Float32(Float): ...
-
-
-class Decimal(Dtype):
-    name = "decimal"
 
 
 class String(Dtype):
@@ -185,9 +179,9 @@ class NullType(Dtype):
 
 def python_type_to_pdt(t: type) -> Dtype:
     if t is int:
-        return Int64()
+        return Int()
     elif t is float:
-        return Float64()
+        return Float()
     elif t is bool:
         return Bool()
     elif t is str:
@@ -205,22 +199,24 @@ def python_type_to_pdt(t: type) -> Dtype:
 
 
 def pdt_type_to_python(t: Dtype) -> type:
-    if t == Int64:
+    if t <= Int():
         return int
-    elif t == Float64:
+    elif t <= Float():
         return float
-    elif t == Bool:
+    elif t <= Bool():
         return bool
-    elif t == String:
+    elif t <= String():
         return str
-    elif t == Datetime:
+    elif t <= Datetime():
         return datetime.datetime
-    elif t == Date:
+    elif t <= Date():
         return datetime.date
-    elif t == Duration:
+    elif t <= Duration():
         return datetime.timedelta
-    elif t == NullType:
+    elif t <= NullType():
         return type(None)
+
+    raise AssertionError
 
 
 def dtype_from_string(t: str) -> Dtype:
@@ -253,9 +249,9 @@ def dtype_from_string(t: str) -> Dtype:
         return Template(base_type, const=is_const, vararg=is_vararg)
 
     if base_type == "int":
-        return Int64(const=is_const, vararg=is_vararg)
+        return Int(const=is_const, vararg=is_vararg)
     if base_type == "float":
-        return Float64(const=is_const, vararg=is_vararg)
+        return Float(const=is_const, vararg=is_vararg)
     if base_type == "decimal":
         return Decimal(const=is_const, vararg=is_vararg)
     if base_type == "str":
@@ -286,9 +282,9 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
             promoted = dtype
             continue
 
-        if dtype.can_promote_to(promoted):
+        if dtype.can_convert_to(promoted):
             continue
-        if promoted.can_promote_to(dtype):
+        if promoted.can_convert_to(dtype):
             promoted = dtype
             continue
 
@@ -298,8 +294,19 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
 
 
 def is_abstract(dtype: Dtype) -> bool:
-    return type(dtype) is Int or type(dtype) is Float
+    return type(dtype) not in (
+        Int64,
+        Int32,
+        Int16,
+        Int8,
+        Uint64,
+        Uint32,
+        Uint16,
+        Uint8,
+        Float64,
+        Float32,
+    )
 
 
 def is_concrete(dtype: Dtype) -> bool:
-    return not is_abstract(dtype)
+    return type(dtype) not in (Int, Float)
