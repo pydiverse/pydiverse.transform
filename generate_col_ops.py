@@ -6,12 +6,12 @@ from types import NoneType
 
 from pydiverse.transform._internal.backend.polars import PolarsImpl
 from pydiverse.transform._internal.ops.core import NoExprMethod, Operator
+from pydiverse.transform._internal.ops.registry import Signature
 from pydiverse.transform._internal.tree.dtypes import (
     Dtype,
     Template,
     pdt_type_to_python,
 )
-from pydiverse.transform._internal.tree.registry import Signature
 
 col_expr_path = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 fns_path = "./src/pydiverse/transform/_internal/pipe/functions.py"

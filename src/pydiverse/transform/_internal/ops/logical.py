@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from pydiverse.transform._internal.ops.core import Binary, ElementWise, Operator, Unary
+from pydiverse.transform._internal.ops.registry import Signature
 from pydiverse.transform._internal.tree import dtypes
-from pydiverse.transform._internal.tree.registry import Signature
 
 __all__ = [
     "Equal",

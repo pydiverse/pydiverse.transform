@@ -3,11 +3,11 @@ from __future__ import annotations
 import pytest
 
 from pydiverse.transform._internal.ops import Operator
-from pydiverse.transform._internal.tree import dtypes
-from pydiverse.transform._internal.tree.registry import (
+from pydiverse.transform._internal.ops.registry import (
     OperatorRegistry,
     Signature,
 )
+from pydiverse.transform._internal.tree import dtypes
 
 
 def assert_signature(s: Signature, args: list[dtypes.Dtype], return_type: dtypes.Dtype):

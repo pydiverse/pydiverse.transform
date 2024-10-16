@@ -11,13 +11,13 @@ import sqlalchemy as sqa
 from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.ops.core import Ftype
-from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Col
-from pydiverse.transform._internal.tree.dtypes import Dtype
-from pydiverse.transform._internal.tree.registry import (
+from pydiverse.transform._internal.ops.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
 )
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.col_expr import Col
+from pydiverse.transform._internal.tree.dtypes import Dtype
 
 if TYPE_CHECKING:
     from pydiverse.transform._internal.ops import Operator
