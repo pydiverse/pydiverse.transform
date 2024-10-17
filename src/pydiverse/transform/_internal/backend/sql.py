@@ -148,12 +148,13 @@ class SqlImpl(TableImpl):
         raise NotImplementedError
 
     @classmethod
-    def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None:
+    def build_query(
+        cls, nd: AstNode, final_select: list[Col], dialect=None
+    ) -> str | None:
         sel = cls.build_select(nd, final_select)
-        engine = get_engine(nd)
-        return str(
-            sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
-        )
+        if dialect is None:
+            dialect = get_engine(nd).dialect
+        return str(sel.compile(dialect=dialect, compile_kwargs={"literal_binds": True}))
 
     # some backends need to do casting to ensure the correct type
     @classmethod
