@@ -23,7 +23,7 @@ jobs:
           environments: py310
 
       - name: Linting - Run pre-commit checks
-        run: pixi run postinstall && pixi run pre-commit run
+        run: pixi run postinstall && pixi run pre-commit run -a --color=always --show-diff-on-failure
 
   test:
     name: pytest
