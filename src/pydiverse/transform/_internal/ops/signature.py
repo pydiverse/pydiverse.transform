@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
+from types import EllipsisType
 
 from pydiverse.transform._internal.ops.aggregate import Any
 from pydiverse.transform._internal.tree import types
@@ -11,9 +12,43 @@ from pydiverse.transform._internal.tree.types import Dtype
 @dataclasses.dataclass(slots=True)
 class Param:
     dtype: Dtype
-    name: str = None
-    default_val: Any = None
+    name: str
+    default_val: Any = ...
+
+
+@dataclasses.dataclass(slots=True, init=False)
+class Signature:
+    params: list[Param]
+    return_type: Dtype
     is_vararg: bool = False
+
+    def __init__(self, *params: Param | Dtype | EllipsisType, return_type: Dtype):
+        self.is_vararg = len(params) >= 1 and params[-1] is Ellipsis
+        if self.is_vararg:
+            params = params[:-1]
+        assert all(isinstance(param, Param | Dtype) for param in params)
+
+        if len(params) == 0:
+            self.params = []
+        elif isinstance(params[0], Dtype):
+            self.params = [Param(params[0], "self")]
+            if len(params) == 2:
+                self.params.append(
+                    params[1]
+                    if isinstance(params[1], Param)
+                    else Param(params[1], "rhs")
+                )
+            elif len(params) >= 3:
+                assert all(isinstance(param, Param) for param in params[1:])
+                self.params.extend(params[1:])
+        else:
+            assert all(isinstance(param, Param) for param in params)
+            self.params = params
+
+        self.return_type = return_type
+
+    def type_list(self) -> list[Dtype]:
+        return [param.dtype for param in self.params]
 
 
 # This thing does NOT deal with type template parameters. You have to manually
