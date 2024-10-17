@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import ElementWise, NoExprMethod
+from pydiverse.transform._internal.ops.op import NoExprMethod, Operator
 
 __all__ = [
     "HMax",
@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 
-class Horizontal(ElementWise, NoExprMethod):
+class Horizontal(Operator, NoExprMethod):
     arg_names = ["args"]
 
 

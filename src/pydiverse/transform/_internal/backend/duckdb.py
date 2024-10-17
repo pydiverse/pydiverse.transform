@@ -4,11 +4,11 @@ import polars as pl
 import sqlalchemy as sqa
 from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
-from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.ops.aggregate import Any
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops.ops.aggregation import Any
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, LiteralCol

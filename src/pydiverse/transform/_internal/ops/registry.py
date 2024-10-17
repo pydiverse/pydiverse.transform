@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from pydiverse.transform._internal.tree import types
 
 if TYPE_CHECKING:
-    from pydiverse.transform._internal.ops import Operator, OperatorExtension
+    from pydiverse.transform._internal.ops.ops import Operator, OperatorExtension
 
 
 class OperatorImpl:

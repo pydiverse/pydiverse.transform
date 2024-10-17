@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import Binary, ElementWise, Unary
+from pydiverse.transform._internal.ops.op import Binary, Operator, Unary
 
 __all__ = [
     "Add",
@@ -25,7 +25,7 @@ __all__ = [
 ]
 
 
-class Add(ElementWise, Binary):
+class Add(Operator, Binary):
     name = "__add__"
     signatures = [
         "int, int -> int",
@@ -34,7 +34,7 @@ class Add(ElementWise, Binary):
     ]
 
 
-class Sub(ElementWise, Binary):
+class Sub(Operator, Binary):
     name = "__sub__"
     signatures = [
         "int, int -> int",
@@ -43,7 +43,7 @@ class Sub(ElementWise, Binary):
     ]
 
 
-class Mul(ElementWise, Binary):
+class Mul(Operator, Binary):
     name = "__mul__"
     signatures = [
         "int, int -> int",
@@ -52,7 +52,7 @@ class Mul(ElementWise, Binary):
     ]
 
 
-class TrueDiv(ElementWise, Binary):
+class TrueDiv(Operator, Binary):
     name = "__truediv__"
     signatures = [
         "int, int -> float",
@@ -61,14 +61,14 @@ class TrueDiv(ElementWise, Binary):
     ]
 
 
-class FloorDiv(ElementWise, Binary):
+class FloorDiv(Operator, Binary):
     name = "__floordiv__"
     signatures = [
         "int, int -> int",
     ]
 
 
-class Pow(ElementWise, Binary):
+class Pow(Operator, Binary):
     name = "__pow__"
     signatures = [
         "int, int -> float",
@@ -77,14 +77,14 @@ class Pow(ElementWise, Binary):
     ]
 
 
-class Mod(ElementWise, Binary):
+class Mod(Operator, Binary):
     name = "__mod__"
     signatures = [
         "int, int -> int",
     ]
 
 
-class Neg(ElementWise, Unary):
+class Neg(Operator, Unary):
     name = "__neg__"
     signatures = [
         "int -> int",
@@ -93,7 +93,7 @@ class Neg(ElementWise, Unary):
     ]
 
 
-class Pos(ElementWise, Unary):
+class Pos(Operator, Unary):
     name = "__pos__"
     signatures = [
         "int -> int",
@@ -102,7 +102,7 @@ class Pos(ElementWise, Unary):
     ]
 
 
-class Abs(ElementWise, Unary):
+class Abs(Operator, Unary):
     name = "__abs__"
     signatures = [
         "int -> int",
@@ -111,7 +111,7 @@ class Abs(ElementWise, Unary):
     ]
 
 
-class Round(ElementWise):
+class Round(Operator):
     name = "__round__"
     signatures = [
         "float, const int -> float",
@@ -122,7 +122,7 @@ class Round(ElementWise):
     defaults = [..., 0]
 
 
-class Floor(ElementWise, Unary):
+class Floor(Operator, Unary):
     name = "floor"
     signatures = [
         "float -> float",
@@ -134,7 +134,7 @@ class Ceil(Floor):
     name = "ceil"
 
 
-class Log(ElementWise, Unary):
+class Log(Operator, Unary):
     name = "log"
     signatures = ["float -> float"]
 
@@ -144,7 +144,7 @@ class Exp(Log):
     signatures = ["float -> float"]
 
 
-class IsInf(ElementWise, Unary):
+class IsInf(Operator, Unary):
     name = "is_inf"
     signatures = ["float -> bool"]
 
@@ -153,7 +153,7 @@ class IsNotInf(IsInf):
     name = "is_not_inf"
 
 
-class IsNan(ElementWise, Unary):
+class IsNan(Operator, Unary):
     name = "is_nan"
     signatures = ["float -> bool"]
 

@@ -5,10 +5,10 @@ from uuid import UUID
 
 import polars as pl
 
-from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
@@ -447,9 +447,9 @@ def polars_type(pdt_type: types.Dtype) -> pl.DataType:
     raise AssertionError
 
 
-with PolarsImpl.op(ops.Mean()) as op:
+with PolarsImpl.impl_store.impl_manager as im:
 
-    @op.auto
+    @im(ops.mean)
     def _mean(x):
         return x.mean()
 

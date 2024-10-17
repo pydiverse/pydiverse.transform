@@ -5,7 +5,7 @@ import inspect
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from pydiverse.transform._internal.ops.core import Operator
+from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import SignatureTrie
 from pydiverse.transform._internal.tree.types import Dtype
 
@@ -67,6 +67,8 @@ class ImplContextManager:
     def __exit__(self, *args): ...
 
     def __call__(self, op: Operator, *sig: Dtype) -> Callable:
+        assert isinstance(op, Operator)
+
         is_vararg = len(sig) > 1 and sig[-1] is Ellipsis
         if is_vararg:
             sig = sig[:-1]

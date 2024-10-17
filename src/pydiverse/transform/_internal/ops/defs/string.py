@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import ElementWise, OperatorExtension, Unary
-from pydiverse.transform._internal.ops.logical import Logical
-from pydiverse.transform._internal.ops.numeric import Add
+from pydiverse.transform._internal.ops.op import Operator, OperatorExtension, Unary
+from pydiverse.transform._internal.ops.ops.logical import Logical
+from pydiverse.transform._internal.ops.ops.numeric import Add
 
 __all__ = [
     "StrAdd",
@@ -27,7 +27,7 @@ class StrAdd(OperatorExtension):
     ]
 
 
-class StrUnary(ElementWise, Unary):
+class StrUnary(Operator, Unary):
     signatures = [
         "str -> str",
     ]
@@ -52,7 +52,7 @@ class StrToLower(StrUnary):
     name = "str.to_lower"
 
 
-class StrReplaceAll(ElementWise):
+class StrReplaceAll(Operator):
     name = "str.replace_all"
     signatures = [
         "str, const str, const str -> str",
@@ -60,7 +60,7 @@ class StrReplaceAll(ElementWise):
     arg_names = ["self", "substr", "replacement"]
 
 
-class StrStartsWith(ElementWise, Logical):
+class StrStartsWith(Operator, Logical):
     name = "str.starts_with"
     signatures = [
         "str, const str -> bool",
@@ -68,7 +68,7 @@ class StrStartsWith(ElementWise, Logical):
     arg_names = ["self", "prefix"]
 
 
-class StrEndsWith(ElementWise, Logical):
+class StrEndsWith(Operator, Logical):
     name = "str.ends_with"
     signatures = [
         "str, const str -> bool",
@@ -76,7 +76,7 @@ class StrEndsWith(ElementWise, Logical):
     arg_names = ["self", "suffix"]
 
 
-class StrContains(ElementWise, Logical):
+class StrContains(Operator, Logical):
     name = "str.contains"
     signatures = [
         "str, const str -> bool",
@@ -84,17 +84,17 @@ class StrContains(ElementWise, Logical):
     arg_names = ["self", "substr"]
 
 
-class StrSlice(ElementWise):
+class StrSlice(Operator):
     name = "str.slice"
     signatures = ["str, int, int -> str"]
     arg_names = ["self", "offset", "n"]
 
 
-class StrToDateTime(ElementWise, Unary):
+class StrToDateTime(Operator, Unary):
     name = "str.to_datetime"
     signatures = ["str -> datetime"]
 
 
-class StrToDate(ElementWise, Unary):
+class StrToDate(Operator, Unary):
     name = "str.to_date"
     signatures = ["str -> date"]

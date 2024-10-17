@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import Binary, ElementWise, Operator, Unary
+from pydiverse.transform._internal.ops.op import Binary, Operator, Unary
 from pydiverse.transform._internal.ops.registry import Signature
 from pydiverse.transform._internal.tree import types
 
@@ -31,7 +31,7 @@ class Logical(Operator):
 #### Comparison Operators ####
 
 
-class Comparison(ElementWise, Binary, Logical):
+class Comparison(Operator, Binary, Logical):
     signatures = [
         "int, int -> bool",
         "float, float -> bool",
@@ -58,17 +58,17 @@ class NotEqual(Comparison):
     signatures = Comparison.signatures
 
 
-class IsNull(ElementWise, Unary, Logical):
+class IsNull(Operator, Unary, Logical):
     name = "is_null"
     signatures = ["T -> bool"]
 
 
-class IsNotNull(ElementWise, Unary, Logical):
+class IsNotNull(Operator, Unary, Logical):
     name = "is_not_null"
     signatures = ["T -> bool"]
 
 
-class FillNull(ElementWise, Binary):
+class FillNull(Operator, Binary):
     name = "fill_null"
     signatures = ["T, T -> T"]
 
@@ -89,13 +89,13 @@ class GreaterEqual(Comparison):
     name = "__ge__"
 
 
-class IsIn(ElementWise, Logical):
+class IsIn(Operator, Logical):
     name = "isin"
     signatures = ["T, T... -> bool"]
     arg_names = ["self", "args"]
 
 
-class BooleanBinary(ElementWise, Binary, Logical):
+class BooleanBinary(Operator, Binary, Logical):
     signatures = [
         "bool, bool -> bool",
     ]
@@ -124,7 +124,7 @@ class Xor(BooleanBinary):
     name = "__xor__"
 
 
-class Invert(ElementWise, Unary, Logical):
+class Invert(Operator, Unary, Logical):
     name = "__invert__"
     signatures = [
         "bool -> bool",

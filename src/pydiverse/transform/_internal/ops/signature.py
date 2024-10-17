@@ -4,7 +4,7 @@ import dataclasses
 from collections.abc import Sequence
 from types import EllipsisType
 
-from pydiverse.transform._internal.ops.aggregate import Any
+from pydiverse.transform._internal.ops.ops.aggregation import Any
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.types import Dtype
 

@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import dataclasses
 import datetime
 
 
-@dataclasses.dataclass(slots=True)
 class Dtype:
-    implicit_conversions: tuple[Dtype] = ()
+    __slots__ = ("const",)
+    const: bool = False
 
-    def __init__(self, *, const: bool = False, vararg: bool = False):
+    def __init__(self, *, const: bool = False):
         self.const = const
-        self.vararg = vararg
 
     def __eq__(self, rhs):
         if type(self) is rhs:
@@ -172,10 +170,18 @@ class Template(Dtype):
         return True
 
 
-class NullType(Dtype):
-    """DType used to represent the `None` value."""
+class NullType(Dtype): ...
 
-    name = "null"
+
+class Tvar(Dtype):
+    __slots__ = ("name",)
+
+    def __init__(self, name: str, *, const: bool = True):
+        self.name = name
+        super().__init__(const=const)
+
+
+D = Tvar("T")
 
 
 def python_type_to_pdt(t: type) -> Dtype:
@@ -326,3 +332,7 @@ for dtype in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
 
 def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
     return implicit_conversions[(dtype, target)]
+
+
+NUMERIC = (Int(), Float(), Decimal())
+COMPARABLE = (Int(), Float(), Decimal(), String(), Datetime(), Date())

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.core import ElementWise, OperatorExtension, Unary
-from pydiverse.transform._internal.ops.numeric import Add, Sub
+from pydiverse.transform._internal.ops.op import Operator, OperatorExtension, Unary
+from pydiverse.transform._internal.ops.ops.numeric import Add, Sub
 
 __all__ = [
     "DtYear",
@@ -23,11 +23,11 @@ __all__ = [
 ]
 
 
-class DtExtract(ElementWise, Unary):
+class DtExtract(Operator, Unary):
     signatures = ["datetime -> int"]
 
 
-class DateExtract(ElementWise, Unary):
+class DateExtract(Operator, Unary):
     signatures = ["datetime -> int", "date -> int"]
 
 
@@ -67,7 +67,7 @@ class DtDayOfYear(DateExtract):
     name = "dt.day_of_year"
 
 
-class DurationToUnit(ElementWise, Unary):
+class DurationToUnit(Operator, Unary):
     signatures = ["duration -> int"]
 
 

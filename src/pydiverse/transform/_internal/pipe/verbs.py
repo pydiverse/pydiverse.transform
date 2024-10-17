@@ -9,7 +9,7 @@ from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
 from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree.ast import AstNode

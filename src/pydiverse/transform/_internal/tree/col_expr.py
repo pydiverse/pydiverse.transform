@@ -13,7 +13,7 @@ from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
 from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops.core import Ftype, Operator
+from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.types import (

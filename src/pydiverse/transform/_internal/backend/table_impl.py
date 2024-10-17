@@ -8,9 +8,10 @@ from uuid import UUID
 import polars as pl
 import sqlalchemy as sqa
 
-from pydiverse.transform._internal import ops
+from pydiverse.transform._internal.backend.impl_store import ImplStore
 from pydiverse.transform._internal.backend.targets import Target
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.ops.registry import (
     OperatorRegistrationContextManager,
     OperatorRegistry,
@@ -20,15 +21,11 @@ from pydiverse.transform._internal.tree.col_expr import Col
 from pydiverse.transform._internal.tree.types import Dtype
 
 if TYPE_CHECKING:
-    from pydiverse.transform._internal.ops import Operator
+    from pydiverse.transform._internal.ops.ops import Operator
 
 
 class TableImpl(AstNode):
-    """
-    Base class from which all table backend implementations are derived from.
-    """
-
-    registry: OperatorRegistry
+    impl_store: ImplStore
 
     def __init__(self, name: str, schema: dict[str, Dtype]):
         self.name = name
@@ -123,11 +120,9 @@ class TableImpl(AstNode):
         return OperatorRegistrationContextManager(cls.registry, operator, **kwargs)
 
 
-TableImpl.registry = OperatorRegistry(TableImpl)
+with TableImpl.impl_store.impl_manager as cm:
 
-with TableImpl.op(ops.NullsFirst()) as op:
-
-    @op.auto
+    @cm(ops.add)
     def _nulls_first(_):
         raise AssertionError
 
