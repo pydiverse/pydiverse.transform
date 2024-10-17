@@ -35,7 +35,12 @@ class PolarsImpl(TableImpl):
         return None
 
     @staticmethod
-    def export(nd: AstNode, target: Target, final_select: list[Col]) -> Any:
+    def export(
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict,
+    ) -> Any:
         lf, _, select, _ = compile_ast(nd)
         lf = lf.select(select)
         if isinstance(target, Polars):

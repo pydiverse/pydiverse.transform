@@ -8,6 +8,7 @@ from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.ops.aggregate import Any
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, LiteralCol
@@ -15,7 +16,13 @@ from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, Litera
 
 class DuckDbImpl(SqlImpl):
     @classmethod
-    def export(cls, nd: AstNode, target: Target, final_select: list[Col]):
+    def export(
+        cls,
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[str, Any],
+    ):
         # insert casts after sum() over integer columns (duckdb converts them to floats)
         for desc in nd.iter_subtree():
             if isinstance(desc, verbs.Verb):
@@ -31,9 +38,11 @@ class DuckDbImpl(SqlImpl):
             engine = sql.get_engine(nd)
             with engine.connect() as conn:
                 return pl.read_database(
-                    DuckDbImpl.build_query(nd, final_select), connection=conn
+                    DuckDbImpl.build_query(nd, final_select),
+                    connection=conn,
+                    schema_overrides=schema_overrides,
                 )
-        return SqlImpl.export(nd, target, final_select)
+        return SqlImpl.export(nd, target, final_select, schema_overrides)
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:

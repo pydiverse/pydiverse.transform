@@ -9,7 +9,9 @@ from sqlalchemy.dialects.mssql import DATETIME2
 
 from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend import sql
+from pydiverse.transform._internal.backend.polars import polars_type
 from pydiverse.transform._internal.backend.sql import SqlImpl
+from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
@@ -33,6 +35,21 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def nan():
         raise NotSupportedError("SQL Server does not support `nan`")
+
+    @classmethod
+    def export(
+        cls,
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[Col, Any],
+    ) -> Any:
+        for col in final_select:
+            if col.dtype() <= types.Bool():
+                if col not in schema_overrides:
+                    schema_overrides[col] = polars_type(col.dtype())
+
+        return super().export(nd, target, final_select, schema_overrides)
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:

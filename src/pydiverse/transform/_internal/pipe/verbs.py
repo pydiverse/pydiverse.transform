@@ -139,14 +139,22 @@ def collect(table: Table, target: Target | None = None) -> Pipeable:
 
 
 @overload
-def export(target: Target) -> Pipeable: ...
+def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable: ...
 
 
 @verb
-def export(table: Table, target: Target) -> Pipeable:
+def export(
+    table: Table, target: Target, *, schema_overrides: dict | None = None
+) -> Pipeable:
+    # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
+    # to columns
     table = table >> alias()
     SourceBackend: type[TableImpl] = get_backend(table._ast)
-    return SourceBackend.export(table._ast, target, table._cache.select)
+    if schema_overrides is None:
+        schema_overrides = {}
+    return SourceBackend.export(
+        table._ast, target, table._cache.select, schema_overrides
+    )
 
 
 @overload

@@ -126,7 +126,13 @@ class SqlImpl(TableImpl):
         return cls.compile_query(nd, query)
 
     @classmethod
-    def export(cls, nd: AstNode, target: Target, final_select: list[Col]) -> Any:
+    def export(
+        cls,
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[str, Any],
+    ) -> Any:
         sel = cls.build_select(nd, final_select)
         engine = get_engine(nd)
         if isinstance(target, Polars):
@@ -134,12 +140,13 @@ class SqlImpl(TableImpl):
                 df = pl.read_database(
                     sel,
                     connection=conn,
-                    # schema_overrides={
-                    #     sql_col.name: polars_type(col.dtype())
-                    #     for sql_col, col in zip(
-                    #         sel.columns.values(), final_select, strict=True
-                    #     )
-                    # },
+                    schema_overrides={
+                        sql_col.name: schema_overrides[col]
+                        for sql_col, col in zip(
+                            sel.columns.values(), final_select, strict=True
+                        )
+                        if col in schema_overrides
+                    },
                 )
                 df.name = nd.name
                 return df

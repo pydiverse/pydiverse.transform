@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 import duckdb
@@ -45,7 +46,12 @@ class DuckDbPolarsImpl(TableImpl):
         return DuckDbImpl.build_query(nd, final_select)
 
     @staticmethod
-    def export(nd: AstNode, target: Target, final_select: list[Col]) -> pl.DataFrame:
+    def export(
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[str, Any],
+    ) -> pl.DataFrame:
         if isinstance(target, Polars):
             sel = DuckDbImpl.build_select(nd, final_select)
             query_str = str(
