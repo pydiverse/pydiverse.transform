@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import dataclasses
 import datetime
 
 
+@dataclasses.dataclass(slots=True)
 class Dtype:
     implicit_conversions: tuple[Dtype] = ()
 
@@ -99,8 +101,7 @@ class Int(Dtype):
     name = "int"
 
 
-class Int64(Int):
-    name = "int"
+class Int64(Int): ...
 
 
 class Int32(Int): ...
@@ -293,20 +294,35 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
     return promoted
 
 
+INT_SUBTYPES = (Uint8, Uint16, Uint32, Uint64, Int8, Int16, Int32, Int64)
+FLOAT_SUBTYPES = (Float32, Float64)
+
+
 def is_abstract(dtype: Dtype) -> bool:
-    return type(dtype) not in (
-        Int64,
-        Int32,
-        Int16,
-        Int8,
-        Uint64,
-        Uint32,
-        Uint16,
-        Uint8,
-        Float64,
-        Float32,
-    )
+    return type(dtype) not in (*INT_SUBTYPES, *FLOAT_SUBTYPES)
 
 
 def is_concrete(dtype: Dtype) -> bool:
     return type(dtype) not in (Int, Float)
+
+
+implicit_conversions = {
+    (Int, Float): (1, 0),
+    (Int, Decimal): (2, 0),
+    **{(int_subtype, Int): (0, 1) for int_subtype in INT_SUBTYPES},
+    **{(float_subtype, Float): (0, 1) for float_subtype in FLOAT_SUBTYPES},
+}
+
+# compute transitive closure of cost graph
+for dtype in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
+    added_edges = {}
+    for (u, v), c in implicit_conversions.items():
+        if u is dtype:
+            for (s, t), d in implicit_conversions.items():
+                if s is v:
+                    added_edges[(u, t)] = (sum(z) for z in zip(c, d, strict=True))
+    implicit_conversions |= added_edges
+
+
+def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
+    return implicit_conversions[(dtype, target)]
