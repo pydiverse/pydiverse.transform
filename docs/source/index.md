@@ -16,7 +16,8 @@ common data manipulation challenges:
 
 These all combine naturally with group_by() which allows you to perform any operation by group."
 
-The following example describes how to create new columns, filter rows, and sort the result:
+The following example describes how to create new columns, filter rows, and sort the result. The pipe operator `>>` is 
+used to chain multiple verbs to describe a data transformation in a functional way:
 
 ```python
 from pydiverse.transform.extended import *
@@ -109,6 +110,37 @@ shape: (3, 3)
 │ 3   ┆ 6   ┆ 9   │
 └─────┴─────┴─────┘
 ```
+
+Using the pipe operator `>>` has two main advantages:
+1. The member namespace of table objects is solely reserved for referencing column names (i.e. `tbl.x`).
+2. It is much easier to create user defined verbs:
+
+```python
+from pydiverse.transform.extended import *
+import pydiverse.transform as pdt
+
+@verb
+def strip_all_strings(tbl):
+    return tbl >> mutate(**{col.name:"'" + col.str.strip() + "'" for col in tbl if col.dtype() == pdt.String})
+
+tbl = pdt.Table(dict(x=[" crazy", "padded ", " strings "], y=[4, 5, 6]))
+tbl >> strip_all_strings() >> show()
+```
+
+```text
+Table ?, backend: PolarsImpl
+shape: (3, 2)
+┌─────┬───────────┐
+│ y   ┆ x         │
+│ --- ┆ ---       │
+│ i64 ┆ str       │
+╞═════╪═══════════╡
+│ 4   ┆ 'crazy'   │
+│ 5   ┆ 'padded'  │
+│ 6   ┆ 'strings' │
+└─────┴───────────┘
+```
+
 
 ## The Pydiverse Library Collection
 
@@ -214,6 +246,10 @@ However, all these techniques are candidates for pydiverse.pipedag integration i
 :hidden:
 
 quickstart
+examples
+table_backends
+database_testing
+best_practices
 reference/api
 ```
 
