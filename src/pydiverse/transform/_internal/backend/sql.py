@@ -636,24 +636,24 @@ def dedup_order_by(
 # the user to come up with dummy names that are not required later anymore. It has
 # to be done before a join so that all column references in the join subtrees remain
 # valid.
-def create_aliases(nd: AstNode, num_occurences: dict[str, int]) -> dict[str, int]:
+def create_aliases(nd: AstNode, num_occurrences: dict[str, int]) -> dict[str, int]:
     if isinstance(nd, verbs.Verb):
-        num_occurences = create_aliases(nd.child, num_occurences)
+        num_occurrences = create_aliases(nd.child, num_occurrences)
 
         if isinstance(nd, verbs.Join):
-            num_occurences = create_aliases(nd.right, num_occurences)
+            num_occurrences = create_aliases(nd.right, num_occurrences)
 
     elif isinstance(nd, TableImpl):
-        if cnt := num_occurences.get(nd.table.name):
+        if cnt := num_occurrences.get(nd.table.name):
             nd.table = nd.table.alias(f"{nd.table.name}_{cnt}")
         else:
             cnt = 0
-        num_occurences[nd.table.name] = cnt + 1
+        num_occurrences[nd.table.name] = cnt + 1
 
     else:
         raise AssertionError
 
-    return num_occurences
+    return num_occurrences
 
 
 def get_engine(nd: AstNode) -> sqa.Engine:

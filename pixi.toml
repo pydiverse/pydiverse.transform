@@ -17,6 +17,8 @@ hatchling = "*"
 [feature.dev.dependencies]
 ruff = ">=0.5.6"
 pre-commit = ">=3"
+pre-commit-hooks = "*"
+taplo = "*"
 pixi-pycharm = ">=0.0.6"
 pytest = ">=7.1.2"
 pytest-xdist = ">=2.5.0"
