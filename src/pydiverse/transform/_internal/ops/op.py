@@ -25,6 +25,7 @@ class Operator:
     __slots__ = (
         "name",
         "trie",
+        "signatures",
         "ftype",
         "context_kwargs",
         "param_names",
@@ -33,6 +34,7 @@ class Operator:
 
     name: str
     trie: SignatureTrie
+    signatures: list[Signature]
     ftype: Ftype
     context_kwargs: list[str]
     param_names: list[str]
@@ -51,6 +53,7 @@ class Operator:
         self.ftype = ftype
         self.context_kwargs = context_kwargs if context_kwargs is not None else []
 
+        self.signatures = signatures
         self.trie = SignatureTrie()
         assert len(signatures) > 0
         for sig in signatures:

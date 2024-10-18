@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from types import EllipsisType
 
 from pydiverse.transform._internal.ops.ops.aggregation import Any
