@@ -1,7 +1,6 @@
 from __future__ import annotations
-from typing import Any
 
-from pydiverse.transform._internal.ops.op import Ftype, Operator
+from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import Bool, Date, Datetime, Int, String
 
@@ -25,7 +24,7 @@ str_replace_all = Operator(
 
 str_starts_with = Operator(
     "str.starts_with",
-    Signature(String(), String(const=True), return_type=Bool),
+    Signature(String(), String(const=True), return_type=Bool()),
     param_names=["self", "prefix"],
 )
 
@@ -39,7 +38,7 @@ str_ends_with = Operator(
 str_contains = Operator(
     "str.contains",
     Signature(String(), String(const=True), return_type=Bool()),
-    param_names=["substr"],
+    param_names=["self", "substr"],
 )
 
 str_slice = Operator(

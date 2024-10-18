@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from types import NoneType
 
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.ops.op import NoExprMethod, Operator
+from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import (
     Dtype,
@@ -31,24 +31,14 @@ RVERSIONS = {
     "__xor__",
 }
 
-PDT_DOT_OPS = (
-    ops.rank,
-    ops.horizontal_max,
-    ops.row_number,
-    ops.horizontal_min,
-    ops.row_number,
-    ops.dense_rank,
-    ops.shift,
-)
-
 
 def add_vararg_star(formatted_args: str) -> str:
     last_arg = "*" + formatted_args.split(", ")[-1]
-    return ", ".join(formatted_args.split(" ")[:-1] + [last_arg])
+    return ", ".join(formatted_args.split(", ")[:-1] + [last_arg])
 
 
 def type_annotation(dtype: Dtype, specialize_generic: bool) -> str:
-    if not specialize_generic or isinstance(dtype, Tvar):
+    if (not specialize_generic and not dtype.const) or isinstance(dtype, Tvar):
         return "ColExpr"
     if dtype.const:
         python_type = pdt_type_to_python(dtype)
@@ -70,6 +60,7 @@ def generate_fn_decl(
 
     annotated_args = ", ".join(
         name
+        + ": "
         + type_annotation(dtype, specialize_generic)
         + (f" = {default_val}" if default_val is not ... else "")
         for dtype, name, default_val in zip(
@@ -79,7 +70,7 @@ def generate_fn_decl(
     if sig.is_vararg:
         annotated_args = add_vararg_star(annotated_args)
 
-    if op.context_kwargs is not None:
+    if len(op.context_kwargs) > 0:
         context_kwarg_annotation = {
             "partition_by": "Col | ColName | Iterable[Col | ColName]",
             "arrange": "ColExpr | Iterable[ColExpr]",
@@ -109,6 +100,7 @@ def generate_fn_body(
     sig: Signature,
     param_names: list[str] | None = None,
     *,
+    op_var_name: str,
     rversion: bool = False,
 ):
     if param_names is None:
@@ -128,11 +120,11 @@ def generate_fn_body(
     else:
         kwargs = ""
 
-    return f'    return ColFn("{op.name}"{args}{kwargs})\n\n'
+    return f"    return ColFn(ops.{op_var_name}{args}{kwargs})\n\n"
 
 
 def generate_overloads(
-    op: Operator, *, name: str | None = None, rversion: bool = False
+    op: Operator, *, name: str | None = None, rversion: bool = False, op_var_name: str
 ):
     res = ""
     in_namespace = "." in op.name
@@ -151,6 +143,7 @@ def generate_overloads(
         op.signatures[0],
         ["self.arg"] + op.param_names[1:] if in_namespace else None,
         rversion=rversion,
+        op_var_name=op_var_name,
     )
 
     return res
@@ -178,14 +171,18 @@ with open(COL_EXPR_PATH, "r+") as file:
         elif not in_generated_section and line.startswith("    @overload"):
             in_generated_section = True
         elif in_col_expr_class and line.startswith("class Col"):
-            for op in ops.__dict__.values():
-                if not isinstance(op, Operator) or isinstance(op, NoExprMethod):
+            for op_var_name in sorted(ops.__dict__):
+                op = ops.__dict__[op_var_name]
+                if not isinstance(op, Operator) or not op.generate_expr_method:
                     continue
 
-                op_overloads = generate_overloads(op)
+                op_overloads = generate_overloads(op, op_var_name=op_var_name)
                 if op.name in RVERSIONS:
                     op_overloads += generate_overloads(
-                        op, name=f"__r{op.name[2:]}", rversion=True
+                        op,
+                        name=f"__r{op.name[2:]}",
+                        rversion=True,
+                        op_var_name=op_var_name,
                     )
 
                 op_overloads = indent(op_overloads, 4)
@@ -230,8 +227,10 @@ with open(FNS_PATH, "r+") as file:
     for line in file:
         new_file_contents += line
         if line.startswith("    return LiteralCol"):
-            for op in PDT_DOT_OPS:
-                new_file_contents += generate_overloads(op)
+            for op_var_name in sorted(ops.__dict__):
+                op = ops.__dict__[op_var_name]
+                if isinstance(op, Operator) and not op.generate_expr_method:
+                    new_file_contents += generate_overloads(op, op_var_name=op_var_name)
             break
 
     file.seek(0)

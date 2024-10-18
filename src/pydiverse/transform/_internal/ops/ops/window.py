@@ -22,6 +22,7 @@ class Window(Operator):
             context_kwargs=["partition_by", "arrange"],
             param_names=param_names,
             default_values=default_values,
+            generate_expr_method=False,
         )
 
 

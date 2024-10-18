@@ -23,6 +23,7 @@ class Operator:
         "context_kwargs",
         "param_names",
         "default_values",
+        "generate_expr_method",
     )
 
     name: str
@@ -32,6 +33,7 @@ class Operator:
     context_kwargs: list[str]
     param_names: list[str]
     default_values: list[str] | None
+    generate_expr_method: bool
 
     def __init__(
         self,
@@ -41,10 +43,12 @@ class Operator:
         context_kwargs: list[str] | None = None,
         param_names: list[str] | None = None,
         default_values: list[Any] | None = None,
+        generate_expr_method: bool = True,
     ):
         self.name = name
         self.ftype = ftype
         self.context_kwargs = context_kwargs if context_kwargs is not None else []
+        self.generate_expr_method = generate_expr_method
 
         assert all(isinstance(sig, Signature) for sig in signatures)
         self.signatures = signatures
@@ -59,8 +63,10 @@ class Operator:
             assert num_params <= 2
             if num_params == 1:
                 param_names = ["self"]
-            else:
+            elif num_params == 2:
                 param_names = ["self", "rhs"]
+            else:
+                param_names = []
 
         self.param_names = param_names
         self.default_values = default_values
@@ -73,6 +79,3 @@ class Operator:
                 f"{", ".join(signature)}"
             )
         return match[1]
-
-
-class NoExprMethod(Operator): ...

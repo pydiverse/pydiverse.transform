@@ -31,6 +31,9 @@ class TableImpl(AstNode):
             for name, dtype in schema.items()
         }
 
+    def __init_subclass__(cls) -> None:
+        cls.impl_store = ImplStore()
+
     @staticmethod
     def from_resource(
         resource: Any,

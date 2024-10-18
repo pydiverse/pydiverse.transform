@@ -122,7 +122,7 @@ class Duration(Dtype):
 class NullType(Dtype): ...
 
 
-class Tvar(Dtype):
+class Tvar(Dtype):  #
     __slots__ = ("name",)
 
     def __init__(self, name: str, *, const: bool = True):
