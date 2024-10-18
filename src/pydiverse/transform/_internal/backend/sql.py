@@ -648,6 +648,8 @@ def create_aliases(nd: AstNode, num_occurences: dict[str, int]) -> dict[str, int
         if cnt := num_occurences.get(nd.table.name):
             nd.table = nd.table.alias(f"{nd.table.name}_{cnt}")
         else:
+            # always set alias to shorten queries with schemas
+            nd.table = nd.table.alias(f"{nd.table.name}")
             cnt = 0
         num_occurences[nd.table.name] = cnt + 1
 
