@@ -13,10 +13,10 @@ from uuid import UUID
 import polars as pl
 import sqlalchemy as sqa
 
-from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
+from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode

@@ -100,11 +100,8 @@ def compile_col_expr(
         return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
-        op = PolarsImpl.registry.get_op(expr.name)
-        impl = PolarsImpl.registry.get_impl(
-            expr.name,
-            tuple(arg.dtype() for arg in expr.args),
-        )
+        impl = PolarsImpl.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
+
         # TODO: technically, constness of our parameters has nothing to do with whether
         # the polars function wants a pdt.lit or python type. We should rather specify
         # this in the impl or always pass both the compiled and uncompiled args. But if

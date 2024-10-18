@@ -5,23 +5,14 @@ import datetime
 
 class Dtype:
     __slots__ = ("const",)
-    const: bool = False
 
     def __init__(self, *, const: bool = False):
         self.const = const
 
-    def __eq__(self, rhs):
-        if type(self) is rhs:
-            return True
-        if type(self) is not type(rhs):
-            return False
-        if self.const != rhs.const:
-            return False
-        if self.vararg != rhs.vararg:
-            return False
-        if self.name != rhs.name:
-            return False
-        return True
+    def __eq__(self, rhs: Dtype) -> bool:
+        if not isinstance(rhs, Dtype):
+            raise TypeError(f"cannot compare type `Dtype` with type `{type(rhs)}`")
+        return self.const == rhs.const and type(self) is type(rhs)
 
     def __le__(self, rhs: Dtype):
         if rhs.const and not self.const:
@@ -32,52 +23,19 @@ class Dtype:
         return not self.__eq__(rhs)
 
     def __hash__(self):
-        return hash((self.name, self.const, self.vararg, type(self).__qualname__))
+        return hash((type(self), self.const))
 
-    def __repr__(self):
-        dtype_str = ""
-        if self.const:
-            dtype_str += "const "
-        dtype_str += self.__class__.__name__
-        if self.vararg:
-            dtype_str += "..."
+    def __repr__(self) -> str:
+        return ("const " if self.const else "") + self.__class__.__name__
 
-        return dtype_str
-
-    def without_modifiers(self: Dtype) -> Dtype:
-        """Returns a copy of `self` with all modifiers removed"""
+    def without_const(self) -> Dtype:
         return type(self)()
 
-    def same_kind(self, other: Dtype) -> bool:
-        """Check if `other` is of the same type as self.
-
-        More specifically, `other` must be a stricter subtype of `self`.
-        """
-        if not isinstance(other, type(self)):
-            return False
-
-        # self.const -> other.const
-        if self.const and not other.const:
-            return False
-
-        # other.vararg -> self.vararg
-        if other.vararg and not self.vararg:
-            return False
-
-        return True
-
-    def can_convert_to(self, other: Dtype) -> bool:
-        if other.const and not self.const:
-            return False
-        if other.vararg and not self.vararg:
-            return False
-
-        conversions = type(self).__mro__[:-1] + (
-            type(self).__bases__[0].implicit_conversions
-            if is_concrete(self) and not is_abstract(self)
-            else type(self).implicit_conversions
-        )
-        return type(other) in conversions
+    def can_convert_to(self, target: Dtype) -> bool:
+        return (not target.const or self.const) and (
+            self.without_const(),
+            target.without_const(),
+        ) in implicit_conversions
 
 
 class Float(Dtype):
@@ -95,7 +53,6 @@ class Decimal(Dtype):
 
 
 class Int(Dtype):
-    implicit_conversions = (Float, Decimal)
     name = "int"
 
 
@@ -300,32 +257,41 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
     return promoted
 
 
-INT_SUBTYPES = (Uint8, Uint16, Uint32, Uint64, Int8, Int16, Int32, Int64)
-FLOAT_SUBTYPES = (Float32, Float64)
+INT_SUBTYPES = (
+    Uint8(),
+    Uint16(),
+    Uint32(),
+    Uint64(),
+    Int8(),
+    Int16(),
+    Int32(),
+    Int64(),
+)
+FLOAT_SUBTYPES = (Float32(), Float64())
 
 
 def is_abstract(dtype: Dtype) -> bool:
-    return type(dtype) not in (*INT_SUBTYPES, *FLOAT_SUBTYPES)
+    return dtype.without_const() not in (*INT_SUBTYPES, *FLOAT_SUBTYPES)
 
 
 def is_concrete(dtype: Dtype) -> bool:
-    return type(dtype) not in (Int, Float)
+    return dtype.without_const() not in (Int(), Float())
 
 
 implicit_conversions = {
-    (Int, Float): (1, 0),
-    (Int, Decimal): (2, 0),
-    **{(int_subtype, Int): (0, 1) for int_subtype in INT_SUBTYPES},
-    **{(float_subtype, Float): (0, 1) for float_subtype in FLOAT_SUBTYPES},
+    (Int(), Float()): (1, 0),
+    (Int(), Decimal()): (2, 0),
+    **{(int_subtype, Int()): (0, 1) for int_subtype in INT_SUBTYPES},
+    **{(float_subtype, Float()): (0, 1) for float_subtype in FLOAT_SUBTYPES},
 }
 
 # compute transitive closure of cost graph
 for dtype in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
     added_edges = {}
     for (u, v), c in implicit_conversions.items():
-        if u is dtype:
+        if u == dtype:
             for (s, t), d in implicit_conversions.items():
-                if s is v:
+                if s == v:
                     added_edges[(u, t)] = (sum(z) for z in zip(c, d, strict=True))
     implicit_conversions |= added_edges
 

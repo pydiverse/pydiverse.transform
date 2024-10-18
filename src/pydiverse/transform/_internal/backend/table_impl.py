@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -10,12 +10,9 @@ import sqlalchemy as sqa
 
 from pydiverse.transform._internal.backend.impl_store import ImplStore
 from pydiverse.transform._internal.backend.targets import Target
+from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
-from pydiverse.transform._internal.ops.registry import (
-    OperatorRegistrationContextManager,
-    OperatorRegistry,
-)
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col
 from pydiverse.transform._internal.tree.types import Dtype
@@ -45,7 +42,7 @@ class TableImpl(AstNode):
             if hasattr(super_cls, "registry"):
                 super_reg = super_cls.registry
                 break
-        cls.registry = OperatorRegistry(cls, super_reg)
+        cls.impl_store = ImplStore(cls, super_reg)
 
     @staticmethod
     def from_resource(
@@ -108,16 +105,19 @@ class TableImpl(AstNode):
     def export(cls, nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
 
     @classmethod
-    def _html_repr_expr(cls, expr):
-        """
-        Return an appropriate string to display an expression from this backend.
-        This is mainly used to IPython.
-        """
-        return repr(expr)
+    def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:
+        if (impl := cls.impl_store.get_impl(op, sig)) is not None:
+            return impl
+        if cls is TableImpl:
+            raise Exception
 
-    @classmethod
-    def op(cls, operator: Operator, **kwargs) -> OperatorRegistrationContextManager:
-        return OperatorRegistrationContextManager(cls.registry, operator, **kwargs)
+        try:
+            super().get_impl(op, sig)
+        except Exception as err:
+            raise NotSupportedError(
+                f"operation `{op.name}` is not supported by the backend "
+                f"`{cls.__name__.lower()[:-4]}`"
+            ) from err
 
 
 with TableImpl.impl_store.impl_manager as cm:

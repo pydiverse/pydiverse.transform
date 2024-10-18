@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 import inspect
 from collections.abc import Callable, Sequence
-from typing import Any
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import SignatureTrie
@@ -34,7 +33,7 @@ class ImplStore:
         else:
             self.impl_trie[op].insert(sig, f, is_vararg)
 
-    def call_impl(self, op: Operator, sig: Sequence[Dtype], *args, **kwargs) -> Any:
+    def get_impl(self, op: Operator, sig: Sequence[Dtype]) -> Callable | None:
         best_match = None
 
         if (trie := self.impl_trie.get(op)) is not None:
@@ -42,7 +41,8 @@ class ImplStore:
         if best_match is None:
             best_match = self.default_impl[op]
 
-        assert best_match is not None
+        if best_match is None:
+            return None
 
         # filter out only those kwargs that the impl wants
         impl_kwargs = {
@@ -51,7 +51,7 @@ class ImplStore:
             if param.kind == inspect.Parameter.KEYWORD_ONLY
         }
 
-        return best_match(
+        return lambda *args, **kwargs: best_match(
             *args,
             **{kwarg: val for kwarg, val in kwargs.items() if kwarg in impl_kwargs},
         )

@@ -13,10 +13,14 @@ from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
 from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype, Operator
+from pydiverse.transform._internal.ops.ops.markers import Marker
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.types import (
+    FLOAT_SUBTYPES,
+    INT_SUBTYPES,
     Bool,
     Date,
     Datetime,
@@ -921,17 +925,19 @@ class LiteralCol(ColExpr):
 
 
 class ColFn(ColExpr):
-    __slots__ = ["name", "args", "context_kwargs"]
+    __slots__ = ("op", "args", "context_kwargs")
 
-    def __init__(self, name: str, *args: ColExpr, **kwargs: list[ColExpr | Order]):
-        self.name = name
+    def __init__(self, op: Operator, *args: ColExpr, **kwargs: list[ColExpr | Order]):
+        self.op = op
         # While building the expression tree, we have to allow markers.
-        self.args = [wrap_literal(arg, allow_markers=True) for arg in args]
+        self.args: list[ColExpr] = [
+            wrap_literal(arg, allow_markers=True) for arg in args
+        ]
         self.context_kwargs = clean_kwargs(**kwargs)
 
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
-                assert self.name == "len"
+                assert self.op.name == "len"
             else:
                 self.args[0] = CaseExpr(
                     [
@@ -951,13 +957,7 @@ class ColFn(ColExpr):
         args = [repr(e) for e in self.args] + [
             f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
         ]
-        return f'{self.name}({", ".join(args)})'
-
-    def op(self) -> Operator:
-        # TODO: backend agnostic registry, make this an attribute?
-        from pydiverse.transform._internal.backend.polars import PolarsImpl
-
-        return PolarsImpl.registry.get_op(self.name)
+        return f'{self.op.name}({", ".join(args)})'
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -1006,10 +1006,10 @@ class ColFn(ColExpr):
         if None in ftypes:
             return None
 
-        op = self.op()
-
         actual_ftype = (
-            Ftype.WINDOW if op.ftype == Ftype.AGGREGATE and agg_is_window else op.ftype
+            Ftype.WINDOW
+            if self.op.ftype == Ftype.AGGREGATE and agg_is_window
+            else self.op.ftype
         )
 
         if actual_ftype == Ftype.ELEMENT_WISE:
@@ -1033,8 +1033,7 @@ class ColFn(ColExpr):
                     node is not self
                     and isinstance(node, ColFn)
                     and (
-                        (desc_ftype := node.op().ftype)
-                        in (Ftype.AGGREGATE, Ftype.WINDOW)
+                        (desc_ftype := node.op.ftype) in (Ftype.AGGREGATE, Ftype.WINDOW)
                     )
                 ):
                     assert isinstance(self, ColFn)
@@ -1043,9 +1042,9 @@ class ColFn(ColExpr):
                         Ftype.WINDOW: "window",
                     }
                     raise FunctionTypeError(
-                        f"{ftype_string[desc_ftype]} function `{node.name}` nested "
-                        f"inside {ftype_string[self._ftype]} function `{self.name}`.\n"
-                        "hint: There may be at most one window / aggregation function "
+                        f"{ftype_string[desc_ftype]} function `{node.op.name}` nested "
+                        f"inside {ftype_string[self._ftype]} function `{self.op.name}`"
+                        ".\nhint: There may be at most one window / aggregation function "
                         "in a column expression on any path from the root to a leaf."
                     )
 
@@ -1190,6 +1189,9 @@ class Cast(ColExpr):
     __slots__ = ["val", "target_type"]
 
     def __init__(self, val: ColExpr, target_type: Dtype):
+        if target_type.const:
+            raise TypeError("cannot cast to `const` type")
+
         self.val = val
         self.target_type = target_type
         super().__init__(target_type)
@@ -1203,28 +1205,37 @@ class Cast(ColExpr):
 
         if not self.val.dtype().can_convert_to(self.target_type):
             valid_casts = {
-                (types.String, types.Int64),
-                (types.String, types.Float64),
-                (types.Float64, types.Int64),
-                (types.Datetime, types.Date),
-                (types.Int64, types.String),
-                (types.Float64, types.String),
-                (types.Datetime, types.String),
-                (types.Date, types.String),
+                *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
+                *(
+                    (ft, it)
+                    for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)
+                ),
+                (Datetime, Date),
+                *(
+                    (t, String())
+                    for t in (
+                        Int(),
+                        *INT_SUBTYPES,
+                        Float() * FLOAT_SUBTYPES,
+                        Datetime(),
+                        Date(),
+                    )
+                ),
             }
 
             if (
-                self.val.dtype().__class__,
-                self.target_type.__class__,
+                self.val.dtype().without_const(),
+                self.target_type,
             ) not in valid_casts:
                 hint = ""
-                if self.val.dtype() == types.String and self.target_type in (
-                    types.Datetime,
-                    types.Date,
+                if self.val.dtype() == String() and self.target_type in (
+                    Datetime(),
+                    Date(),
                 ):
                     hint = (
                         "\nhint: to convert a str to datetime, call "
-                        f"`.str.to_{self.target_type.name}()` on the expression."
+                        f"`.str.to_{self.target_type.__class__.__name__.lower()}()` on "
+                        "the expression."
                     )
 
                 raise TypeError(
@@ -1244,14 +1255,6 @@ class Cast(ColExpr):
         return g(Cast(self.val.map_subtree(g), self.target_type))
 
 
-MARKERS = (
-    "ascending",
-    "descending",
-    "nulls_first",
-    "nulls_last",
-)
-
-
 @dataclasses.dataclass(slots=True)
 class Order:
     order_by: ColExpr
@@ -1267,18 +1270,18 @@ class Order:
         nulls_last = None
         while isinstance(expr, ColFn):
             if descending is None:
-                if expr.name == "descending":
+                if expr.op == ops.descending:
                     descending = True
-                elif expr.name == "ascending":
+                elif expr.op == ops.ascending:
                     descending = False
 
             if nulls_last is None:
-                if expr.name == "nulls_last":
+                if expr.op == ops.nulls_last:
                     nulls_last = True
-                elif expr.name == "nulls_first":
+                elif expr.op == ops.nulls_first:
                     nulls_last = False
 
-            if expr.name in MARKERS:
+            if isinstance(expr.op, Marker):
                 assert len(expr.args) == 1
                 assert len(expr.context_kwargs) == 0
                 expr = expr.args[0]
@@ -1300,17 +1303,18 @@ class Order:
 def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
     if isinstance(expr, ColExpr | Order):
         if isinstance(expr, ColFn) and (
-            (expr.name in MARKERS and not allow_markers)
+            (isinstance(expr.op, Marker) and not allow_markers)
             or (
                 # markers can only be at the top of an expression tree
-                expr.name not in MARKERS
+                not isinstance(expr.op, Marker)
                 and any(
-                    isinstance(arg, ColFn) and arg.name in MARKERS for arg in expr.args
+                    isinstance(arg, ColFn) and isinstance(arg.op, Marker)
+                    for arg in expr.args
                 )
             )
         ):
             raise TypeError(
-                f"invalid usage of `{expr.name}` in a column expression.\n"
+                f"invalid usage of `{expr.op.name}` in a column expression.\n"
                 "note: This marker function can only be used in arguments to the "
                 "`arrange` verb or the `arrange=` keyword argument to window "
                 "functions. Furthermore, all markers have to be at the top of the "
