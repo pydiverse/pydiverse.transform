@@ -673,7 +673,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
                 update_partition_by
                 and isinstance(expr, ColFn)
                 and "partition_by" not in expr.context_kwargs
-                and (expr.op().ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
+                and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
             ):
                 expr.context_kwargs["partition_by"] = table._cache.partition_by
 

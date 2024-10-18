@@ -98,12 +98,13 @@ class TableImpl(AstNode):
     def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:
         if (impl := cls.impl_store.get_impl(op, sig)) is not None:
             return impl
+
         if cls is TableImpl:
-            raise Exception
+            raise NotSupportedError
 
         try:
-            super().get_impl(op, sig)
-        except Exception as err:
+            return cls.__bases__[0].get_impl(op, sig)
+        except NotSupportedError as err:
             raise NotSupportedError(
                 f"operation `{op.name}` is not supported by the backend "
                 f"`{cls.__name__.lower()[:-4]}`"
@@ -111,22 +112,6 @@ class TableImpl(AstNode):
 
 
 with TableImpl.impl_store.impl_manager as impl:
-
-    @impl(ops.nulls_first)
-    def _nulls_first(_):
-        raise AssertionError
-
-    @impl(ops.nulls_last)
-    def _nulls_last(_):
-        raise AssertionError
-
-    @impl(ops.ascending)
-    def _ascending(_):
-        raise AssertionError
-
-    @impl(ops.descending)
-    def _descending(_):
-        raise AssertionError
 
     @impl(ops.add)
     def _add(lhs, rhs):

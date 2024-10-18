@@ -93,24 +93,13 @@ def compile_order(
     )
 
 
-def compile_col_expr(
-    expr: ColExpr, name_in_df: dict[UUID, str], *, compile_literals: bool = True
-) -> pl.Expr:
+def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
     if isinstance(expr, Col):
         return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
         impl = PolarsImpl.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
-
-        # TODO: technically, constness of our parameters has nothing to do with whether
-        # the polars function wants a pdt.lit or python type. We should rather specify
-        # this in the impl or always pass both the compiled and uncompiled args. But if
-        # we know a polars function can only take a python scalar, then our param also
-        # has to be const, so we can unwrap the python scalar from the compiled expr.
-        args: list[pl.Expr] = [
-            compile_col_expr(arg, name_in_df, compile_literals=not param.const)
-            for arg, param in zip(expr.args, impl.impl.signature, strict=False)
-        ]
+        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
 
         if (partition_by := expr.context_kwargs.get("partition_by")) is not None:
             partition_by = [compile_col_expr(pb, name_in_df) for pb in partition_by]
@@ -195,7 +184,7 @@ def compile_col_expr(
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return pl.lit(expr.val) if compile_literals else expr.val
+        return pl.lit(expr.val)
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
@@ -615,7 +604,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.round)
     def _round(x, digits):
-        return x.round(digits)
+        return x.round(pl.select(digits).item())
 
     @impl(ops.exp)
     def _exp(x):

@@ -32,6 +32,8 @@ class ImplStore:
             assert op not in self.default_impl
             self.default_impl[op] = f
         else:
+            if op not in self.impl_trie:
+                self.impl_trie[op] = SignatureTrie()
             self.impl_trie[op].insert(sig, f, is_vararg)
 
     def get_impl(self, op: Operator, sig: Sequence[Dtype]) -> Callable | None:
@@ -40,7 +42,7 @@ class ImplStore:
         if (trie := self.impl_trie.get(op)) is not None:
             _, best_match = trie.best_match(sig)
         if best_match is None:
-            best_match = self.default_impl[op]
+            best_match = self.default_impl.get(op)
 
         if best_match is None:
             return None

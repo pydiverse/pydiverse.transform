@@ -92,22 +92,22 @@ def best_signature_match(
 ) -> int:
     assert len(candidates) > 0
 
-    best = candidates[0]
+    best_index = 0
     best_distance = sig_distance(sig, candidates[0])
 
-    for match in candidates[1:]:
+    for i, match in enumerate(candidates[1:]):
         if best_distance > (this_distance := sig_distance(sig, match)):
-            best = match
+            best_index = i
             best_distance = this_distance
 
     assert (
-        sum(int(best_distance == sig_distance(match, sig)) for match in candidates) == 1
+        sum(int(best_distance == sig_distance(sig, match)) for match in candidates) == 1
     )
-    return best
+    return best_index
 
 
 def sig_distance(sig: Sequence[Dtype], target: Sequence[Dtype]) -> tuple[int, int]:
-    return (
+    return tuple(
         sum(z)
         for z in zip(
             *(types.conversion_cost(s, t) for s, t in zip(sig, target, strict=True)),

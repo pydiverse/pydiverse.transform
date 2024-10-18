@@ -11,7 +11,9 @@ class Dtype:
     def __init__(self, *, const: bool = False):
         self.const = const
 
-    def __eq__(self, rhs: Dtype | type[Dtype]) -> bool:
+    def __eq__(self, rhs: Dtype | type[Dtype] | None) -> bool:
+        if rhs is None:
+            return False
         if inspect.isclass(rhs) and issubclass(rhs, Dtype):
             rhs = rhs()
         if is_supertype(rhs.without_const()) and not is_subtype(rhs.without_const()):
@@ -51,10 +53,8 @@ class Dtype:
 
     def converts_to(self, target: Dtype) -> bool:
         return (
-            (not target.const or self.const)
-            and self.without_const() in IMPLICIT_CONVS
-            and target.without_const() in IMPLICIT_CONVS[self.without_const()]
-        )
+            not target.const or self.const
+        ) and target.without_const() in IMPLICIT_CONVS[self.without_const()]
 
 
 class Float(Dtype):
@@ -236,9 +236,21 @@ def is_subtype(dtype: Dtype) -> bool:
 
 
 IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
-    Int(): {Float(): (1, 0), Decimal(): (2, 0)},
-    **{int_subtype: {Int(): (0, 1)} for int_subtype in INT_SUBTYPES},
-    **{float_subtype: {Float(): (0, 1)} for float_subtype in FLOAT_SUBTYPES},
+    Int(): {Float(): (1, 0), Decimal(): (2, 0), Int(): (0, 0)},
+    **{
+        int_subtype: {Int(): (0, 1), int_subtype: (0, 0)}
+        for int_subtype in INT_SUBTYPES
+    },
+    **{
+        float_subtype: {Float(): (0, 1), float_subtype: (0, 0)}
+        for float_subtype in FLOAT_SUBTYPES
+    },
+    String(): {String(): (0, 0)},
+    Datetime(): {Datetime(): (0, 0)},
+    Date(): {Date(): (0, 0)},
+    Bool(): {Bool(): (0, 0)},
+    NullType(): {NullType(): (0, 0)},
+    Duration(): {Duration(): (0, 0)},
 }
 
 # compute transitive closure of cost graph
@@ -247,7 +259,7 @@ for start_type in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
     for intermediate_type, cost1 in IMPLICIT_CONVS[start_type].items():
         if intermediate_type in IMPLICIT_CONVS:
             for target_type, cost2 in IMPLICIT_CONVS[intermediate_type].items():
-                added_edges[target_type] = (
+                added_edges[target_type] = tuple(
                     sum(z) for z in zip(cost1, cost2, strict=True)
                 )
     if start_type not in IMPLICIT_CONVS:
@@ -256,7 +268,7 @@ for start_type in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
 
 
 def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
-    return IMPLICIT_CONVS[dtype][target]
+    return IMPLICIT_CONVS[dtype.without_const()][target.without_const()]
 
 
 NUMERIC = (Int(), Float(), Decimal())
