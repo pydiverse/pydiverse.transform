@@ -63,7 +63,7 @@ class SignatureTrie:
 
             matches = []
             for dtype, child in self.children.items():
-                if sig[0].can_convert_to(dtype):
+                if sig[0].converts_to(dtype):
                     matches.extend(
                         ([dtype] + match_sig, data)
                         for match_sig, data in child.all_matches(sig[1:])
@@ -81,19 +81,29 @@ class SignatureTrie:
         if len(all_matches) == 0:
             return None
 
-        best = all_matches[0]
-        best_distance = sig_distance(sig, all_matches[0])
+        return all_matches[
+            best_signature_match(sig, [match[0] for match in all_matches])
+        ]
 
-        for match in all_matches[1:]:
-            if best_distance > (this_distance := sig_distance(sig, match)):
-                best = match
-                best_distance = this_distance
 
-        assert (
-            sum(int(best_distance == sig_distance(match, sig)) for match in all_matches)
-            == 1
-        )
-        return best
+# retunrs the index of the signature in `candidates` that matches best
+def best_signature_match(
+    sig: Sequence[Dtype], candidates: Sequence[Sequence[Dtype]]
+) -> int:
+    assert len(candidates) > 0
+
+    best = candidates[0]
+    best_distance = sig_distance(sig, candidates[0])
+
+    for match in candidates[1:]:
+        if best_distance > (this_distance := sig_distance(sig, match)):
+            best = match
+            best_distance = this_distance
+
+    assert (
+        sum(int(best_distance == sig_distance(match, sig)) for match in candidates) == 1
+    )
+    return best
 
 
 def sig_distance(sig: Sequence[Dtype], target: Sequence[Dtype]) -> tuple[int, int]:

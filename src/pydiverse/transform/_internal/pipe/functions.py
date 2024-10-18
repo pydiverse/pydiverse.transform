@@ -32,7 +32,7 @@ def when(condition: ColExpr) -> WhenClause:
 
 
 def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
-    if types.is_concrete(dtype):
+    if types.is_subtype(dtype):
         return LiteralCol(val, dtype).cast(dtype)
     return LiteralCol(val, dtype)
 

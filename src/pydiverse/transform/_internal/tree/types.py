@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import datetime
+import inspect
+import warnings
 
 
 class Dtype:
@@ -9,10 +11,23 @@ class Dtype:
     def __init__(self, *, const: bool = False):
         self.const = const
 
-    def __eq__(self, rhs: Dtype) -> bool:
-        if not isinstance(rhs, Dtype):
-            raise TypeError(f"cannot compare type `Dtype` with type `{type(rhs)}`")
-        return self.const == rhs.const and type(self) is type(rhs)
+    def __eq__(self, rhs: Dtype | type[Dtype]) -> bool:
+        if inspect.isclass(rhs) and issubclass(rhs, Dtype):
+            rhs = rhs()
+        if is_supertype(rhs.without_const()) and not is_subtype(rhs.without_const()):
+            warnings.warn(
+                f"comparing to the supertype `{rhs}` for equality may yield unexpected "
+                "results.\n"
+                "hint: `==` is very strict, e.g. Int16() == Int() is False. Use the "
+                "`<=` operator to also match on subtypes (so Int16() <= Int() would "
+                "return True)."
+            )
+
+        if isinstance(rhs, Dtype):
+            return self.const == rhs.const and type(self) is type(rhs)
+        elif inspect.isclass(rhs) and issubclass(rhs, Dtype):
+            return not self.const and type(self) is rhs
+        raise TypeError(f"cannot compare type `Dtype` with type `{type(rhs)}`")
 
     def __le__(self, rhs: Dtype):
         if rhs.const and not self.const:
@@ -28,14 +43,18 @@ class Dtype:
     def __repr__(self) -> str:
         return ("const " if self.const else "") + self.__class__.__name__
 
+    def with_const(self) -> Dtype:
+        return type(self)(const=True)
+
     def without_const(self) -> Dtype:
         return type(self)()
 
-    def can_convert_to(self, target: Dtype) -> bool:
-        return (not target.const or self.const) and (
-            self.without_const(),
-            target.without_const(),
-        ) in implicit_conversions
+    def converts_to(self, target: Dtype) -> bool:
+        return (
+            (not target.const or self.const)
+            and self.without_const() in IMPLICIT_CONVS
+            and target.without_const() in IMPLICIT_CONVS[self.without_const()]
+        )
 
 
 class Float(Dtype):
@@ -100,33 +119,6 @@ class Duration(Dtype):
     name = "duration"
 
 
-# TODO: this shouldn't be a type. create a parameter class, pack vararg in there
-# and allow parameters of type template
-class Template(Dtype):
-    name = None
-
-    def __init__(self, name, **kwargs):
-        super().__init__(**kwargs)
-        self.name = name
-
-    def without_modifiers(self: Dtype) -> Dtype:
-        return type(self)(self.name)
-
-    def same_kind(self, other: Dtype) -> bool:
-        if not super().same_kind(other):
-            return False
-
-        return self.name == other.name
-
-    def modifiers_compatible(self, other: Dtype) -> bool:
-        """
-        Check if another dtype object is compatible with the modifiers of the template.
-        """
-        if self.const and not other.const:
-            return False
-        return True
-
-
 class NullType(Dtype): ...
 
 
@@ -136,6 +128,19 @@ class Tvar(Dtype):
     def __init__(self, name: str, *, const: bool = True):
         self.name = name
         super().__init__(const=const)
+
+    def __eq__(self, rhs: Dtype) -> bool:
+        if not isinstance(rhs, Dtype):
+            raise TypeError(f"cannot compare type `Dtype` with type `{type(rhs)}`")
+        return (
+            self.const == rhs.const and isinstance(rhs, Tvar) and rhs.name == self.name
+        )
+
+    def with_const(self) -> Dtype:
+        return Tvar(self.name, const=True)
+
+    def without_const(self) -> Dtype:
+        return Tvar(self.name)
 
 
 D = Tvar("T")
@@ -183,57 +188,6 @@ def pdt_type_to_python(t: Dtype) -> type:
     raise AssertionError
 
 
-def dtype_from_string(t: str) -> Dtype:
-    parts = [part for part in t.split(" ") if part]
-
-    is_const = False
-    is_vararg = False
-
-    # Handle vararg
-    if parts[-1] == "...":
-        del parts[-1]
-        is_vararg = True
-    elif parts[-1].endswith("..."):
-        parts[-1] = parts[-1][:-3]
-        is_vararg = True
-
-    *modifiers, base_type = parts
-
-    # Handle modifiers
-    for modifier in modifiers:
-        if modifier == "const":
-            is_const = True
-        else:
-            raise ValueError(f"Unknown type modifier '{modifier}'.")
-
-    # Handle type
-    is_template = len(base_type) == 1 and 65 <= ord(base_type) <= 90
-
-    if is_template:
-        return Template(base_type, const=is_const, vararg=is_vararg)
-
-    if base_type == "int":
-        return Int(const=is_const, vararg=is_vararg)
-    if base_type == "float":
-        return Float(const=is_const, vararg=is_vararg)
-    if base_type == "decimal":
-        return Decimal(const=is_const, vararg=is_vararg)
-    if base_type == "str":
-        return String(const=is_const, vararg=is_vararg)
-    if base_type == "bool":
-        return Bool(const=is_const, vararg=is_vararg)
-    if base_type == "date":
-        return Date(const=is_const, vararg=is_vararg)
-    if base_type == "datetime":
-        return Datetime(const=is_const, vararg=is_vararg)
-    if base_type == "duration":
-        return Duration(const=is_const, vararg=is_vararg)
-    if base_type == "null":
-        return NullType(const=is_const, vararg=is_vararg)
-
-    raise ValueError(f"Unknown type '{base_type}'")
-
-
 def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
     if len(dtypes) == 0:
         raise ValueError("expected non empty list of dtypes")
@@ -246,9 +200,9 @@ def promote_dtypes(dtypes: list[Dtype]) -> Dtype:
             promoted = dtype
             continue
 
-        if dtype.can_convert_to(promoted):
+        if dtype.converts_to(promoted):
             continue
-        if promoted.can_convert_to(dtype):
+        if promoted.converts_to(dtype):
             promoted = dtype
             continue
 
@@ -270,34 +224,36 @@ INT_SUBTYPES = (
 FLOAT_SUBTYPES = (Float32(), Float64())
 
 
-def is_abstract(dtype: Dtype) -> bool:
+def is_supertype(dtype: Dtype) -> bool:
     return dtype.without_const() not in (*INT_SUBTYPES, *FLOAT_SUBTYPES)
 
 
-def is_concrete(dtype: Dtype) -> bool:
+def is_subtype(dtype: Dtype) -> bool:
     return dtype.without_const() not in (Int(), Float())
 
 
-implicit_conversions = {
-    (Int(), Float()): (1, 0),
-    (Int(), Decimal()): (2, 0),
-    **{(int_subtype, Int()): (0, 1) for int_subtype in INT_SUBTYPES},
-    **{(float_subtype, Float()): (0, 1) for float_subtype in FLOAT_SUBTYPES},
+IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
+    Int(): {Float(): (1, 0), Decimal(): (2, 0)},
+    **{int_subtype: {Int(): (0, 1)} for int_subtype in INT_SUBTYPES},
+    **{float_subtype: {Float(): (0, 1)} for float_subtype in FLOAT_SUBTYPES},
 }
 
 # compute transitive closure of cost graph
 for dtype in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
     added_edges = {}
-    for (u, v), c in implicit_conversions.items():
+    for (u, v), c in IMPLICIT_CONVS.items():
+        added_edges[u] = {}
         if u == dtype:
-            for (s, t), d in implicit_conversions.items():
+            for (s, t), d in IMPLICIT_CONVS.items():
                 if s == v:
-                    added_edges[(u, t)] = (sum(z) for z in zip(c, d, strict=True))
-    implicit_conversions |= added_edges
+                    added_edges[u][t] = (sum(z) for z in zip(c, d, strict=True))
+    IMPLICIT_CONVS = {
+        u: IMPLICIT_CONVS[u] | added_edges[u] for u in IMPLICIT_CONVS.keys()
+    }
 
 
 def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
-    return implicit_conversions[(dtype, target)]
+    return IMPLICIT_CONVS[dtype][target]
 
 
 NUMERIC = (Int(), Float(), Decimal())

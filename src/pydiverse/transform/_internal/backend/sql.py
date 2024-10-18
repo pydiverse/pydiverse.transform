@@ -545,7 +545,7 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def sqa_type(cls, pdt_type: Dtype) -> type[sqa.types.TypeEngine]:
-        assert types.is_concrete(pdt_type)
+        assert types.is_subtype(pdt_type)
 
         if pdt_type <= types.Int64():
             return sqa.BigInteger

@@ -13,13 +13,14 @@ from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
 from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops import ops, signature
 from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.ops.markers import Marker
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.types import (
     FLOAT_SUBTYPES,
+    IMPLICIT_CONVS,
     INT_SUBTYPES,
     Bool,
     Date,
@@ -29,6 +30,7 @@ from pydiverse.transform._internal.tree.types import (
     Duration,
     Float,
     Int,
+    NullType,
     String,
     python_type_to_pdt,
 )
@@ -1108,26 +1110,34 @@ class CaseExpr(ColExpr):
         if self._dtype is not None:
             return self._dtype
 
-        try:
-            val_types = [val.dtype() for _, val in self.cases]
-            if self.default_val is not None:
-                val_types.append(self.default_val.dtype())
-
-            if None in val_types:
-                return None
-
-            self._dtype = types.promote_dtypes(
-                [dtype.without_modifiers() for dtype in val_types]
-            )
-        except Exception as e:
-            raise TypeError(f"invalid case expression: {e}") from e
-
         for cond, _ in self.cases:
-            if cond.dtype() is not None and cond.dtype() != types.Bool:
+            if cond.dtype() is not None and not cond.dtype() <= types.Bool():
                 raise TypeError(
                     f"argument `{cond}` for `when` must be of boolean type, but has "
                     f"type `{cond.dtype()}`"
                 )
+
+        val_types = [val.dtype().without_const() for _, val in self.cases]
+        if self.default_val is not None:
+            val_types.append(self.default_val.dtype().without_const())
+
+        if None in val_types:
+            return None
+
+        if (
+            common_ancestors := functools.reduce(
+                operator.and_,
+                (set(IMPLICIT_CONVS[t].keys()) for t in val_types[1:]),
+                IMPLICIT_CONVS[val_types[0]].keys(),
+            )
+        ) is None:
+            raise TypeError(
+                f"incompatible types `{", ".join(val_types)}` in case expression."
+            )
+
+        self._dtype = signature.best_signature_match(
+            val_types, [[anc] * len(val_types) for anc in common_ancestors]
+        )
 
         return self._dtype
 
@@ -1155,7 +1165,6 @@ class CaseExpr(ColExpr):
         elif Ftype.WINDOW in val_ftypes:
             self._ftype = Ftype.WINDOW
         else:
-            # AGGREGATE and EWISE are incompatible
             raise FunctionTypeError(
                 "incompatible function types found in case statement: " ", ".join(
                     val_ftypes
@@ -1203,7 +1212,7 @@ class Cast(ColExpr):
         if self.val.dtype() is None:
             return None
 
-        if not self.val.dtype().can_convert_to(self.target_type):
+        if not self.val.dtype().converts_to(self.target_type):
             valid_casts = {
                 *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
                 *(

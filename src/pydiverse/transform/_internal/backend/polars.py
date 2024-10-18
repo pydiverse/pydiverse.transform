@@ -403,7 +403,7 @@ def pdt_type(pl_type: pl.DataType) -> types.Dtype:
 
 
 def polars_type(pdt_type: types.Dtype) -> pl.DataType:
-    assert types.is_concrete(pdt_type)
+    assert types.is_subtype(pdt_type)
 
     if pdt_type <= types.Float64():
         return pl.Float64()
