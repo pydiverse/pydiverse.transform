@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.op import Aggregation
+from typing import Any
+
+from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import (
     COMPARABLE,
@@ -10,16 +12,16 @@ from pydiverse.transform._internal.tree.types import (
     Int,
 )
 
-__all__ = [
-    "min",
-    "max",
-    "mean",
-    "sum",
-    "any",
-    "all",
-    "count",
-    "len",
-]
+
+class Aggregation(Operator):
+    def __init__(self, name: str, *signatures: Signature):
+        super().__init__(
+            name,
+            *signatures,
+            ftype=Ftype.AGGREGATE,
+            context_kwargs=["partition_by", "filter"],
+        )
+
 
 min = Aggregation("min", *(Signature(dtype, return_type=dtype) for dtype in COMPARABLE))
 

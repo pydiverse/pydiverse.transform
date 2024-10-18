@@ -17,7 +17,8 @@ class ImplStore:
     impl_manager: ImplContextManager
 
     def __init__(self) -> None:
-        self.impls = dict()
+        self.impl_trie = dict()
+        self.default_impl = dict()
         self.impl_manager = ImplContextManager(self)
 
     def add_impl(

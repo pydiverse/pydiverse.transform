@@ -1,19 +1,21 @@
 from __future__ import annotations
+from typing import Any
 
-from pydiverse.transform._internal.ops.op import Operator
+from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import Bool, Date, Datetime, Int, String
 
 
 class StrUnary(Operator):
-    signatures = [Signature(String(), return_type=String())]
+    def __init__(self, name: str):
+        super().__init__(name, Signature(String(), return_type=String()))
 
 
 str_strip = StrUnary("str.strip")
 str_upper = StrUnary("str.upper")
 str_lower = StrUnary("str.lower")
 
-str_len = Operator("str.len", [Signature(String(), return_type=Int())])
+str_len = Operator("str.len", Signature(String(), return_type=Int()))
 
 str_replace_all = Operator(
     "str.replace_all",

@@ -1,8 +1,29 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.op import Window
+from typing import Any
+
+from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import D, Int, Tvar
+
+
+class Window(Operator):
+    def __init__(
+        self,
+        name: str,
+        *signatures: Signature,
+        param_names: list[str] | None = None,
+        default_values: list[Any] | None = None,
+    ):
+        super().__init__(
+            name,
+            *signatures,
+            ftype=Ftype.WINDOW,
+            context_kwargs=["partition_by", "arrange"],
+            param_names=param_names,
+            default_values=default_values,
+        )
+
 
 shift = Window(
     "shift",

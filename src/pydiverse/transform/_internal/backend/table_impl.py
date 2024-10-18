@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class TableImpl(AstNode):
-    impl_store: ImplStore
+    impl_store = ImplStore()
 
     def __init__(self, name: str, schema: dict[str, Dtype]):
         self.name = name
@@ -30,19 +30,6 @@ class TableImpl(AstNode):
             name: Col(name, self, uuid.uuid1(), dtype, Ftype.ELEMENT_WISE)
             for name, dtype in schema.items()
         }
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        # Add new `registry` class variable to subclass.
-        # We define the super registry by walking up the MRO. This allows us
-        # to check for potential operation definitions in the parent classes.
-        super_reg = None
-        for super_cls in cls.__mro__:
-            if hasattr(super_cls, "registry"):
-                super_reg = super_cls.registry
-                break
-        cls.impl_store = ImplStore(cls, super_reg)
 
     @staticmethod
     def from_resource(
@@ -202,7 +189,7 @@ with TableImpl.impl_store.impl_manager as impl:
     def _ne(lhs, rhs):
         return lhs != rhs
 
-    @impl(ops.lt)
+    @impl(ops.less_than)
     def _lt(lhs, rhs):
         return lhs < rhs
 

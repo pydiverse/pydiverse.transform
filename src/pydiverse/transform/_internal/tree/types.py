@@ -136,6 +136,9 @@ class Tvar(Dtype):
             self.const == rhs.const and isinstance(rhs, Tvar) and rhs.name == self.name
         )
 
+    def __hash__(self):
+        return hash((Tvar, self.const, self.name))
+
     def with_const(self) -> Dtype:
         return Tvar(self.name, const=True)
 
@@ -225,11 +228,11 @@ FLOAT_SUBTYPES = (Float32(), Float64())
 
 
 def is_supertype(dtype: Dtype) -> bool:
-    return dtype.without_const() not in (*INT_SUBTYPES, *FLOAT_SUBTYPES)
+    return not any(isinstance(dtype, type(t)) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES))
 
 
 def is_subtype(dtype: Dtype) -> bool:
-    return dtype.without_const() not in (Int(), Float())
+    return not isinstance(dtype, Int | Float)
 
 
 IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
@@ -239,17 +242,17 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
 }
 
 # compute transitive closure of cost graph
-for dtype in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
+for start_type in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
     added_edges = {}
-    for (u, v), c in IMPLICIT_CONVS.items():
-        added_edges[u] = {}
-        if u == dtype:
-            for (s, t), d in IMPLICIT_CONVS.items():
-                if s == v:
-                    added_edges[u][t] = (sum(z) for z in zip(c, d, strict=True))
-    IMPLICIT_CONVS = {
-        u: IMPLICIT_CONVS[u] | added_edges[u] for u in IMPLICIT_CONVS.keys()
-    }
+    for intermediate_type, cost1 in IMPLICIT_CONVS[start_type].items():
+        if intermediate_type in IMPLICIT_CONVS:
+            for target_type, cost2 in IMPLICIT_CONVS[intermediate_type].items():
+                added_edges[target_type] = (
+                    sum(z) for z in zip(cost1, cost2, strict=True)
+                )
+    if start_type not in IMPLICIT_CONVS:
+        IMPLICIT_CONVS[start_type] = added_edges
+    IMPLICIT_CONVS[start_type] |= added_edges
 
 
 def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:

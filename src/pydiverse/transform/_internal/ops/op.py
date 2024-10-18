@@ -7,13 +7,6 @@ from typing import Any
 from pydiverse.transform._internal.ops.signature import Signature, SignatureTrie
 from pydiverse.transform._internal.tree.types import Dtype
 
-__all__ = [
-    "Ftype",
-    "Operator",
-    "Operator",
-    "Window",
-]
-
 
 class Ftype(enum.IntEnum):
     ELEMENT_WISE = 1
@@ -49,10 +42,11 @@ class Operator:
         param_names: list[str] | None = None,
         default_values: list[Any] | None = None,
     ):
-        self.nmae = name
+        self.name = name
         self.ftype = ftype
         self.context_kwargs = context_kwargs if context_kwargs is not None else []
 
+        assert all(isinstance(sig, Signature) for sig in signatures)
         self.signatures = signatures
         self.trie = SignatureTrie()
         assert len(signatures) > 0
@@ -79,44 +73,6 @@ class Operator:
                 f"{", ".join(signature)}"
             )
         return match[1]
-
-
-class Aggregation(Operator):
-    def __init__(
-        self,
-        name: str,
-        *signatures: Signature,
-        param_names: list[str] | None = None,
-        default_values: list[Any] | None = None,
-    ):
-        super().__init__(
-            self,
-            name,
-            *signatures,
-            ftype=Ftype.AGGREGATE,
-            context_kwargs=["partition_by", "filter"],
-            param_names=param_names,
-            default_values=default_values,
-        )
-
-
-class Window(Operator):
-    def __init__(
-        self,
-        name: str,
-        *signatures: Signature,
-        param_names: list[str] | None = None,
-        default_values: list[Any] | None = None,
-    ):
-        super().__init__(
-            self,
-            name,
-            *signatures,
-            ftype=Ftype.WINDOW,
-            context_kwargs=["partition_by", "arrange"],
-            param_names=param_names,
-            default_values=default_values,
-        )
 
 
 class NoExprMethod(Operator): ...

@@ -4,7 +4,6 @@ import os
 from collections.abc import Iterable
 from types import NoneType
 
-from pydiverse.transform._internal.backend.polars import PolarsImpl
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import NoExprMethod, Operator
 from pydiverse.transform._internal.ops.signature import Signature
