@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ._internal.backend.targets import DuckDb, Polars, SqlAlchemy
+from ._internal.pipe.pipeable import verb
 from ._internal.pipe.verbs import (
     arrange,
     drop,
@@ -20,6 +21,7 @@ from .base import *  # noqa: F403
 from .base import __all__ as __base
 
 __all__ = __base + [
+    "verb",
     "arrange",
     "drop",
     "group_by",

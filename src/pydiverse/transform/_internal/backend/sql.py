@@ -148,12 +148,13 @@ class SqlImpl(TableImpl):
         raise NotImplementedError
 
     @classmethod
-    def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None:
+    def build_query(
+        cls, nd: AstNode, final_select: list[Col], dialect=None
+    ) -> str | None:
         sel = cls.build_select(nd, final_select)
-        engine = get_engine(nd)
-        return str(
-            sel.compile(dialect=engine.dialect, compile_kwargs={"literal_binds": True})
-        )
+        if dialect is None:
+            dialect = get_engine(nd).dialect
+        return str(sel.compile(dialect=dialect, compile_kwargs={"literal_binds": True}))
 
     # some backends need to do casting to ensure the correct type
     @classmethod
@@ -647,6 +648,8 @@ def create_aliases(nd: AstNode, num_occurences: dict[str, int]) -> dict[str, int
         if cnt := num_occurences.get(nd.table.name):
             nd.table = nd.table.alias(f"{nd.table.name}_{cnt}")
         else:
+            # always set alias to shorten queries with schemas
+            nd.table = nd.table.alias(f"{nd.table.name}")
             cnt = 0
         num_occurences[nd.table.name] = cnt + 1
 

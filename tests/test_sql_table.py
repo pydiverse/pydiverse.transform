@@ -111,13 +111,13 @@ def tbl_right(engine):
 class TestSqlTable:
     def test_build_query(self, tbl1):
         query_str = tbl1 >> build_query()
-        expected_out = "SELECT df1.col1 AS col1, df1.col2 AS col2 FROM df1"
+        expected_out = "SELECT df1.col1 AS col1, df1.col2 AS col2 FROM df1 as df1"
         assert query_str.lower().split() == expected_out.lower().split()
 
     def test_show_query(self, tbl1, capfd):
         tbl1 >> show_query()
         out = capfd.readouterr().out
-        expected_out = "SELECT df1.col1 AS col1, df1.col2 AS col2 FROM df1"
+        expected_out = "SELECT df1.col1 AS col1, df1.col2 AS col2 FROM df1 as df1"
 
         assert out.lower().split() == expected_out.lower().split()
 
