@@ -688,23 +688,20 @@ def get_engine(nd: AstNode) -> sqa.Engine:
     return engine
 
 
-with SqlImpl.op(ops.FloorDiv(), check_super=False) as op:
+with SqlImpl.impl_store.impl_manager as impl:
     if sqa.__version__ < "2":
 
-        @op.auto
+        @impl(ops.floordiv)
         def _floordiv(lhs, rhs):
             return sqa.cast(lhs / rhs, sqa.Integer())
 
     else:
 
-        @op.auto
+        @impl(ops.floordiv)
         def _floordiv(lhs, rhs):
             return lhs // rhs
 
-
-with SqlImpl.op(ops.Pow()) as op:
-
-    @op.auto
+    @impl(ops.pow)
     def _pow(lhs, rhs):
         if isinstance(lhs.type, sqa.Float) or isinstance(rhs.type, sqa.Float):
             type_ = sqa.Double()
@@ -715,205 +712,121 @@ with SqlImpl.op(ops.Pow()) as op:
 
         return sqa.func.POW(lhs, rhs, type_=type_)
 
-
-with SqlImpl.op(ops.Xor()) as op:
-
-    @op.auto
+    @impl(ops.bool_xor)
     def _xor(lhs, rhs):
         return lhs != rhs
 
-
-with SqlImpl.op(ops.Pos()) as op:
-
-    @op.auto
+    @impl(ops.pos)
     def _pos(x):
         return x
 
-
-with SqlImpl.op(ops.Abs()) as op:
-
-    @op.auto
+    @impl(ops.abs)
     def _abs(x):
         return sqa.func.ABS(x, type_=x.type)
 
-
-with SqlImpl.op(ops.Round()) as op:
-
-    @op.auto
+    @impl(ops.round)
     def _round(x, decimals=0):
         return sqa.func.ROUND(x, decimals, type_=x.type)
 
-
-with SqlImpl.op(ops.IsIn()) as op:
-
-    @op.auto
-    def _isin(x, *values):
+    @impl(ops.is_in)
+    def _is_in(x, *values):
         res = x.in_(v for v in values if not isinstance(v.type, sqa.types.NullType))
         if any(isinstance(v.type, sqa.types.NullType) for v in values):
             res = res | x.is_(sqa.null())
         return res
 
-
-with SqlImpl.op(ops.IsNull()) as op:
-
-    @op.auto
+    @impl(ops.is_null)
     def _is_null(x):
         return x.is_(sqa.null())
 
-
-with SqlImpl.op(ops.IsNotNull()) as op:
-
-    @op.auto
+    @impl(ops.is_not_null)
     def _is_not_null(x):
         return x.is_not(sqa.null())
 
-
-with SqlImpl.op(ops.StrStrip()) as op:
-
-    @op.auto
+    @impl(ops.str_strip)
     def _str_strip(x):
         return sqa.func.TRIM(x, type_=x.type)
 
-
-with SqlImpl.op(ops.StrLen()) as op:
-
-    @op.auto
+    @impl(ops.str_len)
     def _str_length(x):
         return sqa.func.LENGTH(x, type_=sqa.Integer())
 
-
-with SqlImpl.op(ops.StrToUpper()) as op:
-
-    @op.auto
+    @impl(ops.str_upper)
     def _upper(x):
         return sqa.func.UPPER(x, type_=x.type)
 
-
-with SqlImpl.op(ops.StrToLower()) as op:
-
-    @op.auto
-    def _upper(x):
+    @impl(ops.str_upper)
+    def _str_upper(x):
         return sqa.func.LOWER(x, type_=x.type)
 
-
-with SqlImpl.op(ops.StrReplaceAll()) as op:
-
-    @op.auto
-    def _replace_all(x, y, z):
+    @impl(ops.str_replace_all)
+    def _str_replace_all(x, y, z):
         return sqa.func.REPLACE(x, y, z, type_=x.type)
 
-
-with SqlImpl.op(ops.StrStartsWith()) as op:
-
-    @op.auto
-    def _startswith(x, y):
+    @impl(ops.str_starts_with)
+    def _str_starts_with(x, y):
         return x.startswith(y, autoescape=True)
 
-
-with SqlImpl.op(ops.StrEndsWith()) as op:
-
-    @op.auto
-    def _endswith(x, y):
+    @impl(ops.str_ends_with)
+    def _str_ends_with(x, y):
         return x.endswith(y, autoescape=True)
 
-
-with SqlImpl.op(ops.StrContains()) as op:
-
-    @op.auto
-    def _contains(x, y):
+    @impl(ops.str_contains)
+    def _str_contains(x, y):
         return x.contains(y, autoescape=True)
 
-
-with SqlImpl.op(ops.StrSlice()) as op:
-
-    @op.auto
+    @impl(ops.str_slice)
     def _str_slice(x, offset, length):
         # SQL has 1-indexed strings but we do it 0-indexed
         return sqa.func.SUBSTR(x, offset + 1, length)
 
-
-with SqlImpl.op(ops.DtYear()) as op:
-
-    @op.auto
-    def _year(x):
+    @impl(ops.dt_year)
+    def _dt_year(x):
         return sqa.extract("year", x)
 
-
-with SqlImpl.op(ops.DtMonth()) as op:
-
-    @op.auto
-    def _month(x):
+    @impl(ops.dt_month)
+    def _dt_month(x):
         return sqa.extract("month", x)
 
-
-with SqlImpl.op(ops.DtDay()) as op:
-
-    @op.auto
-    def _day(x):
+    @impl(ops.dt_day)
+    def _dt_day(x):
         return sqa.extract("day", x)
 
-
-with SqlImpl.op(ops.DtHour()) as op:
-
-    @op.auto
-    def _hour(x):
+    @impl(ops.dt_hour)
+    def _dt_hour(x):
         return sqa.extract("hour", x)
 
-
-with SqlImpl.op(ops.DtMinute()) as op:
-
-    @op.auto
-    def _minute(x):
+    @impl(ops.dt_minute)
+    def _dt_minute(x):
         return sqa.extract("minute", x)
 
-
-with SqlImpl.op(ops.DtSecond()) as op:
-
-    @op.auto
-    def _second(x):
+    @impl(ops.dt_second)
+    def _dt_second(x):
         return sqa.extract("second", x)
 
-
-with SqlImpl.op(ops.DtMillisecond()) as op:
-
-    @op.auto
-    def _millisecond(x):
+    @impl(ops.dt_millisecond)
+    def _dt_millisecond(x):
         return sqa.extract("milliseconds", x) % 1000
 
-
-with SqlImpl.op(ops.DtDayOfWeek()) as op:
-
-    @op.auto
+    @impl(ops.dt_day_of_week)
     def _day_of_week(x):
         return sqa.extract("dow", x)
 
-
-with SqlImpl.op(ops.DtDayOfYear()) as op:
-
-    @op.auto
+    @impl(ops.dt_day_of_year)
     def _day_of_year(x):
         return sqa.extract("doy", x)
 
-
-with SqlImpl.op(ops.HMax()) as op:
-
-    @op.auto
-    def _greatest(*x):
+    @impl(ops.horizontal_max)
+    def _horizontal_max(*x):
         # TODO: Determine return type
         return sqa.func.GREATEST(*x)
 
-
-with SqlImpl.op(ops.HMin()) as op:
-
-    @op.auto
-    def _least(*x):
+    @impl(ops.horizontal_min)
+    def _horizontal_min(*x):
         # TODO: Determine return type
         return sqa.func.LEAST(*x)
 
-
-with SqlImpl.op(ops.Mean()) as op:
-
-    @op.auto
+    @impl(ops.mean)
     def _mean(x):
         type_ = sqa.Numeric()
         if isinstance(x.type, sqa.Float):
@@ -921,57 +834,33 @@ with SqlImpl.op(ops.Mean()) as op:
 
         return sqa.func.AVG(x, type_=type_)
 
-
-with SqlImpl.op(ops.Min()) as op:
-
-    @op.auto
+    @impl(ops.min)
     def _min(x):
         return sqa.func.min(x)
 
-
-with SqlImpl.op(ops.Max()) as op:
-
-    @op.auto
+    @impl(ops.max)
     def _max(x):
         return sqa.func.max(x)
 
-
-with SqlImpl.op(ops.Sum()) as op:
-
-    @op.auto
+    @impl(ops.sum)
     def _sum(x):
         return sqa.func.sum(x)
 
-
-with SqlImpl.op(ops.Any()) as op:
-
-    @op.auto
+    @impl(ops.any)
     def _any(x):
         return sqa.func.max(x)
 
-
-with SqlImpl.op(ops.All()) as op:
-
-    @op.auto
+    @impl(ops.all)
     def _all(x):
         return sqa.func.min(x)
 
-
-with SqlImpl.op(ops.Count()) as op:
-
-    @op.auto
+    @impl(ops.count)
     def _count(x=None):
         return sqa.func.count(x)
 
-
-with SqlImpl.op(ops.Len()) as op:
-
-    @op.auto
+    @impl(ops.len)
     def _len():
         return sqa.func.count()
-
-
-with SqlImpl.op(ops.Shift()) as op:
 
     def _shift(x, by, empty_value=None):
         if by >= 0:
@@ -979,79 +868,46 @@ with SqlImpl.op(ops.Shift()) as op:
         if by < 0:
             return sqa.func.LEAD(x, -by, empty_value, type_=x.type)
 
-
-with SqlImpl.op(ops.RowNumber()) as op:
-
-    @op.auto
+    @impl(ops.row_number)
     def _row_number():
         return sqa.func.ROW_NUMBER(type_=sqa.Integer())
 
-
-with SqlImpl.op(ops.Rank()) as op:
-
-    @op.auto
+    @impl(ops.rank)
     def _rank():
         return sqa.func.rank()
 
-
-with SqlImpl.op(ops.DenseRank()) as op:
-
-    @op.auto
+    @impl(ops.dense_rank)
     def _dense_rank():
         return sqa.func.dense_rank()
 
-
-with SqlImpl.op(ops.Exp()) as op:
-
-    @op.auto
+    @impl(ops.exp)
     def _exp(x):
         return sqa.func.exp(x)
 
-
-with SqlImpl.op(ops.Log()) as op:
-
-    @op.auto
+    @impl(ops.log)
     def _log(x):
         return sqa.func.ln(x)
 
-
-with SqlImpl.op(ops.Floor()) as op:
-
-    @op.auto
+    @impl(ops.floor)
     def _floor(x):
         return sqa.func.floor(x)
 
-
-with SqlImpl.op(ops.Ceil()) as op:
-
-    @op.auto
+    @impl(ops.ceil)
     def _ceil(x):
         return sqa.func.ceil(x)
 
-
-with SqlImpl.op(ops.StrToDateTime()) as op:
-
-    @op.auto
+    @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return sqa.cast(x, sqa.DateTime)
 
-
-with SqlImpl.op(ops.StrToDate()) as op:
-
-    @op.auto
+    @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return sqa.cast(x, sqa.Date)
 
-
-with SqlImpl.op(ops.IsInf()) as op:
-
-    @op.auto
+    @impl(ops.is_inf)
     def _is_inf(x, *, _Impl):
         return x == _Impl.inf()
 
-
-with SqlImpl.op(ops.IsNotInf()) as op:
-
-    @op.auto
+    @impl(ops.is_not_inf)
     def _is_not_inf(x, *, _Impl):
         return x != _Impl.inf()

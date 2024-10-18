@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import enum
 from typing import Any
 
 from pydiverse.transform._internal.ops.signature import Signature, SignatureTrie
+from pydiverse.transform._internal.tree.types import Dtype
 
 __all__ = [
     "Ftype",
@@ -65,6 +67,9 @@ class Operator:
 
         self.param_names = param_names
         self.default_values = default_values
+
+    def return_type(self, signature: Sequence[Dtype]) -> Dtype:
+        return self.trie.best_match(signature)[1]
 
 
 class Aggregation(Operator):

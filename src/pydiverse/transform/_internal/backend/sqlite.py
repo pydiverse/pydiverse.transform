@@ -5,8 +5,14 @@ import sqlalchemy as sqa
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import Cast
+from pydiverse.transform._internal.tree.types import (
+    Date,
+    Datetime,
+    Decimal,
+    Float,
+    String,
+)
 from pydiverse.transform._internal.util.warnings import warn_non_standard
 
 
@@ -23,7 +29,7 @@ class SqliteImpl(SqlImpl):
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
 
-        if cast.val.dtype() == types.String and cast.target_type == types.Float64:
+        if cast.val.dtype() <= String() and cast.target_type <= Float():
             return sqa.case(
                 (compiled_val == "inf", cls.inf()),
                 (compiled_val == "-inf", -cls.inf()),
@@ -33,10 +39,10 @@ class SqliteImpl(SqlImpl):
                 ),
             )
 
-        elif cast.val.dtype() == types.Datetime and cast.target_type == types.Date:
+        elif cast.val.dtype() <= Datetime() and cast.target_type == Date():
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
 
-        elif cast.val.dtype() == types.Float64 and cast.target_type == types.String:
+        elif cast.val.dtype() <= Float() and cast.target_type == String():
             return sqa.case(
                 (compiled_val == cls.inf(), "inf"),
                 (compiled_val == -cls.inf(), "-inf"),
@@ -46,20 +52,17 @@ class SqliteImpl(SqlImpl):
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
 
-with SqliteImpl.op(ops.Round()) as op:
+with SqliteImpl.impl_store.impl_manager as impl:
 
-    @op("decimal -> decimal")
+    @impl(ops.round, Decimal())
     def _round(x, decimals=0):
         if decimals >= 0:
             return sqa.func.ROUND(x, decimals, type_=x.type)
         # For some reason SQLite doesn't like negative decimals values
         return sqa.func.ROUND(x / (10**-decimals), type_=x.type) * (10**-decimals)
 
-
-with SqliteImpl.op(ops.StrStartsWith()) as op:
-
-    @op.auto
-    def _startswith(x, y):
+    @impl(ops.str_starts_with)
+    def _str_starts_with(x, y):
         warn_non_standard(
             "SQLite: startswith is case-insensitive by default. "
             "Use the 'case_sensitive_like' pragma to change this behaviour. "
@@ -67,11 +70,8 @@ with SqliteImpl.op(ops.StrStartsWith()) as op:
         )
         return x.startswith(y, autoescape=True)
 
-
-with SqliteImpl.op(ops.StrEndsWith()) as op:
-
-    @op.auto
-    def _endswith(x, y):
+    @impl(ops.str_ends_with)
+    def _str_ends_with(x, y):
         warn_non_standard(
             "SQLite: endswith is case-insensitive by default. "
             "Use the 'case_sensitive_like' pragma to change this behaviour. "
@@ -79,11 +79,8 @@ with SqliteImpl.op(ops.StrEndsWith()) as op:
         )
         return x.endswith(y, autoescape=True)
 
-
-with SqliteImpl.op(ops.StrContains()) as op:
-
-    @op.auto
-    def _contains(x, y):
+    @impl(ops.str_contains)
+    def _str_contains(x, y):
         warn_non_standard(
             "SQLite: contains is case-insensitive by default. "
             "Use the 'case_sensitive_like' pragma to change this behaviour. "
@@ -91,11 +88,8 @@ with SqliteImpl.op(ops.StrContains()) as op:
         )
         return x.contains(y, autoescape=True)
 
-
-with SqliteImpl.op(ops.DtMillisecond()) as op:
-
-    @op.auto
-    def _millisecond(x):
+    @impl(ops.dt_millisecond)
+    def _dt_millisecond(x):
         warn_non_standard(
             "SQLite returns rounded milliseconds",
         )
@@ -103,10 +97,7 @@ with SqliteImpl.op(ops.DtMillisecond()) as op:
         frac_seconds = sqa.cast(sqa.func.STRFTIME("%f", x), sqa.Numeric())
         return sqa.cast((frac_seconds * _1000) % _1000, sqa.Integer())
 
-
-with SqliteImpl.op(ops.HMax()) as op:
-
-    @op.auto
+    @impl(ops.horizontal_max)
     def _greatest(*x):
         # The SQLite MAX function returns NULL if any of the inputs are NULL
         # -> Use divide and conquer approach with coalesce to ensure correct result
@@ -120,10 +111,7 @@ with SqliteImpl.op(ops.HMax()) as op:
         # TODO: Determine return type
         return sqa.func.coalesce(sqa.func.MAX(left, right), left, right)
 
-
-with SqliteImpl.op(ops.HMin()) as op:
-
-    @op.auto
+    @impl(ops.horizontal_min)
     def _least(*x):
         # The SQLite MIN function returns NULL if any of the inputs are NULL
         # -> Use divide and conquer approach with coalesce to ensure correct result
@@ -137,39 +125,26 @@ with SqliteImpl.op(ops.HMin()) as op:
         # TODO: Determine return type
         return sqa.func.coalesce(sqa.func.MIN(left, right), left, right)
 
-
-# TODO: we need to get the string in the right format here (so sqlite can work with it)
-with SqliteImpl.op(ops.StrToDateTime()) as op:
-
-    @op.auto
+    # TODO: we need to get the string in the right format here (so sqlite can work with
+    # it)
+    @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return sqa.type_coerce(x, sqa.DateTime)
 
-
-with SqliteImpl.op(ops.StrToDate()) as op:
-
-    @op.auto
+    @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return sqa.type_coerce(x, sqa.Date)
 
-
-with SqliteImpl.op(ops.Floor()) as op:
     # the SQLite floor function is cursed... it throws if you pass in a large value
     # like 1e19. surprisingly, 1e18 works... what a coincidence... :)
-    @op.auto
+    @impl(ops.floor)
     def _floor(x):
         return -sqa.func.ceil(-x)
 
-
-with SqliteImpl.op(ops.IsNan()) as op:
-
-    @op.auto
+    @impl(ops.is_nan)
     def _is_nan(x):
         return False
 
-
-with SqliteImpl.op(ops.IsNotNan()) as op:
-
-    @op.auto
+    @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return True

@@ -19,7 +19,7 @@ greater_equal = Operator("__ge__", *(Signature(t, return_type=t) for t in COMPAR
 
 is_null = Operator("is_null", Signature(D, return_type=D))
 
-not_null = Operator("is_not_null", Signature(D, return_type=D))
+is_not_null = Operator("is_not_null", Signature(D, return_type=D))
 
 fill_null = Operator("fill_null", Signature(D, return_type=D))
 

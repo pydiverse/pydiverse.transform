@@ -10,4 +10,4 @@ bool_or = Operator("__or__", Signature(Bool(), Bool(), return_type=Bool()))
 
 bool_xor = Operator("__xor__", Signature(Bool(), Bool(), return_type=Bool()))
 
-invert = Operator("__invert__", Signature(Bool(), return_type=Bool()))
+bool_invert = Operator("__invert__", Signature(Bool(), return_type=Bool()))

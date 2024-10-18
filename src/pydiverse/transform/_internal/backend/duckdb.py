@@ -59,36 +59,24 @@ class DuckDbImpl(SqlImpl):
         return super().compile_lit(lit)
 
 
-with DuckDbImpl.op(ops.FloorDiv()) as op:
+with DuckDbImpl.impl_store.impl_manager as impl:
 
-    @op.auto
+    @impl(ops.floordiv)
     def _floordiv(lhs, rhs):
         return sqa.func.divide(lhs, rhs)
 
-
-with DuckDbImpl.op(ops.IsInf()) as op:
-
-    @op.auto
+    @impl(ops.is_inf)
     def _is_inf(x):
         return sqa.func.isinf(x)
 
-
-with DuckDbImpl.op(ops.IsNotInf()) as op:
-
-    @op.auto
+    @impl(ops.is_not_inf)
     def _is_not_inf(x):
         return sqa.func.isfinite(x)
 
-
-with DuckDbImpl.op(ops.IsNan()) as op:
-
-    @op.auto
+    @impl(ops.is_nan)
     def _is_nan(x):
         return sqa.func.isnan(x)
 
-
-with DuckDbImpl.op(ops.IsNotNan()) as op:
-
-    @op.auto
+    @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return ~sqa.func.isnan(x)

@@ -120,173 +120,100 @@ class TableImpl(AstNode):
             ) from err
 
 
-with TableImpl.impl_store.impl_manager as cm:
+with TableImpl.impl_store.impl_manager as impl:
 
-    @cm(ops.add)
+    @impl(ops.nulls_first)
     def _nulls_first(_):
         raise AssertionError
 
-
-with TableImpl.op(ops.NullsLast()) as op:
-
-    @op.auto
+    @impl(ops.nulls_last)
     def _nulls_last(_):
         raise AssertionError
 
-
-with TableImpl.op(ops.Ascending()) as op:
-
-    @op.auto
+    @impl(ops.ascending)
     def _ascending(_):
         raise AssertionError
 
-
-with TableImpl.op(ops.Descending()) as op:
-
-    @op.auto
+    @impl(ops.descending)
     def _descending(_):
         raise AssertionError
 
-
-with TableImpl.op(ops.Add()) as op:
-
-    @op.auto
+    @impl(ops.add)
     def _add(lhs, rhs):
         return lhs + rhs
 
-    @op.extension(ops.StrAdd)
-    def _str_add(lhs, rhs):
-        return lhs + rhs
-
-
-with TableImpl.op(ops.Sub()) as op:
-
-    @op.auto
+    @impl(ops.sub)
     def _sub(lhs, rhs):
         return lhs - rhs
 
-
-with TableImpl.op(ops.Mul()) as op:
-
-    @op.auto
+    @impl(ops.mul)
     def _mul(lhs, rhs):
         return lhs * rhs
 
-
-with TableImpl.op(ops.TrueDiv()) as op:
-
-    @op.auto
+    @impl(ops.truediv)
     def _truediv(lhs, rhs):
         return lhs / rhs
 
-
-with TableImpl.op(ops.FloorDiv()) as op:
-
-    @op.auto
+    @impl(ops.floordiv)
     def _floordiv(lhs, rhs):
         return lhs // rhs
 
-
-with TableImpl.op(ops.Pow()) as op:
-
-    @op.auto
+    @impl(ops.pow)
     def _pow(lhs, rhs):
         return lhs**rhs
 
-
-with TableImpl.op(ops.Mod()) as op:
-
-    @op.auto
+    @impl(ops.mod)
     def _mod(lhs, rhs):
         return lhs % rhs
 
-
-with TableImpl.op(ops.Neg()) as op:
-
-    @op.auto
+    @impl(ops.neg)
     def _neg(x):
         return -x
 
-
-with TableImpl.op(ops.Pos()) as op:
-
-    @op.auto
+    @impl(ops.pos)
     def _pos(x):
         return +x
 
-
-with TableImpl.op(ops.Abs()) as op:
-
-    @op.auto
+    @impl(ops.abs)
     def _abs(x):
         return abs(x)
 
-
-with TableImpl.op(ops.And()) as op:
-
-    @op.auto
+    @impl(ops.bool_and)
     def _and(lhs, rhs):
         return lhs & rhs
 
-
-with TableImpl.op(ops.Or()) as op:
-
-    @op.auto
+    @impl(ops.bool_or)
     def _or(lhs, rhs):
         return lhs | rhs
 
-
-with TableImpl.op(ops.Xor()) as op:
-
-    @op.auto
+    @impl(ops.bool_xor)
     def _xor(lhs, rhs):
         return lhs ^ rhs
 
-
-with TableImpl.op(ops.Invert()) as op:
-
-    @op.auto
+    @impl(ops.bool_invert)
     def _invert(x):
         return ~x
 
-
-with TableImpl.op(ops.Equal()) as op:
-
-    @op.auto
+    @impl(ops.equal)
     def _eq(lhs, rhs):
         return lhs == rhs
 
-
-with TableImpl.op(ops.NotEqual()) as op:
-
-    @op.auto
+    @impl(ops.not_equal)
     def _ne(lhs, rhs):
         return lhs != rhs
 
-
-with TableImpl.op(ops.Less()) as op:
-
-    @op.auto
+    @impl(ops.lt)
     def _lt(lhs, rhs):
         return lhs < rhs
 
-
-with TableImpl.op(ops.LessEqual()) as op:
-
-    @op.auto
+    @impl(ops.less_equal)
     def _le(lhs, rhs):
         return lhs <= rhs
 
-
-with TableImpl.op(ops.Greater()) as op:
-
-    @op.auto
+    @impl(ops.greater_than)
     def _gt(lhs, rhs):
         return lhs > rhs
 
-
-with TableImpl.op(ops.GreaterEqual()) as op:
-
-    @op.auto
+    @impl(ops.greater_equal)
     def _ge(lhs, rhs):
         return lhs >= rhs
