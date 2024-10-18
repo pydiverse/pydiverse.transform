@@ -1,23 +1,19 @@
 from __future__ import annotations
 
-import dataclasses
-
-from pydiverse.transform._internal.ops.op import Ftype, NoExprMethod
-from pydiverse.transform._internal.ops.signature import Param, Signature
+from pydiverse.transform._internal.ops.op import NoExprMethod
+from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import COMPARABLE
 
 
-@dataclasses.dataclass(slots=True)
 class Horizontal(NoExprMethod):
-    ftype = Ftype.ELEMENT_WISE
+    def __init__(self, name: str, *signatures: Signature):
+        super().__init__(name, *signatures, param_names=["args"])
 
 
 horizontal_max = Horizontal(
-    "max",
-    *(Signature(Param(dtype, "args"), ..., return_type=dtype) for dtype in COMPARABLE),
+    "max", *(Signature(dtype, ..., return_type=dtype) for dtype in COMPARABLE)
 )
 
 horizontal_min = Horizontal(
-    "min",
-    *(Signature(Param(dtype, "args"), ..., return_type=dtype) for dtype in COMPARABLE),
+    "min", *(Signature(dtype, ..., return_type=dtype) for dtype in COMPARABLE)
 )

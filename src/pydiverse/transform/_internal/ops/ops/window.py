@@ -1,19 +1,14 @@
 from __future__ import annotations
 
 from pydiverse.transform._internal.ops.op import Window
-from pydiverse.transform._internal.ops.signature import Param, Signature
+from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import D, Int, Tvar
 
 shift = Window(
     "shift",
-    [
-        Signature(
-            D,
-            Param(Int(const=True), "n"),
-            Param(Tvar("D", const=True), "fill_value", None),
-            return_type=D,
-        )
-    ],
+    Signature(D, Int(const=True), Tvar("D", const=True), return_type=D),
+    param_names=["self", "n", "fill_value"],
+    default_values=[..., ..., None],
 )
 
 row_number = Window("row_number", Signature(return_type=Int()))

@@ -12,25 +12,21 @@ from pydiverse.transform._internal.tree.types import (
 
 add = Operator(
     "__add__",
-    [
-        *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC),
-        Signature(String(), String(), return_type=String()),
-    ],
+    *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC),
+    Signature(String(), String(), return_type=String()),
 )
 
 sub = Operator(
-    "__sub__", [Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC]
+    "__sub__", *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC)
 )
 
 mul = Operator(
-    "__mul__", [Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC]
+    "__mul__", *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC)
 )
 
 truediv = Operator(
     "__truediv__",
-    [
-        Signature(Int(), Int(), return_type=Float()),
-        Signature(Float(), Float(), return_type=Float()),
-        Signature(Decimal(), Decimal(), return_type=Decimal()),
-    ],
+    Signature(Int(), Int(), return_type=Float()),
+    Signature(Float(), Float(), return_type=Float()),
+    Signature(Decimal(), Decimal(), return_type=Decimal()),
 )
