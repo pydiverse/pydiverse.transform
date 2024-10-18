@@ -58,3 +58,6 @@ required-imports = ["from __future__ import annotations"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.typos.default.extend-words]
+nd = "nd"

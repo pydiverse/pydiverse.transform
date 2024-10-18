@@ -1,15 +1,68 @@
+exclude: ^.pixi$
 repos:
   - repo: local
     hooks:
+      # ensure pixi environments are up to date
+      # workaround for https://github.com/prefix-dev/pixi/issues/1482
+      - id: pixi-install
+        name: pixi-install
+        entry: pixi install -e default
+        language: system
+        always_run: true
+        require_serial: true
+        pass_filenames: false
       - id: generate-col-ops
         name: generate-col-ops
         language: system
-        entry: python generate_col_ops.py
+        entry: pixi run python generate_col_ops.py
         types: [python]
         pass_filenames: false
-
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.5.7
-    hooks:
+      # ruff
       - id: ruff
+        name: ruff
+        entry: pixi run ruff check --fix --exit-non-zero-on-fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
       - id: ruff-format
+        name: ruff-format
+        entry: pixi run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      # mypy
+      # - id: mypy
+      #   name: mypy
+      #   entry: pixi run mypy
+      #   language: system
+      #   types: [python]
+      #   require_serial: true
+      # taplo
+      - id: taplo
+        name: taplo
+        entry: pixi run taplo format
+        language: system
+        types: [toml]
+      # pre-commit-hooks
+      - id: trailing-whitespace-fixer
+        name: trailing-whitespace-fixer
+        entry: pixi run trailing-whitespace-fixer
+        language: system
+        types: [text]
+      - id: end-of-file-fixer
+        name: end-of-file-fixer
+        entry: pixi run end-of-file-fixer
+        language: system
+        types: [text]
+      - id: check-merge-conflict
+        name: check-merge-conflict
+        entry: pixi run check-merge-conflict --assume-in-merge
+        language: system
+        types: [text]
+      # typos
+      - id: typos
+        name: typos
+        entry: pixi run typos --force-exclude
+        language: system
+        types: [text]
+        require_serial: true

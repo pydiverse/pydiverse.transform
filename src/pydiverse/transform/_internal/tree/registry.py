@@ -285,7 +285,7 @@ class Signature:
     @classmethod
     def parse(cls, signature: str) -> Signature:
         def parse_cstypes(cst: str):
-            # cstypes = comma seperated types
+            # cstypes = comma separated types
             types = cst.split(",")
             types = [t.strip() for t in types]
             types = [dtypes.dtype_from_string(t) for t in types if t]
