@@ -135,7 +135,7 @@ def compile_col_expr(
                 nulls_last=[nl if nl is not None else False for nl in nulls_last],
             )
 
-        if op.name in ("rank", "dense_rank"):
+        if expr.op in (ops.rank, ops.dense_rank):
             assert len(expr.args) == 0
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
@@ -145,7 +145,7 @@ def compile_col_expr(
         # TODO: currently, count is the only aggregation function where we don't want
         # to return null for cols containing only null values. If this happens for more
         # aggregation functions, make this configurable in e.g. the operator spec.
-        if op.ftype == Ftype.AGGREGATE and op.name != "len":
+        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.len:
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -165,7 +165,7 @@ def compile_col_expr(
             value = value.over(partition_by, order_by=order_by)
 
         elif arrange:
-            if op.ftype == Ftype.AGGREGATE:
+            if expr.op.ftype == Ftype.AGGREGATE:
                 # TODO: don't fail, but give a warning that `arrange` is useless
                 # here
                 ...
@@ -444,400 +444,227 @@ def polars_type(pdt_type: types.Dtype) -> pl.DataType:
     raise AssertionError
 
 
-with PolarsImpl.impl_store.impl_manager as im:
+with PolarsImpl.impl_store.impl_manager as impl:
 
-    @im(ops.mean)
+    @impl(ops.mean)
     def _mean(x):
         return x.mean()
 
-
-with PolarsImpl.op(ops.Min()) as op:
-
-    @op.auto
+    @impl(ops.min)
     def _min(x):
         return x.min()
 
-
-with PolarsImpl.op(ops.Max()) as op:
-
-    @op.auto
+    @impl(ops.max)
     def _max(x):
         return x.max()
 
-
-with PolarsImpl.op(ops.Sum()) as op:
-
-    @op.auto
+    @impl(ops.sum)
     def _sum(x):
         return x.sum()
 
-
-with PolarsImpl.op(ops.All()) as op:
-
-    @op.auto
+    @impl(ops.all)
     def _all(x):
         return x.all()
 
-
-with PolarsImpl.op(ops.Any()) as op:
-
-    @op.auto
+    @impl(ops.any)
     def _any(x):
         return x.any()
 
-
-with PolarsImpl.op(ops.IsNull()) as op:
-
-    @op.auto
+    @impl(ops.is_null)
     def _is_null(x):
         return x.is_null()
 
-
-with PolarsImpl.op(ops.IsNotNull()) as op:
-
-    @op.auto
+    @impl(ops.is_not_null)
     def _is_not_null(x):
         return x.is_not_null()
 
-
-with PolarsImpl.op(ops.FillNull()) as op:
-
-    @op.auto
+    @impl(ops.fill_null)
     def _fill_null(x, y):
         return x.fill_null(y)
 
-
-with PolarsImpl.op(ops.DtYear()) as op:
-
-    @op.auto
+    @impl(ops.dt_year)
     def _dt_year(x):
         return x.dt.year().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtMonth()) as op:
-
-    @op.auto
+    @impl(ops.dt_month)
     def _dt_month(x):
         return x.dt.month().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDay()) as op:
-
-    @op.auto
+    @impl(ops.dt_day)
     def _dt_day(x):
         return x.dt.day().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtHour()) as op:
-
-    @op.auto
+    @impl(ops.dt_hour)
     def _dt_hour(x):
         return x.dt.hour().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtMinute()) as op:
-
-    @op.auto
+    @impl(ops.dt_minute)
     def _dt_minute(x):
         return x.dt.minute().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtSecond()) as op:
-
-    @op.auto
+    @impl(ops.dt_second)
     def _dt_second(x):
         return x.dt.second().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtMillisecond()) as op:
-
-    @op.auto
+    @impl(ops.dt_millisecond)
     def _dt_millisecond(x):
         return x.dt.millisecond().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDayOfWeek()) as op:
-
-    @op.auto
+    @impl(ops.dt_day_of_week)
     def _dt_day_of_week(x):
         return x.dt.weekday().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDayOfYear()) as op:
-
-    @op.auto
+    @impl(ops.dt_day_of_year)
     def _dt_day_of_year(x):
         return x.dt.ordinal_day().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDays()) as op:
-
-    @op.auto
-    def _days(x):
+    @impl(ops.dt_days)
+    def _dt_days(x):
         return x.dt.total_days()
 
-
-with PolarsImpl.op(ops.DtHours()) as op:
-
-    @op.auto
-    def _hours(x):
+    @impl(ops.dt_hours)
+    def _dt_hours(x):
         return x.dt.total_hours()
 
-
-with PolarsImpl.op(ops.DtMinutes()) as op:
-
-    @op.auto
-    def _minutes(x):
+    @impl(ops.dt_minutes)
+    def _dt_minutes(x):
         return x.dt.total_minutes()
 
-
-with PolarsImpl.op(ops.DtSeconds()) as op:
-
-    @op.auto
-    def _seconds(x):
+    @impl(ops.dt_seconds)
+    def _dt_seconds(x):
         return x.dt.total_seconds()
 
-
-with PolarsImpl.op(ops.DtMilliseconds()) as op:
-
-    @op.auto
-    def _milliseconds(x):
+    @impl(ops.dt_milliseconds)
+    def _dt_milliseconds(x):
         return x.dt.total_milliseconds()
 
-
-with PolarsImpl.op(ops.Sub()) as op:
-
-    @op.extension(ops.DtSub)
-    def _dt_sub(lhs, rhs):
-        return lhs - rhs
-
-
-with PolarsImpl.op(ops.Add()) as op:
-
-    @op.extension(ops.DtDurAdd)
-    def _dt_dur_add(lhs, rhs):
-        return lhs + rhs
-
-
-with PolarsImpl.op(ops.RowNumber()) as op:
-
-    @op.auto
+    @impl(ops.row_number)
     def _row_number():
         return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)
 
-
-with PolarsImpl.op(ops.Rank()) as op:
-
-    @op.auto
+    @impl(ops.rank)
     def _rank(x):
         return x.rank("min").cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DenseRank()) as op:
-
-    @op.auto
+    @impl(ops.dense_rank)
     def _dense_rank(x):
         return x.rank("dense").cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.Shift()) as op:
-
-    @op.auto
+    @impl(ops.shift)
     def _shift(x, n, fill_value=None):
         return x.shift(n, fill_value=fill_value)
 
-
-with PolarsImpl.op(ops.IsIn()) as op:
-
-    @op.auto
-    def _isin(x, *values, _pdt_args):
+    @impl(ops.is_in)
+    def _is_in(x, *values, _pdt_args):
         return pl.any_horizontal(
             (x == val if arg.dtype() != types.NullType else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 
-
-with PolarsImpl.op(ops.StrContains()) as op:
-
-    @op.auto
-    def _contains(x, y):
+    @impl(ops.str_contains)
+    def _str_contains(x, y):
         return x.str.contains(y)
 
-
-with PolarsImpl.op(ops.StrStartsWith()) as op:
-
-    @op.auto
-    def _starts_with(x, y):
+    @impl(ops.str_starts_with)
+    def _str_starts_with(x, y):
         return x.str.starts_with(y)
 
-
-with PolarsImpl.op(ops.StrEndsWith()) as op:
-
-    @op.auto
-    def _ends_with(x, y):
+    @impl(ops.str_ends_with)
+    def _str_ends_with(x, y):
         return x.str.ends_with(y)
 
-
-with PolarsImpl.op(ops.StrToLower()) as op:
-
-    @op.auto
-    def _lower(x):
+    @impl(ops.str_lower)
+    def _str_lower(x):
         return x.str.to_lowercase()
 
-
-with PolarsImpl.op(ops.StrToUpper()) as op:
-
-    @op.auto
-    def _upper(x):
+    @impl(ops.str_upper)
+    def _str_upper(x):
         return x.str.to_uppercase()
 
-
-with PolarsImpl.op(ops.StrReplaceAll()) as op:
-
-    @op.auto
-    def _replace_all(x, to_replace, replacement):
+    @impl(ops.str_replace_all)
+    def _str_replace_all(x, to_replace, replacement):
         return x.str.replace_all(to_replace, replacement)
 
-
-with PolarsImpl.op(ops.StrLen()) as op:
-
-    @op.auto
-    def _string_length(x):
+    @impl(ops.str_len)
+    def _str_len(x):
         return x.str.len_chars().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.StrStrip()) as op:
-
-    @op.auto
+    @impl(ops.str_strip)
     def _str_strip(x):
         return x.str.strip_chars()
 
-
-with PolarsImpl.op(ops.StrSlice()) as op:
-
-    @op.auto
+    @impl(ops.str_slice)
     def _str_slice(x, offset, length):
         return x.str.slice(offset, length)
 
-
-with PolarsImpl.op(ops.Count()) as op:
-
-    @op.auto
+    @impl(ops.count)
     def _count(x):
         return x.count().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.Len()) as op:
-
-    @op.auto
+    @impl(ops.len)
     def _len():
         return pl.len().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.HMax()) as op:
-
-    @op.auto
-    def _greatest(*x):
+    @impl(ops.horizontal_max)
+    def _horizontal_max(*x):
         return pl.max_horizontal(*x)
 
-
-with PolarsImpl.op(ops.HMin()) as op:
-
-    @op.auto
-    def _least(*x):
+    @impl(ops.horizontal_min)
+    def _horizontal_min(*x):
         return pl.min_horizontal(*x)
 
-
-with PolarsImpl.op(ops.Round()) as op:
-
-    @op.auto
-    def _round(x, digits=0):
+    @impl(ops.round)
+    def _round(x, digits):
         return x.round(digits)
 
-
-with PolarsImpl.op(ops.Exp()) as op:
-
-    @op.auto
+    @impl(ops.exp)
     def _exp(x):
         return x.exp()
 
-
-with PolarsImpl.op(ops.Log()) as op:
-
-    @op.auto
+    @impl(ops.log)
     def _log(x):
         return x.log()
 
-
-with PolarsImpl.op(ops.Floor()) as op:
-
-    @op.auto
+    @impl(ops.floor)
     def _floor(x):
         return x.floor()
 
-
-with PolarsImpl.op(ops.Ceil()) as op:
-
-    @op.auto
+    @impl(ops.ceil)
     def _ceil(x):
         return x.ceil()
 
-
-with PolarsImpl.op(ops.StrToDateTime()) as op:
-
-    @op.auto
+    @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return x.str.to_datetime()
 
-
-with PolarsImpl.op(ops.StrToDate()) as op:
-
-    @op.auto
+    @impl(ops.str_to_date)
     def _str_to_date(x):
         return x.str.to_date()
 
-
-with PolarsImpl.op(ops.FloorDiv()) as op:
-
-    @op.auto
+    @impl(ops.floordiv)
     def _floordiv(lhs, rhs):
         result_sign = (lhs < 0) ^ (rhs < 0)
         return (abs(lhs) // abs(rhs)) * pl.when(result_sign).then(-1).otherwise(1)
         # TODO: test some alternatives if this is too slow
 
-
-with PolarsImpl.op(ops.Mod()) as op:
-
-    @op.auto
+    @impl(ops.mod)
     def _mod(lhs, rhs):
         return lhs % (abs(rhs) * pl.when(lhs >= 0).then(1).otherwise(-1))
         # TODO: see whether the following is faster:
         # pl.when(lhs >= 0).then(lhs % abs(rhs)).otherwise(lhs % -abs(rhs))
 
-
-with PolarsImpl.op(ops.IsInf()) as op:
-
-    @op.auto
+    @impl(ops.is_inf)
     def _is_inf(x):
         return x.is_infinite()
 
-
-with PolarsImpl.op(ops.IsNotInf()) as op:
-
-    @op.auto
+    @impl(ops.is_not_inf)
     def _is_not_inf(x):
         return x.is_finite()
 
-
-with PolarsImpl.op(ops.IsNan()) as op:
-
-    @op.auto
+    @impl(ops.is_nan)
     def _is_nan(x):
         return x.is_nan()
 
-
-with PolarsImpl.op(ops.IsNotNan()) as op:
-
-    @op.auto
+    @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x.is_not_nan()

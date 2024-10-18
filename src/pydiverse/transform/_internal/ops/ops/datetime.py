@@ -1,106 +1,56 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.op import Operator, OperatorExtension, Unary
-from pydiverse.transform._internal.ops.ops.numeric import Add, Sub
-
-__all__ = [
-    "DtYear",
-    "DtMonth",
-    "DtDay",
-    "DtHour",
-    "DtMinute",
-    "DtSecond",
-    "DtMillisecond",
-    "DtDayOfWeek",
-    "DtDayOfYear",
-    "DtDays",
-    "DtHours",
-    "DtMinutes",
-    "DtSeconds",
-    "DtMilliseconds",
-    "DtSub",
-    "DtDurAdd",
-]
+from pydiverse.transform._internal.ops.op import Operator
+from pydiverse.transform._internal.ops.signature import Signature
+from pydiverse.transform._internal.tree.types import Date, Datetime, Duration, Int
 
 
-class DtExtract(Operator, Unary):
-    signatures = ["datetime -> int"]
+class DatetimeExtract(Operator):
+    def __init__(self, name: str):
+        super().__init__(name, Signature(Datetime(), return_type=Int()))
 
 
-class DateExtract(Operator, Unary):
-    signatures = ["datetime -> int", "date -> int"]
+class DateExtract(Operator):
+    def __init__(self, name: str):
+        super().__init__(
+            name,
+            Signature(Date(), return_type=Int()),
+            Signature(Datetime(), return_type=Int()),
+        )
 
 
-class DtYear(DateExtract):
-    name = "dt.year"
+dt_year = DateExtract("dt.year")
+
+dt_month = DateExtract("dt.month")
+
+dt_day = DateExtract("dt.day")
+
+dt_hour = DatetimeExtract("dt.hour")
+
+dt_minute = DatetimeExtract("dt.minute")
+
+dt_second = DatetimeExtract("dt.second")
+
+dt_millisecond = DatetimeExtract("dt.millisecond")
+
+dt_microsecond = DatetimeExtract("dt.microsecond")
+
+dt_day_of_week = DateExtract("dt.day_of_week")
+
+dt_day_of_year = DateExtract("dt.day_of_year")
 
 
-class DtMonth(DateExtract):
-    name = "dt.month"
+class DurationToUnit(Operator):
+    def __init__(self, name: str):
+        super().__init__(name, Signature(Duration(), return_type=Int()))
 
 
-class DtDay(DateExtract):
-    name = "dt.day"
+dt_days = DurationToUnit("dt.days")
 
+dt_hours = DurationToUnit("dt.hours")
 
-class DtHour(DtExtract):
-    name = "dt.hour"
+dt_minutes = DurationToUnit("dt.minutes")
 
+dt_seconds = DurationToUnit("dt.seconds")
 
-class DtMinute(DtExtract):
-    name = "dt.minute"
-
-
-class DtSecond(DtExtract):
-    name = "dt.second"
-
-
-class DtMillisecond(DtExtract):
-    name = "dt.millisecond"
-
-
-class DtDayOfWeek(DateExtract):
-    name = "dt.day_of_week"
-
-
-class DtDayOfYear(DateExtract):
-    name = "dt.day_of_year"
-
-
-class DurationToUnit(Operator, Unary):
-    signatures = ["duration -> int"]
-
-
-class DtDays(DurationToUnit):
-    name = "dt.days"
-
-
-class DtHours(DurationToUnit):
-    name = "dt.hours"
-
-
-class DtMinutes(DurationToUnit):
-    name = "dt.minutes"
-
-
-class DtSeconds(DurationToUnit):
-    name = "dt.seconds"
-
-
-class DtMilliseconds(DurationToUnit):
-    name = "dt.milliseconds"
-
-
-class DtSub(OperatorExtension):
-    operator = Sub
-    signatures = [
-        "datetime, datetime -> duration",
-        "datetime, date -> duration",
-        "date, datetime -> duration",
-        "date, date -> duration",
-    ]
-
-
-class DtDurAdd(OperatorExtension):
-    operator = Add
-    signatures = ["duration, duration -> duration"]
+dt_milliseconds = DurationToUnit("dt.milliseconds")

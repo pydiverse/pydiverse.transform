@@ -9,13 +9,13 @@ class StrUnary(Operator):
     signatures = [Signature(String(), return_type=String())]
 
 
-strip = StrUnary("str.strip")
-upper = StrUnary("str.upper")
-lower = StrUnary("str.lower")
+str_strip = StrUnary("str.strip")
+str_upper = StrUnary("str.upper")
+str_lower = StrUnary("str.lower")
 
-len = Operator("str.len", [Signature(String(), return_type=Int())])
+str_len = Operator("str.len", [Signature(String(), return_type=Int())])
 
-replace_all = Operator(
+str_replace_all = Operator(
     "str.replace_all",
     [
         Signature(
@@ -27,7 +27,7 @@ replace_all = Operator(
     ],
 )
 
-starts_with = Operator(
+str_starts_with = Operator(
     "str.starts_with",
     [
         Signature(
@@ -38,7 +38,7 @@ starts_with = Operator(
     ],
 )
 
-ends_with = Operator(
+str_ends_with = Operator(
     "str.ends_with",
     [
         Signature(
@@ -50,7 +50,7 @@ ends_with = Operator(
 )
 
 
-contains = Operator(
+str_contains = Operator(
     "str.contains",
     [
         Signature(
@@ -61,7 +61,7 @@ contains = Operator(
     ],
 )
 
-slice = Operator(
+str_slice = Operator(
     "str.slice",
     [
         Signature(
@@ -70,6 +70,8 @@ slice = Operator(
     ],
 )
 
-to_datetime = Operator("str.to_datetime", [Signature(String(), return_type=Datetime())])
+str_to_datetime = Operator(
+    "str.to_datetime", [Signature(String(), return_type=Datetime())]
+)
 
-to_date = Operator("str.to_date", [Signature(String(), return_type=Date())])
+str_to_date = Operator("str.to_date", [Signature(String(), return_type=Date())])
