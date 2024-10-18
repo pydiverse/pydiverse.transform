@@ -30,7 +30,6 @@ from pydiverse.transform._internal.tree.types import (
     Duration,
     Float,
     Int,
-    NullType,
     String,
     python_type_to_pdt,
 )
@@ -982,9 +981,9 @@ class ColFn(ColExpr):
         if None in arg_dtypes:
             return None
 
-        self._dtype = self.op.terPolarsImpl.registry.get_impl(
-            self.name, arg_dtypes
-        ).return_type
+        self._dtype = self.op.return_type(arg_dtypes)
+        self._dtype.const = all(argt.const for argt in arg_dtypes)
+
         return self._dtype
 
     def ftype(self, *, agg_is_window: bool):
@@ -1135,8 +1134,15 @@ class CaseExpr(ColExpr):
                 f"incompatible types `{", ".join(val_types)}` in case expression."
             )
 
-        self._dtype = signature.best_signature_match(
-            val_types, [[anc] * len(val_types) for anc in common_ancestors]
+        common_ancestors: list[Dtype] = list(common_ancestors)
+        self._dtype = common_ancestors[
+            signature.best_signature_match(
+                val_types, [[anc] * len(val_types) for anc in common_ancestors]
+            )
+        ]
+        self._dtype.const = all(
+            *(cond.dtype().const and val.dtype().const for cond, val in self.cases),
+            self.default_val.dtype().const,
         )
 
         return self._dtype
@@ -1252,6 +1258,7 @@ class Cast(ColExpr):
                     f"{hint}"
                 )
 
+        self._dtype.const = self.val.dtype().const
         return self._dtype
 
     def ftype(self, *, agg_is_window: bool) -> Ftype:

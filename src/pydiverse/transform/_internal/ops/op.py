@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 import enum
+from collections.abc import Sequence
 from typing import Any
 
 from pydiverse.transform._internal.ops.signature import Signature, SignatureTrie
@@ -69,7 +69,13 @@ class Operator:
         self.default_values = default_values
 
     def return_type(self, signature: Sequence[Dtype]) -> Dtype:
-        return self.trie.best_match(signature)[1]
+        match = self.trie.best_match(signature)
+        if match is None:
+            raise TypeError(
+                f"operator `{self.name}` cannot be called with arguments of type "
+                f"{", ".join(signature)}"
+            )
+        return match[1]
 
 
 class Aggregation(Operator):
