@@ -26,7 +26,7 @@ def test_float_to_int(df_num):
         lambda t: t
         >> mutate(
             **{
-                col.name: pdt.when((col <= pdt.Int64.MAX) & (col >= pdt.Int64.MIN))
+                col.name: pdt.when((col <= (1 << 63) - 1) & (col >= -(1 << 63)))
                 .then(col)
                 .otherwise(0)
                 .cast(pdt.Float64())

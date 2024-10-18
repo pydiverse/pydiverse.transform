@@ -1,5 +1,41 @@
 from __future__ import annotations
 
-from ._internal.tree.dtypes import Bool, Date, Datetime, Decimal, Float64, Int64, String
+from ._internal.tree.types import (
+    Bool,
+    Date,
+    Datetime,
+    Decimal,
+    Float,
+    Float32,
+    Float64,
+    Int,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    String,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+)
 
-__all__ = ["Float64", "Int64", "Bool", "String", "Decimal", "Datetime", "Date"]
+__all__ = [
+    "Bool",
+    "Date",
+    "Datetime",
+    "Decimal",
+    "Float",
+    "Float32",
+    "Float64",
+    "Int",
+    "Int8",
+    "Int16",
+    "Int32",
+    "Int64",
+    "String",
+    "Uint8",
+    "Uint16",
+    "Uint32",
+    "Uint64",
+]
