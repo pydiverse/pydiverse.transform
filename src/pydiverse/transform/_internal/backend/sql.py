@@ -199,13 +199,15 @@ class SqlImpl(TableImpl):
             return sqa_col[expr._uuid]
 
         elif isinstance(expr, ColFn):
-            impl = cls.registry.get_impl(
-                expr.name, tuple(arg.dtype() for arg in expr.args)
-            )
+            impl = cls.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
 
             args: list[sqa.ColumnElement] = [
                 cls.compile_col_expr(arg, sqa_col, compile_literals=not param.const)
-                for arg, param in zip(expr.args, impl.impl.signature, strict=False)
+                for arg, param in zip(
+                    expr.args,
+                    expr.op.trie.best_match(tuple(arg.dtype() for arg in expr.args))[0],
+                    strict=False,
+                )
             ]
 
             partition_by = expr.context_kwargs.get("partition_by")
@@ -329,7 +331,7 @@ class SqlImpl(TableImpl):
                     for fn in nd.iter_col_nodes()
                     if (
                         isinstance(fn, ColFn)
-                        and fn.op().ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
+                        and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
                     )
                 )
             )
@@ -755,10 +757,6 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _upper(x):
         return sqa.func.UPPER(x, type_=x.type)
 
-    @impl(ops.str_upper)
-    def _str_upper(x):
-        return sqa.func.LOWER(x, type_=x.type)
-
     @impl(ops.str_replace_all)
     def _str_replace_all(x, y, z):
         return sqa.func.REPLACE(x, y, z, type_=x.type)
@@ -895,10 +893,6 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.ceil)
     def _ceil(x):
         return sqa.func.ceil(x)
-
-    @impl(ops.str_to_datetime)
-    def _str_to_datetime(x):
-        return sqa.cast(x, sqa.DateTime)
 
     @impl(ops.str_to_datetime)
     def _str_to_datetime(x):

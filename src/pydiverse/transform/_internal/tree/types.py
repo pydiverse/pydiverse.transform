@@ -57,8 +57,7 @@ class Dtype:
         ) and target.without_const() in IMPLICIT_CONVS[self.without_const()]
 
 
-class Float(Dtype):
-    name = "float"
+class Float(Dtype): ...
 
 
 class Float64(Float): ...
@@ -67,12 +66,10 @@ class Float64(Float): ...
 class Float32(Float): ...
 
 
-class Decimal(Dtype):
-    name = "decimal"
+class Decimal(Dtype): ...
 
 
-class Int(Dtype):
-    name = "int"
+class Int(Dtype): ...
 
 
 class Int64(Int): ...
@@ -99,24 +96,19 @@ class Uint16(Int): ...
 class Uint8(Int): ...
 
 
-class String(Dtype):
-    name = "str"
+class String(Dtype): ...
 
 
-class Bool(Dtype):
-    name = "bool"
+class Bool(Dtype): ...
 
 
-class Datetime(Dtype):
-    name = "datetime"
+class Datetime(Dtype): ...
 
 
-class Date(Dtype):
-    name = "date"
+class Date(Dtype): ...
 
 
-class Duration(Dtype):
-    name = "duration"
+class Duration(Dtype): ...
 
 
 class NullType(Dtype): ...
@@ -246,7 +238,7 @@ def is_supertype(dtype: Dtype) -> bool:
 
 
 def is_subtype(dtype: Dtype) -> bool:
-    return not isinstance(dtype, Int | Float)
+    return type(dtype) is not Int and type(dtype) is not Float
 
 
 IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {

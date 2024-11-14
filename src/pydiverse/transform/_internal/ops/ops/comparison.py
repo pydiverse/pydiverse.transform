@@ -29,6 +29,6 @@ is_null = Operator("is_null", Signature(D, return_type=Bool()))
 
 is_not_null = Operator("is_not_null", Signature(D, return_type=Bool()))
 
-fill_null = Operator("fill_null", Signature(D, return_type=D))
+fill_null = Operator("fill_null", Signature(D, D, return_type=D))
 
 is_in = Operator("is_in", Signature(D, D, ..., return_type=Bool()))

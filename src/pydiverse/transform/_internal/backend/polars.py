@@ -285,7 +285,7 @@ def compile_ast(
         def has_path_to_leaf_without_agg(expr: ColExpr):
             if isinstance(expr, Col):
                 return True
-            if isinstance(expr, ColFn) and expr.op().ftype == Ftype.AGGREGATE:
+            if isinstance(expr, ColFn) and expr.op.ftype == Ftype.AGGREGATE:
                 return False
             return any(
                 has_path_to_leaf_without_agg(child) for child in expr.iter_children()

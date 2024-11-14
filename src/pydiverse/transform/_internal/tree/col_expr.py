@@ -213,8 +213,8 @@ class ColExpr(Generic[T]):
     def exp(self: ColExpr[Float]) -> ColExpr[Float]:
         return ColFn(ops.exp, self)
 
-    def fill_null(self: ColExpr) -> ColExpr:
-        return ColFn(ops.fill_null, self)
+    def fill_null(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        return ColFn(ops.fill_null, self, rhs)
 
     @overload
     def floor(self: ColExpr[Float]) -> ColExpr[Float]: ...
@@ -1041,6 +1041,8 @@ class CaseExpr(ColExpr):
 
         val_types = [val.dtype().without_const() for _, val in self.cases]
         if self.default_val is not None:
+            if self.default_val.dtype() is None:
+                return None
             val_types.append(self.default_val.dtype().without_const())
 
         if None in val_types:
@@ -1057,6 +1059,9 @@ class CaseExpr(ColExpr):
                 f"incompatible types `{", ".join(val_types)}` in case expression."
             )
 
+        if any(cond.dtype() is None for cond, _ in self.cases):
+            return None
+
         common_ancestors: list[Dtype] = list(common_ancestors)
         self._dtype = common_ancestors[
             signature.best_signature_match(
@@ -1064,8 +1069,10 @@ class CaseExpr(ColExpr):
             )
         ]
         self._dtype.const = all(
-            *(cond.dtype().const and val.dtype().const for cond, val in self.cases),
-            self.default_val.dtype().const,
+            (
+                *(cond.dtype().const and val.dtype().const for cond, val in self.cases),
+                self.default_val is None or self.default_val.dtype().const,
+            )
         )
 
         return self._dtype
