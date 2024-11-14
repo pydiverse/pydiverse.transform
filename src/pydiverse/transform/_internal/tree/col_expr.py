@@ -1104,7 +1104,7 @@ class CaseExpr(ColExpr):
             )
         ):
             raise TypeError(
-                f"incompatible types `{", ".join(val_types)}` in case expression."
+                f'incompatible types `{", ".join(val_types)}` in case expression.'
             )
 
         if any(cond.dtype() is None for cond, _ in self.cases):
