@@ -25,14 +25,14 @@ def test_log(df_num):
 def test_abs(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{c.name: abs(c) for c in t}),
+        lambda t: t >> mutate(**{c.name: c.abs() for c in t}),
     )
 
 
 def test_round(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t >> mutate(**{c.name: round(c) for c in t}),
+        lambda t: t >> mutate(**{c.name: c.round() for c in t}),
     )
 
 
@@ -72,7 +72,7 @@ def test_div(df_num):
         df_num,
         lambda t: t
         >> mutate(
-            **{c.name: pdt.when(abs(c) < 1e-50).then(1e-50).otherwise(c) for c in t}
+            **{c.name: pdt.when(c.abs() < 1e-50).then(1e-50).otherwise(c) for c in t}
         )
         >> (
             lambda s: mutate(**{f"div_{c.name}_{d.name}": c / d for d in s for c in s})

@@ -20,6 +20,27 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
+from pydiverse.transform._internal.tree.types import (
+    Bool,
+    Date,
+    Datetime,
+    Decimal,
+    Dtype,
+    Duration,
+    Float,
+    Float32,
+    Float64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    NullType,
+    String,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+)
 
 
 class PolarsImpl(TableImpl):
@@ -191,7 +212,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             polars_type(expr.target_type)
         )
 
-        if expr.val.dtype() == types.Float64 and expr.target_type == types.String:
+        if expr.val.dtype() <= Float() and expr.target_type == String():
             compiled = compiled.replace("NaN", "nan")
 
         return compiled
@@ -349,85 +370,85 @@ def compile_ast(
     return df, name_in_df, select, partition_by
 
 
-def pdt_type(pl_type: pl.DataType) -> types.Dtype:
+def pdt_type(pl_type: pl.DataType) -> Dtype:
     if pl_type == pl.Float64():
-        return types.Float64()
+        return Float64()
     elif pl_type == pl.Float32():
-        return types.Float32()
+        return Float32()
 
     elif pl_type == pl.Int64():
-        return types.Int64()
+        return Int64()
     elif pl_type == pl.Int32():
-        return types.Int32()
+        return Int32()
     elif pl_type == pl.Int16():
-        return types.Int16()
+        return Int16()
     elif pl_type == pl.Int8():
-        return types.Int8()
+        return Int8()
 
     elif pl_type == pl.UInt64():
-        return types.Uint64()
+        return Uint64()
     elif pl_type == pl.UInt32():
-        return types.Uint32()
+        return Uint32()
     elif pl_type == pl.UInt16():
-        return types.Uint16()
+        return Uint16()
     elif pl_type == pl.UInt8():
-        return types.Uint8()
+        return Uint8()
 
     elif pl_type.is_decimal():
-        return types.Decimal()
+        return Decimal()
     elif isinstance(pl_type, pl.Boolean):
-        return types.Bool()
+        return Bool()
     elif isinstance(pl_type, pl.String):
-        return types.String()
+        return String()
     elif isinstance(pl_type, pl.Datetime):
-        return types.Datetime()
+        return Datetime()
     elif isinstance(pl_type, pl.Date):
-        return types.Date()
+        return Date()
     elif isinstance(pl_type, pl.Duration):
-        return types.Duration()
+        return Duration()
     elif isinstance(pl_type, pl.Null):
-        return types.NullType()
+        return NullType()
 
     raise TypeError(f"polars type {pl_type} is not supported by pydiverse.transform")
 
 
-def polars_type(pdt_type: types.Dtype) -> pl.DataType:
+def polars_type(pdt_type: Dtype) -> pl.DataType:
     assert types.is_subtype(pdt_type)
 
-    if pdt_type <= types.Float64():
+    if pdt_type <= Float64():
         return pl.Float64()
-    elif pdt_type <= types.Float32():
+    elif pdt_type <= Float32():
         return pl.Float32()
 
-    elif pdt_type <= types.Int64():
+    elif pdt_type <= Int64():
         return pl.Int64()
-    elif pdt_type <= types.Int32():
+    elif pdt_type <= Int32():
         return pl.Int32()
-    elif pdt_type <= types.Int16():
+    elif pdt_type <= Int16():
         return pl.Int16()
-    elif pdt_type <= types.Int8():
+    elif pdt_type <= Int8():
         return pl.Int8()
 
-    elif pdt_type <= types.Uint64():
+    elif pdt_type <= Uint64():
         return pl.UInt64()
-    elif pdt_type <= types.Uint32():
+    elif pdt_type <= Uint32():
         return pl.UInt32()
-    elif pdt_type <= types.Uint16():
+    elif pdt_type <= Uint16():
         return pl.UInt16()
-    elif pdt_type <= types.Uint8():
+    elif pdt_type <= Uint8():
         return pl.UInt8()
 
-    elif pdt_type <= types.Bool():
+    elif pdt_type <= Bool():
         return pl.Boolean()
-    elif pdt_type <= types.String():
+    elif pdt_type <= String():
         return pl.String()
-    elif pdt_type <= types.Datetime():
+    elif pdt_type <= Datetime():
         return pl.Datetime()
-    elif pdt_type <= types.Date():
+    elif pdt_type <= Date():
         return pl.Date()
-    elif pdt_type <= types.Duration():
+    elif pdt_type <= Duration():
         return pl.Duration()
-    elif pdt_type <= types.NullType():
+    elif pdt_type <= NullType():
         return pl.Null()
 
     raise AssertionError
@@ -546,7 +567,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.is_in)
     def _is_in(x, *values, _pdt_args):
         return pl.any_horizontal(
-            (x == val if not arg.dtype() <= types.NullType() else x.is_null())
+            (x == val if not arg.dtype() <= NullType() else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 

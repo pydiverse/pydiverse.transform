@@ -62,24 +62,24 @@ def test_string_length(df_strings):
     )
 
 
-def test_to_upper(df_strings):
+def test_upper(df_strings):
     assert_result_equal(
         df_strings,
         lambda t: t
         >> mutate(
-            x=C.col1.str.to_upper(),
-            y=C.col2.str.to_upper(),
+            x=C.col1.str.upper(),
+            y=C.col2.str.upper(),
         ),
     )
 
 
-def test_to_lower(df_strings):
+def test_lower(df_strings):
     assert_result_equal(
         df_strings,
         lambda t: t
         >> mutate(
-            x=C.col1.str.to_lower(),
-            y=C.col2.str.to_lower(),
+            x=C.col1.str.lower(),
+            y=C.col2.str.lower(),
         ),
     )
 

@@ -765,6 +765,10 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _upper(x):
         return sqa.func.UPPER(x, type_=x.type)
 
+    @impl(ops.str_lower)
+    def _lower(x):
+        return sqa.func.LOWER(x, type_=x.type)
+
     @impl(ops.str_replace_all)
     def _str_replace_all(x, y, z):
         return sqa.func.REPLACE(x, y, z, type_=x.type)

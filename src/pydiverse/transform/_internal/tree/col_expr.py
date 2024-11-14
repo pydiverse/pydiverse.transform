@@ -1150,8 +1150,8 @@ class Cast(ColExpr):
             raise TypeError("cannot cast to `const` type")
 
         self.val = val
-        self.target_type = target_type
-        super().__init__(target_type)
+        self.target_type = copy.copy(target_type)
+        super().__init__(copy.copy(target_type))
         self.dtype()
 
     def dtype(self) -> Dtype:
@@ -1159,6 +1159,8 @@ class Cast(ColExpr):
         # `_dtype` until we are able to retrieve the type of `val`.
         if self.val.dtype() is None:
             return None
+
+        assert not self.target_type.const
 
         if not self.val.dtype().converts_to(self.target_type):
             valid_casts = {
@@ -1188,7 +1190,7 @@ class Cast(ColExpr):
                 self.target_type,
             ) not in valid_casts:
                 hint = ""
-                if self.val.dtype() == String() and self.target_type in (
+                if self.val.dtype() <= String() and self.target_type in (
                     Datetime(),
                     Date(),
                 ):
