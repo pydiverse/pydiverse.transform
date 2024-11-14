@@ -30,8 +30,6 @@ def test_row_number(df4):
     )
 
 
-# MSSQL Added the LEAST function in version 2022.
-# Our docker container doesn't yet support it.
 @skip_backends("mssql")
 def test_min(df4):
     assert_result_equal(
@@ -50,8 +48,6 @@ def test_min(df4):
     )
 
 
-# MSSQL Added the GREATEST function in version 2022.
-# Our docker container doesn't yet support it.
 @skip_backends("mssql")
 def test_max(df4):
     assert_result_equal(

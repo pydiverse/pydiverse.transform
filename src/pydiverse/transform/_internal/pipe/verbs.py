@@ -3,16 +3,15 @@ from __future__ import annotations
 import copy
 import uuid
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any, Literal, overload
 
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops.core import Ftype
-from pydiverse.transform._internal.pipe.pipeable import verb
+from pydiverse.transform._internal.ops.op import Ftype
+from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
 from pydiverse.transform._internal.pipe.table import Table
-from pydiverse.transform._internal.tree import dtypes
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
@@ -22,6 +21,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     Order,
     wrap_literal,
 )
+from pydiverse.transform._internal.tree.types import Bool
 from pydiverse.transform._internal.tree.verbs import (
     Alias,
     Arrange,
@@ -60,8 +60,12 @@ __all__ = [
 ]
 
 
+@overload
+def alias(new_name: str | None = None) -> Pipeable: ...
+
+
 @verb
-def alias(table: Table, new_name: str | None = None):
+def alias(table: Table, new_name: str | None = None) -> Pipeable:
     if new_name is None:
         new_name = table._ast.name
     new = copy.copy(table)
@@ -105,8 +109,12 @@ def alias(table: Table, new_name: str | None = None):
     return new
 
 
+@overload
+def collect(target: Target | None = None) -> Pipeable: ...
+
+
 @verb
-def collect(table: Table, target: Target | None = None) -> Table:
+def collect(table: Table, target: Target | None = None) -> Pipeable:
     errors.check_arg_type(Target | None, "collect", "target", target)
 
     df = table >> select(*table._cache.all_cols.values()) >> export(Polars(lazy=False))
@@ -130,22 +138,42 @@ def collect(table: Table, target: Target | None = None) -> Table:
     return new
 
 
+@overload
+def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable: ...
+
+
 @verb
-def export(table: Table, target: Target):
+def export(
+    table: Table, target: Target, *, schema_overrides: dict[Col, Any] | None = None
+) -> Pipeable:
+    # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
+    # to columns
     table = table >> alias()
     SourceBackend: type[TableImpl] = get_backend(table._ast)
-    return SourceBackend.export(table._ast, target, table._cache.select)
+    if schema_overrides is None:
+        schema_overrides = {}
+    return SourceBackend.export(
+        table._ast, target, table._cache.select, schema_overrides
+    )
+
+
+@overload
+def build_query() -> Pipeable: ...
 
 
 @verb
-def build_query(table: Table) -> str:
+def build_query(table: Table) -> Pipeable:
     table = table >> alias()
     SourceBackend: type[TableImpl] = get_backend(table._ast)
     return SourceBackend.build_query(table._ast, table._cache.select)
 
 
+@overload
+def show_query() -> Pipeable: ...
+
+
 @verb
-def show_query(table: Table):
+def show_query(table: Table) -> Pipeable:
     if query := table >> build_query():
         print(query)
     else:
@@ -154,8 +182,12 @@ def show_query(table: Table):
     return table
 
 
+@overload
+def select(*cols: Col | ColName) -> Pipeable: ...
+
+
 @verb
-def select(table: Table, *cols: Col | ColName):
+def select(table: Table, *cols: Col | ColName) -> Pipeable:
     errors.check_vararg_type(Col | ColName, "select", *cols)
 
     new = copy.copy(table)
@@ -168,8 +200,12 @@ def select(table: Table, *cols: Col | ColName):
     return new
 
 
+@overload
+def drop(*cols: Col | ColName) -> Pipeable: ...
+
+
 @verb
-def drop(table: Table, *cols: Col | ColName):
+def drop(table: Table, *cols: Col | ColName) -> Pipeable:
     errors.check_vararg_type(Col | ColName, "drop", *cols)
 
     dropped_uuids = {col._uuid for col in preprocess_arg(cols, table)}
@@ -179,8 +215,12 @@ def drop(table: Table, *cols: Col | ColName):
     )
 
 
+@overload
+def renmae(name_map: dict[str, str]) -> Pipeable: ...
+
+
 @verb
-def rename(table: Table, name_map: dict[str, str]):
+def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     errors.check_arg_type(dict, "rename", "name_map", name_map)
     if len(name_map) == 0:
         return table
@@ -208,8 +248,12 @@ def rename(table: Table, name_map: dict[str, str]):
     return new
 
 
+@overload
+def mutate(**kwargs: ColExpr) -> Pipeable: ...
+
+
 @verb
-def mutate(table: Table, **kwargs: ColExpr):
+def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     if len(kwargs) == 0:
         return table
 
@@ -249,8 +293,12 @@ def mutate(table: Table, **kwargs: ColExpr):
     return new
 
 
+@overload
+def filter(*predicates: ColExpr[Bool]) -> Pipeable: ...
+
+
 @verb
-def filter(table: Table, *predicates: ColExpr):
+def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     if len(predicates) == 0:
         return table
 
@@ -258,21 +306,22 @@ def filter(table: Table, *predicates: ColExpr):
     new._ast = Filter(table._ast, preprocess_arg(predicates, table))
 
     for cond in new._ast.filters:
-        if cond.dtype() != dtypes.Bool:
+        if not cond.dtype() <= Bool():
             raise TypeError(
                 "predicates given to `filter` must be of boolean type.\n"
                 f"hint: {cond} is of type {cond.dtype()} instead."
             )
 
         for fn in cond.iter_subtree():
-            if isinstance(fn, ColFn) and fn.op().ftype in (
+            if isinstance(fn, ColFn) and fn.op.ftype in (
                 Ftype.WINDOW,
                 Ftype.AGGREGATE,
             ):
                 raise FunctionTypeError(
-                    f"forbidden window function `{fn.name}` in `filter`\nhint: If you "
-                    "want to filter by an expression containing a window / aggregation "
-                    "function, first add the expression as a column via `mutate`."
+                    f"forbidden window function `{fn.op.name}` in `filter`\nhint: If "
+                    "you want to filter by an expression containing a window / "
+                    "aggregation function, first add the expression as a column via "
+                    "`mutate`."
                 )
 
     new._cache = copy.copy(table._cache)
@@ -281,8 +330,12 @@ def filter(table: Table, *predicates: ColExpr):
     return new
 
 
+@overload
+def arrange(*order_by: ColExpr) -> Pipeable: ...
+
+
 @verb
-def arrange(table: Table, *order_by: ColExpr):
+def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     if len(order_by) == 0:
         return table
 
@@ -297,8 +350,12 @@ def arrange(table: Table, *order_by: ColExpr):
     return new
 
 
+@overload
+def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable: ...
+
+
 @verb
-def group_by(table: Table, *cols: Col | ColName, add=False):
+def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable:
     if len(cols) == 0:
         return table
 
@@ -318,8 +375,12 @@ def group_by(table: Table, *cols: Col | ColName, add=False):
     return new
 
 
+@overload
+def ungroup() -> Pipeable: ...
+
+
 @verb
-def ungroup(table: Table):
+def ungroup(table: Table) -> Pipeable:
     new = copy.copy(table)
     new._ast = Ungroup(table._ast)
     new._cache = copy.copy(table._cache)
@@ -327,8 +388,12 @@ def ungroup(table: Table):
     return new
 
 
+@overload
+def summarize(**kwargs: ColExpr) -> Pipeable: ...
+
+
 @verb
-def summarize(table: Table, **kwargs: ColExpr):
+def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     new = copy.copy(table)
     new._ast = Summarize(
         table._ast,
@@ -353,7 +418,7 @@ def summarize(table: Table, **kwargs: ColExpr):
         elif isinstance(expr, ColFn):
             if expr.ftype(agg_is_window=False) == Ftype.WINDOW:
                 raise FunctionTypeError(
-                    f"forbidden window function `{expr.name}` in `summarize`"
+                    f"forbidden window function `{expr.op.name}` in `summarize`"
                 )
             elif expr.ftype(agg_is_window=False) == Ftype.AGGREGATE:
                 agg_fn_above = True
@@ -385,8 +450,12 @@ def summarize(table: Table, **kwargs: ColExpr):
     return new
 
 
+@overload
+def slice_head(n: int, *, offset: int = 0) -> Pipeable: ...
+
+
 @verb
-def slice_head(table: Table, n: int, *, offset: int = 0):
+def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
     errors.check_arg_type(int, "slice_head", "n", n)
     errors.check_arg_type(int, "slice_head", "offset", offset)
 
@@ -401,16 +470,27 @@ def slice_head(table: Table, n: int, *, offset: int = 0):
     return new
 
 
-@verb
+@overload
 def join(
-    left: Table,
     right: Table,
-    on: ColExpr,
+    on: ColExpr[Bool],
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-):
+) -> Pipeable: ...
+
+
+@verb
+def join(
+    left: Table,
+    right: Table,
+    on: ColExpr[Bool],
+    how: Literal["inner", "left", "full"],
+    *,
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    suffix: str | None = None,
+) -> Pipeable:
     errors.check_arg_type(Table, "join", "right", right)
     errors.check_arg_type(str | None, "join", "suffix", suffix)
     errors.check_literal_type(["inner", "left", "full"], "join", "how", how)
@@ -479,44 +559,78 @@ def join(
 # We define the join variations explicitly instead of via functools.partial since vscode
 # gives functools.partial objects a different color than normal python functions which
 # looks very confusing.
+@overload
+def inner_join(
+    right: Table,
+    on: ColExpr[Bool],
+    *,
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    suffix: str | None = None,
+) -> Pipeable: ...
+
+
 @verb
 def inner_join(
     left: Table,
     right: Table,
-    on: ColExpr,
+    on: ColExpr[Bool],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-):
+) -> Pipeable:
     return left >> join(right, on, "inner", validate=validate, suffix=suffix)
+
+
+@overload
+def left_join(
+    right: Table,
+    on: ColExpr[Bool],
+    *,
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    suffix: str | None = None,
+) -> Pipeable: ...
 
 
 @verb
 def left_join(
     left: Table,
     right: Table,
-    on: ColExpr,
+    on: ColExpr[Bool],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-):
+) -> Pipeable:
     return left >> join(right, on, "left", validate=validate, suffix=suffix)
+
+
+@overload
+def full_join(
+    right: Table,
+    on: ColExpr[Bool],
+    *,
+    validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
+    suffix: str | None = None,
+) -> Pipeable: ...
 
 
 @verb
 def full_join(
     left: Table,
     right: Table,
-    on: ColExpr,
+    on: ColExpr[Bool],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-):
+) -> Pipeable:
     return left >> join(right, on, "full", validate=validate, suffix=suffix)
 
 
+@overload
+def show() -> Pipeable: ...
+
+
 @verb
-def show(table: Table):
+def show(table: Table) -> Pipeable:
     print(table)
     return table
 
@@ -560,7 +674,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
                 update_partition_by
                 and isinstance(expr, ColFn)
                 and "partition_by" not in expr.context_kwargs
-                and (expr.op().ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
+                and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
             ):
                 expr.context_kwargs["partition_by"] = table._cache.partition_by
 
