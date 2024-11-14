@@ -129,6 +129,11 @@ class ColExpr(Generic[T]):
     @overload
     def __add__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
 
+    @overload
+    def __add__(
+        self: ColExpr[Duration], rhs: ColExpr[Duration]
+    ) -> ColExpr[Duration]: ...
+
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         return ColFn(ops.add, self, rhs)
 
@@ -143,6 +148,11 @@ class ColExpr(Generic[T]):
 
     @overload
     def __radd__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
+
+    @overload
+    def __radd__(
+        self: ColExpr[Duration], rhs: ColExpr[Duration]
+    ) -> ColExpr[Duration]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         return ColFn(ops.add, rhs, self)
@@ -591,6 +601,20 @@ class ColExpr(Generic[T]):
     @overload
     def __sub__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
+    @overload
+    def __sub__(
+        self: ColExpr[Datetime], rhs: ColExpr[Datetime]
+    ) -> ColExpr[Duration]: ...
+
+    @overload
+    def __sub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
+
+    @overload
+    def __sub__(self: ColExpr[Datetime], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
+
+    @overload
+    def __sub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
+
     def __sub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         return ColFn(ops.sub, self, rhs)
 
@@ -602,6 +626,20 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rsub__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    @overload
+    def __rsub__(
+        self: ColExpr[Datetime], rhs: ColExpr[Datetime]
+    ) -> ColExpr[Duration]: ...
+
+    @overload
+    def __rsub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
+
+    @overload
+    def __rsub__(self: ColExpr[Datetime], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
+
+    @overload
+    def __rsub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __rsub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         return ColFn(ops.sub, rhs, self)
