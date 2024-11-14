@@ -150,7 +150,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
 
         if expr.op.return_type(tuple(arg.dtype() for arg in expr.args)) <= Bool():
             # most operations return bits, except for `any`, `all`
-            returns_bool_as_bit = isinstance(expr.op, ops.Aggregation)
+            returns_bool_as_bit = isinstance(expr.op, ops.Aggregation | ops.Window)
 
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr(

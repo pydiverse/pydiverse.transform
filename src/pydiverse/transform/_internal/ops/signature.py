@@ -128,7 +128,7 @@ def best_signature_match(
 
     for i, match in enumerate(candidates[1:]):
         if best_distance > (this_distance := sig_distance(sig, match)):
-            best_index = i
+            best_index = i + 1
             best_distance = this_distance
 
     assert (

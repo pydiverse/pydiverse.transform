@@ -397,14 +397,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def mean(
-        self: ColExpr[Int],
-        *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Int]: ...
-
-    @overload
-    def mean(
         self: ColExpr[Float],
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
@@ -418,6 +410,14 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Decimal]: ...
+
+    @overload
+    def mean(
+        self: ColExpr[Int],
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Float]: ...
 
     def mean(
         self: ColExpr,

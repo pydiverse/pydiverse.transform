@@ -30,7 +30,14 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import Dtype, NullType
+from pydiverse.transform._internal.tree.types import (
+    Dtype,
+    Float,
+    Float64,
+    Int,
+    Int64,
+    NullType,
+)
 
 
 class SqlImpl(TableImpl):
@@ -244,7 +251,7 @@ class SqlImpl(TableImpl):
             return cls.past_over_clause(expr, value, *args)
 
         elif isinstance(expr, CaseExpr):
-            return sqa.case(
+            res = sqa.case(
                 *(
                     (
                         cls.compile_col_expr(cond, sqa_col),
@@ -258,6 +265,19 @@ class SqlImpl(TableImpl):
                     else None
                 ),
             )
+
+            if not cls.pdt_type(res.type) <= expr.dtype():
+                res = res.cast(
+                    cls.sqa_type(
+                        Int64()
+                        if type(expr.dtype()) is Int
+                        else Float64()
+                        if type(expr.dtype()) is Float
+                        else expr.dtype()
+                    )
+                )
+
+            return res
 
         elif isinstance(expr, LiteralCol):
             return cls.compile_lit(expr) if compile_literals else expr.val

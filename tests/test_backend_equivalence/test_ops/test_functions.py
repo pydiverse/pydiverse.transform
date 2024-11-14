@@ -4,7 +4,6 @@ import pydiverse.transform as pdt
 from pydiverse.transform import C
 from pydiverse.transform._internal.pipe.verbs import mutate
 from pydiverse.transform._internal.tree.col_expr import LiteralCol
-from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
@@ -30,9 +29,6 @@ def test_row_number(df4):
     )
 
 
-# MSSQL Added the LEAST function in version 2022.
-# Our docker container doesn't yet support it.
-@skip_backends("mssql")
 def test_min(df4):
     assert_result_equal(
         df4,
@@ -50,9 +46,6 @@ def test_min(df4):
     )
 
 
-# MSSQL Added the GREATEST function in version 2022.
-# Our docker container doesn't yet support it.
-@skip_backends("mssql")
 def test_max(df4):
     assert_result_equal(
         df4,

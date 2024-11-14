@@ -7,6 +7,8 @@ from pydiverse.transform._internal.tree.types import (
     NUMERIC,
     Bool,
     D,
+    Decimal,
+    Float,
     Int,
 )
 
@@ -28,7 +30,11 @@ min = Aggregation("min", *(Signature(dtype, return_type=dtype) for dtype in COMP
 
 max = Aggregation("max", *(Signature(dtype, return_type=dtype) for dtype in COMPARABLE))
 
-mean = Aggregation("mean", *(Signature(dtype, return_type=dtype) for dtype in NUMERIC))
+mean = Aggregation(
+    "mean",
+    *(Signature(dtype, return_type=dtype) for dtype in (Float(), Decimal())),
+    Signature(Int(), return_type=Float()),
+)
 
 sum = Aggregation("sum", *(Signature(dtype, return_type=dtype) for dtype in NUMERIC))
 

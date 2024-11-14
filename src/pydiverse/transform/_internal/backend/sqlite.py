@@ -11,7 +11,6 @@ from pydiverse.transform._internal.tree.types import (
     Datetime,
     Decimal,
     Float,
-    Int,
     String,
 )
 from pydiverse.transform._internal.util.warnings import warn_non_standard
@@ -56,7 +55,11 @@ class SqliteImpl(SqlImpl):
     def past_over_clause(
         cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
     ) -> sqa.ColumnElement:
-        if fn.op == ops.mean and fn.dtype() <= Int():
+        if (
+            fn.op
+            in (ops.horizontal_min, ops.horizontal_max, ops.mean, ops.min, ops.max)
+            and fn.dtype() <= Float()
+        ):
             return sqa.cast(val, sqa.Double)
         return val
 
@@ -117,7 +120,6 @@ with SqliteImpl.impl_store.impl_manager as impl:
         left = _greatest(*x[:mid])
         right = _greatest(*x[mid:])
 
-        # TODO: Determine return type
         return sqa.func.coalesce(sqa.func.MAX(left, right), left, right)
 
     @impl(ops.horizontal_min)
@@ -131,7 +133,6 @@ with SqliteImpl.impl_store.impl_manager as impl:
         left = _least(*x[:mid])
         right = _least(*x[mid:])
 
-        # TODO: Determine return type
         return sqa.func.coalesce(sqa.func.MIN(left, right), left, right)
 
     # TODO: we need to get the string in the right format here (so sqlite can work with
