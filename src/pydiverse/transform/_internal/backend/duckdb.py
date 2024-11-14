@@ -24,15 +24,6 @@ class DuckDbImpl(SqlImpl):
         final_select: list[Col],
         schema_overrides: dict[str, Any],
     ):
-        # insert casts after sum() over integer columns (duckdb converts them to floats)
-        # for desc in nd.iter_subtree():
-        #     if isinstance(desc, verbs.Verb):
-        #         desc.map_col_nodes(
-        #             lambda u: Cast(u, Int64())
-        #             if isinstance(u, ColFn) and u.op == ops.sum and u.dtype() <= Int()
-        #             else u
-        #         )
-
         if isinstance(target, Polars):
             engine = sql.get_engine(nd)
             with engine.connect() as conn:
@@ -57,6 +48,14 @@ class DuckDbImpl(SqlImpl):
             return sqa.cast(lit.val, sqa.BigInteger)
         return super().compile_lit(lit)
 
+    @classmethod
+    def past_over_clause(
+        cls, fn: sql.ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
+    ) -> sqa.ColumnElement:
+        if fn.op == ops.sum:
+            return sqa.cast(val, type_=args[0].type)
+        return val
+
 
 with DuckDbImpl.impl_store.impl_manager as impl:
 
@@ -79,10 +78,3 @@ with DuckDbImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return ~sqa.func.isnan(x)
-
-    @impl(ops.sum)
-    def _sum(x):
-        y = sqa.func.sum(x)
-        if isinstance(x.type, sqa.BigInteger):
-            return sqa.cast(y, sqa.BigInteger())
-        return y

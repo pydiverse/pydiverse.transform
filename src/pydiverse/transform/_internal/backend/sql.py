@@ -172,7 +172,7 @@ class SqlImpl(TableImpl):
                 return cls.nan()
             elif math.isinf(lit.val):
                 return cls.inf() if lit.val > 0 else -cls.inf()
-        return sqa.literal(lit.val)
+        return sqa.literal(lit.val, cls.sqa_type(lit.dtype()))
 
     @classmethod
     def compile_order(
@@ -906,6 +906,10 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
+        return sqa.cast(x, sqa.DateTime)
+
+    @impl(ops.str_to_date)
+    def _str_to_date(x):
         return sqa.cast(x, sqa.Date)
 
     @impl(ops.is_inf)

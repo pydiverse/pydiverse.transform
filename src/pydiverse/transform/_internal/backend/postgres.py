@@ -34,6 +34,9 @@ class PostgresImpl(SqlImpl):
     ) -> sqa.ColumnElement:
         if isinstance(fn.op, ops.DatetimeExtract | ops.DateExtract):
             return sqa.cast(val, sqa.BigInteger)
+        elif fn.op == ops.sum:
+            # postgres sometimes switches types for `sum`
+            return sqa.cast(val, args[0].type)
         return val
 
 
