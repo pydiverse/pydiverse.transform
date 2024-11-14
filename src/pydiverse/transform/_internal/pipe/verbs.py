@@ -306,21 +306,22 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     new._ast = Filter(table._ast, preprocess_arg(predicates, table))
 
     for cond in new._ast.filters:
-        if cond.dtype() != Bool:
+        if not cond.dtype() <= Bool():
             raise TypeError(
                 "predicates given to `filter` must be of boolean type.\n"
                 f"hint: {cond} is of type {cond.dtype()} instead."
             )
 
         for fn in cond.iter_subtree():
-            if isinstance(fn, ColFn) and fn.op().ftype in (
+            if isinstance(fn, ColFn) and fn.op.ftype in (
                 Ftype.WINDOW,
                 Ftype.AGGREGATE,
             ):
                 raise FunctionTypeError(
-                    f"forbidden window function `{fn.name}` in `filter`\nhint: If you "
-                    "want to filter by an expression containing a window / aggregation "
-                    "function, first add the expression as a column via `mutate`."
+                    f"forbidden window function `{fn.op.name}` in `filter`\nhint: If "
+                    "you want to filter by an expression containing a window / "
+                    "aggregation function, first add the expression as a column via "
+                    "`mutate`."
                 )
 
     new._cache = copy.copy(table._cache)

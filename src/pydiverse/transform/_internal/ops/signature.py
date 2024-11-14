@@ -6,7 +6,7 @@ from types import EllipsisType
 from typing import Any
 
 from pydiverse.transform._internal.tree import types
-from pydiverse.transform._internal.tree.types import Dtype
+from pydiverse.transform._internal.tree.types import IMPLICIT_CONVS, Dtype, Tvar
 
 
 @dataclasses.dataclass(slots=True, init=False)
@@ -57,17 +57,48 @@ class SignatureTrie:
                 sig[1:], data, last_is_vararg, last_type=sig[0]
             )
 
-        def all_matches(self, sig: Sequence[Dtype]) -> list[tuple[list[Dtype], Any]]:
+        def all_matches(
+            self, sig: Sequence[Dtype], tvars: dict[str, Dtype]
+        ) -> list[tuple[list[Dtype], Any]]:
             if len(sig) == 0:
-                return [([], self.data)]
-
-            matches = []
-            for dtype, child in self.children.items():
-                if sig[0].converts_to(dtype):
-                    matches.extend(
-                        ([dtype] + match_sig, data)
-                        for match_sig, data in child.all_matches(sig[1:])
+                return [
+                    (
+                        [],
+                        self.data
+                        if not isinstance(self.data, Tvar)
+                        else tvars[self.data.name],
                     )
+                ]
+
+            matches: list[tuple[list[Dtype], Any]] = []
+            tvar = None
+            for dtype, child in self.children.items():
+                match_dtype = (
+                    tvars[dtype.name]
+                    if isinstance(dtype, Tvar) and dtype.name in tvars
+                    else dtype
+                )
+                if isinstance(match_dtype, Tvar):
+                    assert tvar is None
+                    tvar = dtype
+                elif sig[0].converts_to(match_dtype):
+                    matches.extend(
+                        ([match_dtype] + match_sig, data)
+                        for match_sig, data in child.all_matches(sig[1:], tvars)
+                    )
+
+            # When the current node is a type var, try every type we can convert to.
+            if tvar is not None:
+                already_matched = {m[0][0].without_const() for m in matches}
+                for dtype, _ in IMPLICIT_CONVS[sig[0].without_const()].items():
+                    match_dtype = dtype.with_const() if tvar.const else dtype
+                    if dtype not in already_matched and sig[0].converts_to(match_dtype):
+                        matches.extend(
+                            ([match_dtype] + match_sig, data)
+                            for match_sig, data in self.children[tvar].all_matches(
+                                sig[1:], tvars | {tvar.name: match_dtype}
+                            )
+                        )
 
             return matches
 
@@ -77,7 +108,7 @@ class SignatureTrie:
         self.root.insert(sig, data, last_is_vararg)
 
     def best_match(self, sig: Sequence[Dtype]) -> tuple[list[Dtype], Any] | None:
-        all_matches = self.root.all_matches(sig)
+        all_matches = self.root.all_matches(sig, {})
         if len(all_matches) == 0:
             return None
 

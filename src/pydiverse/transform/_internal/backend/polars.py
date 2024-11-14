@@ -204,11 +204,11 @@ def compile_join_cond(
     expr: ColExpr, name_in_df: dict[UUID, str]
 ) -> list[tuple[pl.Expr, pl.Expr]]:
     if isinstance(expr, ColFn):
-        if expr.name == "__and__":
+        if expr.op == ops.bool_and:
             return compile_join_cond(expr.args[0], name_in_df) + compile_join_cond(
                 expr.args[1], name_in_df
             )
-        if expr.name == "__eq__":
+        if expr.op == ops.equal:
             return [
                 (
                     compile_col_expr(expr.args[0], name_in_df),

@@ -207,8 +207,8 @@ class ColExpr(Generic[T]):
     def descending(self: ColExpr) -> ColExpr:
         return ColFn(ops.descending, self)
 
-    def __eq__(self: ColExpr) -> ColExpr:
-        return ColFn(ops.equal, self)
+    def __eq__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
+        return ColFn(ops.equal, self, rhs)
 
     def exp(self: ColExpr[Float]) -> ColExpr[Float]:
         return ColFn(ops.exp, self)
@@ -232,48 +232,48 @@ class ColExpr(Generic[T]):
         return ColFn(ops.floordiv, rhs, self)
 
     @overload
-    def __ge__(self: ColExpr[Int]) -> ColExpr[Int]: ...
+    def __ge__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[Float]) -> ColExpr[Float]: ...
+    def __ge__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+    def __ge__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[String]) -> ColExpr[String]: ...
+    def __ge__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
+    def __ge__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[Date]) -> ColExpr[Date]: ...
+    def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
-    def __ge__(self: ColExpr) -> ColExpr:
-        return ColFn(ops.greater_equal, self)
-
-    @overload
-    def __gt__(self: ColExpr[Int]) -> ColExpr[Int]: ...
+    def __ge__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        return ColFn(ops.greater_equal, self, rhs)
 
     @overload
-    def __gt__(self: ColExpr[Float]) -> ColExpr[Float]: ...
+    def __gt__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+    def __gt__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[String]) -> ColExpr[String]: ...
+    def __gt__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
+    def __gt__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[Date]) -> ColExpr[Date]: ...
+    def __gt__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
-    def __gt__(self: ColExpr) -> ColExpr:
-        return ColFn(ops.greater_than, self)
+    @overload
+    def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
-    def is_in(self: ColExpr, *rhs: ColExpr) -> ColExpr:
+    def __gt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        return ColFn(ops.greater_than, self, rhs)
+
+    def is_in(self: ColExpr, *rhs: ColExpr) -> ColExpr[Bool]:
         return ColFn(ops.is_in, self, *rhs)
 
     def is_inf(self: ColExpr[Float]) -> ColExpr[Bool]:
@@ -288,53 +288,53 @@ class ColExpr(Generic[T]):
     def is_not_nan(self: ColExpr[Float]) -> ColExpr[Bool]:
         return ColFn(ops.is_not_nan, self)
 
-    def is_not_null(self: ColExpr) -> ColExpr:
+    def is_not_null(self: ColExpr) -> ColExpr[Bool]:
         return ColFn(ops.is_not_null, self)
 
-    def is_null(self: ColExpr) -> ColExpr:
+    def is_null(self: ColExpr) -> ColExpr[Bool]:
         return ColFn(ops.is_null, self)
 
     @overload
-    def __le__(self: ColExpr[Int]) -> ColExpr[Int]: ...
+    def __le__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[Float]) -> ColExpr[Float]: ...
+    def __le__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+    def __le__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[String]) -> ColExpr[String]: ...
+    def __le__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
+    def __le__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[Date]) -> ColExpr[Date]: ...
+    def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
-    def __le__(self: ColExpr) -> ColExpr:
-        return ColFn(ops.less_equal, self)
-
-    @overload
-    def __lt__(self: ColExpr[Int]) -> ColExpr[Int]: ...
+    def __le__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        return ColFn(ops.less_equal, self, rhs)
 
     @overload
-    def __lt__(self: ColExpr[Float]) -> ColExpr[Float]: ...
+    def __lt__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+    def __lt__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[String]) -> ColExpr[String]: ...
+    def __lt__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
+    def __lt__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[Date]) -> ColExpr[Date]: ...
+    def __lt__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
-    def __lt__(self: ColExpr) -> ColExpr:
-        return ColFn(ops.less_than, self)
+    @overload
+    def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    def __lt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        return ColFn(ops.less_than, self, rhs)
 
     def log(self: ColExpr[Float]) -> ColExpr[Float]:
         return ColFn(ops.log, self)
@@ -525,8 +525,8 @@ class ColExpr(Generic[T]):
     def __neg__(self: ColExpr) -> ColExpr:
         return ColFn(ops.neg, self)
 
-    def __ne__(self: ColExpr) -> ColExpr:
-        return ColFn(ops.not_equal, self)
+    def __ne__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
+        return ColFn(ops.not_equal, self, rhs)
 
     def nulls_first(self: ColExpr) -> ColExpr:
         return ColFn(ops.nulls_first, self)

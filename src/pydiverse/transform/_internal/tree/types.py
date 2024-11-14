@@ -122,14 +122,16 @@ class Duration(Dtype):
 class NullType(Dtype): ...
 
 
-class Tvar(Dtype):  #
+class Tvar(Dtype):
     __slots__ = ("name",)
 
-    def __init__(self, name: str, *, const: bool = True):
+    def __init__(self, name: str, *, const: bool = False):
         self.name = name
         super().__init__(const=const)
 
     def __eq__(self, rhs: Dtype) -> bool:
+        if rhs is None:
+            return False
         if not isinstance(rhs, Dtype):
             raise TypeError(f"cannot compare type `Dtype` with type `{type(rhs)}`")
         return (
@@ -225,6 +227,18 @@ INT_SUBTYPES = (
     Int64(),
 )
 FLOAT_SUBTYPES = (Float32(), Float64())
+ALL_TYPES = (
+    *INT_SUBTYPES,
+    *FLOAT_SUBTYPES,
+    Int(),
+    Float(),
+    String(),
+    Date(),
+    Datetime(),
+    Bool(),
+    NullType(),
+    Duration(),
+)
 
 
 def is_supertype(dtype: Dtype) -> bool:
@@ -245,6 +259,7 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
         float_subtype: {Float(): (0, 1), float_subtype: (0, 0)}
         for float_subtype in FLOAT_SUBTYPES
     },
+    Float(): {Float(): (0, 0)},
     String(): {String(): (0, 0)},
     Datetime(): {Datetime(): (0, 0)},
     Date(): {Date(): (0, 0)},
