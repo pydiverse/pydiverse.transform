@@ -32,7 +32,7 @@ __all__ = ["len", "row_number", "rank", "when", "dense_rank", "min", "max"]
 
 def when(condition: ColExpr) -> WhenClause:
     condition = wrap_literal(condition)
-    if condition.dtype() is not None and condition.dtype() != Bool:
+    if condition.dtype() is not None and not condition.dtype() <= Bool():
         raise TypeError(
             "argument for `when` must be of boolean type, but has type "
             f"`{condition.dtype()}`"
@@ -42,7 +42,7 @@ def when(condition: ColExpr) -> WhenClause:
 
 
 def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
-    if types.is_subtype(dtype):
+    if dtype is not None and types.is_subtype(dtype):
         return LiteralCol(val, dtype).cast(dtype)
     return LiteralCol(val, dtype)
 
@@ -133,16 +133,3 @@ def row_number(
     arrange: ColExpr | Iterable[ColExpr] | None = None,
 ) -> ColExpr[Int]:
     return ColFn(ops.row_number, partition_by=partition_by, arrange=arrange)
-
-
-def shift(
-    self: ColExpr,
-    n: int,
-    fill_value: ColExpr = None,
-    *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr] | None = None,
-) -> ColExpr:
-    return ColFn(
-        ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange
-    )

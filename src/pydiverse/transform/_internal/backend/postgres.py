@@ -4,7 +4,7 @@ import sqlalchemy as sqa
 
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.tree.col_expr import Cast
+from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
 from pydiverse.transform._internal.tree.types import Float, Int, String
 
 
@@ -27,6 +27,14 @@ class PostgresImpl(SqlImpl):
                 )
 
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
+
+    @classmethod
+    def past_over_clause(
+        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
+    ) -> sqa.ColumnElement:
+        if isinstance(fn.op, ops.DatetimeExtract | ops.DateExtract):
+            return sqa.cast(val, sqa.BigInteger)
+        return val
 
 
 with PostgresImpl.impl_store.impl_manager as impl:

@@ -13,6 +13,7 @@ from uuid import UUID
 import polars as pl
 import sqlalchemy as sqa
 
+from pydiverse.transform._internal.backend.polars import polars_type
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
@@ -29,7 +30,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import Dtype
+from pydiverse.transform._internal.tree.types import Dtype, NullType
 
 
 class SqlImpl(TableImpl):
@@ -131,7 +132,7 @@ class SqlImpl(TableImpl):
         nd: AstNode,
         target: Target,
         final_select: list[Col],
-        schema_overrides: dict[str, Any],
+        schema_overrides: dict[Col, Any],
     ) -> Any:
         sel = cls.build_select(nd, final_select)
         engine = get_engine(nd)
@@ -142,10 +143,12 @@ class SqlImpl(TableImpl):
                     connection=conn,
                     schema_overrides={
                         sql_col.name: schema_overrides[col]
+                        if col in schema_overrides
+                        else polars_type(col.dtype())
                         for sql_col, col in zip(
                             sel.columns.values(), final_select, strict=True
                         )
-                        if col in schema_overrides
+                        if col in schema_overrides or col.dtype() <= NullType()
                     },
                 )
                 df.name = nd.name
@@ -192,6 +195,12 @@ class SqlImpl(TableImpl):
         )
 
     @classmethod
+    def past_over_clause(
+        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
+    ) -> sqa.ColumnElement:
+        return val
+
+    @classmethod
     def compile_col_expr(
         cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], *, compile_literals=True
     ) -> sqa.ColumnElement:
@@ -199,8 +208,6 @@ class SqlImpl(TableImpl):
             return sqa_col[expr._uuid]
 
         elif isinstance(expr, ColFn):
-            impl = cls.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
-
             args: list[sqa.ColumnElement] = [
                 cls.compile_col_expr(arg, sqa_col, compile_literals=not param.const)
                 for arg, param in zip(
@@ -229,11 +236,12 @@ class SqlImpl(TableImpl):
             else:
                 order_by = None
 
+            impl = cls.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
             value: sqa.ColumnElement = impl(*args, _Impl=cls)
             if partition_by is not None or order_by is not None:
                 value = sqa.over(value, partition_by=partition_by, order_by=order_by)
 
-            return value
+            return cls.past_over_clause(expr, value, *args)
 
         elif isinstance(expr, CaseExpr):
             return sqa.case(
@@ -816,12 +824,10 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.horizontal_max)
     def _horizontal_max(*x):
-        # TODO: Determine return type
         return sqa.func.GREATEST(*x)
 
     @impl(ops.horizontal_min)
     def _horizontal_min(*x):
-        # TODO: Determine return type
         return sqa.func.LEAST(*x)
 
     @impl(ops.mean)
@@ -829,7 +835,6 @@ with SqlImpl.impl_store.impl_manager as impl:
         type_ = sqa.Numeric()
         if isinstance(x.type, sqa.Float):
             type_ = sqa.Double()
-
         return sqa.func.AVG(x, type_=type_)
 
     @impl(ops.min)
@@ -860,6 +865,7 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _len():
         return sqa.func.count()
 
+    @impl(ops.shift)
     def _shift(x, by, empty_value=None):
         if by >= 0:
             return sqa.func.LAG(x, by, empty_value, type_=x.type)

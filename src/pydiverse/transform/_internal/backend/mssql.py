@@ -127,12 +127,12 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         )
 
     elif isinstance(expr, Col):
-        if not wants_bool_as_bit and expr.dtype() == Bool():
-            return ColFn("__eq__", expr, LiteralCol(True))
+        if not wants_bool_as_bit and expr.dtype() <= Bool():
+            return ColFn(ops.equal, expr, LiteralCol(True))
         return expr
 
     elif isinstance(expr, ColFn):
-        wants_bool_as_bit_input = expr.op not in (
+        wants_args_bool_as_bit = expr.op not in (
             ops.bool_xor,
             ops.bool_and,
             ops.bool_or,
@@ -141,19 +141,16 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
 
         converted = copy.copy(expr)
         converted.args = [
-            convert_bool_bit(arg, wants_bool_as_bit_input) for arg in expr.args
+            convert_bool_bit(arg, wants_args_bool_as_bit) for arg in expr.args
         ]
         converted.context_kwargs = {
             key: [convert_bool_bit(val, wants_bool_as_bit) for val in arr]
             for key, arr in expr.context_kwargs.items()
         }
 
-        impl = MsSqlImpl.registry.get_impl(
-            expr.name, tuple(arg.dtype() for arg in expr.args)
-        )
-
-        if isinstance(impl.return_type, Bool):
-            returns_bool_as_bit = not isinstance(expr.op, ops.logical.Logical)
+        if expr.op.return_type(tuple(arg.dtype() for arg in expr.args)) <= Bool():
+            # most operations return bits, except for `any`, `all`
+            returns_bool_as_bit = isinstance(expr.op, ops.Aggregation)
 
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr(
@@ -161,7 +158,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
                     None,
                 )
             elif not wants_bool_as_bit and returns_bool_as_bit:
-                return ColFn("__eq__", converted, LiteralCol(True))
+                return ColFn(ops.equal, converted, LiteralCol(True))
 
         return converted
 

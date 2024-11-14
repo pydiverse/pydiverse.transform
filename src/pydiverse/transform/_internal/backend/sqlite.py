@@ -5,12 +5,13 @@ import sqlalchemy as sqa
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.tree.col_expr import Cast
+from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
 from pydiverse.transform._internal.tree.types import (
     Date,
     Datetime,
     Decimal,
     Float,
+    Int,
     String,
 )
 from pydiverse.transform._internal.util.warnings import warn_non_standard
@@ -50,6 +51,14 @@ class SqliteImpl(SqlImpl):
             )
 
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
+
+    @classmethod
+    def past_over_clause(
+        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
+    ) -> sqa.ColumnElement:
+        if fn.op == ops.mean and fn.dtype() <= Int():
+            return sqa.cast(val, sqa.Double)
+        return val
 
 
 with SqliteImpl.impl_store.impl_manager as impl:
@@ -130,10 +139,6 @@ with SqliteImpl.impl_store.impl_manager as impl:
     @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return sqa.type_coerce(x, sqa.DateTime)
-
-    @impl(ops.str_to_datetime)
-    def _str_to_datetime(x):
-        return sqa.type_coerce(x, sqa.Date)
 
     # the SQLite floor function is cursed... it throws if you pass in a large value
     # like 1e19. surprisingly, 1e18 works... what a coincidence... :)

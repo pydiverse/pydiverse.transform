@@ -40,7 +40,9 @@ class ImplStore:
         best_match = None
 
         if (trie := self.impl_trie.get(op)) is not None:
-            _, best_match = trie.best_match(sig)
+            trie_match = trie.best_match(sig)
+            if trie_match is not None:
+                best_match = trie_match[1]
         if best_match is None:
             best_match = self.default_impl.get(op)
 

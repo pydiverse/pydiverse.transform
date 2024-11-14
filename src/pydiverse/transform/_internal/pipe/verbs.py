@@ -144,7 +144,7 @@ def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable:
 
 @verb
 def export(
-    table: Table, target: Target, *, schema_overrides: dict | None = None
+    table: Table, target: Target, *, schema_overrides: dict[Col, Any] | None = None
 ) -> Pipeable:
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
@@ -418,7 +418,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
         elif isinstance(expr, ColFn):
             if expr.ftype(agg_is_window=False) == Ftype.WINDOW:
                 raise FunctionTypeError(
-                    f"forbidden window function `{expr.name}` in `summarize`"
+                    f"forbidden window function `{expr.op.name}` in `summarize`"
                 )
             elif expr.ftype(agg_is_window=False) == Ftype.AGGREGATE:
                 agg_fn_above = True

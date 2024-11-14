@@ -14,6 +14,7 @@ class Window(Operator):
         *signatures: Signature,
         param_names: list[str] | None = None,
         default_values: list[Any] | None = None,
+        generate_expr_method=False,
     ):
         super().__init__(
             name,
@@ -22,7 +23,7 @@ class Window(Operator):
             context_kwargs=["partition_by", "arrange"],
             param_names=param_names,
             default_values=default_values,
-            generate_expr_method=False,
+            generate_expr_method=generate_expr_method,
         )
 
 
@@ -31,6 +32,7 @@ shift = Window(
     Signature(D, Int(const=True), Tvar("D", const=True), return_type=D),
     param_names=["self", "n", "fill_value"],
     default_values=[..., ..., None],
+    generate_expr_method=True,
 )
 
 row_number = Window("row_number", Signature(return_type=Int()))

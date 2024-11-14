@@ -184,7 +184,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return pl.lit(expr.val)
+        return pl.lit(expr.val, dtype=polars_type(expr.dtype()))
 
     elif isinstance(expr, Cast):
         compiled = compile_col_expr(expr.val, name_in_df).cast(
@@ -546,7 +546,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.is_in)
     def _is_in(x, *values, _pdt_args):
         return pl.any_horizontal(
-            (x == val if arg.dtype() != types.NullType else x.is_null())
+            (x == val if not arg.dtype() <= types.NullType() else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 

@@ -145,9 +145,9 @@ D = Tvar("T")
 
 def python_type_to_pdt(t: type) -> Dtype:
     if t is int:
-        return Int()
+        return Int64()
     elif t is float:
-        return Float()
+        return Float64()
     elif t is bool:
         return Bool()
     elif t is str:
@@ -224,6 +224,7 @@ ALL_TYPES = (
     *FLOAT_SUBTYPES,
     Int(),
     Float(),
+    Decimal(),
     String(),
     Date(),
     Datetime(),
@@ -253,10 +254,14 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
     },
     Float(): {Float(): (0, 0)},
     String(): {String(): (0, 0)},
+    Decimal(): {Decimal(): (0, 0)},
     Datetime(): {Datetime(): (0, 0)},
     Date(): {Date(): (0, 0)},
     Bool(): {Bool(): (0, 0)},
-    NullType(): {NullType(): (0, 0)},
+    NullType(): {
+        NullType(): (0, 0),
+        **{t: (1, 0) for t in ALL_TYPES if t != NullType()},
+    },
     Duration(): {Duration(): (0, 0)},
 }
 

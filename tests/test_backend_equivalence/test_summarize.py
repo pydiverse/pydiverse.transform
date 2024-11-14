@@ -102,7 +102,7 @@ def test_filter_argument(df3):
         >> group_by(t.col4, t.col1)
         >> summarize(
             u=(t.col3 * t.col4 - t.col2).sum(
-                filter=(t.col5.isin("a", "e", "i", "o", "u"))
+                filter=(t.col5.is_in("a", "e", "i", "o", "u"))
             )
         ),
     )

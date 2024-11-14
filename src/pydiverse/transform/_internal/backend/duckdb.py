@@ -10,9 +10,9 @@ from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Cast, Col, ColFn, LiteralCol
+from pydiverse.transform._internal.tree.col_expr import Cast, Col, LiteralCol
+from pydiverse.transform._internal.tree.types import Float, Int, Int64
 
 
 class DuckDbImpl(SqlImpl):
@@ -25,15 +25,13 @@ class DuckDbImpl(SqlImpl):
         schema_overrides: dict[str, Any],
     ):
         # insert casts after sum() over integer columns (duckdb converts them to floats)
-        for desc in nd.iter_subtree():
-            if isinstance(desc, verbs.Verb):
-                desc.map_col_nodes(
-                    lambda u: Cast(u, types.Int64())
-                    if isinstance(u, ColFn)
-                    and u.name == "sum"
-                    and u.dtype() == types.Int64
-                    else u
-                )
+        # for desc in nd.iter_subtree():
+        #     if isinstance(desc, verbs.Verb):
+        #         desc.map_col_nodes(
+        #             lambda u: Cast(u, Int64())
+        #             if isinstance(u, ColFn) and u.op == ops.sum and u.dtype() <= Int()
+        #             else u
+        #         )
 
         if isinstance(target, Polars):
             engine = sql.get_engine(nd)
@@ -47,15 +45,15 @@ class DuckDbImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        if cast.val.dtype() == types.Float64 and cast.target_type == types.Int64:
+        if cast.val.dtype() <= Float() and cast.target_type <= Int():
             return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
-                sqa.BigInteger()
+                cls.sqa_type(cast.target_type)
             )
         return super().compile_cast(cast, sqa_col)
 
     @classmethod
     def compile_lit(cls, lit: LiteralCol) -> sqa.ColumnElement:
-        if lit.dtype() == types.Int64:
+        if lit.dtype() <= Int64():
             return sqa.cast(lit.val, sqa.BigInteger)
         return super().compile_lit(lit)
 
@@ -81,3 +79,10 @@ with DuckDbImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return ~sqa.func.isnan(x)
+
+    @impl(ops.sum)
+    def _sum(x):
+        y = sqa.func.sum(x)
+        if isinstance(x.type, sqa.BigInteger):
+            return sqa.cast(y, sqa.BigInteger())
+        return y

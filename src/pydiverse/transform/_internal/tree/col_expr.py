@@ -75,7 +75,7 @@ class ColExpr(Generic[T]):
         return CaseExpr(
             (
                 (
-                    self.isin(
+                    self.is_in(
                         *(
                             (wrap_literal(elem) for elem in key)
                             if isinstance(key, Iterable)
@@ -570,6 +570,18 @@ class ColExpr(Generic[T]):
     def round(self: ColExpr, decimals: int = 0) -> ColExpr:
         return ColFn(ops.round, self, decimals)
 
+    def shift(
+        self: ColExpr,
+        n: int,
+        fill_value: ColExpr = None,
+        *,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr:
+        return ColFn(
+            ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange
+        )
+
     @overload
     def __sub__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]: ...
 
@@ -806,12 +818,12 @@ class Col(ColExpr):
             from pydiverse.transform._internal.backend.polars import PolarsImpl
             from pydiverse.transform._internal.backend.targets import Polars
 
-            df = PolarsImpl.export(self._ast, Polars(lazy=False), [self])
+            df = PolarsImpl.export(self._ast, Polars(lazy=False), [self], {})
             return str(df.get_column(df.columns[0]))
         except Exception as e:
             return (
                 repr(self)
-                + f"\ncould evaluate {repr(self)} due to"
+                + f"\ncould not evaluate {repr(self)} due to"
                 + f"{e.__class__.__name__}: {str(e)}"
             )
 
@@ -1039,22 +1051,20 @@ class CaseExpr(ColExpr):
                     f"type `{cond.dtype()}`"
                 )
 
-        val_types = [val.dtype().without_const() for _, val in self.cases]
+        val_types = [val.dtype() for _, val in self.cases]
         if self.default_val is not None:
-            if self.default_val.dtype() is None:
-                return None
-            val_types.append(self.default_val.dtype().without_const())
-
+            val_types.append(self.default_val.dtype())
         if None in val_types:
             return None
+        val_types = [t.without_const() for t in val_types]
 
-        if (
+        if not (
             common_ancestors := functools.reduce(
                 operator.and_,
                 (set(IMPLICIT_CONVS[t].keys()) for t in val_types[1:]),
                 IMPLICIT_CONVS[val_types[0]].keys(),
             )
-        ) is None:
+        ):
             raise TypeError(
                 f"incompatible types `{", ".join(val_types)}` in case expression."
             )
@@ -1063,11 +1073,13 @@ class CaseExpr(ColExpr):
             return None
 
         common_ancestors: list[Dtype] = list(common_ancestors)
-        self._dtype = common_ancestors[
-            signature.best_signature_match(
-                val_types, [[anc] * len(val_types) for anc in common_ancestors]
-            )
-        ]
+        self._dtype = copy.copy(
+            common_ancestors[
+                signature.best_signature_match(
+                    val_types, [[anc] * len(val_types) for anc in common_ancestors]
+                )
+            ]
+        )
         self._dtype.const = all(
             (
                 *(cond.dtype().const and val.dtype().const for cond, val in self.cases),
@@ -1155,17 +1167,20 @@ class Cast(ColExpr):
                     (ft, it)
                     for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)
                 ),
-                (Datetime, Date),
+                (Datetime(), Date()),
                 *(
                     (t, String())
                     for t in (
                         Int(),
                         *INT_SUBTYPES,
-                        Float() * FLOAT_SUBTYPES,
+                        Float(),
+                        *FLOAT_SUBTYPES,
                         Datetime(),
                         Date(),
                     )
                 ),
+                *((Int(), t) for t in INT_SUBTYPES),
+                *((Float(), t) for t in FLOAT_SUBTYPES),
             }
 
             if (

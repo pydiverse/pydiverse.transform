@@ -92,7 +92,13 @@ class TableImpl(AstNode):
     def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None: ...
 
     @classmethod
-    def export(cls, nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
+    def export(
+        cls,
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[Col, Any],
+    ) -> Any: ...
 
     @classmethod
     def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:
