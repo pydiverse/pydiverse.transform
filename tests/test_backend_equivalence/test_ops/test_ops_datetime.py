@@ -2,11 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydiverse.transform import C
-from pydiverse.transform._internal.pipe.verbs import (
-    filter,
-    mutate,
-)
+from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
 

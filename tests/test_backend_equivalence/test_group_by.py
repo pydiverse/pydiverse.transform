@@ -2,18 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from pydiverse.transform import C
-from pydiverse.transform._internal.pipe import functions
-from pydiverse.transform._internal.pipe.verbs import (
-    arrange,
-    filter,
-    group_by,
-    join,
-    left_join,
-    mutate,
-    select,
-    ungroup,
-)
+import pydiverse.transform as pdt
+from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
 
@@ -48,12 +38,12 @@ def test_mutate(df3, df4):
         >> ungroup()
         >> left_join(u, t.col2 == u.col2)
         >> mutate(
-            x=functions.row_number(
+            x=pdt.row_number(
                 arrange=[u.col4.nulls_last(), t.col4.nulls_first()],
                 partition_by=[t.col1],
             ),
             p=t.col1 * u.col4,
-            y=functions.rank(
+            y=pdt.rank(
                 arrange=[(t.col1 * u.col4).nulls_last().nulls_first().nulls_last()]
             ),
         ),
