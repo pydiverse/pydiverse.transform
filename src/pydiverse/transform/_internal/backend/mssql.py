@@ -25,7 +25,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     Order,
 )
 from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, String
-from pydiverse.transform._internal.util.warnings import warn_non_standard
 
 
 class MsSqlImpl(SqlImpl):
@@ -194,49 +193,51 @@ with MsSqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.equal, String(), String())
     def _eq(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        return (sqa.func.LENGTH(x + "a") == sqa.func.LENGTH(y + "a")) & (
+            x.collate("Latin1_General_bin") == y
         )
-        return x == y
 
     @impl(ops.not_equal, String(), String())
     def _ne(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        return (sqa.func.LENGTH(x + "a") != sqa.func.LENGTH(y + "a")) | (
+            x.collate("Latin1_General_bin") != y
         )
-        return x != y
 
     @impl(ops.less_than, String(), String())
     def _lt(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") < y_) | (
+            (sqa.func.LENGTH(x + "a") < sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x < y
 
     @impl(ops.less_equal, String(), String())
     def _le(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") < y_) | (
+            (sqa.func.LENGTH(x + "a") <= sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x <= y
 
     @impl(ops.greater_than, String(), String())
     def _gt(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") > y_) | (
+            (sqa.func.LENGTH(x + "a") > sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x > y
 
     @impl(ops.greater_equal, String(), String())
     def _ge(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") > y_) | (
+            (sqa.func.LENGTH(x + "a") >= sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x >= y
 
     @impl(ops.str_len)
     def _str_length(x):
-        return sqa.func.LENGTH(x + "a", type_=sqa.Integer()) - 1
+        return sqa.func.LENGTH(x + "a", type_=sqa.BigInteger()) - 1
 
     @impl(ops.str_replace_all)
     def _str_replace_all(x, y, z):

@@ -33,10 +33,22 @@ def test_gt(df_strings):
 
 
 def test_le(df_strings):
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> mutate(
+            col1_le_c=C.col1 <= C.c,
+            col1_le_col2=t.col1 <= t.col2,
+            d_le_c=t.d <= t.c,
+        ),
+    )
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 <= C.col2))
 
 
 def test_ge(df_strings):
+    assert_result_equal(
+        df_strings, lambda t: t >> mutate(col1_ge_col2=C.col1 >= C.col2)
+    )
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 >= C.col2))
 
 
