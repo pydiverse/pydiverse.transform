@@ -7,7 +7,6 @@ import polars as pl
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
@@ -380,14 +379,29 @@ def compile_ast(
                 coalesce=False,
             )
         else:
-            if nd.how != "inner":
-                raise NotSupportedError(
-                    f"polars does not support {nd.how} inequality join but only inner "
-                    "ones"
+            if nd.how in ("left", "full"):
+                df = df.with_columns(
+                    __LEFT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
                 )
-            df = df.join_where(
+            if nd.how in ("full"):
+                right_df = right_df.with_columns(
+                    __RIGHT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+                )
+
+            joined = df.join_where(
                 right_df, *(compile_col_expr(pred, name_in_df) for pred in predicates)
             )
+
+            if nd.how in ("left", "full"):
+                joined = df.join(joined, on="__LEFT_INDEX__", how="left").drop(
+                    "__LEFT_INDEX__"
+                )
+            if nd.how in ("full"):
+                joined = joined.join(right_df, on="__RIGHT_INDEX__", how="right").drop(
+                    "__RIGHT_INDEX__"
+                )
+
+            df = joined
 
         select += [col_name + nd.suffix for col_name in right_select]
 

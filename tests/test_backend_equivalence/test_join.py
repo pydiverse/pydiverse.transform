@@ -65,7 +65,7 @@ def test_join_and_select(df1, df2, how):
     assert_result_equal(
         (df1, df2),
         lambda t, u: t
-        >> join(u >> select(), (t.col1 == u.col1) & (u.col1 == t.col2), how=how),
+        >> join(u >> select(), (t.col1 == u.col1) & (u.col2 == t.col1), how=how),
         check_row_order=False,
     )
 
@@ -130,5 +130,25 @@ def test_ineq_join(df3, df4, df_strings):
             t,
             (s.col1 - s.col2 <= t.c.str.len())
             & (s.col4 >= pdt.when(t.col1.str.starts_with("-")).then(100).otherwise(4)),
+        ),
+    )
+
+    assert_result_equal(
+        (df3, df_strings),
+        lambda s, t: s
+        >> left_join(
+            t,
+            (s.col1 - s.col2 <= t.c.str.len() * t.d.str.len())
+            & (s.col4 >= pdt.when(t.col1.str.starts_with("-")).then(100).otherwise(7)),
+        ),
+    )
+
+    assert_result_equal(
+        (df3, df_strings),
+        lambda s, t: s
+        >> left_join(
+            t,
+            (s.col4 - s.col2 <= t.col1.str.len() * t.d.str.len())
+            & (s.col4 >= pdt.when(t.col1.str.starts_with(" ")).then(10).otherwise(7)),
         ),
     )
