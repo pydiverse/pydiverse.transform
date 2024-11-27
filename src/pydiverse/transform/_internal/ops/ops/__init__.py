@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from .aggregate import *
-from .core import *
+from .aggregation import *
+from .arithmetic import *
+from .comparison import *
 from .datetime import *
-from .generic import *
+from .horizontal import *
 from .logical import *
 from .markers import *
 from .numeric import *

@@ -7,11 +7,13 @@ from typing import Any
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import DATETIME2
 
-from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend import sql
+from pydiverse.transform._internal.backend.polars import polars_type
 from pydiverse.transform._internal.backend.sql import SqlImpl
+from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.errors import NotSupportedError
-from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.tree import verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
@@ -22,7 +24,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.util.warnings import warn_non_standard
+from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, String
 
 
 class MsSqlImpl(SqlImpl):
@@ -33,6 +35,21 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def nan():
         raise NotSupportedError("SQL Server does not support `nan`")
+
+    @classmethod
+    def export(
+        cls,
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[Col, Any],
+    ) -> Any:
+        for col in final_select:
+            if col.dtype() <= Bool():
+                if col not in schema_overrides:
+                    schema_overrides[col] = polars_type(col.dtype())
+
+        return super().export(nd, target, final_select, schema_overrides)
 
     @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
@@ -64,11 +81,11 @@ class MsSqlImpl(SqlImpl):
         return cls.compile_query(table, query)
 
     @classmethod
-    def sqa_type(cls, t: dtypes.Dtype):
-        if isinstance(t, dtypes.Datetime):
+    def sqa_type(cls, pdt_type: Dtype):
+        if pdt_type <= Datetime():
             return DATETIME2
 
-        return super().sqa_type(t)
+        return super().sqa_type(pdt_type)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
@@ -109,31 +126,30 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         )
 
     elif isinstance(expr, Col):
-        if not wants_bool_as_bit and expr.dtype() == dtypes.Bool:
-            return ColFn("__eq__", expr, LiteralCol(True))
+        if not wants_bool_as_bit and expr.dtype() <= Bool():
+            return ColFn(ops.equal, expr, LiteralCol(True))
         return expr
 
     elif isinstance(expr, ColFn):
-        op = MsSqlImpl.registry.get_op(expr.name)
-        wants_bool_as_bit_input = not isinstance(
-            op, ops.logical.BooleanBinary | ops.logical.Invert
+        wants_args_bool_as_bit = expr.op not in (
+            ops.bool_xor,
+            ops.bool_and,
+            ops.bool_or,
+            ops.bool_invert,
         )
 
         converted = copy.copy(expr)
         converted.args = [
-            convert_bool_bit(arg, wants_bool_as_bit_input) for arg in expr.args
+            convert_bool_bit(arg, wants_args_bool_as_bit) for arg in expr.args
         ]
         converted.context_kwargs = {
             key: [convert_bool_bit(val, wants_bool_as_bit) for val in arr]
             for key, arr in expr.context_kwargs.items()
         }
 
-        impl = MsSqlImpl.registry.get_impl(
-            expr.name, tuple(arg.dtype() for arg in expr.args)
-        )
-
-        if isinstance(impl.return_type, dtypes.Bool):
-            returns_bool_as_bit = not isinstance(op, ops.logical.Logical)
+        if expr.op.return_type(tuple(arg.dtype() for arg in expr.args)) <= Bool():
+            # most operations return bits, except for `any`, `all`
+            returns_bool_as_bit = isinstance(expr.op, ops.Aggregation | ops.Window)
 
             if wants_bool_as_bit and not returns_bool_as_bit:
                 return CaseExpr(
@@ -141,7 +157,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
                     None,
                 )
             elif not wants_bool_as_bit and returns_bool_as_bit:
-                return ColFn("__eq__", converted, LiteralCol(True))
+                return ColFn(ops.equal, converted, LiteralCol(True))
 
         return converted
 
@@ -173,185 +189,116 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
     raise AssertionError
 
 
-with MsSqlImpl.op(ops.Equal()) as op:
+with MsSqlImpl.impl_store.impl_manager as impl:
 
-    @op("str, str -> bool")
+    @impl(ops.equal, String(), String())
     def _eq(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        return (sqa.func.LENGTH(x + "a") == sqa.func.LENGTH(y + "a")) & (
+            x.collate("Latin1_General_bin") == y
         )
-        return x == y
 
-
-with MsSqlImpl.op(ops.NotEqual()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.not_equal, String(), String())
     def _ne(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        return (sqa.func.LENGTH(x + "a") != sqa.func.LENGTH(y + "a")) | (
+            x.collate("Latin1_General_bin") != y
         )
-        return x != y
 
-
-with MsSqlImpl.op(ops.Less()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.less_than, String(), String())
     def _lt(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") < y_) | (
+            (sqa.func.LENGTH(x + "a") < sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x < y
 
-
-with MsSqlImpl.op(ops.LessEqual()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.less_equal, String(), String())
     def _le(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") < y_) | (
+            (sqa.func.LENGTH(x + "a") <= sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x <= y
 
-
-with MsSqlImpl.op(ops.Greater()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.greater_than, String(), String())
     def _gt(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") > y_) | (
+            (sqa.func.LENGTH(x + "a") > sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x > y
 
-
-with MsSqlImpl.op(ops.GreaterEqual()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.greater_equal, String(), String())
     def _ge(x, y):
-        warn_non_standard(
-            "MSSQL ignores trailing whitespace when comparing strings",
+        y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
+        return (x.collate("Latin1_General_bin") > y_) | (
+            (sqa.func.LENGTH(x + "a") >= sqa.func.LENGTH(y + "a"))
+            & (x.collate("Latin1_General_bin") == y_)
         )
-        return x >= y
 
-
-with MsSqlImpl.op(ops.Pow()) as op:
-
-    @op.auto
-    def _pow(lhs, rhs):
-        # In MSSQL, the output type of pow is the same as the input type.
-        # This means, that if lhs is a decimal, then we may very easily loose
-        # a lot of precision if the exponent is <= 1
-        # https://learn.microsoft.com/en-us/sql/t-sql/functions/power-transact-sql?view=sql-server-ver16
-        return sqa.func.POWER(sqa.cast(lhs, sqa.Double()), rhs, type_=sqa.Double())
-
-
-with MsSqlImpl.op(ops.StrLen()) as op:
-
-    @op.auto
+    @impl(ops.str_len)
     def _str_length(x):
-        return sqa.func.LENGTH(x + "a", type_=sqa.Integer()) - 1
+        return sqa.func.LENGTH(x + "a", type_=sqa.BigInteger()) - 1
 
-
-with MsSqlImpl.op(ops.StrReplaceAll()) as op:
-
-    @op.auto
-    def _replace_all(x, y, z):
+    @impl(ops.str_replace_all)
+    def _str_replace_all(x, y, z):
         x = x.collate("Latin1_General_CS_AS")
         return sqa.func.REPLACE(x, y, z, type_=x.type)
 
-
-with MsSqlImpl.op(ops.StrStartsWith()) as op:
-
-    @op.auto
-    def _startswith(x, y):
+    @impl(ops.str_starts_with)
+    def _str_starts_with(x, y):
         x = x.collate("Latin1_General_CS_AS")
         return x.startswith(y, autoescape=True)
 
-
-with MsSqlImpl.op(ops.StrEndsWith()) as op:
-
-    @op.auto
-    def _endswith(x, y):
+    @impl(ops.str_ends_with)
+    def _str_ends_with(x, y):
         x = x.collate("Latin1_General_CS_AS")
         return x.endswith(y, autoescape=True)
 
-
-with MsSqlImpl.op(ops.StrContains()) as op:
-
-    @op.auto
+    @impl(ops.str_contains)
     def _contains(x, y):
         x = x.collate("Latin1_General_CS_AS")
         return x.contains(y, autoescape=True)
 
-
-with MsSqlImpl.op(ops.StrSlice()) as op:
-
-    @op.auto
+    @impl(ops.str_slice)
     def _str_slice(x, offset, length):
         return sqa.func.SUBSTRING(x, offset + 1, length)
 
-
-with MsSqlImpl.op(ops.DtDayOfWeek()) as op:
-
-    @op.auto
-    def _day_of_week(x):
+    @impl(ops.dt_day_of_week)
+    def _dt_day_of_week(x):
         # Offset DOW such that Mon=1, Sun=7
         _1 = sqa.literal_column("1")
         _2 = sqa.literal_column("2")
         _7 = sqa.literal_column("7")
         return (sqa.extract("dow", x) + sqa.text("@@DATEFIRST") - _2) % _7 + _1
 
-
-with MsSqlImpl.op(ops.Mean()) as op:
-
-    @op.auto
+    @impl(ops.mean)
     def _mean(x):
         return sqa.func.AVG(sqa.cast(x, sqa.Double()), type_=sqa.Double())
 
-
-with MsSqlImpl.op(ops.Log()) as op:
-
-    @op.auto
+    @impl(ops.log)
     def _log(x):
         return sqa.func.log(x)
 
-
-with MsSqlImpl.op(ops.Ceil()) as op:
-
-    @op.auto
+    @impl(ops.ceil)
     def _ceil(x):
         return sqa.func.ceiling(x)
 
-
-with MsSqlImpl.op(ops.StrToDateTime()) as op:
-
-    @op.auto
+    @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return sqa.cast(x, DATETIME2)
 
-
-with MsSqlImpl.op(ops.IsInf()) as op:
-
-    @op.auto
+    @impl(ops.is_inf)
     def _is_inf(x):
         return False
 
-
-with MsSqlImpl.op(ops.IsNotInf()) as op:
-
-    @op.auto
+    @impl(ops.is_not_inf)
     def _is_not_inf(x):
         return True
 
-
-with MsSqlImpl.op(ops.IsNan()) as op:
-
-    @op.auto
+    @impl(ops.is_nan)
     def _is_nan(x):
         return False
 
-
-with MsSqlImpl.op(ops.IsNotNan()) as op:
-
-    @op.auto
+    @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return True

@@ -5,11 +5,11 @@ from uuid import UUID
 
 import polars as pl
 
-from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.ops.core import Ftype
-from pydiverse.transform._internal.tree import dtypes, verbs
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops.op import Ftype
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
@@ -20,6 +20,28 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
+from pydiverse.transform._internal.tree.types import (
+    Bool,
+    Date,
+    Datetime,
+    Decimal,
+    Dtype,
+    Duration,
+    Float,
+    Float32,
+    Float64,
+    Int,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    NullType,
+    String,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+)
 
 
 class PolarsImpl(TableImpl):
@@ -27,10 +49,7 @@ class PolarsImpl(TableImpl):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
         super().__init__(
             name,
-            {
-                name: polars_type_to_pdt(dtype)
-                for name, dtype in df.collect_schema().items()
-            },
+            {name: pdt_type(dtype) for name, dtype in df.collect_schema().items()},
         )
 
     @staticmethod
@@ -38,9 +57,14 @@ class PolarsImpl(TableImpl):
         return None
 
     @staticmethod
-    def export(nd: AstNode, target: Target, final_select: list[Col]) -> Any:
+    def export(
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict,
+    ) -> Any:
         lf, _, select, _ = compile_ast(nd)
-        lf = lf.select(select)
+        lf = lf.select(*select)
         if isinstance(target, Polars):
             if not target.lazy:
                 lf = lf.collect()
@@ -91,22 +115,13 @@ def compile_order(
     )
 
 
-def compile_col_expr(
-    expr: ColExpr, name_in_df: dict[UUID, str], *, compile_literals: bool = True
-) -> pl.Expr:
+def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
     if isinstance(expr, Col):
         return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
-        op = PolarsImpl.registry.get_op(expr.name)
-        impl = PolarsImpl.registry.get_impl(
-            expr.name,
-            tuple(arg.dtype() for arg in expr.args),
-        )
-        args: list[pl.Expr] = [
-            compile_col_expr(arg, name_in_df, compile_literals=not param.const)
-            for arg, param in zip(expr.args, impl.impl.signature, strict=False)
-        ]
+        impl = PolarsImpl.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
+        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
 
         if (partition_by := expr.context_kwargs.get("partition_by")) is not None:
             partition_by = [compile_col_expr(pb, name_in_df) for pb in partition_by]
@@ -131,7 +146,7 @@ def compile_col_expr(
                 nulls_last=[nl if nl is not None else False for nl in nulls_last],
             )
 
-        if op.name in ("rank", "dense_rank"):
+        if expr.op in (ops.rank, ops.dense_rank):
             assert len(expr.args) == 0
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
@@ -141,7 +156,7 @@ def compile_col_expr(
         # TODO: currently, count is the only aggregation function where we don't want
         # to return null for cols containing only null values. If this happens for more
         # aggregation functions, make this configurable in e.g. the operator spec.
-        if op.ftype == Ftype.AGGREGATE and op.name != "len":
+        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.len:
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -161,7 +176,7 @@ def compile_col_expr(
             value = value.over(partition_by, order_by=order_by)
 
         elif arrange:
-            if op.ftype == Ftype.AGGREGATE:
+            if expr.op.ftype == Ftype.AGGREGATE:
                 # TODO: don't fail, but give a warning that `arrange` is useless
                 # here
                 ...
@@ -191,18 +206,20 @@ def compile_col_expr(
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return (
-            pl.lit(expr.val, dtype=pdt_type_to_polars(expr.dtype()))
-            if compile_literals
-            else expr.val
-        )
+        return pl.lit(expr.val, dtype=polars_type(expr.dtype()))
 
     elif isinstance(expr, Cast):
+        if (
+            expr.target_type <= Int()
+            or expr.target_type <= Float()
+            and expr.val.dtype() <= String()
+        ):
+            expr.val = expr.val.str.strip()
         compiled = compile_col_expr(expr.val, name_in_df).cast(
-            pdt_type_to_polars(expr.target_type)
+            polars_type(expr.target_type)
         )
 
-        if expr.val.dtype() == dtypes.Float64 and expr.target_type == dtypes.String:
+        if expr.val.dtype() <= Float() and expr.target_type == String():
             compiled = compiled.replace("NaN", "nan")
 
         return compiled
@@ -211,23 +228,12 @@ def compile_col_expr(
         raise AssertionError
 
 
-def compile_join_cond(
-    expr: ColExpr, name_in_df: dict[UUID, str]
-) -> list[tuple[pl.Expr, pl.Expr]]:
-    if isinstance(expr, ColFn):
-        if expr.name == "__and__":
-            return compile_join_cond(expr.args[0], name_in_df) + compile_join_cond(
-                expr.args[1], name_in_df
-            )
-        if expr.name == "__eq__":
-            return [
-                (
-                    compile_col_expr(expr.args[0], name_in_df),
-                    compile_col_expr(expr.args[1], name_in_df),
-                )
-            ]
-
-    raise AssertionError()
+def split_join_cond(expr: ColFn) -> list[ColFn]:
+    assert isinstance(expr, ColFn)
+    if expr.op == ops.bool_and:
+        return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
+    else:
+        return [expr]
 
 
 def compile_ast(
@@ -296,7 +302,7 @@ def compile_ast(
         def has_path_to_leaf_without_agg(expr: ColExpr):
             if isinstance(expr, Col):
                 return True
-            if isinstance(expr, ColFn) and expr.op().ftype == Ftype.AGGREGATE:
+            if isinstance(expr, ColFn) and expr.op.ftype == Ftype.AGGREGATE:
                 return False
             return any(
                 has_path_to_leaf_without_agg(child) for child in expr.iter_children()
@@ -334,22 +340,70 @@ def compile_ast(
 
     elif isinstance(nd, verbs.Join):
         right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
+        assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
         name_in_df.update(
             {uid: name + nd.suffix for uid, name in right_name_in_df.items()}
         )
-        left_on, right_on = zip(*compile_join_cond(nd.on, name_in_df), strict=True)
 
         assert len(partition_by) == 0
-        select += [col_name + nd.suffix for col_name in right_select]
 
-        df = df.join(
-            right_df.rename({name: name + nd.suffix for name in right_df.columns}),
-            left_on=left_on,
-            right_on=right_on,
-            how=nd.how,
-            validate=nd.validate,
-            coalesce=False,
+        predicates = split_join_cond(nd.on)
+        right_df = right_df.rename(
+            {name: name + nd.suffix for name in right_df.columns}
         )
+
+        if all(pred.op == ops.equal for pred in predicates):
+            left_on = []
+            right_on = []
+            for pred in predicates:
+                left_on.append(pred.args[0])
+                right_on.append(pred.args[1])
+
+                left_is_left = None
+                for e in pred.args[0].iter_subtree():
+                    if isinstance(e, Col):
+                        left_is_left = e._uuid not in right_name_in_df
+                        assert e._uuid in name_in_df
+                        break
+                assert left_is_left is not None
+
+                if not left_is_left:
+                    left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
+
+            df = df.join(
+                right_df,
+                left_on=[compile_col_expr(col, name_in_df) for col in left_on],
+                right_on=[compile_col_expr(col, name_in_df) for col in right_on],
+                how=nd.how,
+                validate=nd.validate,
+                coalesce=False,
+            )
+        else:
+            if nd.how in ("left", "full"):
+                df = df.with_columns(
+                    __LEFT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+                )
+            if nd.how in ("full"):
+                right_df = right_df.with_columns(
+                    __RIGHT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+                )
+
+            joined = df.join_where(
+                right_df, *(compile_col_expr(pred, name_in_df) for pred in predicates)
+            )
+
+            if nd.how in ("left", "full"):
+                joined = df.join(joined, on="__LEFT_INDEX__", how="left").drop(
+                    "__LEFT_INDEX__"
+                )
+            if nd.how in ("full"):
+                joined = joined.join(right_df, on="__RIGHT_INDEX__", how="right").drop(
+                    "__RIGHT_INDEX__"
+                )
+
+            df = joined
+
+        select += [col_name + nd.suffix for col_name in right_select]
 
     elif isinstance(nd, PolarsImpl):
         df = nd.df
@@ -360,442 +414,317 @@ def compile_ast(
     return df, name_in_df, select, partition_by
 
 
-def polars_type_to_pdt(t: pl.DataType) -> dtypes.Dtype:
-    if t.is_float():
-        return dtypes.Float64()
-    elif t.is_integer():
-        return dtypes.Int64()
-    elif isinstance(t, pl.Boolean):
-        return dtypes.Bool()
-    elif isinstance(t, pl.String):
-        return dtypes.String()
-    elif isinstance(t, pl.Datetime):
-        return dtypes.Datetime()
-    elif isinstance(t, pl.Date):
-        return dtypes.Date()
-    elif isinstance(t, pl.Duration):
-        return dtypes.Duration()
-    elif isinstance(t, pl.Null):
-        return dtypes.NullType()
+def pdt_type(pl_type: pl.DataType) -> Dtype:
+    if pl_type == pl.Float64():
+        return Float64()
+    elif pl_type == pl.Float32():
+        return Float32()
 
-    raise TypeError(f"polars type {t} is not supported by pydiverse.transform")
+    elif pl_type == pl.Int64():
+        return Int64()
+    elif pl_type == pl.Int32():
+        return Int32()
+    elif pl_type == pl.Int16():
+        return Int16()
+    elif pl_type == pl.Int8():
+        return Int8()
+
+    elif pl_type == pl.UInt64():
+        return Uint64()
+    elif pl_type == pl.UInt32():
+        return Uint32()
+    elif pl_type == pl.UInt16():
+        return Uint16()
+    elif pl_type == pl.UInt8():
+        return Uint8()
+
+    elif pl_type.is_decimal():
+        return Decimal()
+    elif isinstance(pl_type, pl.Boolean):
+        return Bool()
+    elif isinstance(pl_type, pl.String):
+        return String()
+    elif isinstance(pl_type, pl.Datetime):
+        return Datetime()
+    elif isinstance(pl_type, pl.Date):
+        return Date()
+    elif isinstance(pl_type, pl.Duration):
+        return Duration()
+    elif isinstance(pl_type, pl.Null):
+        return NullType()
+
+    raise TypeError(f"polars type {pl_type} is not supported by pydiverse.transform")
 
 
-def pdt_type_to_polars(t: dtypes.Dtype) -> pl.DataType:
-    if isinstance(t, dtypes.Float64 | dtypes.Decimal):
+def polars_type(pdt_type: Dtype) -> pl.DataType:
+    assert types.is_subtype(pdt_type)
+
+    if pdt_type <= Float64():
         return pl.Float64()
-    elif isinstance(t, dtypes.Int64):
+    elif pdt_type <= Float32():
+        return pl.Float32()
+
+    elif pdt_type <= Int64():
         return pl.Int64()
-    elif isinstance(t, dtypes.Bool):
+    elif pdt_type <= Int32():
+        return pl.Int32()
+    elif pdt_type <= Int16():
+        return pl.Int16()
+    elif pdt_type <= Int8():
+        return pl.Int8()
+
+    elif pdt_type <= Uint64():
+        return pl.UInt64()
+    elif pdt_type <= Uint32():
+        return pl.UInt32()
+    elif pdt_type <= Uint16():
+        return pl.UInt16()
+    elif pdt_type <= Uint8():
+        return pl.UInt8()
+
+    elif pdt_type <= Bool():
         return pl.Boolean()
-    elif isinstance(t, dtypes.String):
+    elif pdt_type <= String():
         return pl.String()
-    elif isinstance(t, dtypes.Datetime):
+    elif pdt_type <= Datetime():
         return pl.Datetime()
-    elif isinstance(t, dtypes.Date):
+    elif pdt_type <= Date():
         return pl.Date()
-    elif isinstance(t, dtypes.Duration):
+    elif pdt_type <= Duration():
         return pl.Duration()
-    elif isinstance(t, dtypes.NullType):
+    elif pdt_type <= NullType():
         return pl.Null()
 
     raise AssertionError
 
 
-with PolarsImpl.op(ops.Mean()) as op:
+with PolarsImpl.impl_store.impl_manager as impl:
 
-    @op.auto
+    @impl(ops.mean)
     def _mean(x):
         return x.mean()
 
-
-with PolarsImpl.op(ops.Min()) as op:
-
-    @op.auto
+    @impl(ops.min)
     def _min(x):
         return x.min()
 
-
-with PolarsImpl.op(ops.Max()) as op:
-
-    @op.auto
+    @impl(ops.max)
     def _max(x):
         return x.max()
 
-
-with PolarsImpl.op(ops.Sum()) as op:
-
-    @op.auto
+    @impl(ops.sum)
     def _sum(x):
         return x.sum()
 
-
-with PolarsImpl.op(ops.All()) as op:
-
-    @op.auto
+    @impl(ops.all)
     def _all(x):
         return x.all()
 
-
-with PolarsImpl.op(ops.Any()) as op:
-
-    @op.auto
+    @impl(ops.any)
     def _any(x):
         return x.any()
 
-
-with PolarsImpl.op(ops.IsNull()) as op:
-
-    @op.auto
+    @impl(ops.is_null)
     def _is_null(x):
         return x.is_null()
 
-
-with PolarsImpl.op(ops.IsNotNull()) as op:
-
-    @op.auto
+    @impl(ops.is_not_null)
     def _is_not_null(x):
         return x.is_not_null()
 
-
-with PolarsImpl.op(ops.FillNull()) as op:
-
-    @op.auto
+    @impl(ops.fill_null)
     def _fill_null(x, y):
         return x.fill_null(y)
 
-
-with PolarsImpl.op(ops.DtYear()) as op:
-
-    @op.auto
+    @impl(ops.dt_year)
     def _dt_year(x):
         return x.dt.year().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtMonth()) as op:
-
-    @op.auto
+    @impl(ops.dt_month)
     def _dt_month(x):
         return x.dt.month().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDay()) as op:
-
-    @op.auto
+    @impl(ops.dt_day)
     def _dt_day(x):
         return x.dt.day().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtHour()) as op:
-
-    @op.auto
+    @impl(ops.dt_hour)
     def _dt_hour(x):
         return x.dt.hour().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtMinute()) as op:
-
-    @op.auto
+    @impl(ops.dt_minute)
     def _dt_minute(x):
         return x.dt.minute().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtSecond()) as op:
-
-    @op.auto
+    @impl(ops.dt_second)
     def _dt_second(x):
         return x.dt.second().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtMillisecond()) as op:
-
-    @op.auto
+    @impl(ops.dt_millisecond)
     def _dt_millisecond(x):
         return x.dt.millisecond().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDayOfWeek()) as op:
-
-    @op.auto
+    @impl(ops.dt_day_of_week)
     def _dt_day_of_week(x):
         return x.dt.weekday().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDayOfYear()) as op:
-
-    @op.auto
+    @impl(ops.dt_day_of_year)
     def _dt_day_of_year(x):
         return x.dt.ordinal_day().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DtDays()) as op:
-
-    @op.auto
-    def _days(x):
+    @impl(ops.dt_days)
+    def _dt_days(x):
         return x.dt.total_days()
 
-
-with PolarsImpl.op(ops.DtHours()) as op:
-
-    @op.auto
-    def _hours(x):
+    @impl(ops.dt_hours)
+    def _dt_hours(x):
         return x.dt.total_hours()
 
-
-with PolarsImpl.op(ops.DtMinutes()) as op:
-
-    @op.auto
-    def _minutes(x):
+    @impl(ops.dt_minutes)
+    def _dt_minutes(x):
         return x.dt.total_minutes()
 
-
-with PolarsImpl.op(ops.DtSeconds()) as op:
-
-    @op.auto
-    def _seconds(x):
+    @impl(ops.dt_seconds)
+    def _dt_seconds(x):
         return x.dt.total_seconds()
 
-
-with PolarsImpl.op(ops.DtMilliseconds()) as op:
-
-    @op.auto
-    def _milliseconds(x):
+    @impl(ops.dt_milliseconds)
+    def _dt_milliseconds(x):
         return x.dt.total_milliseconds()
 
-
-with PolarsImpl.op(ops.Sub()) as op:
-
-    @op.extension(ops.DtSub)
-    def _dt_sub(lhs, rhs):
-        return lhs - rhs
-
-
-with PolarsImpl.op(ops.Add()) as op:
-
-    @op.extension(ops.DtDurAdd)
-    def _dt_dur_add(lhs, rhs):
-        return lhs + rhs
-
-
-with PolarsImpl.op(ops.RowNumber()) as op:
-
-    @op.auto
+    @impl(ops.row_number)
     def _row_number():
         return pl.int_range(start=1, end=pl.len() + 1, dtype=pl.Int64)
 
-
-with PolarsImpl.op(ops.Rank()) as op:
-
-    @op.auto
+    @impl(ops.rank)
     def _rank(x):
         return x.rank("min").cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.DenseRank()) as op:
-
-    @op.auto
+    @impl(ops.dense_rank)
     def _dense_rank(x):
         return x.rank("dense").cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.Shift()) as op:
-
-    @op.auto
+    @impl(ops.shift)
     def _shift(x, n, fill_value=None):
         return x.shift(n, fill_value=fill_value)
 
-
-with PolarsImpl.op(ops.IsIn()) as op:
-
-    @op.auto
-    def _isin(x, *values, _pdt_args):
+    @impl(ops.is_in)
+    def _is_in(x, *values, _pdt_args):
+        if len(values) == 0:
+            return pl.lit(False)
         return pl.any_horizontal(
-            (x == val if arg.dtype() != dtypes.NullType else x.is_null())
+            (x == val if not arg.dtype() <= NullType() else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)
         )
 
-
-with PolarsImpl.op(ops.StrContains()) as op:
-
-    @op.auto
-    def _contains(x, y):
+    @impl(ops.str_contains)
+    def _str_contains(x, y):
         return x.str.contains(y)
 
-
-with PolarsImpl.op(ops.StrStartsWith()) as op:
-
-    @op.auto
-    def _starts_with(x, y):
+    @impl(ops.str_starts_with)
+    def _str_starts_with(x, y):
         return x.str.starts_with(y)
 
-
-with PolarsImpl.op(ops.StrEndsWith()) as op:
-
-    @op.auto
-    def _ends_with(x, y):
+    @impl(ops.str_ends_with)
+    def _str_ends_with(x, y):
         return x.str.ends_with(y)
 
-
-with PolarsImpl.op(ops.StrToLower()) as op:
-
-    @op.auto
-    def _lower(x):
+    @impl(ops.str_lower)
+    def _str_lower(x):
         return x.str.to_lowercase()
 
-
-with PolarsImpl.op(ops.StrToUpper()) as op:
-
-    @op.auto
-    def _upper(x):
+    @impl(ops.str_upper)
+    def _str_upper(x):
         return x.str.to_uppercase()
 
-
-with PolarsImpl.op(ops.StrReplaceAll()) as op:
-
-    @op.auto
-    def _replace_all(x, to_replace, replacement):
+    @impl(ops.str_replace_all)
+    def _str_replace_all(x, to_replace, replacement):
         return x.str.replace_all(to_replace, replacement)
 
-
-with PolarsImpl.op(ops.StrLen()) as op:
-
-    @op.auto
-    def _string_length(x):
+    @impl(ops.str_len)
+    def _str_len(x):
         return x.str.len_chars().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.StrStrip()) as op:
-
-    @op.auto
+    @impl(ops.str_strip)
     def _str_strip(x):
         return x.str.strip_chars()
 
-
-with PolarsImpl.op(ops.StrSlice()) as op:
-
-    @op.auto
+    @impl(ops.str_slice)
     def _str_slice(x, offset, length):
         return x.str.slice(offset, length)
 
-
-with PolarsImpl.op(ops.Count()) as op:
-
-    @op.auto
+    @impl(ops.count)
     def _count(x):
         return x.count().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.Len()) as op:
-
-    @op.auto
+    @impl(ops.len)
     def _len():
         return pl.len().cast(pl.Int64)
 
-
-with PolarsImpl.op(ops.HMax()) as op:
-
-    @op.auto
-    def _greatest(*x):
+    @impl(ops.horizontal_max)
+    def _horizontal_max(*x):
         return pl.max_horizontal(*x)
 
-
-with PolarsImpl.op(ops.HMin()) as op:
-
-    @op.auto
-    def _least(*x):
+    @impl(ops.horizontal_min)
+    def _horizontal_min(*x):
         return pl.min_horizontal(*x)
 
+    @impl(ops.round)
+    def _round(x, digits):
+        return x.round(pl.select(digits).item())
 
-with PolarsImpl.op(ops.Round()) as op:
-
-    @op.auto
-    def _round(x, digits=0):
-        return x.round(digits)
-
-
-with PolarsImpl.op(ops.Exp()) as op:
-
-    @op.auto
+    @impl(ops.exp)
     def _exp(x):
         return x.exp()
 
-
-with PolarsImpl.op(ops.Log()) as op:
-
-    @op.auto
+    @impl(ops.log)
     def _log(x):
         return x.log()
 
-
-with PolarsImpl.op(ops.Floor()) as op:
-
-    @op.auto
+    @impl(ops.floor)
     def _floor(x):
         return x.floor()
 
-
-with PolarsImpl.op(ops.Ceil()) as op:
-
-    @op.auto
+    @impl(ops.ceil)
     def _ceil(x):
         return x.ceil()
 
-
-with PolarsImpl.op(ops.StrToDateTime()) as op:
-
-    @op.auto
+    @impl(ops.str_to_datetime)
     def _str_to_datetime(x):
         return x.str.to_datetime()
 
-
-with PolarsImpl.op(ops.StrToDate()) as op:
-
-    @op.auto
+    @impl(ops.str_to_date)
     def _str_to_date(x):
         return x.str.to_date()
 
-
-with PolarsImpl.op(ops.FloorDiv()) as op:
-
-    @op.auto
+    @impl(ops.floordiv)
     def _floordiv(lhs, rhs):
         result_sign = (lhs < 0) ^ (rhs < 0)
         return (abs(lhs) // abs(rhs)) * pl.when(result_sign).then(-1).otherwise(1)
         # TODO: test some alternatives if this is too slow
 
-
-with PolarsImpl.op(ops.Mod()) as op:
-
-    @op.auto
+    @impl(ops.mod)
     def _mod(lhs, rhs):
         return lhs % (abs(rhs) * pl.when(lhs >= 0).then(1).otherwise(-1))
         # TODO: see whether the following is faster:
         # pl.when(lhs >= 0).then(lhs % abs(rhs)).otherwise(lhs % -abs(rhs))
 
-
-with PolarsImpl.op(ops.IsInf()) as op:
-
-    @op.auto
+    @impl(ops.is_inf)
     def _is_inf(x):
         return x.is_infinite()
 
-
-with PolarsImpl.op(ops.IsNotInf()) as op:
-
-    @op.auto
+    @impl(ops.is_not_inf)
     def _is_not_inf(x):
         return x.is_finite()
 
-
-with PolarsImpl.op(ops.IsNan()) as op:
-
-    @op.auto
+    @impl(ops.is_nan)
     def _is_nan(x):
         return x.is_nan()
 
-
-with PolarsImpl.op(ops.IsNotNan()) as op:
-
-    @op.auto
+    @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x.is_not_nan()
+
+    @impl(ops.coalesce)
+    def _coalesce(*x):
+        return pl.coalesce(*x)

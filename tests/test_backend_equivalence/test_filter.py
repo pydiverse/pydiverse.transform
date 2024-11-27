@@ -40,28 +40,29 @@ def test_filter_after_mutate(df4):
     )
 
 
-def test_filter_isin(df4):
+def test_filter_is_in(df4):
     assert_result_equal(
         df4,
         lambda t: t
         >> filter(
-            C.col1.isin(0, 2),
-            C.col2.isin(0, t.col1 * t.col2),
-        ),
+            C.col1.is_in(0, 2),
+            C.col2.is_in(0, t.col1 * t.col2),
+        )
+        >> mutate(u=C.col3.is_in()),
     )
 
     assert_result_equal(
         df4,
-        lambda t: t >> filter((-(t.col4 // 2 - 1)).isin(1, 4, t.col1 + t.col2)),
+        lambda t: t >> filter((-(t.col4 // 2 - 1)).is_in(1, 4, t.col1 + t.col2)),
     )
 
-    assert_result_equal(df4, lambda t: t >> filter(t.col1.isin(None)))
+    assert_result_equal(df4, lambda t: t >> filter(t.col1.is_in(None)))
 
     assert_result_equal(
         df4,
         lambda t: t
-        >> mutate(x=t.col1.isin(0, 2))
+        >> mutate(x=t.col1.is_in(0, 2))
         >> filter(
-            t.col2.isin(0, 2) & C.x,
+            t.col2.is_in(0, 2) & C.x,
         ),
     )
