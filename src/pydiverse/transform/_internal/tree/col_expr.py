@@ -1114,7 +1114,8 @@ class CaseExpr(ColExpr):
         self._dtype = copy.copy(
             common_ancestors[
                 signature.best_signature_match(
-                    val_types, [[anc] * len(val_types) for anc in common_ancestors]
+                    val_types,
+                    [[ancestor] * len(val_types) for ancestor in common_ancestors],
                 )
             ]
         )

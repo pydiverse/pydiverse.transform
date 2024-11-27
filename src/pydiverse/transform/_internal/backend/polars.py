@@ -132,7 +132,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
                 *[compile_order(order, name_in_df) for order in arrange], strict=True
             )
 
-        # The following `if` block is absolutely unecessary and just an optimization.
+        # The following `if` block is absolutely unnecessary and just an optimization.
         # Otherwise, `over` would be used for sorting, but we cannot pass descending /
         # nulls_last there and the required workaround is probably slower than polars`s
         # native `sort_by`.
@@ -167,7 +167,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         if partition_by:
             # when doing sort_by -> over in polars, for whatever reason the
             # `nulls_last` argument is ignored. thus when both a grouping and an
-            # arrangment are specified, we manually add the descending and
+            # arrangement are specified, we manually add the descending and
             # nulls_last markers to the ordering.
             if arrange:
                 order_by = merge_desc_nulls_last(order_by, descending, nulls_last)
