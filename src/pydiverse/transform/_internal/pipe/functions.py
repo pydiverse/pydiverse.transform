@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+import operator
 from collections.abc import Iterable
 from typing import Any, overload
 
@@ -47,6 +49,35 @@ def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
     return LiteralCol(val, dtype)
 
 
+def all(*args: ColExpr[Bool]) -> ColExpr[Bool]:
+    return functools.reduce(operator.and_, args)
+
+
+def any(*args: ColExpr[Bool]) -> ColExpr[Bool]:
+    return functools.reduce(operator.or_, args)
+
+
+@overload
+def sum(*args: ColExpr[Int]) -> ColExpr[Int]: ...
+
+
+@overload
+def sum(*args: ColExpr[Float]) -> ColExpr[Float]: ...
+
+
+@overload
+def sum(*args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+
+@overload
+def sum(*args: ColExpr[String]) -> ColExpr[String]: ...
+
+
+def sum(*args: ColExpr) -> ColExpr:
+    return functools.reduce(operator.add, args)
+
+
+# --- frome here the code is generated ---
 def dense_rank(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,

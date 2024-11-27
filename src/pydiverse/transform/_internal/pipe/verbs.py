@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import uuid
-from collections.abc import Iterable
 from typing import Any, Literal, overload
 
 from pydiverse.transform._internal import errors
@@ -261,7 +260,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     new._ast = Mutate(
         table._ast,
         list(kwargs.keys()),
-        preprocess_arg(kwargs.values(), table),
+        [preprocess_arg(val, table) for val in kwargs.values()],
         [uuid.uuid1() for _ in kwargs.keys()],
     )
 
@@ -636,20 +635,6 @@ def show(table: Table) -> Pipeable:
 
 
 def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:
-    if isinstance(arg, dict):
-        return {
-            key: preprocess_arg(val, table, update_partition_by=update_partition_by)
-            for key, val in arg.items()
-        }
-
-    # TODO: Be more strict in what is allowed here. Preferably, make the iteration the
-    # responsibility of the caller, otherwise error messages could get bad.
-    if isinstance(arg, Iterable) and not isinstance(arg, str):
-        return [
-            preprocess_arg(elem, table, update_partition_by=update_partition_by)
-            for elem in arg
-        ]
-
     if isinstance(arg, Order):
         return Order(
             preprocess_arg(

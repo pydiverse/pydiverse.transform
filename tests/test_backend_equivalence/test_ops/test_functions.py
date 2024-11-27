@@ -30,6 +30,7 @@ def test_row_number(df4):
     )
 
 
+# TODO: add these back in when string comparison is fixed in mssql
 @skip_backends("mssql")
 def test_min(df4):
     assert_result_equal(
@@ -62,5 +63,28 @@ def test_max(df4):
             float2=pdt.max(1, C.col1 + 1.5, C.col2, 2.2),
             str1=pdt.max(C.col5, "c"),
             str2=pdt.max(C.col5, "C"),
+        ),
+    )
+
+
+def test_any_all(df4):
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            g=pdt.any(t.col1 == 0, t.col2 == 0),
+            h=pdt.all(t.col1 < t.col4, t.col4 > 0, t.col5.str.len() <= 1),
+        ),
+    )
+
+
+def test_sum(df4):
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            w=pdt.min(*(c for c in t if c.dtype() <= pdt.Int())),
+            u=pdt.sum(*(c for c in t if c.dtype() <= pdt.Int())),
+            h=pdt.sum(t.col1 * t.col4, t.col5.str.len() * 2, t.col2 - t.col1),
         ),
     )
