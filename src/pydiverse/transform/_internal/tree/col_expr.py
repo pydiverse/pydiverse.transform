@@ -105,6 +105,8 @@ class ColExpr(Generic[T]):
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
 
+    # --- generated code starts here, do not delete this comment ---
+
     @overload
     def abs(self: ColExpr[Int]) -> ColExpr[Int]: ...
 
@@ -834,6 +836,9 @@ class DtNamespace(FnNamespace):
 
     def year(self: ColExpr) -> ColExpr:
         return ColFn(ops.dt_year, self.arg)
+
+
+# --- generated code ends here, do not delete this comment ---
 
 
 class Col(ColExpr):
