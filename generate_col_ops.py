@@ -226,7 +226,7 @@ with open(FNS_PATH, "r+") as file:
 
     for line in file:
         new_file_contents += line
-        if line.startswith("    return LiteralCol"):
+        if line.startswith("# --- from here the code is generated ---"):
             for op_var_name in sorted(ops.__dict__):
                 op = ops.__dict__[op_var_name]
                 if isinstance(op, Operator) and not op.generate_expr_method:

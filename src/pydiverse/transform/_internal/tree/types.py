@@ -161,7 +161,10 @@ def python_type_to_pdt(t: type) -> Dtype:
     elif t is type(None):
         return NullType()
 
-    raise TypeError(f"invalid usage of type {t} in a column expression")
+    raise TypeError(
+        "objects used in a column expression must have type `ColExpr` or "
+        f"a suitable python builtin type, found `{t.__name__}` instead"
+    )
 
 
 def pdt_type_to_python(t: Dtype) -> type:

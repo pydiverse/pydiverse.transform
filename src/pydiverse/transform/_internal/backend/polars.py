@@ -30,6 +30,7 @@ from pydiverse.transform._internal.tree.types import (
     Float,
     Float32,
     Float64,
+    Int,
     Int8,
     Int16,
     Int32,
@@ -63,7 +64,7 @@ class PolarsImpl(TableImpl):
         schema_overrides: dict,
     ) -> Any:
         lf, _, select, _ = compile_ast(nd)
-        lf = lf.select(select)
+        lf = lf.select(*select)
         if isinstance(target, Polars):
             if not target.lazy:
                 lf = lf.collect()
@@ -208,6 +209,12 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return pl.lit(expr.val, dtype=polars_type(expr.dtype()))
 
     elif isinstance(expr, Cast):
+        if (
+            expr.target_type <= Int()
+            or expr.target_type <= Float()
+            and expr.val.dtype() <= String()
+        ):
+            expr.val = expr.val.str.strip()
         compiled = compile_col_expr(expr.val, name_in_df).cast(
             polars_type(expr.target_type)
         )
@@ -221,23 +228,12 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         raise AssertionError
 
 
-def compile_join_cond(
-    expr: ColExpr, name_in_df: dict[UUID, str]
-) -> list[tuple[pl.Expr, pl.Expr]]:
-    if isinstance(expr, ColFn):
-        if expr.op == ops.bool_and:
-            return compile_join_cond(expr.args[0], name_in_df) + compile_join_cond(
-                expr.args[1], name_in_df
-            )
-        if expr.op == ops.equal:
-            return [
-                (
-                    compile_col_expr(expr.args[0], name_in_df),
-                    compile_col_expr(expr.args[1], name_in_df),
-                )
-            ]
-
-    raise AssertionError()
+def split_join_cond(expr: ColFn) -> list[ColFn]:
+    assert isinstance(expr, ColFn)
+    if expr.op == ops.bool_and:
+        return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
+    else:
+        return [expr]
 
 
 def compile_ast(
@@ -344,22 +340,70 @@ def compile_ast(
 
     elif isinstance(nd, verbs.Join):
         right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
+        assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
         name_in_df.update(
             {uid: name + nd.suffix for uid, name in right_name_in_df.items()}
         )
-        left_on, right_on = zip(*compile_join_cond(nd.on, name_in_df), strict=True)
 
         assert len(partition_by) == 0
-        select += [col_name + nd.suffix for col_name in right_select]
 
-        df = df.join(
-            right_df.rename({name: name + nd.suffix for name in right_df.columns}),
-            left_on=left_on,
-            right_on=right_on,
-            how=nd.how,
-            validate=nd.validate,
-            coalesce=False,
+        predicates = split_join_cond(nd.on)
+        right_df = right_df.rename(
+            {name: name + nd.suffix for name in right_df.columns}
         )
+
+        if all(pred.op == ops.equal for pred in predicates):
+            left_on = []
+            right_on = []
+            for pred in predicates:
+                left_on.append(pred.args[0])
+                right_on.append(pred.args[1])
+
+                left_is_left = None
+                for e in pred.args[0].iter_subtree():
+                    if isinstance(e, Col):
+                        left_is_left = e._uuid not in right_name_in_df
+                        assert e._uuid in name_in_df
+                        break
+                assert left_is_left is not None
+
+                if not left_is_left:
+                    left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
+
+            df = df.join(
+                right_df,
+                left_on=[compile_col_expr(col, name_in_df) for col in left_on],
+                right_on=[compile_col_expr(col, name_in_df) for col in right_on],
+                how=nd.how,
+                validate=nd.validate,
+                coalesce=False,
+            )
+        else:
+            if nd.how in ("left", "full"):
+                df = df.with_columns(
+                    __LEFT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+                )
+            if nd.how in ("full"):
+                right_df = right_df.with_columns(
+                    __RIGHT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+                )
+
+            joined = df.join_where(
+                right_df, *(compile_col_expr(pred, name_in_df) for pred in predicates)
+            )
+
+            if nd.how in ("left", "full"):
+                joined = df.join(joined, on="__LEFT_INDEX__", how="left").drop(
+                    "__LEFT_INDEX__"
+                )
+            if nd.how in ("full"):
+                joined = joined.join(right_df, on="__RIGHT_INDEX__", how="right").drop(
+                    "__RIGHT_INDEX__"
+                )
+
+            df = joined
+
+        select += [col_name + nd.suffix for col_name in right_select]
 
     elif isinstance(nd, PolarsImpl):
         df = nd.df
@@ -566,6 +610,8 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.is_in)
     def _is_in(x, *values, _pdt_args):
+        if len(values) == 0:
+            return pl.lit(False)
         return pl.any_horizontal(
             (x == val if not arg.dtype() <= NullType() else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)
@@ -678,3 +724,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x.is_not_nan()
+
+    @impl(ops.coalesce)
+    def _coalesce(*x):
+        return pl.coalesce(*x)

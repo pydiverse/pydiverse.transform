@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import uuid
-from collections.abc import Iterable
 from typing import Any, Literal, overload
 
 from pydiverse.transform._internal import errors
@@ -191,7 +190,7 @@ def select(table: Table, *cols: Col | ColName) -> Pipeable:
     errors.check_vararg_type(Col | ColName, "select", *cols)
 
     new = copy.copy(table)
-    new._ast = Select(table._ast, preprocess_arg(cols, table))
+    new._ast = Select(table._ast, [preprocess_arg(col, table) for col in cols])
     new._cache = copy.copy(table._cache)
     # TODO: prevent selection of overwritten columns
     new._cache.update(new_select=new._ast.select)
@@ -208,7 +207,7 @@ def drop(*cols: Col | ColName) -> Pipeable: ...
 def drop(table: Table, *cols: Col | ColName) -> Pipeable:
     errors.check_vararg_type(Col | ColName, "drop", *cols)
 
-    dropped_uuids = {col._uuid for col in preprocess_arg(cols, table)}
+    dropped_uuids = {preprocess_arg(col, table)._uuid for col in cols}
     return select(
         table,
         *(col for col in table._cache.select if col._uuid not in dropped_uuids),
@@ -261,7 +260,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     new._ast = Mutate(
         table._ast,
         list(kwargs.keys()),
-        preprocess_arg(kwargs.values(), table),
+        [preprocess_arg(val, table) for val in kwargs.values()],
         [uuid.uuid1() for _ in kwargs.keys()],
     )
 
@@ -303,7 +302,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
         return table
 
     new = copy.copy(table)
-    new._ast = Filter(table._ast, preprocess_arg(predicates, table))
+    new._ast = Filter(table._ast, [preprocess_arg(pred, table) for pred in predicates])
 
     for cond in new._ast.filters:
         if not cond.dtype() <= Bool():
@@ -342,7 +341,7 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     new = copy.copy(table)
     new._ast = Arrange(
         table._ast,
-        preprocess_arg((Order.from_col_expr(ord) for ord in order_by), table),
+        [preprocess_arg(Order.from_col_expr(ord), table) for ord in order_by],
     )
 
     new._cache.derived_from = table._cache.derived_from | {new._ast}
@@ -363,7 +362,7 @@ def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable:
     errors.check_arg_type(bool, "group_by", "add", add)
 
     new = copy.copy(table)
-    new._ast = GroupBy(table._ast, preprocess_arg(cols, table), add)
+    new._ast = GroupBy(table._ast, [preprocess_arg(col, table) for col in cols], add)
     new._cache = copy.copy(table._cache)
     if add:
         new._cache.partition_by = table._cache.partition_by + new._ast.group_by
@@ -398,7 +397,10 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     new._ast = Summarize(
         table._ast,
         list(kwargs.keys()),
-        preprocess_arg(kwargs.values(), table, update_partition_by=False),
+        [
+            preprocess_arg(val, table, update_partition_by=False)
+            for val in kwargs.values()
+        ],
         [uuid.uuid1() for _ in kwargs.keys()],
     )
 
@@ -636,20 +638,6 @@ def show(table: Table) -> Pipeable:
 
 
 def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:
-    if isinstance(arg, dict):
-        return {
-            key: preprocess_arg(val, table, update_partition_by=update_partition_by)
-            for key, val in arg.items()
-        }
-
-    # TODO: Be more strict in what is allowed here. Preferably, make the iteration the
-    # responsibility of the caller, otherwise error messages could get bad.
-    if isinstance(arg, Iterable) and not isinstance(arg, str):
-        return [
-            preprocess_arg(elem, table, update_partition_by=update_partition_by)
-            for elem in arg
-        ]
-
     if isinstance(arg, Order):
         return Order(
             preprocess_arg(

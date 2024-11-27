@@ -47,7 +47,8 @@ def test_filter_is_in(df4):
         >> filter(
             C.col1.is_in(0, 2),
             C.col2.is_in(0, t.col1 * t.col2),
-        ),
+        )
+        >> mutate(u=C.col3.is_in()),
     )
 
     assert_result_equal(
