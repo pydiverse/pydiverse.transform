@@ -119,7 +119,7 @@ class SignatureTrie:
         ]
 
 
-# retunrs the index of the signature in `candidates` that matches best
+# returns the index of the signature in `candidates` that matches best
 def best_signature_match(
     sig: Sequence[Dtype], candidates: Sequence[Sequence[Dtype]]
 ) -> int:
