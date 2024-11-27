@@ -83,11 +83,11 @@ with PostgresImpl.impl_store.impl_manager as impl:
             sqa.extract("milliseconds", x) % _1000, type_=sqa.Integer()
         )
 
-    @impl(ops.horizontal_max, String(), ...)
+    @impl(ops.horizontal_max, String(), String(), ...)
     def _horizontal_max(*x):
         return sqa.func.GREATEST(*(sqa.collate(e, "POSIX") for e in x))
 
-    @impl(ops.horizontal_min, String(), ...)
+    @impl(ops.horizontal_min, String(), String(), ...)
     def _least(*x):
         return sqa.func.LEAST(*(sqa.collate(e, "POSIX") for e in x))
 

@@ -573,6 +573,8 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.is_in)
     def _is_in(x, *values, _pdt_args):
+        if len(values) == 0:
+            return pl.lit(False)
         return pl.any_horizontal(
             (x == val if not arg.dtype() <= NullType() else x.is_null())
             for val, arg in zip(values, _pdt_args[1:], strict=True)

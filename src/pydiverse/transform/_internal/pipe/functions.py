@@ -49,35 +49,39 @@ def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
     return LiteralCol(val, dtype)
 
 
-def all(*args: ColExpr[Bool]) -> ColExpr[Bool]:
-    return functools.reduce(operator.and_, args)
+def all(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
+    return functools.reduce(operator.and_, (arg, *args))
 
 
-def any(*args: ColExpr[Bool]) -> ColExpr[Bool]:
-    return functools.reduce(operator.or_, args)
-
-
-@overload
-def sum(*args: ColExpr[Int]) -> ColExpr[Int]: ...
+def any(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
+    return functools.reduce(operator.or_, (arg, *args))
 
 
 @overload
-def sum(*args: ColExpr[Float]) -> ColExpr[Float]: ...
+def sum(arg: ColExpr[Int], *args: ColExpr[Int]) -> ColExpr[Int]: ...
 
 
 @overload
-def sum(*args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+def sum(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
 
 
 @overload
-def sum(*args: ColExpr[String]) -> ColExpr[String]: ...
+def sum(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
 
-def sum(*args: ColExpr) -> ColExpr:
-    return functools.reduce(operator.add, args)
+@overload
+def sum(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
 
 
-# --- frome here the code is generated ---
+def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    return functools.reduce(operator.add, (arg, *args))
+
+
+# --- from here the code is generated ---
+def coalesce(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    return ColFn(ops.coalesce, arg, *args)
+
+
 def dense_rank(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
@@ -87,59 +91,59 @@ def dense_rank(
 
 
 @overload
-def max(*args: ColExpr[Int]) -> ColExpr[Int]: ...
+def max(arg: ColExpr[Int], *args: ColExpr[Int]) -> ColExpr[Int]: ...
 
 
 @overload
-def max(*args: ColExpr[Float]) -> ColExpr[Float]: ...
+def max(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
 
 
 @overload
-def max(*args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+def max(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
 
 @overload
-def max(*args: ColExpr[String]) -> ColExpr[String]: ...
+def max(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
 
 
 @overload
-def max(*args: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
+def max(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
 
 
 @overload
-def max(*args: ColExpr[Date]) -> ColExpr[Date]: ...
+def max(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
-def max(*args: ColExpr) -> ColExpr:
-    return ColFn(ops.horizontal_max, *args)
-
-
-@overload
-def min(*args: ColExpr[Int]) -> ColExpr[Int]: ...
+def max(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    return ColFn(ops.horizontal_max, arg, *args)
 
 
 @overload
-def min(*args: ColExpr[Float]) -> ColExpr[Float]: ...
+def min(arg: ColExpr[Int], *args: ColExpr[Int]) -> ColExpr[Int]: ...
 
 
 @overload
-def min(*args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+def min(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
 
 
 @overload
-def min(*args: ColExpr[String]) -> ColExpr[String]: ...
+def min(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
 
 @overload
-def min(*args: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
+def min(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
 
 
 @overload
-def min(*args: ColExpr[Date]) -> ColExpr[Date]: ...
+def min(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
 
 
-def min(*args: ColExpr) -> ColExpr:
-    return ColFn(ops.horizontal_min, *args)
+@overload
+def min(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
+
+
+def min(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    return ColFn(ops.horizontal_min, arg, *args)
 
 
 def len(

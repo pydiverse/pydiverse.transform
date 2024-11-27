@@ -43,12 +43,14 @@ class SignatureTrie:
             *,
             last_type: Dtype | None = None,
         ) -> None:
+            if len(sig) == 1 and last_is_vararg:
+                assert isinstance(last_type, Dtype)
+                self.children[last_type] = self
+                sig = []
+
             if len(sig) == 0:
                 assert self.data is None
                 self.data = data
-                if last_is_vararg:
-                    assert isinstance(last_type, Dtype)
-                    self.children[last_type] = self
                 return
 
             if sig[0] not in self.children:
