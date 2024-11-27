@@ -3,6 +3,7 @@ from __future__ import annotations
 from ._internal.pipe.functions import (
     all,
     any,
+    coalesce,
     dense_rank,
     len,
     lit,
@@ -23,6 +24,7 @@ __all__ = __common + [
     "sum",
     "filter",
     "len",
+    "coalesce",
     "dense_rank",
     "max",
     "min",
