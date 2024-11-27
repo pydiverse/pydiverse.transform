@@ -30,6 +30,7 @@ from pydiverse.transform._internal.tree.types import (
     Float,
     Float32,
     Float64,
+    Int,
     Int8,
     Int16,
     Int32,
@@ -208,6 +209,12 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return pl.lit(expr.val, dtype=polars_type(expr.dtype()))
 
     elif isinstance(expr, Cast):
+        if (
+            expr.target_type <= Int()
+            or expr.target_type <= Float()
+            and expr.val.dtype() <= String()
+        ):
+            expr.val = expr.val.str.strip()
         compiled = compile_col_expr(expr.val, name_in_df).cast(
             polars_type(expr.target_type)
         )
