@@ -13,6 +13,14 @@ from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.pipe.pipeable import Pipeable
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col, ColName
+from pydiverse.transform._internal.tree.verbs import (
+    Join,
+    Mutate,
+    Rename,
+    Select,
+    Summarize,
+    Verb,
+)
 
 
 class Table:
@@ -28,7 +36,7 @@ class Table:
     def __init__(
         self, resource: Any, backend: Target | None = None, *, name: str | None = None
     ):
-        self._ast = TableImpl.from_resource(resource, backend, name=name)
+        self._ast: AstNode = TableImpl.from_resource(resource, backend, name=name)
         self._cache = Cache(
             self._ast.cols,
             list(self._ast.cols.values()),
@@ -44,11 +52,7 @@ class Table:
                 f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
                 f"str, got {type(key)} instead."
             )
-        if not self._cache.has_col(key):
-            raise ValueError(
-                f"column `{key}` does not exist in table `{self._ast.name}`"
-            )
-        return self._cache.cols[key]
+        return self.__getattr__(key)
 
     def __getattr__(self, name: str) -> Col:
         if name in ("__copy__", "__deepcopy__", "__setstate__", "__getstate__"):
@@ -58,7 +62,8 @@ class Table:
             raise ValueError(
                 f"column `{name}` does not exist in table `{self._ast.name}`"
             )
-        return self._cache.cols[name]
+        col = self._cache.cols[name]
+        return Col(name, self._ast, col._uuid, col._dtype, col._ftype)
 
     def __setstate__(self, d):  # to avoid very annoying AttributeErrors
         for slot, val in d[1].items():
@@ -158,7 +163,7 @@ class Cache:
             col = col.name
         return col in self.cols and self.cols[col]._uuid in self.uuid_to_name
 
-    def update(
+    def _update(
         self,
         *,
         new_select: list[Col] | None = None,
@@ -183,3 +188,57 @@ class Cache:
                 for name, col in self.cols.items()
                 if col._uuid in selected_uuids
             }
+
+    def update(self, vb: Verb, rcache: Cache | None = None):
+        if isinstance(vb, Select):
+            self._update(new_select=vb.select)
+
+        elif isinstance(vb, Rename):
+            self._update(
+                new_cols={
+                    (new_name if (new_name := vb.name_map.get(name)) else name): col
+                    for name, col in self.cols.items()
+                }
+            )
+
+        elif isinstance(vb, Mutate | Summarize):
+            new_cols = self.cols | {
+                name: Col(
+                    name,
+                    vb,
+                    uid,
+                    val.dtype(),
+                    val.ftype(agg_is_window=isinstance(vb, Mutate)),
+                )
+                for name, val, uid in zip(vb.names, vb.values, vb.uuids, strict=True)
+            }
+
+            overwritten = {col_name for col_name in vb.names if col_name in self.cols}
+
+            self._update(
+                new_select=(
+                    [
+                        col
+                        for col in self.select
+                        if self.uuid_to_name[col._uuid] not in overwritten
+                    ]
+                    if isinstance(vb, Mutate)
+                    else self.partition_by
+                )
+                + [new_cols[name] for name in vb.names],
+                new_cols=new_cols,
+            )
+
+            if isinstance(vb, Summarize):
+                self.partition_by = []
+
+        elif isinstance(vb, Join):
+            self._update(
+                new_cols=self.cols
+                | {name + vb.suffix: col for name, col in rcache.cols.items()},
+                new_select=self.select + rcache.select,
+            )
+
+            self.derived_from = self.derived_from | rcache.derived_from
+
+        self.derived_from = self.derived_from | {vb}

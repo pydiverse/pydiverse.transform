@@ -155,7 +155,6 @@ def indent(s: str, by: int) -> str:
 
 with open(COL_EXPR_PATH, "r+") as file:
     new_file_contents = ""
-    in_col_expr_class = False
     in_generated_section = False
     namespace_contents: dict[str, str] = {
         name: (
@@ -166,11 +165,17 @@ with open(COL_EXPR_PATH, "r+") as file:
     }
 
     for line in file:
-        if line.startswith("class ColExpr"):
-            in_col_expr_class = True
-        elif not in_generated_section and line.startswith("    @overload"):
+        if not in_generated_section and line.startswith(
+            "    # --- generated code starts here, do not delete this comment ---"
+        ):
             in_generated_section = True
-        elif in_col_expr_class and line.startswith("class Col"):
+            new_file_contents += (
+                "    # --- generated code starts here, do not delete this "
+                "comment ---\n\n"
+            )
+        elif in_generated_section and line.startswith(
+            "# --- generated code ends here, do not delete this comment ---"
+        ):
             for op_var_name in sorted(ops.__dict__):
                 op = ops.__dict__[op_var_name]
                 if not isinstance(op, Operator) or not op.generate_expr_method:
@@ -209,7 +214,6 @@ with open(COL_EXPR_PATH, "r+") as file:
                 new_file_contents += namespace_contents[name]
 
             in_generated_section = False
-            in_col_expr_class = False
 
         if not in_generated_section:
             new_file_contents += line
@@ -226,7 +230,10 @@ with open(FNS_PATH, "r+") as file:
 
     for line in file:
         new_file_contents += line
-        if line.startswith("# --- from here the code is generated ---"):
+        if line.startswith(
+            "# --- from here the code is generated, do not delete this comment ---"
+        ):
+            new_file_contents += "\n"
             for op_var_name in sorted(ops.__dict__):
                 op = ops.__dict__[op_var_name]
                 if isinstance(op, Operator) and not op.generate_expr_method:

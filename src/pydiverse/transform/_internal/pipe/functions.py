@@ -77,7 +77,9 @@ def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
     return functools.reduce(operator.add, (arg, *args))
 
 
-# --- from here the code is generated ---
+# --- from here the code is generated, do not delete this comment ---
+
+
 def coalesce(arg: ColExpr, *args: ColExpr) -> ColExpr:
     return ColFn(ops.coalesce, arg, *args)
 

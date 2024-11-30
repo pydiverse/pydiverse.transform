@@ -4,11 +4,15 @@ import copy
 import uuid
 from typing import Any, Literal, overload
 
+import pandas as pd
+import polars as pl
+
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
-from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops.op import Ftype
+from pydiverse.transform._internal.pipe.c import C
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
 from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree.ast import AstNode
@@ -73,16 +77,6 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
     new._ast = Alias(new._ast)
     new._cache = copy.copy(table._cache)
 
-    # Why do we copy everything here? column UUIDs have to be rerolled => column
-    # expressions need to be rebuilt => verb nodes need to be rebuilt
-
-    # TODO: think about more efficient ways. We could e.g. just update the _cache UUIDs
-    # and do the UUID reroll on export (that we do anyway, currently, to allow the
-    # backends to rewrite the tree). Then each TableImpl would have to carry some hash
-    # for self-join detection.
-    # We could also do lazy alias, e.g. wait until a join happens and then only copy
-    # the common subtree.
-
     new._cache.all_cols = {
         uuid_map[uid]: Col(
             col.name, nd_map[col._ast], uuid_map[uid], col._dtype, col._ftype
@@ -93,7 +87,7 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
         new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.partition_by
     ]
 
-    new._cache.update(
+    new._cache._update(
         new_select=[
             new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
         ],
@@ -103,7 +97,7 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
         },
     )
 
-    new._cache.derived_from = set(new._ast.iter_subtree())
+    new._cache.derived_from = set(new._ast.iter_subtree_postorder())
 
     return new
 
@@ -143,17 +137,70 @@ def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable:
 
 @verb
 def export(
-    table: Table, target: Target, *, schema_overrides: dict[Col, Any] | None = None
+    data: Table | ColExpr,
+    target: Target,
+    *,
+    schema_overrides: dict[Col, Any] | None = None,
 ) -> Pipeable:
+    if isinstance(data, ColExpr):
+        # Find the common ancestor of all AST nodes of columns appearing in the
+        # expression.
+        nodes: dict[AstNode, int] = {}
+        for col in data.iter_subtree():
+            if isinstance(col, Col):
+                nodes[col._ast] = 0
+
+        for nd in list(nodes.keys()):
+            gen = nd.iter_subtree_preorder()
+            try:
+                descendant = next(gen)
+                while True:
+                    if descendant != nd and descendant in nodes:
+                        nodes[descendant] += 1
+                        descendant = gen.send(True)
+                    else:
+                        descendant = next(gen)
+            except StopIteration:
+                ...
+
+        indeg0 = (nd for nd, cnt in nodes.items() if cnt == 0)
+        root = next(indeg0)
+        try:
+            next(indeg0)
+            # The AST nodes have a common ancestor if and only if there is exactly one
+            # node that has not been reached by another one.
+            raise ValueError(
+                "cannot export a column expression containing columns without a common "
+                "ancestor"
+            )
+        except StopIteration:
+            ...
+
+        uid = uuid.uuid1()
+        table = from_ast(root)
+        df = (
+            table
+            >> _mutate([str(uid)], [data], [uid])
+            >> select(C[str(uid)])
+            >> export(target)
+        )
+
+        if isinstance(target, Polars):
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(str(uid))
+        elif isinstance(target, Pandas):
+            assert isinstance(df, pd.DataFrame)
+            return pd.Series(df[str(uid)])
+        raise AssertionError
+
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
-    table = table >> alias()
-    SourceBackend: type[TableImpl] = get_backend(table._ast)
+    SourceBackend: type[TableImpl] = get_backend(data._ast)
+    data = data >> alias()
     if schema_overrides is None:
         schema_overrides = {}
-    return SourceBackend.export(
-        table._ast, target, table._cache.select, schema_overrides
-    )
+    return SourceBackend.export(data._ast, target, data._cache.select, schema_overrides)
 
 
 @overload
@@ -192,9 +239,8 @@ def select(table: Table, *cols: Col | ColName) -> Pipeable:
     new = copy.copy(table)
     new._ast = Select(table._ast, [preprocess_arg(col, table) for col in cols])
     new._cache = copy.copy(table._cache)
+    new._cache.update(new._ast)
     # TODO: prevent selection of overwritten columns
-    new._cache.update(new_select=new._ast.select)
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -215,7 +261,7 @@ def drop(table: Table, *cols: Col | ColName) -> Pipeable:
 
 
 @overload
-def renmae(name_map: dict[str, str]) -> Pipeable: ...
+def rename(name_map: dict[str, str]) -> Pipeable: ...
 
 
 @verb
@@ -227,23 +273,16 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     new = copy.copy(table)
     new._ast = Rename(table._ast, name_map)
     new._cache = copy.copy(table._cache)
-    new_cols = copy.copy(table._cache.cols)
 
-    for name, _ in name_map.items():
-        if name not in new_cols:
-            raise ValueError(
-                f"no column with name `{name}` in table `{table._ast.name}`"
-            )
-        del new_cols[name]
+    if d := set(name_map) - set(table._cache.cols):
+        raise ValueError(
+            f"no column with name `{next(iter(d))}` in table `{table._ast.name}`"
+        )
 
-    for name, replacement in name_map.items():
-        if replacement in new_cols:
-            raise ValueError(f"duplicate column name `{replacement}`")
-        new_cols[replacement] = table._cache.cols[name]
+    if d := (set(table._cache.cols) - set(name_map)) & set(name_map.values()):
+        raise ValueError(f"duplicate column name `{next(iter(d))}`")
 
-    new._cache.update(new_cols=new_cols)
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
-
+    new._cache.update(new._ast)
     return new
 
 
@@ -255,39 +294,31 @@ def mutate(**kwargs: ColExpr) -> Pipeable: ...
 def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     if len(kwargs) == 0:
         return table
+    return table >> _mutate(*map(list, zip(*kwargs.items(), strict=True)))
 
+
+@verb
+def _mutate(
+    table: Table,
+    names: list[str],
+    values: list[ColExpr],
+    uuids: list[uuid.UUID] | None = None,
+) -> Pipeable:
     new = copy.copy(table)
+    if uuids is None:
+        uuids = [uuid.uuid1() for _ in names]
+    else:
+        assert len(uuids) == len(names)
+
     new._ast = Mutate(
         table._ast,
-        list(kwargs.keys()),
-        [preprocess_arg(val, table) for val in kwargs.values()],
-        [uuid.uuid1() for _ in kwargs.keys()],
+        names,
+        [preprocess_arg(val, table) for val in values],
+        uuids,
     )
 
     new._cache = copy.copy(table._cache)
-    new_cols = copy.copy(table._cache.cols)
-
-    for name, val, uid in zip(
-        new._ast.names, new._ast.values, new._ast.uuids, strict=True
-    ):
-        new_cols[name] = Col(
-            name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=True)
-        )
-
-    overwritten = {
-        col_name for col_name in new._ast.names if col_name in table._cache.cols
-    }
-
-    new._cache.update(
-        new_select=[
-            col
-            for col in table._cache.select
-            if table._cache.uuid_to_name[col._uuid] not in overwritten
-        ]
-        + [new_cols[name] for name in new._ast.names],
-        new_cols=new_cols,
-    )
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
+    new._cache.update(new._ast)
 
     return new
 
@@ -304,7 +335,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     new = copy.copy(table)
     new._ast = Filter(table._ast, [preprocess_arg(pred, table) for pred in predicates])
 
-    for cond in new._ast.filters:
+    for cond in new._ast.predicates:
         if not cond.dtype() <= Bool():
             raise TypeError(
                 "predicates given to `filter` must be of boolean type.\n"
@@ -324,7 +355,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
                 )
 
     new._cache = copy.copy(table._cache)
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
+    new._cache.update(new._ast)
 
     return new
 
@@ -344,7 +375,8 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
         [preprocess_arg(Order.from_col_expr(ord), table) for ord in order_by],
     )
 
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache)
+    new._cache.update(new._ast)
 
     return new
 
@@ -393,15 +425,28 @@ def summarize(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
+    return table >> _summarize(*map(list, zip(*kwargs.items(), strict=True)))
+
+
+@verb
+def _summarize(
+    table: Table,
+    names: list[str],
+    values: list[ColExpr],
+    uuids: list[uuid.UUID] | None = None,
+) -> Pipeable:
     new = copy.copy(table)
+
+    if uuids is None:
+        uuids = [uuid.uuid1() for _ in names]
+    else:
+        assert len(uuids) == len(names)
+
     new._ast = Summarize(
         table._ast,
-        list(kwargs.keys()),
-        [
-            preprocess_arg(val, table, update_partition_by=False)
-            for val in kwargs.values()
-        ],
-        [uuid.uuid1() for _ in kwargs.keys()],
+        names,
+        [preprocess_arg(val, table, update_partition_by=False) for val in values],
+        uuids,
     )
 
     partition_by_uuids = {col._uuid for col in table._cache.partition_by}
@@ -431,23 +476,8 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     for root in new._ast.values:
         check_summarize_col_expr(root, False)
 
-    # TODO: handle duplicate column names
     new._cache = copy.copy(table._cache)
-
-    new_cols = table._cache.cols | {
-        name: Col(name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=False))
-        for name, val, uid in zip(
-            new._ast.names, new._ast.values, new._ast.uuids, strict=True
-        )
-    }
-
-    new._cache.update(
-        new_select=table._cache.partition_by
-        + [new_cols[name] for name in new._ast.names],
-        new_cols=new_cols,
-    )
-    new._cache.partition_by = []
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
+    new._cache.update(new._ast)
 
     return new
 
@@ -467,7 +497,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
     new = copy.copy(table)
     new._ast = SliceHead(table._ast, n, offset)
     new._cache = copy.copy(table._cache)
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
+    new._cache.update(new._ast)
 
     return new
 
@@ -539,21 +569,16 @@ def join(
         if cnt > 0:
             suffix += f"_{cnt}"
 
-    # The arg preprocessing for join is a bit more complicated since we have to give the
-    # joined table to `preprocess_args` so that C.<right column> works.
     new = copy.copy(left)
     new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
+    # The join condition must be preprocessed with respect to both tables
+    new._ast.on = resolve_C_columns(
+        resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
+    )
 
     new._cache = copy.copy(left._cache)
-    new._cache.update(
-        new_cols=left._cache.cols
-        | {name + suffix: col for name, col in right._cache.cols.items()},
-        new_select=left._cache.select + right._cache.select,
-    )
-    new._cache.derived_from = (
-        left._cache.derived_from | right._cache.derived_from | {new._ast}
-    )
-    new._ast.on = preprocess_arg(new._ast.on, new, update_partition_by=False)
+    new._cache.update(new._ast, rcache=right._cache)
+    new._ast.on = preprocess_arg(new._ast.on, new)
 
     return new
 
@@ -637,6 +662,23 @@ def show(table: Table) -> Pipeable:
     return table
 
 
+def resolve_C_columns(expr: ColExpr, table: Table, *, strict=True, suffix=""):
+    def resolve_C(col: ColName):
+        if strict or col in table:
+            return table[col.name[: len(col.name) - len(suffix)]]
+        return col
+
+    return expr.map_subtree(
+        lambda col: resolve_C(col)
+        if isinstance(col, ColName)
+        else (
+            table._cache.all_cols[col._uuid]
+            if isinstance(col, Col) and col._uuid in table._cache.all_cols
+            else col
+        )
+    )
+
+
 def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:
     if isinstance(arg, Order):
         return Order(
@@ -666,13 +708,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
             ):
                 expr.context_kwargs["partition_by"] = table._cache.partition_by
 
-        arg: ColExpr = arg.map_subtree(
-            lambda col: table[col.name]
-            if isinstance(col, ColName)
-            else (table._cache.all_cols[col._uuid] if isinstance(col, Col) else col)
-        )
-
-        return arg
+        return resolve_C_columns(arg, table)
 
 
 def get_backend(nd: AstNode) -> type[TableImpl]:
@@ -680,3 +716,19 @@ def get_backend(nd: AstNode) -> type[TableImpl]:
         return get_backend(nd.child)
     assert isinstance(nd, TableImpl) and nd is not TableImpl
     return nd.__class__
+
+
+def from_ast(root: AstNode) -> Table:
+    if isinstance(root, TableImpl):
+        return Table(root)
+
+    assert isinstance(root, Verb)
+    child = from_ast(root.child)
+    if isinstance(root, Alias):
+        return child >> alias(root.name)
+
+    child._cache.update(
+        root, from_ast(root.right)._cache if isinstance(root, Join) else None
+    )
+    child._ast = root
+    return child

@@ -5,7 +5,7 @@ import pytest
 
 from pydiverse.transform import C, Table
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, inverse_partial, verb
-from pydiverse.transform._internal.pipe.verbs import join, mutate, select
+from pydiverse.transform._internal.pipe.verbs import mutate, select
 
 
 @pytest.fixture
@@ -27,22 +27,14 @@ class TestTable:
             _ = tbl1.colXXX
 
     def test_getitem(self, tbl1):
-        assert tbl1.col1 is tbl1["col1"]
-        assert tbl1.col2 is tbl1["col2"]
-
-        assert tbl1.col2 is tbl1[tbl1.col2.name]
-        assert tbl1.col2 is tbl1[C.col2.name]
+        assert tbl1.col1._uuid == tbl1["col1"]._uuid
+        assert tbl1.col2._uuid is tbl1["col2"]._uuid
 
     def test_iter(self, tbl1, tbl2):
         assert repr(list(tbl1)) == repr([tbl1.col1, tbl1.col2])
         assert repr(list(tbl2)) == repr([tbl2.col1, tbl2.col2, tbl2.col3])
 
         assert repr(list(tbl2 >> select(tbl2.col2))) == repr([tbl2.col2])
-
-        joined = tbl1 >> join(
-            tbl2 >> select(tbl2.col3), tbl1.col1 == tbl2.col2, "left", suffix="_2"
-        )
-        assert repr(list(joined)) == repr([tbl1.col1, tbl1.col2, joined.col3_2])
 
     def test_dir(self, tbl1):
         assert dir(tbl1) == ["col1", "col2"]

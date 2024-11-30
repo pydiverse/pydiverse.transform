@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Generator, Iterable, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -14,7 +14,7 @@ from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Col
+from pydiverse.transform._internal.tree.col_expr import Col, ColExpr
 from pydiverse.transform._internal.tree.types import Dtype
 
 if TYPE_CHECKING:
@@ -85,7 +85,10 @@ class TableImpl(AstNode):
 
         return res
 
-    def iter_subtree(self) -> Iterable[AstNode]:
+    def iter_subtree_postorder(self) -> Iterable[AstNode]:
+        yield self
+
+    def iter_subtree_preorder(self) -> Generator[AstNode, bool | None, None]:
         yield self
 
     @classmethod
@@ -99,6 +102,9 @@ class TableImpl(AstNode):
         final_select: list[Col],
         schema_overrides: dict[Col, Any],
     ) -> Any: ...
+
+    @classmethod
+    def export_col(cls, expr: ColExpr, target: Target): ...
 
     @classmethod
     def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:

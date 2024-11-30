@@ -6,7 +6,7 @@ from uuid import UUID
 import polars as pl
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
-from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
@@ -70,6 +70,17 @@ class PolarsImpl(TableImpl):
                 lf = lf.collect()
             lf.name = nd.name
             return lf
+
+        raise AssertionError
+
+    @staticmethod
+    def export_col(expr: ColExpr, target: Target) -> pl.Series:
+        if isinstance(target, Polars):
+            ...
+        elif isinstance(target, Pandas):
+            ...
+
+        raise AssertionError
 
     def _clone(self) -> tuple[PolarsImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned = PolarsImpl(self.name, self.df.clone())
@@ -283,7 +294,7 @@ def compile_ast(
         select += nd.names
 
     elif isinstance(nd, verbs.Filter):
-        df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.filters])
+        df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.predicates])
 
     elif isinstance(nd, verbs.Arrange):
         order_by, descending, nulls_last = zip(
