@@ -1234,8 +1234,17 @@ class Cast(ColExpr):
                         Date(),
                     )
                 ),
-                *((Int(), t) for t in INT_SUBTYPES),
-                *((Float(), t) for t in FLOAT_SUBTYPES),
+                *(
+                    (t, u)
+                    for t, u in itertools.chain(
+                        itertools.product(
+                            (Int(), *INT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
+                        ),
+                        itertools.product(
+                            (Float(), *FLOAT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
+                        ),
+                    )
+                ),
             }
 
             if (

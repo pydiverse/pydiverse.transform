@@ -52,11 +52,7 @@ class Table:
                 f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
                 f"str, got {type(key)} instead."
             )
-        if not self._cache.has_col(key):
-            raise ValueError(
-                f"column `{key}` does not exist in table `{self._ast.name}`"
-            )
-        return self._cache.cols[key]
+        return self.__getattr__(key)
 
     def __getattr__(self, name: str) -> Col:
         if name in ("__copy__", "__deepcopy__", "__setstate__", "__getstate__"):
@@ -66,7 +62,8 @@ class Table:
             raise ValueError(
                 f"column `{name}` does not exist in table `{self._ast.name}`"
             )
-        return self._cache.cols[name]
+        col = self._cache.cols[name]
+        return Col(name, self._ast, col._uuid, col._dtype, col._ftype)
 
     def __setstate__(self, d):  # to avoid very annoying AttributeErrors
         for slot, val in d[1].items():
@@ -242,6 +239,6 @@ class Cache:
                 new_select=self.select + rcache.select,
             )
 
-            self.derived_from.update(rcache.derived_from)
+            self.derived_from = self.derived_from | rcache.derived_from
 
-        self.derived_from.add(vb)
+        self.derived_from = self.derived_from | {vb}

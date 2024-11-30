@@ -592,7 +592,9 @@ class TestPolarsLazyImpl:
             tbl1, tbl1.col1.cast(pdt.Float64()) <= tbl2.col1 + tbl2.col3
         )
         e_ex = e >> export(Polars(lazy=False))
-        assert_equal(e_ex["col2"] + e_ex["col2_df1"], (e.col2 + tbl1.col1) >> export())
+        assert_equal(
+            e_ex["col2"] + e_ex["col1_df1"], (e.col2 + tbl1.col1) >> export(Polars())
+        )
 
 
 class TestPrintAndRepr:

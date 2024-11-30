@@ -151,10 +151,17 @@ def export(
                 nodes[col._ast] = 0
 
         for nd in list(nodes.keys()):
-            for descendant in (gen := nd.iter_subtree_preorder()):
-                if descendant != nd and descendant in nodes:
-                    nodes[descendant] += 1
-                    gen.send(True)
+            gen = nd.iter_subtree_preorder()
+            try:
+                descendant = next(gen)
+                while True:
+                    if descendant != nd and descendant in nodes:
+                        nodes[descendant] += 1
+                        descendant = gen.send(True)
+                    else:
+                        descendant = next(gen)
+            except StopIteration:
+                ...
 
         indeg0 = (nd for nd, cnt in nodes.items() if cnt == 0)
         root = next(indeg0)
@@ -163,7 +170,7 @@ def export(
             # The AST nodes have a common ancestor if and only if there is exactly one
             # node that has not been reached by another one.
             raise ValueError(
-                "cannot export a column expression containing columns without a common"
+                "cannot export a column expression containing columns without a common "
                 "ancestor"
             )
         except StopIteration:
@@ -563,14 +570,16 @@ def join(
         if cnt > 0:
             suffix += f"_{cnt}"
 
-    # The arg preprocessing for join is a bit more complicated since we have to give the
-    # joined table to `preprocess_args` so that C.<right column> works.
     new = copy.copy(left)
     new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
+    # The join condition must be preprocessed with respect to both tables
+    new._ast.on = resolve_C_columns(
+        resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
+    )
 
     new._cache = copy.copy(left._cache)
     new._cache.update(new._ast, rcache=right._cache)
-    new._ast.on = preprocess_arg(new._ast.on, new, update_partition_by=False)
+    new._ast.on = preprocess_arg(new._ast.on, new)
 
     return new
 
@@ -654,6 +663,23 @@ def show(table: Table) -> Pipeable:
     return table
 
 
+def resolve_C_columns(expr: ColExpr, table: Table, *, strict=True, suffix=""):
+    def resolve_C(col: ColName):
+        if strict or col in table:
+            return table[col.name[: len(col.name) - len(suffix)]]
+        return col
+
+    return expr.map_subtree(
+        lambda col: resolve_C(col)
+        if isinstance(col, ColName)
+        else (
+            table._cache.all_cols[col._uuid]
+            if isinstance(col, Col) and col._uuid in table._cache.all_cols
+            else col
+        )
+    )
+
+
 def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:
     if isinstance(arg, Order):
         return Order(
@@ -683,13 +709,7 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
             ):
                 expr.context_kwargs["partition_by"] = table._cache.partition_by
 
-        arg: ColExpr = arg.map_subtree(
-            lambda col: table[col.name]
-            if isinstance(col, ColName)
-            else (table._cache.all_cols[col._uuid] if isinstance(col, Col) else col)
-        )
-
-        return arg
+        return resolve_C_columns(arg, table)
 
 
 def get_backend(nd: AstNode) -> type[TableImpl]:
