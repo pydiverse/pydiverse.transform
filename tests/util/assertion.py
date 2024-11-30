@@ -5,7 +5,7 @@ import warnings
 
 import polars as pl
 import pytest
-from polars.testing import assert_frame_equal
+from polars.testing import assert_frame_equal, assert_series_equal
 
 from pydiverse.transform._internal.backend.targets import Polars
 from pydiverse.transform._internal.errors import NonStandardWarning
@@ -14,6 +14,11 @@ from pydiverse.transform._internal.pipe.verbs import export, show_query
 
 
 def assert_equal(left, right, check_dtypes=False, check_row_order=True):
+    if isinstance(left, pl.Series):
+        assert isinstance(right, pl.Series)
+        assert_series_equal(left, right, check_names=False)
+        return
+
     left_df = left >> export(Polars(lazy=False)) if isinstance(left, Table) else left
     right_df = (
         right >> export(Polars(lazy=False)) if isinstance(right, Table) else right
