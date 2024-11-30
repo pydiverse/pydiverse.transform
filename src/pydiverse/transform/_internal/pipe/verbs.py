@@ -4,11 +4,15 @@ import copy
 import uuid
 from typing import Any, Literal, overload
 
+import pandas as pd
+import polars as pl
+
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
-from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops.op import Ftype
+from pydiverse.transform._internal.pipe.c import C
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
 from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree.ast import AstNode
@@ -172,8 +176,22 @@ def export(
 
         root = next(nd for nd, cnt in nodes.items() if cnt == 0)
         uid = uuid.uuid1()
-        root = Mutate(root, [str(uid)], [data], [uid])
-        root = Select(root, [Col(str(uid), root, uid, None, None)])
+        table = from_ast(root)
+        df = (
+            table
+            >> _mutate([str(uid)], [data], [uid])
+            >> select(C[str(uid)])
+            >> export(target)
+        )
+
+        if isinstance(target, Polars):
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(str(uid))
+        elif isinstance(target, Pandas):
+            assert isinstance(df, pd.DataFrame)
+            return pd.Series(df[str(uid)])
+        raise AssertionError
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
