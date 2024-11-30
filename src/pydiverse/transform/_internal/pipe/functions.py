@@ -78,6 +78,8 @@ def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
 
 
 # --- from here the code is generated, do not delete this comment ---
+
+
 def coalesce(arg: ColExpr, *args: ColExpr) -> ColExpr:
     return ColFn(ops.coalesce, arg, *args)
 

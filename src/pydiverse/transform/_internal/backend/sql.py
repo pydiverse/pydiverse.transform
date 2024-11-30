@@ -323,8 +323,8 @@ class SqlImpl(TableImpl):
         cls, nd: AstNode, needed_cols: dict[UUID, int]
     ) -> tuple[sqa.Table, Query, dict[UUID, sqa.Label]]:
         if isinstance(nd, verbs.Verb):
-            # store a counter how often each UUID is referenced by ancestors. This
-            # allows to only select necessary columns in a subquery.
+            # store a counter in `needed_cols how often each UUID is referenced by
+            # ancestors. This allows to only select necessary columns in a subquery.
             for node in nd.iter_col_nodes():
                 if isinstance(node, Col):
                     cnt = needed_cols.get(node._uuid)
@@ -472,11 +472,11 @@ class SqlImpl(TableImpl):
         elif isinstance(nd, verbs.Filter):
             if query.group_by:
                 query.having.extend(
-                    cls.compile_col_expr(fil, sqa_col) for fil in nd.filters
+                    cls.compile_col_expr(fil, sqa_col) for fil in nd.predicates
                 )
             else:
                 query.where.extend(
-                    cls.compile_col_expr(fil, sqa_col) for fil in nd.filters
+                    cls.compile_col_expr(fil, sqa_col) for fil in nd.predicates
                 )
 
         elif isinstance(nd, verbs.Arrange):

@@ -103,7 +103,7 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
         },
     )
 
-    new._cache.derived_from = set(new._ast.iter_subtree())
+    new._cache.derived_from = set(new._ast.iter_subtree_postorder())
 
     return new
 
@@ -143,17 +143,45 @@ def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable:
 
 @verb
 def export(
-    table: Table, target: Target, *, schema_overrides: dict[Col, Any] | None = None
+    data: Table | ColExpr,
+    target: Target,
+    *,
+    schema_overrides: dict[Col, Any] | None = None,
 ) -> Pipeable:
+    if isinstance(data, ColExpr):
+        # Find the common ancestor of all AST nodes of columns appearing in the
+        # expression.
+        nodes: dict[AstNode, int] = {}
+        for col in data.iter_subtree():
+            if isinstance(col, Col):
+                nodes[col._ast] = 0
+
+        for nd in list(nodes.keys()):
+            for descendant in (gen := nd.iter_subtree_preorder()):
+                if descendant in nodes:
+                    nodes[descendant] += 1
+                    gen.send(True)
+
+        if list(nodes.values()).count(0) > 1:
+            # The AST nodes have a common ancestor if and only if there is exactly one
+            # node that has not been reached by another one.
+            raise ValueError(
+                "cannot export a column expression containing columns without a common"
+                "ancestor"
+            )
+
+        root = next(nd for nd, cnt in nodes.items() if cnt == 0)
+        uid = uuid.uuid1()
+        root = Mutate(root, [str(uid)], [data], [uid])
+        root = Select(root, [Col(str(uid), root, uid, None, None)])
+
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
-    table = table >> alias()
-    SourceBackend: type[TableImpl] = get_backend(table._ast)
+    SourceBackend: type[TableImpl] = get_backend(data._ast)
+    data = data >> alias()
     if schema_overrides is None:
         schema_overrides = {}
-    return SourceBackend.export(
-        table._ast, target, table._cache.select, schema_overrides
-    )
+    return SourceBackend.export(data._ast, target, data._cache.select, schema_overrides)
 
 
 @overload
@@ -253,30 +281,37 @@ def mutate(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
-    if len(kwargs) == 0:
+    return _mutate(table, *map(list, zip(*kwargs.items(), strict=True)))
+
+
+@verb
+def _mutate(
+    table: Table,
+    names: list[str],
+    values: list[ColExpr],
+    uuids: list[uuid.UUID] | None = None,
+) -> Pipeable:
+    if len(names) == 0:
         return table
 
     new = copy.copy(table)
+    assert uuids is None or len(uuids) == len(names)
     new._ast = Mutate(
         table._ast,
-        list(kwargs.keys()),
-        [preprocess_arg(val, table) for val in kwargs.values()],
-        [uuid.uuid1() for _ in kwargs.keys()],
+        names,
+        [preprocess_arg(val, table) for val in values],
+        uuids,
     )
 
     new._cache = copy.copy(table._cache)
     new_cols = copy.copy(table._cache.cols)
 
-    for name, val, uid in zip(
-        new._ast.names, new._ast.values, new._ast.uuids, strict=True
-    ):
+    for name, val, uid in zip(names, new._ast.values, uuids, strict=True):
         new_cols[name] = Col(
             name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=True)
         )
 
-    overwritten = {
-        col_name for col_name in new._ast.names if col_name in table._cache.cols
-    }
+    overwritten = {col_name for col_name in names if col_name in table._cache.cols}
 
     new._cache.update(
         new_select=[
@@ -284,7 +319,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
             for col in table._cache.select
             if table._cache.uuid_to_name[col._uuid] not in overwritten
         ]
-        + [new_cols[name] for name in new._ast.names],
+        + [new_cols[name] for name in names],
         new_cols=new_cols,
     )
     new._cache.derived_from = table._cache.derived_from | {new._ast}
@@ -393,15 +428,24 @@ def summarize(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
+    return table >> _summarize(table, *map(list, zip(*kwargs.items(), strict=True)))
+
+
+@verb
+def _summarize(
+    table: Table,
+    names: list[str],
+    values: list[ColExpr],
+    uuids: list[uuid.UUID] | None = None,
+) -> Pipeable:
     new = copy.copy(table)
+    assert uuids is None or len(uuids) == len(names)
+
     new._ast = Summarize(
         table._ast,
-        list(kwargs.keys()),
-        [
-            preprocess_arg(val, table, update_partition_by=False)
-            for val in kwargs.values()
-        ],
-        [uuid.uuid1() for _ in kwargs.keys()],
+        names,
+        [preprocess_arg(val, table, update_partition_by=False) for val in values],
+        uuids,
     )
 
     partition_by_uuids = {col._uuid for col in table._cache.partition_by}
@@ -436,14 +480,11 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
 
     new_cols = table._cache.cols | {
         name: Col(name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=False))
-        for name, val, uid in zip(
-            new._ast.names, new._ast.values, new._ast.uuids, strict=True
-        )
+        for name, val, uid in zip(names, new._ast.values, uuids, strict=True)
     }
 
     new._cache.update(
-        new_select=table._cache.partition_by
-        + [new_cols[name] for name in new._ast.names],
+        new_select=table._cache.partition_by + [new_cols[name] for name in names],
         new_cols=new_cols,
     )
     new._cache.partition_by = []
@@ -680,3 +721,40 @@ def get_backend(nd: AstNode) -> type[TableImpl]:
         return get_backend(nd.child)
     assert isinstance(nd, TableImpl) and nd is not TableImpl
     return nd.__class__
+
+
+def from_ast(root: AstNode) -> Table:
+    if isinstance(root, TableImpl):
+        return Table(root)
+
+    assert isinstance(root, Verb)
+    child = from_ast(root.child)
+
+    if isinstance(root, Select):
+        return child >> select(*root.select)
+    elif isinstance(root, Rename):
+        return child >> rename(root.name_map)
+    elif isinstance(root, Mutate):
+        return child >> _mutate(root.names, root.values, root.uuids)
+    elif isinstance(root, Filter):
+        return child >> filter(*root.predicates)
+    elif isinstance(root, Arrange):
+        return child >> arrange(*root.order_by)
+    elif isinstance(root, Summarize):
+        return child >> _summarize(root.names, root.values, root.uuids)
+    elif isinstance(root, GroupBy):
+        return child >> group_by(*root.group_by, add=root.add)
+    elif isinstance(root, Ungroup):
+        return child >> ungroup()
+    elif isinstance(root, Join):
+        return child >> join(
+            from_ast(root.right),
+            root.on,
+            root.how,
+            validate=root.validate,
+            suffix=root.suffix,
+        )
+    elif isinstance(root, SliceHead):
+        return child >> slice_head(root.n, offset=root.offset)
+    elif isinstance(root, Alias):
+        return child >> alias(new_name=root.name)

@@ -16,6 +16,7 @@ from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops import ops, signature
 from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.ops.markers import Marker
+from pydiverse.transform._internal.pipe.pipeable import Pipeable
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.types import (
@@ -104,6 +105,14 @@ class ColExpr(Generic[T]):
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
+
+    def __rshift__(self, rhs):
+        if not isinstance(rhs, Pipeable):
+            raise TypeError(
+                "the right shift operator `>>` can only be applied to a column "
+                "expression if a verb is on the right"
+            )
+        return rhs(self)
 
     # --- generated code starts here, do not delete this comment ---
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ._internal.backend.targets import DuckDb, Polars, SqlAlchemy
+from ._internal.backend.targets import DuckDb, Pandas, Polars, SqlAlchemy
 from ._internal.pipe.verbs import (
     arrange,
     drop,
@@ -36,4 +36,5 @@ __all__ = __base + [
     "DuckDb",
     "SqlAlchemy",
     "Polars",
+    "Pandas",
 ]

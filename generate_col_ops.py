@@ -233,6 +233,7 @@ with open(FNS_PATH, "r+") as file:
         if line.startswith(
             "# --- from here the code is generated, do not delete this comment ---"
         ):
+            new_file_contents += "\n"
             for op_var_name in sorted(ops.__dict__):
                 op = ops.__dict__[op_var_name]
                 if isinstance(op, Operator) and not op.generate_expr_method:
