@@ -194,7 +194,7 @@ class Cache:
             self._update(new_select=vb.select)
 
         elif isinstance(vb, Rename):
-            self.update(
+            self._update(
                 new_cols={
                     (new_name if (new_name := vb.name_map.get(name)) else name): col
                     for name, col in self.cols.items()

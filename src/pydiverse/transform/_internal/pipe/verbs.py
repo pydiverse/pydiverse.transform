@@ -276,11 +276,11 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
 
     if d := set(name_map) - set(table._cache.cols):
         raise ValueError(
-            f"no column with name `{next(d)}` in table `{table._ast.name}`"
+            f"no column with name `{next(iter(d))}` in table `{table._ast.name}`"
         )
 
-    if d := (set(table._cache.cols) - set(name_map)) | set(name_map.values()):
-        raise ValueError(f"duplicate column name `{next(d)}`")
+    if d := (set(table._cache.cols) - set(name_map)) & set(name_map.values()):
+        raise ValueError(f"duplicate column name `{next(iter(d))}`")
 
     new._cache.update(new._ast)
     return new
@@ -292,6 +292,8 @@ def mutate(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
+    if len(kwargs) == 0:
+        return table
     return table >> _mutate(*map(list, zip(*kwargs.items(), strict=True)))
 
 
@@ -302,9 +304,6 @@ def _mutate(
     values: list[ColExpr],
     uuids: list[uuid.UUID] | None = None,
 ) -> Pipeable:
-    if len(names) == 0:
-        return table
-
     new = copy.copy(table)
     if uuids is None:
         uuids = [uuid.uuid1() for _ in names]
