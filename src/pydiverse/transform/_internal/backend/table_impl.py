@@ -1,23 +1,21 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import polars as pl
 import sqlalchemy as sqa
 
-from pydiverse.transform._internal import ops
+from pydiverse.transform._internal.backend.impl_store import ImplStore
 from pydiverse.transform._internal.backend.targets import Target
-from pydiverse.transform._internal.ops.core import Ftype
+from pydiverse.transform._internal.errors import NotSupportedError
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Col
-from pydiverse.transform._internal.tree.dtypes import Dtype
-from pydiverse.transform._internal.tree.registry import (
-    OperatorRegistrationContextManager,
-    OperatorRegistry,
-)
+from pydiverse.transform._internal.tree.col_expr import Col, ColExpr
+from pydiverse.transform._internal.tree.types import Dtype
 
 try:
     import pandas as pd
@@ -25,35 +23,21 @@ except ImportError:
     pd = None
 
 if TYPE_CHECKING:
-    from pydiverse.transform._internal.ops import Operator
+    from pydiverse.transform._internal.ops.ops import Operator
 
 
 class TableImpl(AstNode):
-    """
-    Base class from which all table backend implementations are derived from.
-    """
-
-    registry: OperatorRegistry
+    impl_store = ImplStore()
 
     def __init__(self, name: str, schema: dict[str, Dtype]):
         self.name = name
         self.cols = {
-            name: Col(name, self, uuid.uuid1(), dtype, Ftype.EWISE)
+            name: Col(name, self, uuid.uuid1(), dtype, Ftype.ELEMENT_WISE)
             for name, dtype in schema.items()
         }
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        # Add new `registry` class variable to subclass.
-        # We define the super registry by walking up the MRO. This allows us
-        # to check for potential operation definitions in the parent classes.
-        super_reg = None
-        for super_cls in cls.__mro__:
-            if hasattr(super_cls, "registry"):
-                super_reg = super_cls.registry
-                break
-        cls.registry = OperatorRegistry(cls, super_reg)
+    def __init_subclass__(cls) -> None:
+        cls.impl_store = ImplStore()
 
     @staticmethod
     def from_resource(
@@ -118,197 +102,122 @@ class TableImpl(AstNode):
 
         return res
 
-    def iter_subtree(self) -> Iterable[AstNode]:
+    def iter_subtree_postorder(self) -> Iterable[AstNode]:
+        yield self
+
+    def iter_subtree_preorder(self) -> Generator[AstNode, bool | None, None]:
         yield self
 
     @classmethod
     def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None: ...
 
     @classmethod
-    def export(cls, nd: AstNode, target: Target, final_select: list[Col]) -> Any: ...
+    def export(
+        cls,
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[Col, Any],
+    ) -> Any: ...
 
     @classmethod
-    def _html_repr_expr(cls, expr):
-        """
-        Return an appropriate string to display an expression from this backend.
-        This is mainly used to IPython.
-        """
-        return repr(expr)
+    def export_col(cls, expr: ColExpr, target: Target): ...
 
     @classmethod
-    def op(cls, operator: Operator, **kwargs) -> OperatorRegistrationContextManager:
-        return OperatorRegistrationContextManager(cls.registry, operator, **kwargs)
+    def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:
+        if (impl := cls.impl_store.get_impl(op, sig)) is not None:
+            return impl
+
+        if cls is TableImpl:
+            raise NotSupportedError
+
+        try:
+            return cls.__bases__[0].get_impl(op, sig)
+        except NotSupportedError as err:
+            raise NotSupportedError(
+                f"operation `{op.name}` is not supported by the backend "
+                f"`{cls.__name__.lower()[:-4]}`"
+            ) from err
 
 
-TableImpl.registry = OperatorRegistry(TableImpl)
+with TableImpl.impl_store.impl_manager as impl:
 
-with TableImpl.op(ops.NullsFirst()) as op:
-
-    @op.auto
-    def _nulls_first(_):
-        raise AssertionError
-
-
-with TableImpl.op(ops.NullsLast()) as op:
-
-    @op.auto
-    def _nulls_last(_):
-        raise AssertionError
-
-
-with TableImpl.op(ops.Ascending()) as op:
-
-    @op.auto
-    def _ascending(_):
-        raise AssertionError
-
-
-with TableImpl.op(ops.Descending()) as op:
-
-    @op.auto
-    def _descending(_):
-        raise AssertionError
-
-
-with TableImpl.op(ops.Add()) as op:
-
-    @op.auto
+    @impl(ops.add)
     def _add(lhs, rhs):
         return lhs + rhs
 
-    @op.extension(ops.StrAdd)
-    def _str_add(lhs, rhs):
-        return lhs + rhs
-
-
-with TableImpl.op(ops.Sub()) as op:
-
-    @op.auto
+    @impl(ops.sub)
     def _sub(lhs, rhs):
         return lhs - rhs
 
-
-with TableImpl.op(ops.Mul()) as op:
-
-    @op.auto
+    @impl(ops.mul)
     def _mul(lhs, rhs):
         return lhs * rhs
 
-
-with TableImpl.op(ops.TrueDiv()) as op:
-
-    @op.auto
+    @impl(ops.truediv)
     def _truediv(lhs, rhs):
         return lhs / rhs
 
-
-with TableImpl.op(ops.FloorDiv()) as op:
-
-    @op.auto
+    @impl(ops.floordiv)
     def _floordiv(lhs, rhs):
         return lhs // rhs
 
-
-with TableImpl.op(ops.Pow()) as op:
-
-    @op.auto
+    @impl(ops.pow)
     def _pow(lhs, rhs):
         return lhs**rhs
 
-
-with TableImpl.op(ops.Mod()) as op:
-
-    @op.auto
+    @impl(ops.mod)
     def _mod(lhs, rhs):
         return lhs % rhs
 
-
-with TableImpl.op(ops.Neg()) as op:
-
-    @op.auto
+    @impl(ops.neg)
     def _neg(x):
         return -x
 
-
-with TableImpl.op(ops.Pos()) as op:
-
-    @op.auto
+    @impl(ops.pos)
     def _pos(x):
         return +x
 
-
-with TableImpl.op(ops.Abs()) as op:
-
-    @op.auto
+    @impl(ops.abs)
     def _abs(x):
         return abs(x)
 
-
-with TableImpl.op(ops.And()) as op:
-
-    @op.auto
+    @impl(ops.bool_and)
     def _and(lhs, rhs):
         return lhs & rhs
 
-
-with TableImpl.op(ops.Or()) as op:
-
-    @op.auto
+    @impl(ops.bool_or)
     def _or(lhs, rhs):
         return lhs | rhs
 
-
-with TableImpl.op(ops.Xor()) as op:
-
-    @op.auto
+    @impl(ops.bool_xor)
     def _xor(lhs, rhs):
         return lhs ^ rhs
 
-
-with TableImpl.op(ops.Invert()) as op:
-
-    @op.auto
+    @impl(ops.bool_invert)
     def _invert(x):
         return ~x
 
-
-with TableImpl.op(ops.Equal()) as op:
-
-    @op.auto
+    @impl(ops.equal)
     def _eq(lhs, rhs):
         return lhs == rhs
 
-
-with TableImpl.op(ops.NotEqual()) as op:
-
-    @op.auto
+    @impl(ops.not_equal)
     def _ne(lhs, rhs):
         return lhs != rhs
 
-
-with TableImpl.op(ops.Less()) as op:
-
-    @op.auto
+    @impl(ops.less_than)
     def _lt(lhs, rhs):
         return lhs < rhs
 
-
-with TableImpl.op(ops.LessEqual()) as op:
-
-    @op.auto
+    @impl(ops.less_equal)
     def _le(lhs, rhs):
         return lhs <= rhs
 
-
-with TableImpl.op(ops.Greater()) as op:
-
-    @op.auto
+    @impl(ops.greater_than)
     def _gt(lhs, rhs):
         return lhs > rhs
 
-
-with TableImpl.op(ops.GreaterEqual()) as op:
-
-    @op.auto
+    @impl(ops.greater_equal)
     def _ge(lhs, rhs):
         return lhs >= rhs

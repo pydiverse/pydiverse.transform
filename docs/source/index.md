@@ -4,7 +4,7 @@ hide-toc: true
 
 # pydiverse.transform
 
-Pydiverse.transform is best described by quoting from [dplyr documentation](https://dplyr.tidyverse.org/). 
+Pydiverse.transform is best described by quoting from [dplyr documentation](https://dplyr.tidyverse.org/).
 Pydiverse.transform "is a grammar of data manipulation, providing a consistent set of verbs that help you solve the most
 common data manipulation challenges:
 
@@ -16,7 +16,7 @@ common data manipulation challenges:
 
 These all combine naturally with group_by() which allows you to perform any operation by group."
 
-The following example describes how to create new columns, filter rows, and sort the result. The pipe operator `>>` is 
+The following example describes how to create new columns, filter rows, and sort the result. The pipe operator `>>` is
 used to chain multiple verbs to describe a data transformation in a functional way:
 
 ```python
@@ -27,7 +27,7 @@ tbl = pdt.Table(dict(x=[1, 2, 3], y=[4, 5, 6]))
 tbl >> mutate(z=tbl.x + tbl.y) >> filter(tbl.x > 1) >> arrange(C.z) >> show()
 ```
 
-Please note that you can reference columns either as members of table objects (i.e. `tbl.x`), or as generic reference 
+Please note that you can reference columns either as members of table objects (i.e. `tbl.x`), or as generic reference
 to a column in the expression with a specific name by prefixing with `C.` (i.e. `C.z`). If you are familiar with Polars,
 this corresponds to `pl.col("z")` but is intentionally short.
 
@@ -46,7 +46,7 @@ shape: (2, 3)
 
 Pydiverse.transform is designed to provide a single syntax for data transformation code that can be executed reliably on
 both in-memory dataframes and SQL databases. Focus is on predictable types, well defined semantics, and a nice syntax
-that is pleasant and efficient to work with. The results should be identical across different backends, and good error 
+that is pleasant and efficient to work with. The results should be identical across different backends, and good error
 messages should be raised before sending a query to a backend if a specific feature is not supported.
 
 Polars and DuckDB SQL based execution can be described in one pipe chain of data transformation tasks:
@@ -59,14 +59,14 @@ tbl = pdt.Table(dict(x=[1, 2, 3], y=[4, 5, 6]), name="A")
 tbl2 = pdt.Table(dict(x=[2, 3], z=["b", "c"]), name="B") >> collect(DuckDb())
 
 (
-    tbl >> collect(DuckDb()) >> left_join(tbl2, tbl.x == tbl2.x) >> show_query() 
+    tbl >> collect(DuckDb()) >> left_join(tbl2, tbl.x == tbl2.x) >> show_query()
         >> collect(Polars()) >> mutate(z=tbl.x + tbl.y) >> show()
 )
 ```
 
 The output of `show_query()` is:
 ```text
-SELECT "A".x AS x, "A".y AS y, "B".x AS "x_B", "B".z AS "z_B" 
+SELECT "A".x AS x, "A".y AS y, "B".x AS "x_B", "B".z AS "z_B"
 FROM "A" LEFT OUTER JOIN "B" ON "A".x = "B".x
 ```
 
@@ -182,7 +182,7 @@ how written code behaves on all backends.
 A few features are still missing so transform can serve the majority of data transformation needs:
 
 1. The verb `materialize` should allow executing a query directly within any SQL database. This functionality is common
-   between pydiverse.pipedag and pydiverse.transform. In its lazy form it would just be an abstract node in the 
+   between pydiverse.pipedag and pydiverse.transform. In its lazy form it would just be an abstract node in the
    execution graph. Especially, the pipedag integration might greatly benefit from this because pipedag could contribute
    database connection and schema information.
 2. Expansion of the type system in the direction of Duration, Categorical, and Array types.
@@ -204,13 +204,13 @@ making interactive development within IDE debuggers overly complex.
 
 [Pandas](https://pandas.pydata.org/) and [Polars](https://www.pola.rs/) are currently contending for what is the best
 dataframe processing library in Python.
-We appreciate, use, and support both. In pydiverse.transform, we decided to only provide a backend natively using 
+We appreciate, use, and support both. In pydiverse.transform, we decided to only provide a backend natively using
 Polars. Pandas 2.0 can exchange data zero-copy with Polars when using Apache Arrow as storage format. Otherwise, Pandas
-data might need to be copied when entering or exiting pydiverse.transform expressions. 
+data might need to be copied when entering or exiting pydiverse.transform expressions.
 
-[DuckDB](https://duckdb.org/) is a columnar relational database technology that very well integrates with the Parquet 
-file format, Polars, and Apache Arrow. Pydiverse.transform can use DuckDB as a SQL backend and even make it work based 
-on Polars DataFrames. Switching between DuckDB and Polars processing can be done even within one functional chain of 
+[DuckDB](https://duckdb.org/) is a columnar relational database technology that very well integrates with the Parquet
+file format, Polars, and Apache Arrow. Pydiverse.transform can use DuckDB as a SQL backend and even make it work based
+on Polars DataFrames. Switching between DuckDB and Polars processing can be done even within one functional chain of
 data processing transformations.
 
 Leaving all intermediate calculation steps of a data pipeline in the database is beneficial for analyzing problems and

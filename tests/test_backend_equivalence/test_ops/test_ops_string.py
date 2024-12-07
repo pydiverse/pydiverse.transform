@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform import C
-from pydiverse.transform._internal.pipe.verbs import (
-    filter,
-    mutate,
-)
+from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
 
@@ -33,10 +29,22 @@ def test_gt(df_strings):
 
 
 def test_le(df_strings):
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> mutate(
+            col1_le_c=C.col1 <= C.c,
+            col1_le_col2=t.col1 <= t.col2,
+            d_le_c=t.d <= t.c,
+        ),
+    )
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 <= C.col2))
 
 
 def test_ge(df_strings):
+    assert_result_equal(
+        df_strings, lambda t: t >> mutate(col1_ge_col2=C.col1 >= C.col2)
+    )
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 >= C.col2))
 
 
@@ -62,24 +70,24 @@ def test_string_length(df_strings):
     )
 
 
-def test_to_upper(df_strings):
+def test_upper(df_strings):
     assert_result_equal(
         df_strings,
         lambda t: t
         >> mutate(
-            x=C.col1.str.to_upper(),
-            y=C.col2.str.to_upper(),
+            x=C.col1.str.upper(),
+            y=C.col2.str.upper(),
         ),
     )
 
 
-def test_to_lower(df_strings):
+def test_lower(df_strings):
     assert_result_equal(
         df_strings,
         lambda t: t
         >> mutate(
-            x=C.col1.str.to_lower(),
-            y=C.col2.str.to_lower(),
+            x=C.col1.str.lower(),
+            y=C.col2.str.lower(),
         ),
     )
 

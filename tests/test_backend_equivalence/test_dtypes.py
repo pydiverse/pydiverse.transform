@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.pipe.verbs import alias, filter, inner_join, mutate
+from pydiverse.transform.extended import *
 from tests.util.assertion import assert_result_equal
 
 

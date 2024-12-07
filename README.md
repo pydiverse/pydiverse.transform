@@ -49,7 +49,7 @@ pixi run pytest --postgres --mssql
 ## Testing db2 functionality
 
 For running @pytest.mark.ibm_db2 tests, you need to spin up a docker container without `docker compose` since it needs
-the `--priviledged` option which `docker compose` does not offer.
+the `--privileged` option which `docker compose` does not offer.
 
 ```bash
 docker run -h db2server --name db2server --restart=always --detach --privileged=true -p 50000:50000 --env-file docker_db2.env_list -v /Docker:/database ibmcom/db2

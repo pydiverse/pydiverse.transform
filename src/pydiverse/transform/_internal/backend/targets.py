@@ -7,13 +7,15 @@ from __future__ import annotations
 import sqlalchemy as sqa
 
 
-# TODO: better name for this? (the user sees this)
 class Target: ...
 
 
 class Polars(Target):
     def __init__(self, *, lazy: bool = True) -> None:
         self.lazy = lazy
+
+
+class Pandas(Target): ...
 
 
 class DuckDb(Target): ...

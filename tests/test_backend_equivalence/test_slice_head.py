@@ -1,18 +1,7 @@
 from __future__ import annotations
 
 import pydiverse.transform as pdt
-from pydiverse.transform import C
-from pydiverse.transform._internal.pipe.verbs import (
-    alias,
-    arrange,
-    filter,
-    group_by,
-    left_join,
-    mutate,
-    select,
-    slice_head,
-    summarize,
-)
+from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 import duckdb
@@ -7,8 +8,8 @@ import duckdb_engine
 import polars as pl
 import sqlalchemy as sqa
 
+from pydiverse.transform._internal.backend import polars
 from pydiverse.transform._internal.backend.duckdb import DuckDbImpl
-from pydiverse.transform._internal.backend.polars import polars_type_to_pdt
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.tree.ast import AstNode
@@ -26,7 +27,7 @@ class DuckDbPolarsImpl(TableImpl):
         super().__init__(
             name,
             {
-                name: polars_type_to_pdt(dtype)
+                name: polars.pdt_type(dtype)
                 for name, dtype in df.collect_schema().items()
             },
         )
@@ -45,7 +46,12 @@ class DuckDbPolarsImpl(TableImpl):
         return DuckDbImpl.build_query(nd, final_select, dialect=duckdb_engine.Dialect())
 
     @staticmethod
-    def export(nd: AstNode, target: Target, final_select: list[Col]) -> pl.DataFrame:
+    def export(
+        nd: AstNode,
+        target: Target,
+        final_select: list[Col],
+        schema_overrides: dict[str, Any],
+    ) -> pl.DataFrame:
         if isinstance(target, Polars):
             sel = DuckDbImpl.build_select(nd, final_select)
             query_str = str(
@@ -57,7 +63,7 @@ class DuckDbPolarsImpl(TableImpl):
 
             # tell duckdb which table names in the SQL query correspond to which
             # data frames
-            for desc in nd.iter_subtree():
+            for desc in nd.iter_subtree_postorder():
                 if isinstance(desc, DuckDbPolarsImpl):
                     duckdb.register(desc.table.name, desc.df)
 

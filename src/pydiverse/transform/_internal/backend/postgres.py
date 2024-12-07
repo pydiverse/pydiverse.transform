@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import sqlalchemy as sqa
 
-from pydiverse.transform._internal import ops
 from pydiverse.transform._internal.backend.sql import SqlImpl
-from pydiverse.transform._internal.tree import dtypes
-from pydiverse.transform._internal.tree.col_expr import Cast
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
+from pydiverse.transform._internal.tree.types import Float, Int, String
 
 
 class PostgresImpl(SqlImpl):
@@ -13,11 +13,11 @@ class PostgresImpl(SqlImpl):
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
 
-        if isinstance(cast.val.dtype(), dtypes.Float64):
-            if isinstance(cast.target_type, dtypes.Int64):
+        if cast.val.dtype() <= Float():
+            if cast.target_type <= Int():
                 return sqa.func.trunc(compiled_val).cast(sqa.BigInteger())
 
-            if isinstance(cast.target_type, dtypes.String):
+            if cast.target_type == String():
                 compiled = sqa.cast(compiled_val, sqa.String)
                 return sqa.case(
                     (compiled == "NaN", "nan"),
@@ -28,38 +28,37 @@ class PostgresImpl(SqlImpl):
 
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
+    @classmethod
+    def past_over_clause(
+        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
+    ) -> sqa.ColumnElement:
+        if isinstance(fn.op, ops.DatetimeExtract | ops.DateExtract):
+            return sqa.cast(val, sqa.BigInteger)
+        elif fn.op == ops.sum:
+            # postgres sometimes switches types for `sum`
+            return sqa.cast(val, args[0].type)
+        return val
 
-with PostgresImpl.op(ops.Less()) as op:
 
-    @op("str, str -> bool")
+with PostgresImpl.impl_store.impl_manager as impl:
+
+    @impl(ops.less_than, String(), String())
     def _lt(x, y):
         return x < sqa.collate(y, "POSIX")
 
-
-with PostgresImpl.op(ops.LessEqual()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.less_equal, String(), String())
     def _le(x, y):
         return x <= sqa.collate(y, "POSIX")
 
-
-with PostgresImpl.op(ops.Greater()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.greater_than, String(), String())
     def _gt(x, y):
         return x > sqa.collate(y, "POSIX")
 
-
-with PostgresImpl.op(ops.GreaterEqual()) as op:
-
-    @op("str, str -> bool")
+    @impl(ops.greater_equal, String(), String())
     def _ge(x, y):
         return x >= sqa.collate(y, "POSIX")
 
-
-with PostgresImpl.op(ops.Round()) as op:
-
-    @op.auto
+    @impl(ops.round)
     def _round(x, decimals=0):
         if decimals == 0:
             if isinstance(x.type, sqa.Integer):
@@ -73,83 +72,37 @@ with PostgresImpl.op(ops.Round()) as op:
 
         return sqa.func.ROUND(x, decimals, type_=x.type)
 
-
-with PostgresImpl.op(ops.DtSecond()) as op:
-
-    @op.auto
-    def _second(x):
+    @impl(ops.dt_second)
+    def _dt_second(x):
         return sqa.func.FLOOR(sqa.extract("second", x), type_=sqa.Integer())
 
-
-with PostgresImpl.op(ops.DtMillisecond()) as op:
-
-    @op.auto
-    def _millisecond(x):
+    @impl(ops.dt_millisecond)
+    def _dt_millisecond(x):
         _1000 = sqa.literal_column("1000")
         return sqa.func.FLOOR(
             sqa.extract("milliseconds", x) % _1000, type_=sqa.Integer()
         )
 
-
-with PostgresImpl.op(ops.HMax()) as op:
-
-    @op("str... -> str")
-    def _greatest(*x):
-        # TODO: Determine return type
+    @impl(ops.horizontal_max, String(), String(), ...)
+    def _horizontal_max(*x):
         return sqa.func.GREATEST(*(sqa.collate(e, "POSIX") for e in x))
 
-
-with PostgresImpl.op(ops.HMin()) as op:
-
-    @op("str... -> str")
+    @impl(ops.horizontal_min, String(), String(), ...)
     def _least(*x):
-        # TODO: Determine return type
         return sqa.func.LEAST(*(sqa.collate(e, "POSIX") for e in x))
 
+    @impl(ops.any)
+    def _any(x):
+        return sqa.func.BOOL_OR(x, type_=sqa.Boolean())
 
-with PostgresImpl.op(ops.Any()) as op:
-
-    @op.auto
-    def _any(x, *, _window_partition_by=None, _window_order_by=None):
-        return sqa.func.coalesce(sqa.func.BOOL_OR(x, type_=sqa.Boolean()), sqa.null())
-
-    @op.auto(variant="window")
-    def _any(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.BOOL_OR(x, type_=sqa.Boolean()).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
-
-
-with PostgresImpl.op(ops.All()) as op:
-
-    @op.auto
+    @impl(ops.all)
     def _all(x):
-        return sqa.func.coalesce(sqa.func.BOOL_AND(x, type_=sqa.Boolean()), sqa.null())
+        return sqa.func.BOOL_AND(x, type_=sqa.Boolean())
 
-    @op.auto(variant="window")
-    def _all(x, *, partition_by=None, order_by=None):
-        return sqa.func.coalesce(
-            sqa.func.BOOL_AND(x, type_=sqa.Boolean()).over(
-                partition_by=partition_by,
-                order_by=order_by,
-            ),
-            sqa.null(),
-        )
-
-
-with SqlImpl.op(ops.IsNan()) as op:
-
-    @op.auto
+    @impl(ops.is_nan)
     def _is_nan(x):
         return x == PostgresImpl.nan()
 
-
-with SqlImpl.op(ops.IsNotNan()) as op:
-
-    @op.auto
+    @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x != PostgresImpl.nan()
