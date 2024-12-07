@@ -3,12 +3,13 @@ Column Operators
 ================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :hidden:
 
    logical/index
-   comparison
-   string
+   comparison/index
+   string/index
+   aggregation/index
 
 .. currentmodule:: pydiverse.transform
 

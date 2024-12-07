@@ -40,6 +40,8 @@ extensions = [
     "sphinx.ext.napoleon",
 ]
 
+maximum_signature_line_length = 100
+
 myst_enable_extensions = [
     "fieldlist",
     "deflist",

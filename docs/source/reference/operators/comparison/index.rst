@@ -2,9 +2,12 @@
 Comparison
 ==========
 
+hello
+
 .. currentmodule:: pydiverse.transform.ColExpr
 .. autosummary::
-    :toctree: api/
+    :toctree: .
     :nosignatures:
+    :template: short_name.rst
 
     __lt__
