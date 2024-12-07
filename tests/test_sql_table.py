@@ -4,11 +4,8 @@ import polars as pl
 import pytest
 import sqlalchemy as sqa
 
-from pydiverse.transform import C
-from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy
-from pydiverse.transform._internal.pipe import functions as f
-from pydiverse.transform._internal.pipe.table import Table
-from pydiverse.transform._internal.pipe.verbs import *
+import pydiverse.transform as pdt
+from pydiverse.transform.extended import *
 from tests.util import assert_equal
 
 df1 = pl.DataFrame(
@@ -80,32 +77,32 @@ def engine():
 
 @pytest.fixture
 def tbl1(engine):
-    return Table("df1", SqlAlchemy(engine))
+    return pdt.Table("df1", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl2(engine):
-    return Table("df2", SqlAlchemy(engine))
+    return pdt.Table("df2", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl3(engine):
-    return Table("df3", SqlAlchemy(engine))
+    return pdt.Table("df3", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl4(engine):
-    return Table("df4", SqlAlchemy(engine))
+    return pdt.Table("df4", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl_left(engine):
-    return Table("df_left", SqlAlchemy(engine))
+    return pdt.Table("df_left", SqlAlchemy(engine))
 
 
 @pytest.fixture
 def tbl_right(engine):
-    return Table("df_right", SqlAlchemy(engine))
+    return pdt.Table("df_right", SqlAlchemy(engine))
 
 
 class TestSqlTable:
@@ -354,12 +351,12 @@ class TestSqlTable:
 
     def test_select_without_tbl_ref(self, tbl2):
         assert_equal(
-            tbl2 >> summarize(count=f.len()),
+            tbl2 >> summarize(count=pdt.count()),
             tbl2 >> summarize(count=tbl2.col1.count()),
         )
 
         assert_equal(
-            tbl2 >> summarize(count=f.len()), pl.DataFrame({"count": [len(df2)]})
+            tbl2 >> summarize(count=count()), pl.DataFrame({"count": [len(df2)]})
         )
 
     def test_null_comparison(self, tbl4):
@@ -378,7 +375,7 @@ class TestSqlTable:
             (
                 tbl3
                 >> mutate(
-                    col1=f.when(C.col1 == 0)
+                    col1=when(C.col1 == 0)
                     .then(1)
                     .when(C.col1 == 1)
                     .then(2)
@@ -395,7 +392,7 @@ class TestSqlTable:
             (
                 tbl3
                 >> mutate(
-                    x=f.when(C.col1 == C.col2)
+                    x=when(C.col1 == C.col2)
                     .then(1)
                     .when(C.col1 == C.col3)
                     .then(2)
