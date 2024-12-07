@@ -53,6 +53,8 @@ autodoc_default_options = {
 
 autosectionlabel_prefix_document = True
 
+toc_object_entries_show_parents = "all"
+
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "sa": ("https://docs.sqlalchemy.org/en/stable", None),

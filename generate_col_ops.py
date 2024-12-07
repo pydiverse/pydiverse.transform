@@ -136,14 +136,18 @@ def generate_overloads(
         for sig in op.signatures:
             res += "@overload\n" + generate_fn_decl(op, sig, name=name) + "    ...\n\n"
 
-    res += generate_fn_decl(
-        op, op.signatures[0], name=name, specialize_generic=not has_overloads
-    ) + generate_fn_body(
-        op,
-        op.signatures[0],
-        ["self.arg"] + op.param_names[1:] if in_namespace else None,
-        rversion=rversion,
-        op_var_name=op_var_name,
+    res += (
+        generate_fn_decl(
+            op, op.signatures[0], name=name, specialize_generic=not has_overloads
+        )
+        + f'    """\n{op.doc}\n"""\n\n'
+        + generate_fn_body(
+            op,
+            op.signatures[0],
+            ["self.arg"] + op.param_names[1:] if in_namespace else None,
+            rversion=rversion,
+            op_var_name=op_var_name,
+        )
     )
 
     return res

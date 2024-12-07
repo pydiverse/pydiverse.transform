@@ -7,11 +7,11 @@ Column Operators
    :hidden:
 
    logical
+   comparison
+   string
 
 .. currentmodule:: pydiverse.transform
 
 .. autoclass:: ColExpr
     :members:
     :noindex:
-    :autosummary:
-    :autosummary-nosignatures:

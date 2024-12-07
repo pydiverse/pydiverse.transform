@@ -1,3 +1,5 @@
 =====
 Verbs
 =====
+
+.. currentmodule:: pydiverse.transform

@@ -8,33 +8,9 @@ API
     operators/index
     verbs
 
-Core
-----
+Table
+-----
 
-.. automodule:: pydiverse.transform
-    :members:
-    :undoc-members:
-
-
-
-Builtin Verbs
--------------
-
-.. automodule:: pydiverse.transform.core.verbs
-    :members:
-    :undoc-members:
-
-
-Operators
----------
-
-.. automodule:: pydiverse.transform.core.ops.aggregate
-    :members:
-.. automodule:: pydiverse.transform.core.ops.logical
-    :members:
-.. automodule:: pydiverse.transform.core.ops.numeric
-    :members:
-.. automodule:: pydiverse.transform.core.ops.string
-    :members:
-.. automodule:: pydiverse.transform.core.ops.window
-    :members:
+.. currentmodule:: pydiverse.transform
+.. autoclass:: Table
+    :noindex:
