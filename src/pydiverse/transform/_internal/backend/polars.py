@@ -167,7 +167,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         # TODO: currently, count is the only aggregation function where we don't want
         # to return null for cols containing only null values. If this happens for more
         # aggregation functions, make this configurable in e.g. the operator spec.
-        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.len:
+        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.count_star:
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -668,7 +668,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _count(x):
         return x.count().cast(pl.Int64)
 
-    @impl(ops.len)
+    @impl(ops.count_star)
     def _len():
         return pl.len().cast(pl.Int64)
 

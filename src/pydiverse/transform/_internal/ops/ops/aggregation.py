@@ -44,4 +44,6 @@ all = Aggregation("all", Signature(Bool(), return_type=Bool()))
 
 count = Aggregation("count", Signature(D, return_type=Int()))
 
-len = Aggregation("len", Signature(return_type=Int()), generate_expr_method=False)
+count_star = Aggregation(
+    "count", Signature(return_type=Int()), generate_expr_method=False
+)

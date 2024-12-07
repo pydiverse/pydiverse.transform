@@ -17,6 +17,11 @@ from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col, ColExpr
 from pydiverse.transform._internal.tree.types import Dtype
 
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
 if TYPE_CHECKING:
     from pydiverse.transform._internal.ops.ops import Operator
 
@@ -50,6 +55,18 @@ class TableImpl(AstNode):
 
         if isinstance(resource, TableImpl):
             res = resource
+
+        elif isinstance(resource, dict):
+            return TableImpl.from_resource(
+                pl.DataFrame(resource), backend, name=name, uuids=uuids
+            )
+
+        elif pd is not None and isinstance(resource, pd.DataFrame):
+            # copy pandas dataframe to polars
+            # TODO: try zero-copy for arrow backed pandas
+            return TableImpl.from_resource(
+                pl.DataFrame(resource), backend, name=name, uuids=uuids
+            )
 
         elif isinstance(resource, pl.DataFrame | pl.LazyFrame):
             if name is None:
