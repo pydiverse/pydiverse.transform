@@ -1,5 +1,0 @@
-=====
-Verbs
-=====
-
-.. currentmodule:: pydiverse.transform
