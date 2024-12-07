@@ -1,5 +1,12 @@
+===
 API
 ===
+
+.. toctree::
+    :maxdepth: 2
+
+    operators/index
+    verbs
 
 Core
 ----
@@ -8,7 +15,6 @@ Core
     :members:
     :undoc-members:
 
-    .. autodata:: pydiverse.transform.λ
 
 
 Builtin Verbs
@@ -32,18 +38,3 @@ Operators
     :members:
 .. automodule:: pydiverse.transform.core.ops.window
     :members:
-
-
-Functions
----------
-
-.. automodule:: pydiverse.transform.core.functions
-    :members:
-    :undoc-members:
-
-
-Table Implementations
----------------------
-
-.. autoclass:: pydiverse.transform.eager.PandasTableImpl
-.. autoclass:: pydiverse.transform.lazy.SQLTableImpl
