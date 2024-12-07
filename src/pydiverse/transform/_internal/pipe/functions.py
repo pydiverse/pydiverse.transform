@@ -79,7 +79,7 @@ def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
 
 
 def coalesce(arg: ColExpr, *args: ColExpr) -> ColExpr:
-    """ """
+    """"""
 
     return ColFn(ops.coalesce, arg, *args)
 
@@ -89,7 +89,9 @@ def count(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
 ) -> ColExpr[Int]:
-    """ """
+    """
+    Returns the number of rows of the current table, like :code:`COUNT(*)` in SQL.
+    """
 
     return ColFn(ops.count_star, partition_by=partition_by, filter=filter)
 
@@ -99,7 +101,7 @@ def dense_rank(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     arrange: ColExpr | Iterable[ColExpr] | None = None,
 ) -> ColExpr[Int]:
-    """ """
+    """"""
 
     return ColFn(ops.dense_rank, partition_by=partition_by, arrange=arrange)
 
@@ -129,7 +131,7 @@ def max(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
 def max(arg: ColExpr, *args: ColExpr) -> ColExpr:
-    """ """
+    """"""
 
     return ColFn(ops.horizontal_max, arg, *args)
 
@@ -159,7 +161,7 @@ def min(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
 def min(arg: ColExpr, *args: ColExpr) -> ColExpr:
-    """ """
+    """"""
 
     return ColFn(ops.horizontal_min, arg, *args)
 
@@ -169,7 +171,7 @@ def rank(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     arrange: ColExpr | Iterable[ColExpr] | None = None,
 ) -> ColExpr[Int]:
-    """ """
+    """"""
 
     return ColFn(ops.rank, partition_by=partition_by, arrange=arrange)
 
@@ -179,6 +181,6 @@ def row_number(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     arrange: ColExpr | Iterable[ColExpr] | None = None,
 ) -> ColExpr[Int]:
-    """ """
+    """"""
 
     return ColFn(ops.row_number, partition_by=partition_by, arrange=arrange)

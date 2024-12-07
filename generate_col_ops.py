@@ -140,7 +140,7 @@ def generate_overloads(
         generate_fn_decl(
             op, op.signatures[0], name=name, specialize_generic=not has_overloads
         )
-        + f'    """\n{op.doc}\n"""\n\n'
+        + f'    """{op.doc}"""\n\n'
         + generate_fn_body(
             op,
             op.signatures[0],
