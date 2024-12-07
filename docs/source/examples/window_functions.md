@@ -1,15 +1,15 @@
 # Window functions
 
-Pydiverse.transform offers window functions with the `mutate()` verb. 
-Window functions are functions that operate on a set of rows related to the current row. 
-They can be computed independently on groups, can use the order of rows, and can be computed only on a filtered 
-subset of the table. The most simple window function is `shift(n)` which shifts a column by `n` rows. Defining an 
+Pydiverse.transform offers window functions with the `mutate()` verb.
+Window functions are functions that operate on a set of rows related to the current row.
+They can be computed independently on groups, can use the order of rows, and can be computed only on a filtered
+subset of the table. The most simple window function is `shift(n)` which shifts a column by `n` rows. Defining an
 ordering is very important for this operation.
 
-There are two notations which define the grouping and arranging in a different way. 
+There are two notations which define the grouping and arranging in a different way.
 The first is explicitly defining the `partition_by`, `order_by`, and `filter` arguments of the window function.
-The second makes use of existing verbs like `group_by()` and `arrange()`. However, an additional verb `ungroup()` tells 
-that no `summarize()` will follow but rather that `group_by()` arguments should be used as `partition_by` and `arrange()` 
+The second makes use of existing verbs like `group_by()` and `arrange()`. However, an additional verb `ungroup()` tells
+that no `summarize()` will follow but rather that `group_by()` arguments should be used as `partition_by` and `arrange()`
 arguments as `arrange` parameters to window functions.
 
 ```python

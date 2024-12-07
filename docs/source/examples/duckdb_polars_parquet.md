@@ -10,7 +10,7 @@ tbl = pdt.Table(dict(x=[1, 2, 3], y=[4, 5, 6]), name="A")
 tbl2 = pdt.Table(dict(x=[2, 3], z=["b", "c"]), name="B") >> collect(DuckDb())
 
 out = (
-    tbl >> collect(DuckDb()) >> left_join(tbl2, tbl.x == tbl2.x) >> show_query() 
+    tbl >> collect(DuckDb()) >> left_join(tbl2, tbl.x == tbl2.x) >> show_query()
         >> collect(Polars()) >> mutate(z=tbl.x + tbl.y) >> show()
 )
 

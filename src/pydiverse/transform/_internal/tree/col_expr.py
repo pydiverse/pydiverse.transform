@@ -924,7 +924,7 @@ class ColFn(ColExpr):
 
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
-                assert self.op.name == "len"
+                assert self.op == ops.count_star
             else:
                 self.args[0] = CaseExpr(
                     [

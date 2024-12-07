@@ -6,6 +6,7 @@ from ._internal.pipe.functions import (
     all,
     any,
     coalesce,
+    count,
     dense_rank,
     lit,
     max,
@@ -22,6 +23,7 @@ from .common import __all__ as __common
 __all__ = __common + [
     "any",
     "all",
+    "count",
     "sum",
     "filter",
     "coalesce",

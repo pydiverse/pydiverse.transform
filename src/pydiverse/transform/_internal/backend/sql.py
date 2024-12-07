@@ -888,7 +888,7 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _count(x=None):
         return sqa.func.count(x)
 
-    @impl(ops.len)
+    @impl(ops.count_star)
     def _len():
         return sqa.func.count()
 

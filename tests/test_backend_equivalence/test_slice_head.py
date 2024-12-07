@@ -137,7 +137,7 @@ def test_with_group_by(df3):
         >> slice_head(1)
         >> alias()
         >> group_by(C.col1)
-        >> mutate(x=pdt.len()),
+        >> mutate(x=pdt.count()),
     )
 
     assert_result_equal(
@@ -159,7 +159,7 @@ def test_with_group_by(df3):
         >> slice_head(4)
         >> alias()
         >> group_by(C.key)
-        >> summarize(x=pdt.len()),
+        >> summarize(x=pdt.count()),
     )
 
 
@@ -170,7 +170,7 @@ def test_with_summarize(df3):
         >> arrange(*t)
         >> slice_head(4)
         >> alias()
-        >> summarize(count=pdt.len()),
+        >> summarize(count=pdt.count()),
     )
 
     assert_result_equal(

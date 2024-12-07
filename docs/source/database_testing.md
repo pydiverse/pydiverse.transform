@@ -1,11 +1,11 @@
 # Database testing
 
 Relational databases are quite effective for analyzing medium size tabular data. You can leave the data in the database
-and just describe the transformation in python. All that needs to be exchanged between python and the database is the 
-SQL string that is executed within the database as a `CREATE TABLE ... AS SELECT ...` statement. The database can 
+and just describe the transformation in python. All that needs to be exchanged between python and the database is the
+SQL string that is executed within the database as a `CREATE TABLE ... AS SELECT ...` statement. The database can
 execute query in an optimal and parallelized way.
 
-In practice, a relational database is already running somewhere and all you need is a connection URL and access 
+In practice, a relational database is already running somewhere and all you need is a connection URL and access
 credentials. See [Table Backends](table_backends.md) for a list of currently supported databases.
 
 The following example shows how to launch a postgres database in a container with docker-compose and how to work with it

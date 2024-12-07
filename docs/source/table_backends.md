@@ -53,4 +53,3 @@ with tempfile.TemporaryDirectory() as temp_dir:
         conn.commit()
     example(engine)
 ```
-

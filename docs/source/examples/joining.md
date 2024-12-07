@@ -50,7 +50,7 @@ shape: (3, 4)
 
 For DataFrame libraries, it is quite common that a join combines all columns of both tables, so the user then can pick
 the columns of interest for further expressions. In SQL, the act of joining is actually not bringing in any new columns.
-It only adds the columns of the joined tables to the namespace of usable columns in expressions of the `mutate` and 
+It only adds the columns of the joined tables to the namespace of usable columns in expressions of the `mutate` and
 `summarize` verbs.
 
 In pydiverse.transform, the empty `select()` verb can be used to hide all columns of a table. But all columns can still
@@ -64,13 +64,13 @@ tbl1 = pdt.Table(dict(a=["a", "b", "c"], b=[1, 2, 3]))
 tbl2 = pdt.Table(dict(a=["a", "b", "b", "d"], c=[1.1, 2.2, 2.3, 4.4]), name="tbl2")
 
 (
-    tbl1 
+    tbl1
         >> left_join(tbl2 >> select(), tbl1.a == tbl2.a) >> show()
         >> mutate(d=tbl1.b + tbl2.c) >> show()
 )
 ```
 
-*dplyr* has also a verb called `transmute` which is very similar to `mutate`, but removes/hides all columns which were 
+*dplyr* has also a verb called `transmute` which is very similar to `mutate`, but removes/hides all columns which were
 not specified in the `mutate` call. This can be easily implemented in pydiverse.transform in user space:
 
 ```python

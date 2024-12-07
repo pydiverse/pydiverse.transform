@@ -84,6 +84,14 @@ def coalesce(arg: ColExpr, *args: ColExpr) -> ColExpr:
     return ColFn(ops.coalesce, arg, *args)
 
 
+def count(
+    *,
+    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+) -> ColExpr[Int]:
+    return ColFn(ops.count_star, partition_by=partition_by, filter=filter)
+
+
 def dense_rank(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
@@ -146,14 +154,6 @@ def min(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 def min(arg: ColExpr, *args: ColExpr) -> ColExpr:
     return ColFn(ops.horizontal_min, arg, *args)
-
-
-def len(
-    *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-) -> ColExpr[Int]:
-    return ColFn(ops.len, partition_by=partition_by, filter=filter)
 
 
 def rank(
