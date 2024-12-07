@@ -6,7 +6,7 @@ Column Operators
    :maxdepth: 2
    :hidden:
 
-   logical
+   logical/index
    comparison
    string
 

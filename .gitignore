@@ -1,3 +1,7 @@
+# documentation files that are generated on build
+
+docs/**/pydiverse.transform.*.rst
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
