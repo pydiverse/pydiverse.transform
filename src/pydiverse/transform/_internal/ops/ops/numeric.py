@@ -4,13 +4,11 @@ from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import NUMERIC, Bool, Decimal, Float, Int
 
-floordiv = Operator("__floordiv__", Signature(Int(), Int(), return_type=Int()))
-
 mod = Operator("__mod__", Signature(Int(), Int(), return_type=Int()))
 
 
 pow = Operator(
-    "pow",
+    "__pow__",
     Signature(Int(), Int(), return_type=Float()),
     Signature(Float(), Float(), return_type=Float()),
     Signature(Decimal(), Decimal(), return_type=Decimal()),

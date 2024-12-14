@@ -1,6 +1,6 @@
-======
-String
-======
+===================
+Datetime / Duration
+===================
 
 .. currentmodule:: pydiverse.transform
 .. autosummary::

@@ -689,18 +689,32 @@ class ColExpr(Generic[T]):
         return ColFn(ops.pos, self)
 
     @overload
-    def pow(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Float]: ...
+    def __pow__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Float]: ...
 
     @overload
-    def pow(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
+    def __pow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     @overload
-    def pow(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+    def __pow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
-    def pow(self: ColExpr, rhs: ColExpr) -> ColExpr:
+    def __pow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """"""
 
         return ColFn(ops.pow, self, rhs)
+
+    @overload
+    def __rpow__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Float]: ...
+
+    @overload
+    def __rpow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
+
+    @overload
+    def __rpow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    def __rpow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
+        return ColFn(ops.pow, rhs, self)
 
     @overload
     def round(self: ColExpr[Int], decimals: int = 0) -> ColExpr[Int]: ...

@@ -39,3 +39,5 @@ truediv = Operator(
     Signature(Float(), Float(), return_type=Float()),
     Signature(Decimal(), Decimal(), return_type=Decimal()),
 )
+
+floordiv = Operator("__floordiv__", Signature(Int(), Int(), return_type=Int()))
