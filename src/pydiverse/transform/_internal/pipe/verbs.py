@@ -146,17 +146,32 @@ def export(
 
     Parameters
     ----------
-    The pydiverse.transform Table or column expression to be exported.
-
     target
         Can currently be either a `Polars` or `Pandas` object. For polars, one can
         specify whether a DataFrame or LazyFrame is returned via the `lazy` kwarg.
         If `lazy=True`, no actual computations are performed, they just get stored in
         the LazyFrame.
 
+    schema_overrides
+        A dictionary of columns to backend-specific data types. This controls which data
+        types are used when writing to the backend. Because the data types are not
+        constrained by pydiverse.transform's type system, this may sometimes be
+        preferred over a `cast`.
+
     Returns
     -------
     A polars or pandas DataFrame / LazyFrame or a series.
+
+
+    Note
+    ----
+    This verb can be used with a Table or column expression on the left. When applied to
+    a column expression, all tables containing columns in the expression tree are
+    gathered and the expression is exported with respect to the most recent table. This
+    means that there has to be one column in the expression tree, whose table is a
+    common ancestor of all others. If this is not the case, the export fails. Anonymous
+    columns (`C`-columns) can be used in the expression and are interpreted with respect
+    to this common ancestor table.
     """
     if isinstance(data, ColExpr):
         # Find the common ancestor of all AST nodes of columns appearing in the
