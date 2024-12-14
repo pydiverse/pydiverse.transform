@@ -16,7 +16,7 @@ from pydiverse.transform._internal.tree.types import (
 COL_EXPR_PATH = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 FNS_PATH = "./src/pydiverse/transform/_internal/pipe/functions.py"
 
-NAMESPACES = ["str", "dt"]
+NAMESPACES = ["str", "dt", "dur"]
 
 RVERSIONS = {
     "__add__",

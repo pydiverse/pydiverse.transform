@@ -45,12 +45,14 @@ class DurationToUnit(Operator):
         super().__init__(name, Signature(Duration(), return_type=Int()))
 
 
-dt_days = DurationToUnit("dt.days")
+dur_days = DurationToUnit("dur.days")
 
-dt_hours = DurationToUnit("dt.hours")
+dur_hours = DurationToUnit("dur.hours")
 
-dt_minutes = DurationToUnit("dt.minutes")
+dur_minutes = DurationToUnit("dur.minutes")
 
-dt_seconds = DurationToUnit("dt.seconds")
+dur_seconds = DurationToUnit("dur.seconds")
 
-dt_milliseconds = DurationToUnit("dt.milliseconds")
+dur_milliseconds = DurationToUnit("dur.milliseconds")
+
+dur_microseconds = DurationToUnit("dur.microseconds")

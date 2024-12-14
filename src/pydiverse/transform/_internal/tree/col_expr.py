@@ -868,6 +868,7 @@ class ColExpr(Generic[T]):
 
     str: StrNamespace
     dt: DtNamespace
+    dur: DurNamespace
 
 
 @dataclasses.dataclass(slots=True)
@@ -974,20 +975,10 @@ class DtNamespace(FnNamespace):
 
         return ColFn(ops.dt_day_of_year, self.arg)
 
-    def days(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
-
-        return ColFn(ops.dt_days, self.arg)
-
     def hour(self: ColExpr[Datetime]) -> ColExpr[Int]:
         """"""
 
         return ColFn(ops.dt_hour, self.arg)
-
-    def hours(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
-
-        return ColFn(ops.dt_hours, self.arg)
 
     def microsecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
         """"""
@@ -999,20 +990,10 @@ class DtNamespace(FnNamespace):
 
         return ColFn(ops.dt_millisecond, self.arg)
 
-    def milliseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
-
-        return ColFn(ops.dt_milliseconds, self.arg)
-
     def minute(self: ColExpr[Datetime]) -> ColExpr[Int]:
         """"""
 
         return ColFn(ops.dt_minute, self.arg)
-
-    def minutes(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
-
-        return ColFn(ops.dt_minutes, self.arg)
 
     @overload
     def month(self: ColExpr[Date]) -> ColExpr[Int]: ...
@@ -1030,11 +1011,6 @@ class DtNamespace(FnNamespace):
 
         return ColFn(ops.dt_second, self.arg)
 
-    def seconds(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
-
-        return ColFn(ops.dt_seconds, self.arg)
-
     @overload
     def year(self: ColExpr[Date]) -> ColExpr[Int]: ...
 
@@ -1045,6 +1021,40 @@ class DtNamespace(FnNamespace):
         """"""
 
         return ColFn(ops.dt_year, self.arg)
+
+
+@register_accessor("dur")
+@dataclasses.dataclass(slots=True)
+class DurNamespace(FnNamespace):
+    def days(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_days, self.arg)
+
+    def hours(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_hours, self.arg)
+
+    def microseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_microseconds, self.arg)
+
+    def milliseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_milliseconds, self.arg)
+
+    def minutes(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_minutes, self.arg)
+
+    def seconds(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_seconds, self.arg)
 
 
 # --- generated code ends here, do not delete this comment ---
