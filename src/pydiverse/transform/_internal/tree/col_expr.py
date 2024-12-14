@@ -90,6 +90,9 @@ class ColExpr(Generic[T]):
         p.text(str(self) if not cycle else "...")
 
     def dtype(self) -> Dtype:
+        """
+        Returns the data type of the expression.
+        """
         return self._dtype
 
     def ftype(self, *, agg_is_window: bool) -> Ftype:

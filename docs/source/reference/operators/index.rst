@@ -13,9 +13,12 @@ Column Operators
    string
    datetime
    aggregation
+   window
+   sorting_markers
+   horizontal_aggregation
 
 .. currentmodule:: pydiverse.transform
 
 .. autoclass:: ColExpr
-    :members:
-    :noindex:
+   :noindex:
+   :members: dtype
