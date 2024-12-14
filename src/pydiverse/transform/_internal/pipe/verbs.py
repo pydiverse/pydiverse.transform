@@ -142,6 +142,22 @@ def export(
     *,
     schema_overrides: dict[Col, Any] | None = None,
 ) -> Pipeable:
+    """Convert a pydiverse.transform Table to a data frame.
+
+    Parameters
+    ----------
+    The pydiverse.transform Table or column expression to be exported.
+
+    target
+        Can currently be either a `Polars` or `Pandas` object. For polars, one can
+        specify whether a DataFrame or LazyFrame is returned via the `lazy` kwarg.
+        If `lazy=True`, no actual computations are performed, they just get stored in
+        the LazyFrame.
+
+    Returns
+    -------
+    A polars or pandas DataFrame / LazyFrame or a series.
+    """
     if isinstance(data, ColExpr):
         # Find the common ancestor of all AST nodes of columns appearing in the
         # expression.

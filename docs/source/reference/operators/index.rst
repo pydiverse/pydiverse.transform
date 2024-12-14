@@ -1,6 +1,6 @@
-================
-Column Operators
-================
+=================
+Column Operations
+=================
 
 .. toctree::
    :maxdepth: 1
@@ -17,8 +17,25 @@ Column Operators
    sorting_markers
    horizontal_aggregation
 
+
 .. currentmodule:: pydiverse.transform
 
 .. autoclass:: ColExpr
-   :noindex:
+   :no-index:
    :members: dtype
+
+.. autosummary::
+    :toctree: _generated/
+    :template: autosummary/short_title.rst
+    :nosignatures:
+
+    lit
+    when
+
+.. autosummary::
+    :toctree: _generated/
+    :template: autosummary/short_title.rst
+    :nosignatures:
+
+    ColExpr.cast
+    ColExpr.map

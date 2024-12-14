@@ -7,7 +7,7 @@ API
 
     verbs
     operators/index
-    functions
+    targets
 
 Table
 -----
