@@ -162,6 +162,7 @@ with open(COL_EXPR_PATH, "r+") as file:
     in_generated_section = False
     namespace_contents: dict[str, str] = {
         name: (
+            f'@register_accessor("{name}")\n'
             "@dataclasses.dataclass(slots=True)\n"
             f"class {name.title()}Namespace(FnNamespace):\n"
         )
@@ -202,11 +203,7 @@ with open(COL_EXPR_PATH, "r+") as file:
                     new_file_contents += op_overloads
 
             for name in NAMESPACES:
-                new_file_contents += (
-                    "    @property\n"
-                    f"    def {name}(self):\n"
-                    f"        return {name.title()}Namespace(self)\n\n"
-                )
+                new_file_contents += f"    {name} : {name.title()}Namespace\n"
 
             new_file_contents += (
                 "@dataclasses.dataclass(slots=True)\n"

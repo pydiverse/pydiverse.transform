@@ -852,13 +852,8 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.truediv, rhs, self)
 
-    @property
-    def str(self):
-        return StrNamespace(self)
-
-    @property
-    def dt(self):
-        return DtNamespace(self)
+    str: StrNamespace
+    dt: DtNamespace
 
 
 @dataclasses.dataclass(slots=True)
@@ -866,6 +861,7 @@ class FnNamespace:
     arg: ColExpr
 
 
+@register_accessor("str")
 @dataclasses.dataclass(slots=True)
 class StrNamespace(FnNamespace):
     def contains(self: ColExpr[String], substr: str) -> ColExpr[Bool]:
@@ -928,6 +924,7 @@ class StrNamespace(FnNamespace):
         return ColFn(ops.str_upper, self.arg)
 
 
+@register_accessor("dt")
 @dataclasses.dataclass(slots=True)
 class DtNamespace(FnNamespace):
     @overload
