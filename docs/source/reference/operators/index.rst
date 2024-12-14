@@ -6,10 +6,11 @@ Column Operators
    :maxdepth: 1
    :hidden:
 
-   logical/index
-   comparison/index
-   string/index
-   aggregation/index
+   logical
+   comparison
+   string
+   aggregation
+   datetime
 
 .. currentmodule:: pydiverse.transform
 

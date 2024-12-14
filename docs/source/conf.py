@@ -10,6 +10,7 @@ import sys
 
 import sphinx.util
 from sphinx.ext.napoleon import GoogleDocstring
+import sphinx_autosummary_accessors
 
 
 sys.path.insert(0, os.path.abspath("../../src"))
@@ -69,7 +70,7 @@ napoleon_custom_sections = [
     "Config File",
 ]
 
-templates_path = ["_templates"]
+templates_path = ["_templates", sphinx_autosummary_accessors.templates_path]
 exclude_patterns = []
 
 

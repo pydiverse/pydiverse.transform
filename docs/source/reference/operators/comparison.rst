@@ -4,9 +4,9 @@ Comparison
 
 .. currentmodule:: pydiverse.transform.ColExpr
 .. autosummary::
-    :toctree: .
+    :toctree: _generated/
     :nosignatures:
-    :template: short_name.rst
+    :template: autosummary/short_title.rst
 
     __eq__
     __ge__

@@ -5,9 +5,9 @@ API
 .. toctree::
     :maxdepth: 1
 
-    verbs/index
+    verbs
     operators/index
-    functions/index
+    functions
 
 Table
 -----

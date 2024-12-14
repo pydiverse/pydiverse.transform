@@ -4,8 +4,8 @@ Functions
 
 .. currentmodule:: pydiverse.transform
 .. autosummary::
-    :toctree: .
-    :template: short_name.rst
+    :toctree: _generated/
+    :template: autosummary/short_title.rst
     :nosignatures:
 
     all

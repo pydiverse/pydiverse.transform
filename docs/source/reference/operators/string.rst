@@ -4,8 +4,8 @@ String
 
 .. currentmodule:: pydiverse.transform.ColExpr
 .. autosummary::
-    :toctree: .
+    :toctree: _generated/
     :nosignatures:
-    :template: namespace_method.rst
+    :template: autosummary/accessor_method.rst
 
     str.contains

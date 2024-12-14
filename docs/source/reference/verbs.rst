@@ -4,9 +4,9 @@ Verbs
 
 .. currentmodule:: pydiverse.transform
 .. autosummary::
-    :toctree: .
+    :toctree: _generated/
     :nosignatures:
-    :template: short_name.rst
+    :template: autosummary/short_title.rst
 
     alias
     arrange
