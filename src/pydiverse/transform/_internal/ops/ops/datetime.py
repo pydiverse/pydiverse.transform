@@ -6,16 +6,17 @@ from pydiverse.transform._internal.tree.types import Date, Datetime, Duration, I
 
 
 class DatetimeExtract(Operator):
-    def __init__(self, name: str):
-        super().__init__(name, Signature(Datetime(), return_type=Int()))
+    def __init__(self, name: str, doc: str = ""):
+        super().__init__(name, Signature(Datetime(), return_type=Int()), doc=doc)
 
 
 class DateExtract(Operator):
-    def __init__(self, name: str):
+    def __init__(self, name: str, doc: str = ""):
         super().__init__(
             name,
             Signature(Date(), return_type=Int()),
             Signature(Datetime(), return_type=Int()),
+            doc=doc,
         )
 
 
@@ -41,8 +42,8 @@ dt_day_of_year = DateExtract("dt.day_of_year")
 
 
 class DurationToUnit(Operator):
-    def __init__(self, name: str):
-        super().__init__(name, Signature(Duration(), return_type=Int()))
+    def __init__(self, name: str, doc: str = ""):
+        super().__init__(name, Signature(Duration(), return_type=Int()), doc=doc)
 
 
 dur_days = DurationToUnit("dur.days")

@@ -6,9 +6,13 @@ from pydiverse.transform._internal.tree.types import COMPARABLE, D
 
 
 class Horizontal(Operator):
-    def __init__(self, name: str, *signatures: Signature):
+    def __init__(self, name: str, *signatures: Signature, doc: str = ""):
         super().__init__(
-            name, *signatures, param_names=["arg", "args"], generate_expr_method=False
+            name,
+            *signatures,
+            param_names=["arg", "args"],
+            generate_expr_method=False,
+            doc=doc,
         )
 
 
