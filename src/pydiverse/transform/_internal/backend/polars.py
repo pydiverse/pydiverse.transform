@@ -583,24 +583,24 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _dt_day_of_year(x):
         return x.dt.ordinal_day().cast(pl.Int64)
 
-    @impl(ops.dt_days)
-    def _dt_days(x):
+    @impl(ops.dur_days)
+    def _dur_days(x):
         return x.dt.total_days()
 
-    @impl(ops.dt_hours)
-    def _dt_hours(x):
+    @impl(ops.dur_hours)
+    def _dur_hours(x):
         return x.dt.total_hours()
 
-    @impl(ops.dt_minutes)
-    def _dt_minutes(x):
+    @impl(ops.dur_minutes)
+    def _dur_minutes(x):
         return x.dt.total_minutes()
 
-    @impl(ops.dt_seconds)
-    def _dt_seconds(x):
+    @impl(ops.dur_seconds)
+    def _dur_seconds(x):
         return x.dt.total_seconds()
 
-    @impl(ops.dt_milliseconds)
-    def _dt_milliseconds(x):
+    @impl(ops.dur_milliseconds)
+    def _dur_milliseconds(x):
         return x.dt.total_milliseconds()
 
     @impl(ops.row_number)

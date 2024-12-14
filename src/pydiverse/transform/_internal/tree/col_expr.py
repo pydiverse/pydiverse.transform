@@ -64,8 +64,6 @@ def register_accessor(name):
 
 
 class ColExpr(Generic[T]):
-    __slots__ = ["_dtype", "_ftype"]
-
     __contains__ = None
     __iter__ = None
 
@@ -78,10 +76,6 @@ class ColExpr(Generic[T]):
             "cannot call __bool__() on a ColExpr. hint: A ColExpr cannot be "
             "converted to a boolean or used with the and, or, not keywords"
         )
-
-    def __setstate__(self, d):  # to avoid very annoying AttributeErrors
-        for slot, val in d[1].items():
-            setattr(self, slot, val)
 
     def _repr_html_(self) -> str:
         return f"<pre>{html.escape(repr(self))}</pre>"
@@ -1064,8 +1058,6 @@ class DurNamespace(FnNamespace):
 
 
 class Col(ColExpr):
-    __slots__ = ["name", "_ast", "_uuid"]
-
     def __init__(
         self, name: str, _ast: AstNode, _uuid: UUID, _dtype: Dtype, _ftype: Ftype
     ):
@@ -1097,8 +1089,6 @@ class Col(ColExpr):
 
 
 class ColName(ColExpr):
-    __slots__ = ["name"]
-
     def __init__(
         self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None
     ):
@@ -1111,8 +1101,6 @@ class ColName(ColExpr):
 
 
 class LiteralCol(ColExpr):
-    __slots__ = ["val"]
-
     def __init__(self, val: Any, dtype: types.Dtype | None = None):
         self.val = val
         if dtype is None:
@@ -1125,8 +1113,6 @@ class LiteralCol(ColExpr):
 
 
 class ColFn(ColExpr):
-    __slots__ = ("op", "args", "context_kwargs")
-
     def __init__(self, op: Operator, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.op = op
         # While building the expression tree, we have to allow markers.
@@ -1265,8 +1251,6 @@ class WhenClause:
 
 
 class CaseExpr(ColExpr):
-    __slots__ = ["cases", "default_val"]
-
     def __init__(
         self,
         cases: Iterable[tuple[ColExpr, ColExpr]],
@@ -1409,8 +1393,6 @@ class CaseExpr(ColExpr):
 
 
 class Cast(ColExpr):
-    __slots__ = ["val", "target_type"]
-
     def __init__(self, val: ColExpr, target_type: Dtype):
         if target_type.const:
             raise TypeError("cannot cast to `const` type")
