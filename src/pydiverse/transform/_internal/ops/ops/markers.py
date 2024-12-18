@@ -26,6 +26,9 @@ Specifies that nulls are placed at the beginning of the ordering.
 This does not mean that nulls are considered to be `less` than any other
 element. I.e. if both `nulls_first` and `descending` are given, nulls will still
 be placed at the beginning.
+
+If neither `nulls_first` nor `nulls_last` is specified, the position of nulls is
+backend-dependent.
 """,
 )
 
@@ -37,6 +40,9 @@ Specifies that nulls are placed at the end of the ordering.
 This does not mean that nulls are considered to be `greater` than any other
 element. I.e. if both `nulls_last` and `descending` are given, nulls will still
 be placed at the end.
+
+If neither `nulls_first` nor `nulls_last` is specified, the position of nulls is
+backend-dependent.
 """,
 )
 
