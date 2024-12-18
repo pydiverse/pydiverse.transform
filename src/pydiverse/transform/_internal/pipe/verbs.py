@@ -144,34 +144,20 @@ def export(
 ) -> Pipeable:
     """Convert a pydiverse.transform Table to a data frame.
 
-    Parameters
-    ----------
-    target
+    :param target:
         Can currently be either a `Polars` or `Pandas` object. For polars, one can
         specify whether a DataFrame or LazyFrame is returned via the `lazy` kwarg.
         If `lazy=True`, no actual computations are performed, they just get stored in
         the LazyFrame.
 
-    schema_overrides
+    :param schema_overrides:
         A dictionary of columns to backend-specific data types. This controls which data
         types are used when writing to the backend. Because the data types are not
         constrained by pydiverse.transform's type system, this may sometimes be
         preferred over a `cast`.
 
-    Returns
-    -------
-    A polars or pandas DataFrame / LazyFrame or a series.
-
-
-    Note
-    ----
-    This verb can be used with a Table or column expression on the left. When applied to
-    a column expression, all tables containing columns in the expression tree are
-    gathered and the expression is exported with respect to the most recent table. This
-    means that there has to be one column in the expression tree, whose table is a
-    common ancestor of all others. If this is not the case, the export fails. Anonymous
-    columns (`C`-columns) can be used in the expression and are interpreted with respect
-    to this common ancestor table.
+    :return:
+        A polars or pandas DataFrame / LazyFrame or a series.
     """
     if isinstance(data, ColExpr):
         # Find the common ancestor of all AST nodes of columns appearing in the
@@ -554,6 +540,73 @@ def join(
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
 ) -> Pipeable:
+    """
+    Joins two tables on a boolean expression.
+
+    The left table in the join comes through the pipe `>>` operator from the
+    left.
+
+    :param right:
+        The right table to join with.
+
+    :param on:
+        The join condition. See the note below for more information on which expressions
+        are allowed here.
+
+    :param how:
+        The join type.
+
+    :param validate:
+        Only relevant for polars. When set to ``"m:m"``, this does nothing. If set to
+        ``"1:m"``, it is checked whether each right row matches at most one left row. In
+        case this does not hold, an error is raised. Symmetrically, if set to ``"m:1"``
+        it is checked whether each left row matches at most one right row. If set to
+        ``"1:1"`` both ``"1:m"`` and ``"m:1"`` are checked.
+
+    :param suffix:
+        A string that is appended to all column names from the right table. If no suffix
+        is specified and there are no column name collisions, columns will retain their
+        original name. If there are name collisions, the name of the right table is
+        appended to all columns of the right table. If this still does not resolve all
+        name collisions, additionally an integer is appended to the column names of the
+        right table.
+
+
+    Note
+    ----
+    Not all backends can handle arbitrary boolean expressions in ``on`` with every join
+    type.
+
+    :polars:
+        For everything except conjunctions of equalities, it depends on whether polars
+        ``join_asof`` can handle the join condition.
+    :postgres:
+        In full joins, the join condition must be hashable or mergeable. See
+        https://wiki.postgresql.org/wiki/PostgreSQL_vs_SQL_Standard#FULL_OUTER_JOIN_conditions.
+
+    Examples
+    --------
+    >>> t1 = pdt.Table({"a": [3, 1, 4, 1, 5, 9, 4]}, name="t1")
+    >>> t2 = pdt.Table({"a": [4, 4, 1, 7], "b": ["f", "g", "h", "i"]}, name="t2")
+    >>> t1 >> join(t2, t1.a == t2.a, how="left") >> export(Polars())
+    shape: (9, 3)
+    ┌─────┬──────┬──────┐
+    │ a   ┆ a_t2 ┆ b_t2 │
+    │ --- ┆ ---  ┆ ---  │
+    │ i64 ┆ i64  ┆ str  │
+    ╞═════╪══════╪══════╡
+    │ 3   ┆ null ┆ null │
+    │ 1   ┆ 1    ┆ h    │
+    │ 4   ┆ 4    ┆ f    │
+    │ 4   ┆ 4    ┆ g    │
+    │ 1   ┆ 1    ┆ h    │
+    │ 5   ┆ null ┆ null │
+    │ 9   ┆ null ┆ null │
+    │ 4   ┆ 4    ┆ f    │
+    │ 4   ┆ 4    ┆ g    │
+    └─────┴──────┴──────┘
+    """
+
     errors.check_arg_type(Table, "join", "right", right)
     errors.check_arg_type(str | None, "join", "suffix", suffix)
     errors.check_literal_type(["inner", "left", "full"], "join", "how", how)
@@ -636,6 +689,10 @@ def inner_join(
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
 ) -> Pipeable:
+    """
+    Alias for the `join` verb with `how="inner"`.
+    """
+
     return left >> join(right, on, "inner", validate=validate, suffix=suffix)
 
 
@@ -658,6 +715,10 @@ def left_join(
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
 ) -> Pipeable:
+    """
+    Alias for the `join` verb with `how="left"`.
+    """
+
     return left >> join(right, on, "left", validate=validate, suffix=suffix)
 
 
@@ -680,6 +741,10 @@ def full_join(
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
 ) -> Pipeable:
+    """
+    Alias for the `join` verb with `how="full"`.
+    """
+
     return left >> join(right, on, "full", validate=validate, suffix=suffix)
 
 

@@ -10,4 +10,5 @@ Conditional Logic
     :nosignatures:
 
     when
+    coalesce
     ColExpr.map
