@@ -174,7 +174,7 @@ def rank(
     """
     The number of strictly smaller elements in the column plus one.
 
-    This is the same as `rank("min")` in polars.
+    This is the same as ``rank("min")`` in polars.
 
     Examples
     --------

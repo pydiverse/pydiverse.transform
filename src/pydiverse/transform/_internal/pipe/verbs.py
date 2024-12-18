@@ -299,6 +299,12 @@ def drop(*cols: Col | ColName) -> Pipeable: ...
 
 @verb
 def drop(table: Table, *cols: Col | ColName) -> Pipeable:
+    """
+    Removes a subset of the columns.
+
+    :param cols:
+        The columns to be removed.
+    """
     errors.check_vararg_type(Col | ColName, "drop", *cols)
 
     dropped_uuids = {preprocess_arg(col, table)._uuid for col in cols}
@@ -314,6 +320,12 @@ def rename(name_map: dict[str, str]) -> Pipeable: ...
 
 @verb
 def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
+    """
+    Renames columns.
+
+    :param name_map:
+        A dictionary assigning some columns (given by their name) new names.
+    """
     errors.check_arg_type(dict, "rename", "name_map", name_map)
     if len(name_map) == 0:
         return table
@@ -340,6 +352,33 @@ def mutate(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
+    """
+    Adds new columns to the table.
+
+    :param kwargs:
+        Each key is the name of a new column, and its value is the column
+        expression defining the new column.
+
+    Examples
+    --------
+    >>> t1 = pdt.Table(
+    ...     dict(a=[3, 1, 4, 1, 5, 9], b=[2.465, 0.22, -4.477, 10.8, -81.2, 0.0])
+    ... )
+    >>> t1 >> mutate(u=t1.a * t1.b) >> export(Polars())
+    shape: (6, 3)
+    ┌─────┬────────┬─────────┐
+    │ a   ┆ b      ┆ u       │
+    │ --- ┆ ---    ┆ ---     │
+    │ i64 ┆ f64    ┆ f64     │
+    ╞═════╪════════╪═════════╡
+    │ 3   ┆ 2.465  ┆ 7.395   │
+    │ 1   ┆ 0.22   ┆ 0.22    │
+    │ 4   ┆ -4.477 ┆ -17.908 │
+    │ 1   ┆ 10.8   ┆ 10.8    │
+    │ 5   ┆ -81.2  ┆ -406.0  │
+    │ 9   ┆ 0.0    ┆ 0.0     │
+    └─────┴────────┴─────────┘
+    """
     if len(kwargs) == 0:
         return table
     return table >> _mutate(*map(list, zip(*kwargs.items(), strict=True)))
@@ -377,6 +416,7 @@ def filter(*predicates: ColExpr[Bool]) -> Pipeable: ...
 
 @verb
 def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
+    """ """
     if len(predicates) == 0:
         return table
 
@@ -737,7 +777,7 @@ def inner_join(
     suffix: str | None = None,
 ) -> Pipeable:
     """
-    Alias for the ``join`` verb with ``how="inner"``.
+    Alias for the :doc:`pydiverse.transform.join` verb with ``how="inner"``.
     """
 
     return left >> join(right, on, "inner", validate=validate, suffix=suffix)
@@ -763,7 +803,7 @@ def left_join(
     suffix: str | None = None,
 ) -> Pipeable:
     """
-    Alias for the ``join`` verb with `how="left"`.
+    Alias for the :doc:`pydiverse.transform.join` verb with ``how="left"``.
     """
 
     return left >> join(right, on, "left", validate=validate, suffix=suffix)
@@ -789,7 +829,7 @@ def full_join(
     suffix: str | None = None,
 ) -> Pipeable:
     """
-    Alias for the `join` verb with `how="full"`.
+    Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
     """
 
     return left >> join(right, on, "full", validate=validate, suffix=suffix)
