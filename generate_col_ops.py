@@ -78,7 +78,8 @@ def generate_fn_decl(
         }
 
         annotated_kwargs = "".join(
-            f", {kwarg}: {context_kwarg_annotation[kwarg]} | None = None"
+            f", {kwarg.name}: {context_kwarg_annotation[kwarg.name]}"
+            + f"{'' if kwarg.required else ' | None = None'}"
             for kwarg in op.context_kwargs
         )
 
@@ -116,7 +117,7 @@ def generate_fn_body(
         args = add_vararg_star(args)
 
     if op.context_kwargs is not None:
-        kwargs = "".join(f", {kwarg}={kwarg}" for kwarg in op.context_kwargs)
+        kwargs = "".join(f", {kwarg.name}={kwarg.name}" for kwarg in op.context_kwargs)
     else:
         kwargs = ""
 

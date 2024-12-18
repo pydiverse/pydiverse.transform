@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import inspect
-import warnings
 
 
 class Dtype:
@@ -16,14 +15,6 @@ class Dtype:
             return False
         if inspect.isclass(rhs) and issubclass(rhs, Dtype):
             rhs = rhs()
-        if is_supertype(rhs.without_const()) and not is_subtype(rhs.without_const()):
-            warnings.warn(
-                f"comparing to the supertype `{rhs}` for equality may yield unexpected "
-                "results.\n"
-                "hint: `==` is very strict, e.g. Int16() == Int() is False. Use the "
-                "`<=` operator to also match on subtypes (so Int16() <= Int() would "
-                "return True)."
-            )
 
         if isinstance(rhs, Dtype):
             return self.const == rhs.const and type(self) is type(rhs)

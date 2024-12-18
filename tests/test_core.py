@@ -2,20 +2,21 @@ from __future__ import annotations
 
 import polars as pl
 import pytest
+from polars.testing import assert_series_equal
 
-from pydiverse.transform import C, Table
-from pydiverse.transform._internal.pipe.pipeable import Pipeable, inverse_partial, verb
-from pydiverse.transform._internal.pipe.verbs import mutate, select
+import pydiverse.transform as pdt
+from pydiverse.transform._internal.pipe.pipeable import Pipeable, inverse_partial
+from pydiverse.transform.common import *
 
 
 @pytest.fixture
 def tbl1():
-    return Table(pl.DataFrame({"col1": [0.1], "col2": [3.14]}))
+    return pdt.Table(pl.DataFrame({"col1": [0.1], "col2": [3.14]}))
 
 
 @pytest.fixture
 def tbl2():
-    return Table(pl.DataFrame({"col1": [1], "col2": [2], "col3": [3]}))
+    return pdt.Table(pl.DataFrame({"col1": [1], "col2": [2], "col3": [3]}))
 
 
 class TestTable:
@@ -58,6 +59,14 @@ class TestTable:
 
         assert all(col in tbl1 for col in tbl1)
         assert all(col in tbl2 for col in tbl2)
+
+    def test_dict_constructor(self):
+        t = pdt.Table({"a": [3, 1, 4, 1, 5, 9, 4]})
+        assert_series_equal(
+            pdt.rank(arrange=t.a) >> export(Polars()),
+            pl.Series([3, 1, 4, 1, 6, 7, 4]),
+            check_names=False,
+        )
 
 
 class TestDispatchers:

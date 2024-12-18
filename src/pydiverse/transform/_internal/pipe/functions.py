@@ -99,7 +99,7 @@ def count(
 def dense_rank(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
     """"""
 
@@ -169,9 +169,17 @@ def min(arg: ColExpr, *args: ColExpr) -> ColExpr:
 def rank(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
-    """"""
+    """
+    The number of strictly smaller elements in the column, plus one.
+
+    This is the same as `rank("min")` in polars.
+
+    Examples
+    --------
+    t = pdt.Table({"})
+    """
 
     return ColFn(ops.rank, partition_by=partition_by, arrange=arrange)
 
@@ -179,7 +187,7 @@ def rank(
 def row_number(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
     """"""
 

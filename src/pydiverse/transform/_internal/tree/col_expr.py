@@ -733,7 +733,7 @@ class ColExpr(Generic[T]):
         fill_value: ColExpr = None,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
+        arrange: ColExpr | Iterable[ColExpr],
     ) -> ColExpr:
         """"""
 

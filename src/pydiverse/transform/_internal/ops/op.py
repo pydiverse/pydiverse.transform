@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 from collections.abc import Sequence
 from typing import Any
@@ -12,6 +13,12 @@ class Ftype(enum.IntEnum):
     ELEMENT_WISE = 1
     AGGREGATE = 2
     WINDOW = 3
+
+
+@dataclasses.dataclass(slots=True)
+class ContextKwarg:
+    name: str
+    required: bool
 
 
 class Operator:
@@ -31,7 +38,7 @@ class Operator:
     trie: SignatureTrie
     signatures: list[Signature]
     ftype: Ftype
-    context_kwargs: list[str]
+    context_kwargs: list[ContextKwarg]
     param_names: list[str]
     default_values: list[str] | None
     generate_expr_method: bool
@@ -42,7 +49,7 @@ class Operator:
         name: str,
         *signatures: Signature,
         ftype: Ftype = Ftype.ELEMENT_WISE,
-        context_kwargs: list[str] | None = None,
+        context_kwargs: list[ContextKwarg] | None = None,
         param_names: list[str] | None = None,
         default_values: list[Any] | None = None,
         generate_expr_method: bool = True,
