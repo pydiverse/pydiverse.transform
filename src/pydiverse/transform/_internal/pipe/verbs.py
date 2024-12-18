@@ -219,7 +219,7 @@ def export(
         if isinstance(target, Polars):
             if isinstance(df, pl.LazyFrame):
                 df = df.collect()
-            return df.get_column(str(uid))
+            return df.get_column(str(uid)).rename("<unnamed>")
         elif isinstance(target, Pandas):
             assert isinstance(df, pd.DataFrame)
             return pd.Series(df[str(uid)])

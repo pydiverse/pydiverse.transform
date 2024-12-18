@@ -172,13 +172,28 @@ def rank(
     arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
     """
-    The number of strictly smaller elements in the column, plus one.
+    The number of strictly smaller elements in the column plus one.
 
     This is the same as `rank("min")` in polars.
 
     Examples
     --------
-    t = pdt.Table({"})
+    >>> t = pdt.Table({"a": [3, 1, 4, 1, 5, 9, 4]})
+    >>> t >> mutate(b=pdt.rank(arrange=t.a)) >> export(Polars(lazy=False))
+    shape: (7, 2)
+    ┌─────┬─────┐
+    │ a   ┆ b   │
+    │ --- ┆ --- │
+    │ i64 ┆ i64 │
+    ╞═════╪═════╡
+    │ 3   ┆ 3   │
+    │ 1   ┆ 1   │
+    │ 4   ┆ 4   │
+    │ 1   ┆ 1   │
+    │ 5   ┆ 6   │
+    │ 9   ┆ 7   │
+    │ 4   ┆ 4   │
+    └─────┴─────┘
     """
 
     return ColFn(ops.rank, partition_by=partition_by, arrange=arrange)
