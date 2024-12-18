@@ -217,7 +217,12 @@ class ColExpr(Generic[T]):
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
     def ascending(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        The default ordering.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.ascending, self)
 
@@ -280,7 +285,12 @@ class ColExpr(Generic[T]):
         return ColFn(ops.count, self, partition_by=partition_by, filter=filter)
 
     def descending(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        Reverses the default ordering.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.descending, self)
 
@@ -662,12 +672,30 @@ class ColExpr(Generic[T]):
         return ColFn(ops.not_equal, self, rhs)
 
     def nulls_first(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        Specifies that nulls are placed at the beginning of the ordering.
+
+        This does not mean that nulls are considered to be `less` than any other
+        element. I.e. if both `nulls_first` and `descending` are given, nulls will still
+        be placed at the beginning.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.nulls_first, self)
 
     def nulls_last(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        Specifies that nulls are placed at the end of the ordering.
+
+        This does not mean that nulls are considered to be `greater` than any other
+        element. I.e. if both `nulls_last` and `descending` are given, nulls will still
+        be placed at the end.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.nulls_last, self)
 
