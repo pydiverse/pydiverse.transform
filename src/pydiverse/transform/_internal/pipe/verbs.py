@@ -69,6 +69,19 @@ def alias(new_name: str | None = None) -> Pipeable: ...
 
 @verb
 def alias(table: Table, new_name: str | None = None) -> Pipeable:
+    """
+    Changes the name of the current table and resets column references.
+
+    That column references are reset means that the resulting table is not
+    considered to be derived from the input table, i.e. one cannot use columns
+    from the input table in subsequent operations on the result table. However,
+    the reset of column references is necessary before performing a self-join.
+
+    :param new_name:
+        The new name assigned to the table. If this is ``None``, the table
+        retains its previous name.
+    """
+
     if new_name is None:
         new_name = table._ast.name
     new = copy.copy(table)
@@ -226,6 +239,13 @@ def build_query() -> Pipeable: ...
 
 @verb
 def build_query(table: Table) -> Pipeable:
+    """
+    Compiles the operations accumulated on the current table to a SQL query.
+
+    :returns:
+        The SQL query as a string.
+    """
+
     table = table >> alias()
     SourceBackend: type[TableImpl] = get_backend(table._ast)
     return SourceBackend.build_query(table._ast, table._cache.select)
@@ -237,6 +257,10 @@ def show_query() -> Pipeable: ...
 
 @verb
 def show_query(table: Table) -> Pipeable:
+    """
+    Prints the compiled SQL query to stdout.
+    """
+
     if query := table >> build_query():
         print(query)
     else:
@@ -251,6 +275,13 @@ def select(*cols: Col | ColName) -> Pipeable: ...
 
 @verb
 def select(table: Table, *cols: Col | ColName) -> Pipeable:
+    """
+    Selects a subset of columns.
+
+    :param cols:
+        The columns to be included in the resulting table.
+    """
+
     errors.check_vararg_type(Col | ColName, "select", *cols)
 
     new = copy.copy(table)
@@ -505,6 +536,16 @@ def slice_head(n: int, *, offset: int = 0) -> Pipeable: ...
 
 @verb
 def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
+    """
+    Selects a subset of rows based on their index.
+
+    :param n:
+        The number of rows to select.
+
+    :param offset:
+        The index of the first row (0-based) that is included in the selection.
+    """
+
     errors.check_arg_type(int, "slice_head", "n", n)
     errors.check_arg_type(int, "slice_head", "offset", offset)
 
@@ -581,8 +622,14 @@ def join(
         For everything except conjunctions of equalities, it depends on whether polars
         ``join_asof`` can handle the join condition.
     :postgres:
-        In full joins, the join condition must be hashable or mergeable. See
-        https://wiki.postgresql.org/wiki/PostgreSQL_vs_SQL_Standard#FULL_OUTER_JOIN_conditions.
+        For full joins, the join condition must be hashable or mergeable. See the
+        `postgres documentation <https://wiki.postgresql.org/wiki/PostgreSQL_vs_SQL_Standard#FULL_OUTER_JOIN_conditions>`_
+        for more details.
+
+    Tip
+    ---
+    Two tables cannot be joined if one is derived from the other. In particular, before
+    a self-join, the ``alias`` verb has to be applied to one table.
 
     Examples
     --------
@@ -690,7 +737,7 @@ def inner_join(
     suffix: str | None = None,
 ) -> Pipeable:
     """
-    Alias for the `join` verb with `how="inner"`.
+    Alias for the ``join`` verb with ``how="inner"``.
     """
 
     return left >> join(right, on, "inner", validate=validate, suffix=suffix)
@@ -716,7 +763,7 @@ def left_join(
     suffix: str | None = None,
 ) -> Pipeable:
     """
-    Alias for the `join` verb with `how="left"`.
+    Alias for the ``join`` verb with `how="left"`.
     """
 
     return left >> join(right, on, "left", validate=validate, suffix=suffix)
@@ -754,6 +801,9 @@ def show() -> Pipeable: ...
 
 @verb
 def show(table: Table) -> Pipeable:
+    """
+    Prints the table to stdout.
+    """
     print(table)
     return table
 

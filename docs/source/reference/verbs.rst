@@ -17,6 +17,7 @@ Verbs
     filter
     full_join
     group_by
+    inner_join
     join
     left_join
     mutate
