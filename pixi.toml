@@ -58,6 +58,7 @@ Sphinx = ">=7.3.7"
 furo = ">=2023.5.20"
 sphinxcontrib-apidoc = ">=0.3.0"
 myst-parser = ">=2.0.0"
+sphinx-autosummary-accessors = "2023.4.0"
 [feature.docs.tasks]
 docs = "cd docs && make html "
 readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/build/html $READTHEDOCS_OUTPUT/html"

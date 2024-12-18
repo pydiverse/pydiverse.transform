@@ -16,7 +16,7 @@ from pydiverse.transform._internal.tree.types import (
 COL_EXPR_PATH = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 FNS_PATH = "./src/pydiverse/transform/_internal/pipe/functions.py"
 
-NAMESPACES = ["str", "dt"]
+NAMESPACES = ["str", "dt", "dur"]
 
 RVERSIONS = {
     "__add__",
@@ -136,14 +136,18 @@ def generate_overloads(
         for sig in op.signatures:
             res += "@overload\n" + generate_fn_decl(op, sig, name=name) + "    ...\n\n"
 
-    res += generate_fn_decl(
-        op, op.signatures[0], name=name, specialize_generic=not has_overloads
-    ) + generate_fn_body(
-        op,
-        op.signatures[0],
-        ["self.arg"] + op.param_names[1:] if in_namespace else None,
-        rversion=rversion,
-        op_var_name=op_var_name,
+    res += (
+        generate_fn_decl(
+            op, op.signatures[0], name=name, specialize_generic=not has_overloads
+        )
+        + f'    """{op.doc}"""\n\n'
+        + generate_fn_body(
+            op,
+            op.signatures[0],
+            ["self.arg"] + op.param_names[1:] if in_namespace else None,
+            rversion=rversion,
+            op_var_name=op_var_name,
+        )
     )
 
     return res
@@ -158,6 +162,7 @@ with open(COL_EXPR_PATH, "r+") as file:
     in_generated_section = False
     namespace_contents: dict[str, str] = {
         name: (
+            f'@register_accessor("{name}")\n'
             "@dataclasses.dataclass(slots=True)\n"
             f"class {name.title()}Namespace(FnNamespace):\n"
         )
@@ -198,11 +203,7 @@ with open(COL_EXPR_PATH, "r+") as file:
                     new_file_contents += op_overloads
 
             for name in NAMESPACES:
-                new_file_contents += (
-                    "    @property\n"
-                    f"    def {name}(self):\n"
-                    f"        return {name.title()}Namespace(self)\n\n"
-                )
+                new_file_contents += f"    {name} : {name.title()}Namespace\n"
 
             new_file_contents += (
                 "@dataclasses.dataclass(slots=True)\n"

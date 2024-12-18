@@ -24,6 +24,7 @@ class Operator:
         "param_names",
         "default_values",
         "generate_expr_method",
+        "doc",
     )
 
     name: str
@@ -34,6 +35,7 @@ class Operator:
     param_names: list[str]
     default_values: list[str] | None
     generate_expr_method: bool
+    doc: str
 
     def __init__(
         self,
@@ -44,6 +46,7 @@ class Operator:
         param_names: list[str] | None = None,
         default_values: list[Any] | None = None,
         generate_expr_method: bool = True,
+        doc: str = "",
     ):
         self.name = name
         self.ftype = ftype
@@ -70,6 +73,7 @@ class Operator:
 
         self.param_names = param_names
         self.default_values = default_values
+        self.doc = doc
 
     def return_type(self, signature: Sequence[Dtype]) -> Dtype:
         match = self.trie.best_match(signature)

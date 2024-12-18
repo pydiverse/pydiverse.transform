@@ -10,7 +10,11 @@ not_equal = Operator("__ne__", Signature(D, D, return_type=Bool()))
 
 
 less_than = Operator(
-    "__lt__", *(Signature(t, t, return_type=Bool()) for t in COMPARABLE)
+    "__lt__",
+    *(Signature(t, t, return_type=Bool()) for t in COMPARABLE),
+    doc="""
+`<` as you know it.
+""",
 )
 
 less_equal = Operator(

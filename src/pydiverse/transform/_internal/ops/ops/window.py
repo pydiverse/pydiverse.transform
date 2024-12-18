@@ -15,6 +15,7 @@ class Window(Operator):
         param_names: list[str] | None = None,
         default_values: list[Any] | None = None,
         generate_expr_method=False,
+        doc: str = "",
     ):
         super().__init__(
             name,
@@ -24,6 +25,7 @@ class Window(Operator):
             param_names=param_names,
             default_values=default_values,
             generate_expr_method=generate_expr_method,
+            doc=doc,
         )
 
 

@@ -6,8 +6,8 @@ from pydiverse.transform._internal.tree.types import D
 
 
 class Marker(Operator):
-    def __init__(self, name: str):
-        super().__init__(name, Signature(D, return_type=D))
+    def __init__(self, name: str, doc: str = ""):
+        super().__init__(name, Signature(D, return_type=D), doc=doc)
 
 
 nulls_first = Marker("nulls_first")

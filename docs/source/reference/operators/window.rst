@@ -1,0 +1,21 @@
+======
+Window
+======
+
+.. currentmodule:: pydiverse.transform.ColExpr
+.. autosummary::
+    :toctree: _generated/
+    :nosignatures:
+    :template: autosummary/short_title.rst
+
+    shift
+
+.. currentmodule:: pydiverse.transform
+.. autosummary::
+    :toctree: _generated/
+    :nosignatures:
+    :template: autosummary/short_title.rst
+
+    dense_rank
+    rank
+    row_number

@@ -6,16 +6,17 @@ from pydiverse.transform._internal.tree.types import Date, Datetime, Duration, I
 
 
 class DatetimeExtract(Operator):
-    def __init__(self, name: str):
-        super().__init__(name, Signature(Datetime(), return_type=Int()))
+    def __init__(self, name: str, doc: str = ""):
+        super().__init__(name, Signature(Datetime(), return_type=Int()), doc=doc)
 
 
 class DateExtract(Operator):
-    def __init__(self, name: str):
+    def __init__(self, name: str, doc: str = ""):
         super().__init__(
             name,
             Signature(Date(), return_type=Int()),
             Signature(Datetime(), return_type=Int()),
+            doc=doc,
         )
 
 
@@ -41,16 +42,18 @@ dt_day_of_year = DateExtract("dt.day_of_year")
 
 
 class DurationToUnit(Operator):
-    def __init__(self, name: str):
-        super().__init__(name, Signature(Duration(), return_type=Int()))
+    def __init__(self, name: str, doc: str = ""):
+        super().__init__(name, Signature(Duration(), return_type=Int()), doc=doc)
 
 
-dt_days = DurationToUnit("dt.days")
+dur_days = DurationToUnit("dur.days")
 
-dt_hours = DurationToUnit("dt.hours")
+dur_hours = DurationToUnit("dur.hours")
 
-dt_minutes = DurationToUnit("dt.minutes")
+dur_minutes = DurationToUnit("dur.minutes")
 
-dt_seconds = DurationToUnit("dt.seconds")
+dur_seconds = DurationToUnit("dur.seconds")
 
-dt_milliseconds = DurationToUnit("dt.milliseconds")
+dur_milliseconds = DurationToUnit("dur.milliseconds")
+
+dur_microseconds = DurationToUnit("dur.microseconds")

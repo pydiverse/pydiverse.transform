@@ -15,7 +15,11 @@ from pydiverse.transform._internal.tree.types import (
 
 class Aggregation(Operator):
     def __init__(
-        self, name: str, *signatures: Signature, generate_expr_method: bool = True
+        self,
+        name: str,
+        *signatures: Signature,
+        generate_expr_method: bool = True,
+        doc: str = "",
     ):
         super().__init__(
             name,
@@ -23,6 +27,7 @@ class Aggregation(Operator):
             ftype=Ftype.AGGREGATE,
             context_kwargs=["partition_by", "filter"],
             generate_expr_method=generate_expr_method,
+            doc=doc,
         )
 
 
@@ -42,8 +47,19 @@ any = Aggregation("any", Signature(Bool(), return_type=Bool()))
 
 all = Aggregation("all", Signature(Bool(), return_type=Bool()))
 
-count = Aggregation("count", Signature(D, return_type=Int()))
+count = Aggregation(
+    "count",
+    Signature(D, return_type=Int()),
+    doc="""
+Counts the number of non-null elements in the column.
+""",
+)
 
 count_star = Aggregation(
-    "count", Signature(return_type=Int()), generate_expr_method=False
+    "count",
+    Signature(return_type=Int()),
+    generate_expr_method=False,
+    doc="""
+Returns the number of rows of the current table, like :code:`COUNT(*)` in SQL.
+""",
 )
