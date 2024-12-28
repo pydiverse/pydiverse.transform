@@ -149,19 +149,52 @@ def export(
     """Convert a pydiverse.transform Table to a data frame.
 
     :param target:
-        Can currently be either a `Polars` or `Pandas` object. For polars, one can
-        specify whether a DataFrame or LazyFrame is returned via the `lazy` kwarg.
-        If `lazy=True`, no actual computations are performed, they just get stored in
+        Can currently be either a ``Polars`` or ``Pandas`` object. For polars, one can
+        specify whether a DataFrame or LazyFrame is returned via the ``lazy`` kwarg.
+        If ``lazy=True``, no actual computations are performed, they just get stored in
         the LazyFrame.
 
     :param schema_overrides:
         A dictionary of columns to backend-specific data types. This controls which data
         types are used when writing to the backend. Because the data types are not
         constrained by pydiverse.transform's type system, this may sometimes be
-        preferred over a `cast`.
+        preferred over a cast.
 
     :return:
         A polars or pandas DataFrame / LazyFrame.
+
+    Examples
+    --------
+
+    >>> t1 = pdt.Table(
+    ...     {
+    ...         "a": [3, 1, 4, 1, 5, 9],
+    ...         "b": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0],
+    ...         "c": ["a,", "bcbc", "pydiverse", "transform", "'  '", "-22"],
+    ...     }
+    ... )
+    >>> t1 >> export(Pandas())
+       a      b          c
+    0  3  2.465         a,
+    1  1   0.22       bcbc
+    2  4 -4.477  pydiverse
+    3  1   10.8  transform
+    4  5  -81.2       '  '
+    5  9    0.0        -22
+    >>> t1 >> export(Polars())
+    shape: (6, 3)
+    ┌─────┬────────┬───────────┐
+    │ a   ┆ b      ┆ c         │
+    │ --- ┆ ---    ┆ ---       │
+    │ i64 ┆ f64    ┆ str       │
+    ╞═════╪════════╪═══════════╡
+    │ 3   ┆ 2.465  ┆ a,        │
+    │ 1   ┆ 0.22   ┆ bcbc      │
+    │ 4   ┆ -4.477 ┆ pydiverse │
+    │ 1   ┆ 10.8   ┆ transform │
+    │ 5   ┆ -81.2  ┆ '  '      │
+    │ 9   ┆ 0.0    ┆ -22       │
+    └─────┴────────┴───────────┘
     """
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that

@@ -20,7 +20,3 @@ Column Operations
    type_conversion
 
 .. currentmodule:: pydiverse.transform
-
-.. autoclass:: ColExpr
-   :no-index:
-   :members: dtype

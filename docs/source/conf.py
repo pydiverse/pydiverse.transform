@@ -55,6 +55,9 @@ autodoc_default_options = {
     "member-order": "bysource",
 }
 
+autodoc_class_signature = "separated"
+autodoc_default_options = {"exclude-members": "__new__"}
+
 autosectionlabel_prefix_document = True
 
 toc_object_entries_show_parents = "all"

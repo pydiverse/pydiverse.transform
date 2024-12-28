@@ -6,7 +6,7 @@ from uuid import UUID
 import polars as pl
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
-from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
@@ -70,6 +70,9 @@ class PolarsImpl(TableImpl):
                 lf = lf.collect()
             lf.name = nd.name
             return lf
+
+        elif isinstance(target, Pandas):
+            return lf.collect().to_pandas(use_pyarrow_extension_array=True)
 
         raise AssertionError
 

@@ -138,7 +138,7 @@ class TableImpl(AstNode):
 
 
 def get_backend(nd: AstNode) -> type[TableImpl]:
-    from pydiverse.transform._internal.pipe.verbs import Verb
+    from pydiverse.transform._internal.tree.verbs import Verb
 
     if isinstance(nd, Verb):
         return get_backend(nd.child)

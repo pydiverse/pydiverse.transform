@@ -1126,6 +1126,40 @@ class Col(ColExpr):
         return hash(self._uuid)
 
     def export(self, target: Target) -> Any:
+        """
+        Exports a column to a polars or pandas Series.
+
+        :param target:
+            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
+            object. The ``lazy`` kwarg for polars is ignored.
+
+        :return:
+            A polars or pandas Series.
+
+        Examples
+        --------
+        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
+        >>> t1.h.export(Polars())
+        shape: (6,)
+        Series: 'h' [f64]
+        [
+                2.465
+                0.22
+                -4.477
+                10.8
+                -81.2
+                0.0
+        ]
+        >>> t1.h.export(Pandas())
+        0    2.465
+        1     0.22
+        2   -4.477
+        3     10.8
+        4    -81.2
+        5      0.0
+        Name: h, dtype: double[pyarrow]
+        """
+
         from pydiverse.transform._internal.backend.table_impl import get_backend
         from pydiverse.transform._internal.tree.verbs import Select
 
