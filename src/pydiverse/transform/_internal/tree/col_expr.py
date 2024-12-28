@@ -140,6 +140,24 @@ class ColExpr(Generic[T]):
             )
         return rhs(self)
 
+    def rank(
+        self: ColExpr,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    ) -> ColExpr[Int]:
+        """
+        Alias for :doc:`/reference/operators/_generated/pydiverse.transform.rank`.
+        """
+        return ColFn(ops.rank, partition_by=partition_by, arrange=self)
+
+    def dense_rank(
+        self: ColExpr,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    ) -> ColExpr[Int]:
+        """
+        Alias for :doc:`/reference/operators/_generated/pydiverse.transform.dense_rank`.
+        """
+        return ColFn(ops.dense_rank, partition_by=partition_by, arrange=self)
+
     # --- generated code starts here, do not delete this comment ---
 
     @overload
