@@ -664,6 +664,24 @@ def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable: ...
 
 @verb
 def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable:
+    """
+    Add a grouping state to the table.
+
+    :param cols:
+        The columns to group by.
+
+    :param add:
+        If ``add=True``, the given columns are added to the set of columns the table is
+        currently grouped by. If ``add=False``, the current grouping state is replaced
+        by the given columns.
+
+    This verb does not modify the table itself, but only adds a grouping in the
+    background. The number of rows is only reduced when
+    :doc:`summarize <pydiverse.transform.summarize>`
+    is called. The
+    :doc:`ungroup <pydiverse.transform.ungroup>`
+    verb can be used to clear the grouping state.
+    """
     if len(cols) == 0:
         return table
 
@@ -689,6 +707,46 @@ def ungroup() -> Pipeable: ...
 
 @verb
 def ungroup(table: Table) -> Pipeable:
+    """
+    Clear the grouping state of the table.
+
+    Examples
+    --------
+    In the following example, ``group_by`` and ``ungroup`` are used to specify that each
+    aggregation function between them uses the column ``t.c`` for grouping.
+
+    >>> t = pdt.Table(
+    ...     {
+    ...         "a": [1.2, 5.077, -2.29, -0.0, 3.0, -7.7],
+    ...         "b": ["a  ", "transform", "pipedag", "cdegh", "  -ade ", "  pq"],
+    ...         "c": [True, False, None, None, True, True],
+    ...         "d": [4, 4, 2, 0, 1, 0],
+    ...     }
+    ... )
+    >>> (
+    ...     t
+    ...     >> group_by(t.c)
+    ...     >> mutate(
+    ...         u=t.b.str.len().max() + t.a.min(),
+    ...         v=t.d.mean(filter=t.a >= 0),
+    ...     )
+    ...     >> ungroup()
+    ...     >> export(Polars())
+    ... )
+    shape: (6, 6)
+    ┌───────┬───────────┬───────┬─────┬────────┬─────┐
+    │ a     ┆ b         ┆ c     ┆ d   ┆ u      ┆ v   │
+    │ ---   ┆ ---       ┆ ---   ┆ --- ┆ ---    ┆ --- │
+    │ f64   ┆ str       ┆ bool  ┆ i64 ┆ f64    ┆ f64 │
+    ╞═══════╪═══════════╪═══════╪═════╪════════╪═════╡
+    │ 1.2   ┆ a         ┆ true  ┆ 4   ┆ -0.7   ┆ 2.5 │
+    │ 5.077 ┆ transform ┆ false ┆ 4   ┆ 14.077 ┆ 4.0 │
+    │ -2.29 ┆ pipedag   ┆ null  ┆ 2   ┆ 4.71   ┆ 0.0 │
+    │ -0.0  ┆ cdegh     ┆ null  ┆ 0   ┆ 4.71   ┆ 0.0 │
+    │ 3.0   ┆   -ade    ┆ true  ┆ 1   ┆ -0.7   ┆ 2.5 │
+    │ -7.7  ┆   pq      ┆ true  ┆ 0   ┆ -0.7   ┆ 2.5 │
+    └───────┴───────────┴───────┴─────┴────────┴─────┘
+    """
     new = copy.copy(table)
     new._ast = Ungroup(table._ast)
     new._cache = copy.copy(table._cache)
@@ -702,6 +760,7 @@ def summarize(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
+    """ """
     names, values = map(list, zip(*kwargs.items(), strict=True))
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
@@ -760,6 +819,27 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 
     :param offset:
         The index of the first row (0-based) that is included in the selection.
+
+
+    Examples
+    --------
+    >>> t = pdt.Table(
+    ...     {
+    ...         "a": [65, 5, 312, -55, 0],
+    ...         "b": ["l", "r", "srq", "---", " "],
+    ...     }
+    ... )
+    >>> t >> slice_head(3, offset=1) >> export(Polars())
+    shape: (3, 2)
+    ┌─────┬─────┐
+    │ a   ┆ b   │
+    │ --- ┆ --- │
+    │ i64 ┆ str │
+    ╞═════╪═════╡
+    │ 5   ┆ r   │
+    │ 312 ┆ srq │
+    │ -55 ┆ --- │
+    └─────┴─────┘
     """
 
     errors.check_arg_type(int, "slice_head", "n", n)
