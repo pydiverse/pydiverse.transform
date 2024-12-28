@@ -63,7 +63,7 @@ class TestTable:
     def test_dict_constructor(self):
         t = pdt.Table({"a": [3, 1, 4, 1, 5, 9, 4]})
         assert_series_equal(
-            pdt.rank(arrange=t.a) >> export(Polars()),
+            (t >> mutate(r=pdt.rank(arrange=t.a))).r.export(Polars()),
             pl.Series([3, 1, 4, 1, 6, 7, 4]),
             check_names=False,
         )

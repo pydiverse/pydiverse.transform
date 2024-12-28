@@ -12,6 +12,10 @@ from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
+import pandas as pd
+import polars as pl
+
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops import ops, signature
 from pydiverse.transform._internal.ops.op import Ftype, Operator
@@ -1120,6 +1124,20 @@ class Col(ColExpr):
 
     def __hash__(self) -> int:
         return hash(self._uuid)
+
+    def export(self, target: Target) -> Any:
+        from pydiverse.transform._internal.backend.table_impl import get_backend
+        from pydiverse.transform._internal.tree.verbs import Select
+
+        ast = Select(self._ast, [self])
+        df = get_backend(self._ast).export(ast, target, [self], {})
+        if isinstance(target, Polars):
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(self.name)
+        else:
+            assert isinstance(target, Pandas)
+            return pd.Series(df[self.name])
 
 
 class ColName(ColExpr):

@@ -4,18 +4,13 @@ import copy
 import uuid
 from typing import Any, Literal, overload
 
-import pandas as pd
-import polars as pl
-
 from pydiverse.transform._internal import errors
-from pydiverse.transform._internal.backend.table_impl import TableImpl
-from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
+from pydiverse.transform._internal.backend.table_impl import TableImpl, get_backend
+from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops.op import Ftype
-from pydiverse.transform._internal.pipe.c import C
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
 from pydiverse.transform._internal.pipe.table import Table
-from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
@@ -37,7 +32,6 @@ from pydiverse.transform._internal.tree.verbs import (
     SliceHead,
     Summarize,
     Ungroup,
-    Verb,
 )
 
 __all__ = [
@@ -150,10 +144,7 @@ def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable:
 
 @verb
 def export(
-    data: Table | ColExpr,
-    target: Target,
-    *,
-    schema_overrides: dict[Col, Any] | None = None,
+    data: Table, target: Target, *, schema_overrides: dict[Col, Any] | None = None
 ) -> Pipeable:
     """Convert a pydiverse.transform Table to a data frame.
 
@@ -170,59 +161,8 @@ def export(
         preferred over a `cast`.
 
     :return:
-        A polars or pandas DataFrame / LazyFrame or a series.
+        A polars or pandas DataFrame / LazyFrame.
     """
-    if isinstance(data, ColExpr):
-        # Find the common ancestor of all AST nodes of columns appearing in the
-        # expression.
-        nodes: dict[AstNode, int] = {}
-        for col in data.iter_subtree():
-            if isinstance(col, Col):
-                nodes[col._ast] = 0
-
-        for nd in list(nodes.keys()):
-            gen = nd.iter_subtree_preorder()
-            try:
-                descendant = next(gen)
-                while True:
-                    if descendant != nd and descendant in nodes:
-                        nodes[descendant] += 1
-                        descendant = gen.send(True)
-                    else:
-                        descendant = next(gen)
-            except StopIteration:
-                ...
-
-        indeg0 = (nd for nd, cnt in nodes.items() if cnt == 0)
-        root = next(indeg0)
-        try:
-            next(indeg0)
-            # The AST nodes have a common ancestor if and only if there is exactly one
-            # node that has not been reached by another one.
-            raise ValueError(
-                "cannot export a column expression containing columns without a common "
-                "ancestor"
-            )
-        except StopIteration:
-            ...
-
-        uid = uuid.uuid1()
-        table = from_ast(root)
-        df = (
-            table
-            >> _mutate([str(uid)], [data], [uid])
-            >> select(C[str(uid)])
-            >> export(target)
-        )
-
-        if isinstance(target, Polars):
-            if isinstance(df, pl.LazyFrame):
-                df = df.collect()
-            return df.get_column(str(uid)).rename("<unnamed>")
-        elif isinstance(target, Pandas):
-            assert isinstance(df, pd.DataFrame)
-            return pd.Series(df[str(uid)])
-        raise AssertionError
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
@@ -379,23 +319,13 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     │ 9   ┆ 0.0    ┆ 0.0     │
     └─────┴────────┴─────────┘
     """
+
     if len(kwargs) == 0:
         return table
-    return table >> _mutate(*map(list, zip(*kwargs.items(), strict=True)))
 
-
-@verb
-def _mutate(
-    table: Table,
-    names: list[str],
-    values: list[ColExpr],
-    uuids: list[uuid.UUID] | None = None,
-) -> Pipeable:
+    names, values = map(list, zip(*kwargs.items(), strict=True))
+    uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
-    if uuids is None:
-        uuids = [uuid.uuid1() for _ in names]
-    else:
-        assert len(uuids) == len(names)
 
     new._ast = Mutate(
         table._ast,
@@ -513,22 +443,9 @@ def summarize(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
-    return table >> _summarize(*map(list, zip(*kwargs.items(), strict=True)))
-
-
-@verb
-def _summarize(
-    table: Table,
-    names: list[str],
-    values: list[ColExpr],
-    uuids: list[uuid.UUID] | None = None,
-) -> Pipeable:
+    names, values = map(list, zip(*kwargs.items(), strict=True))
+    uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
-
-    if uuids is None:
-        uuids = [uuid.uuid1() for _ in names]
-    else:
-        assert len(uuids) == len(names)
 
     new._ast = Summarize(
         table._ast,
@@ -895,26 +812,3 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
                 expr.context_kwargs["partition_by"] = table._cache.partition_by
 
         return resolve_C_columns(arg, table)
-
-
-def get_backend(nd: AstNode) -> type[TableImpl]:
-    if isinstance(nd, Verb):
-        return get_backend(nd.child)
-    assert isinstance(nd, TableImpl) and nd is not TableImpl
-    return nd.__class__
-
-
-def from_ast(root: AstNode) -> Table:
-    if isinstance(root, TableImpl):
-        return Table(root)
-
-    assert isinstance(root, Verb)
-    child = from_ast(root.child)
-    if isinstance(root, Alias):
-        return child >> alias(root.name)
-
-    child._cache.update(
-        root, from_ast(root.right)._cache if isinstance(root, Join) else None
-    )
-    child._ast = root
-    return child
