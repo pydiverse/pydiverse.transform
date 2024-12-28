@@ -327,6 +327,22 @@ def select(table: Table, *cols: Col | ColName) -> Pipeable:
 
     :param cols:
         The columns to be included in the resulting table.
+
+    Examples
+    --------
+    >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
+    >>> t >> select(t.a) >> export(Polars())
+    shape: (4, 1)
+    ┌─────┐
+    │ a   │
+    │ --- │
+    │ i64 │
+    ╞═════╡
+    │ 3   │
+    │ 2   │
+    │ 6   │
+    │ 4   │
+    └─────┘
     """
 
     errors.check_vararg_type(Col | ColName, "select", *cols)
@@ -351,12 +367,27 @@ def drop(table: Table, *cols: Col | ColName) -> Pipeable:
 
     :param cols:
         The columns to be removed.
+
+    Examples
+    --------
+    >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
+    >>> t >> drop(t.a) >> export(Polars())
+    shape: (4, 1)
+    ┌───────┐
+    │ b     │
+    │ ---   │
+    │ str   │
+    ╞═══════╡
+    │ lll   │
+    │ g     │
+    │ u0    │
+    │ __**_ │
+    └───────┘
     """
     errors.check_vararg_type(Col | ColName, "drop", *cols)
 
     dropped_uuids = {preprocess_arg(col, table)._uuid for col in cols}
-    return select(
-        table,
+    return table >> select(
         *(col for col in table._cache.select if col._uuid not in dropped_uuids),
     )
 
@@ -372,6 +403,60 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
 
     :param name_map:
         A dictionary assigning some columns (given by their name) new names.
+
+    Examples
+    --------
+    Renaming one column:
+
+    >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
+    >>> t >> rename({"a": "h"}) >> export(Polars())
+    shape: (4, 2)
+    ┌─────┬───────┐
+    │ h   ┆ b     │
+    │ --- ┆ ---   │
+    │ i64 ┆ str   │
+    ╞═════╪═══════╡
+    │ 3   ┆ lll   │
+    │ 2   ┆ g     │
+    │ 6   ┆ u0    │
+    │ 4   ┆ __**_ │
+    └─────┴───────┘
+
+    Here is a more subtle example: As long as there are no two equal column names in the
+    result table, one can give names to columns that already exist in the table. In the
+    following example, the names of columns *a* and *b* are swapped.
+
+    >>> s = t >> rename({"a": "b", "b": "a"}) >> show()
+    Table <unnamed>, backend: PolarsImpl
+    shape: (4, 2)
+    ┌─────┬───────┐
+    │ b   ┆ a     │
+    │ --- ┆ ---   │
+    │ i64 ┆ str   │
+    ╞═════╪═══════╡
+    │ 3   ┆ lll   │
+    │ 2   ┆ g     │
+    │ 6   ┆ u0    │
+    │ 4   ┆ __**_ │
+    └─────┴───────┘
+
+    When using the column ``t.a`` in an expression derived from *s* now, it
+    still refers to the same column, which now has the name *b*. The anonymous
+    column ``C.a``, however, refers to the column with name *a* in the *current*
+    table.
+
+    >>> s >> mutate(u=t.a, v=C.a) >> export(Polars())
+    shape: (4, 4)
+    ┌─────┬───────┬─────┬───────┐
+    │ b   ┆ a     ┆ u   ┆ v     │
+    │ --- ┆ ---   ┆ --- ┆ ---   │
+    │ i64 ┆ str   ┆ i64 ┆ str   │
+    ╞═════╪═══════╪═════╪═══════╡
+    │ 3   ┆ lll   ┆ 3   ┆ lll   │
+    │ 2   ┆ g     ┆ 2   ┆ g     │
+    │ 6   ┆ u0    ┆ 6   ┆ u0    │
+    │ 4   ┆ __**_ ┆ 4   ┆ __**_ │
+    └─────┴───────┴─────┴───────┘
     """
     errors.check_arg_type(dict, "rename", "name_map", name_map)
     if len(name_map) == 0:
@@ -511,6 +596,53 @@ def arrange(*order_by: ColExpr) -> Pipeable: ...
 
 @verb
 def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
+    """
+    Sorts the rows of the table.
+
+    :param order_by:
+        Column expressions to sort by. The order of the expressions determines
+        the priority.
+
+    Examples
+    --------
+    >>> t = pdt.Table(
+    ...     {
+    ...         "r": [2, 7, 3, 2, 6, None, 4],
+    ...         "s": ["l", "o", "a", "c", "s", "---", "3"],
+    ...         "p": [0.655, -4.33, None, 143.6, 0.0, 1.0, 4.5],
+    ...     }
+    ... )
+    >>> t >> arrange(t.r.nulls_first(), t.p) >> export(Polars())
+    shape: (7, 3)
+    ┌──────┬─────┬───────┐
+    │ r    ┆ s   ┆ p     │
+    │ ---  ┆ --- ┆ ---   │
+    │ i64  ┆ str ┆ f64   │
+    ╞══════╪═════╪═══════╡
+    │ null ┆ --- ┆ 1.0   │
+    │ 2    ┆ l   ┆ 0.655 │
+    │ 2    ┆ c   ┆ 143.6 │
+    │ 3    ┆ a   ┆ null  │
+    │ 4    ┆ 3   ┆ 4.5   │
+    │ 6    ┆ s   ┆ 0.0   │
+    │ 7    ┆ o   ┆ -4.33 │
+    └──────┴─────┴───────┘
+    >>> t >> arrange(t.p.nulls_last().descending(), t.s) >> export(Polars())
+    shape: (7, 3)
+    ┌──────┬─────┬───────┐
+    │ r    ┆ s   ┆ p     │
+    │ ---  ┆ --- ┆ ---   │
+    │ i64  ┆ str ┆ f64   │
+    ╞══════╪═════╪═══════╡
+    │ 2    ┆ c   ┆ 143.6 │
+    │ 4    ┆ 3   ┆ 4.5   │
+    │ null ┆ --- ┆ 1.0   │
+    │ 2    ┆ l   ┆ 0.655 │
+    │ 6    ┆ s   ┆ 0.0   │
+    │ 7    ┆ o   ┆ -4.33 │
+    │ 3    ┆ a   ┆ null  │
+    └──────┴─────┴───────┘
+    """
     if len(order_by) == 0:
         return table
 
