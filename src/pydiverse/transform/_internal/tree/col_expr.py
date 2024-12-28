@@ -343,12 +343,80 @@ class ColExpr(Generic[T]):
         return ColFn(ops.floor, self)
 
     def __floordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Integer division.
+
+        Warning
+        -------
+        The behavior of this operator differs from polars and python. Polars and python
+        always round towards negative infinity, whereas pydiverse.transform always
+        rounds towards zero, regardless of the sign. This behavior matches the one of C,
+        C++ and all currently supported SQL backends.
+
+        See also
+        --------
+        __mod__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 9   │
+        │ -65 ┆ 7   ┆ -9  │
+        │ 65  ┆ -7  ┆ -9  │
+        │ -65 ┆ -7  ┆ 9   │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.floordiv, self, rhs)
 
     def __rfloordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Integer division.
+
+        Warning
+        -------
+        The behavior of this operator differs from polars and python. Polars and python
+        always round towards negative infinity, whereas pydiverse.transform always
+        rounds towards zero, regardless of the sign. This behavior matches the one of C,
+        C++ and all currently supported SQL backends.
+
+        See also
+        --------
+        __mod__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 9   │
+        │ -65 ┆ 7   ┆ -9  │
+        │ 65  ┆ -7  ┆ -9  │
+        │ -65 ┆ -7  ┆ 9   │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.floordiv, rhs, self)
 
@@ -637,12 +705,82 @@ class ColExpr(Generic[T]):
         return ColFn(ops.min, self, partition_by=partition_by, filter=filter)
 
     def __mod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Computes the remainder of integer division.
+
+        Warning
+        -------
+        This operator behaves differently than in polars. There are at least two
+        conventions how `%` and :doc:`// <pydiverse.transform.ColExpr.__floordiv__>`
+        should behave  for negative inputs. We follow the one that C, C++ and all
+        currently supported SQL backends follow. This means that the output has the same
+        sign as the left hand side of the input, regardless of the right hand side.
+
+        See also
+        --------
+        __floordiv__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 2   │
+        │ -65 ┆ 7   ┆ -2  │
+        │ 65  ┆ -7  ┆ 2   │
+        │ -65 ┆ -7  ┆ -2  │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.mod, self, rhs)
 
     def __rmod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Computes the remainder of integer division.
+
+        Warning
+        -------
+        This operator behaves differently than in polars. There are at least two
+        conventions how `%` and :doc:`// <pydiverse.transform.ColExpr.__floordiv__>`
+        should behave  for negative inputs. We follow the one that C, C++ and all
+        currently supported SQL backends follow. This means that the output has the same
+        sign as the left hand side of the input, regardless of the right hand side.
+
+        See also
+        --------
+        __floordiv__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 2   │
+        │ -65 ┆ 7   ┆ -2  │
+        │ 65  ┆ -7  ┆ 2   │
+        │ -65 ┆ -7  ┆ -2  │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.mod, rhs, self)
 

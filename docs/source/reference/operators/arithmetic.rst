@@ -10,6 +10,7 @@ Arithmetic
 
     __add__
     __floordiv__
+    __mod__
     __mul__
     __neg__
     __pos__
