@@ -74,6 +74,40 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
     :param new_name:
         The new name assigned to the table. If this is ``None``, the table
         retains its previous name.
+
+    Examples
+    --------
+
+    A self join without applying ``alias`` before raises an exception:
+
+    >>> t = pdt.Table({"a": [4, 2, 1, 4], "b": ["l", "g", "uu", "--   r"]})
+    >>> t >> join(t, t.a == t.a, how="inner", suffix="_right")
+    ValueError: table `<pydiverse.transform._internal.backend.polars.PolarsImpl object
+    at 0x13f86d510>` occurs twice in the table tree.
+    hint: To join two tables derived from a common table, apply `>> alias()` to one of
+    them before the join.
+
+    By applying ``alias`` to the right table and storing the result in a new variable,
+    the self join succeeds.
+
+    >>> (
+    ...     t
+    ...     >> join(s := t >> alias(), t.a == s.a, how="inner", suffix="_right")
+    ...     >> export(Polars())
+    ... )
+    shape: (6, 4)
+    ┌─────┬────────┬─────────┬─────────┐
+    │ a   ┆ b      ┆ a_right ┆ b_right │
+    │ --- ┆ ---    ┆ ---     ┆ ---     │
+    │ i64 ┆ str    ┆ i64     ┆ str     │
+    ╞═════╪════════╪═════════╪═════════╡
+    │ 4   ┆ l      ┆ 4       ┆ l       │
+    │ 4   ┆ --   r ┆ 4       ┆ l       │
+    │ 2   ┆ g      ┆ 2       ┆ g       │
+    │ 1   ┆ uu     ┆ 1       ┆ uu      │
+    │ 4   ┆ l      ┆ 4       ┆ --   r  │
+    │ 4   ┆ --   r ┆ 4       ┆ --   r  │
+    └─────┴────────┴─────────┴─────────┘
     """
 
     if new_name is None:
@@ -115,6 +149,46 @@ def collect(target: Target | None = None) -> Pipeable: ...
 
 @verb
 def collect(table: Table, target: Target | None = None) -> Pipeable:
+    """
+    Execute all accumulated operations and write the result to a new Table.
+
+    This verb is only for polars-backed tables. All operations lazily stored in the
+    table are executed and a new table containing the result is returned. The returned
+    table always stored the data in a polars LazyFrame. One can choose whether the
+    following operations on the table are executed via polars or DuckDB on the
+    LazyFrame (see also :doc:`/examples/duckdb_polars_parquet`).
+
+    :param target:
+        The execution engine to be used from here on. Can be either ``Polars`` or
+        ``DuckDb``.
+
+    Examples
+    --------
+    Here, ``collect`` does not change anything in the result, but the ``mutate`` is
+    executed on the DataFrame when ``collect`` is called, whereas the ``arrange`` is
+    only executed when ``export`` is called. Without ``collect``, the ``mutate`` would
+    only have been executed with the ``export``, too.
+
+    >>> t = pdt.Table({"a": [4, 2, 1, 4], "b": ["l", "g", "uu", "--   r"]})
+    >>> (
+    ...     t
+    ...     >> mutate(z=t.a + t.b.str.len())
+    ...     >> collect()
+    ...     >> arrange(C.z, t.a)
+    ...     >> export(Polars())
+    ... )
+    shape: (4, 3)
+    ┌─────┬────────┬─────┐
+    │ a   ┆ b      ┆ z   │
+    │ --- ┆ ---    ┆ --- │
+    │ i64 ┆ str    ┆ i64 │
+    ╞═════╪════════╪═════╡
+    │ 1   ┆ uu     ┆ 3   │
+    │ 2   ┆ g      ┆ 3   │
+    │ 4   ┆ l      ┆ 5   │
+    │ 4   ┆ --   r ┆ 10  │
+    └─────┴────────┴─────┘
+    """
     errors.check_arg_type(Target | None, "collect", "target", target)
 
     df = table >> select(*table._cache.all_cols.values()) >> export(Polars(lazy=False))
@@ -379,7 +453,27 @@ def filter(*predicates: ColExpr[Bool]) -> Pipeable: ...
 
 @verb
 def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
-    """ """
+    """
+    Selects a subset of rows based on some condition.
+
+    :param predicates:
+        Column expressions of boolean type to filter by. Only rows where all expressions
+        are true are included in the result.
+
+    Examples
+    --------
+    >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
+    >>> t >> filter(t.a <= 4, ~t.b.str.contains("_")) >> export(Polars())
+    shape: (2, 2)
+    ┌─────┬─────┐
+    │ a   ┆ b   │
+    │ --- ┆ --- │
+    │ i64 ┆ str │
+    ╞═════╪═════╡
+    │ 3   ┆ lll │
+    │ 2   ┆ g   │
+    └─────┴─────┘
+    """
     if len(predicates) == 0:
         return table
 
