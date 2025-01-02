@@ -14,8 +14,13 @@ from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Col, ColExpr
+from pydiverse.transform._internal.tree.col_expr import Col
 from pydiverse.transform._internal.tree.types import Dtype
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 if TYPE_CHECKING:
     from pydiverse.transform._internal.ops.ops import Operator
@@ -51,6 +56,18 @@ class TableImpl(AstNode):
         if isinstance(resource, TableImpl):
             res = resource
 
+        elif isinstance(resource, dict):
+            return TableImpl.from_resource(
+                pl.DataFrame(resource), backend, name=name, uuids=uuids
+            )
+
+        elif pd is not None and isinstance(resource, pd.DataFrame):
+            # copy pandas dataframe to polars
+            # TODO: try zero-copy for arrow backed pandas
+            return TableImpl.from_resource(
+                pl.DataFrame(resource), backend, name=name, uuids=uuids
+            )
+
         elif isinstance(resource, pl.DataFrame | pl.LazyFrame):
             if name is None:
                 # If the data frame has be previously exported by transform, a
@@ -58,7 +75,7 @@ class TableImpl(AstNode):
                 if hasattr(resource, "name"):
                     name = resource.name
                 else:
-                    name = "?"
+                    name = "<unnamed>"
             if backend is None or isinstance(backend, Polars):
                 from pydiverse.transform._internal.backend.polars import PolarsImpl
 
@@ -104,9 +121,6 @@ class TableImpl(AstNode):
     ) -> Any: ...
 
     @classmethod
-    def export_col(cls, expr: ColExpr, target: Target): ...
-
-    @classmethod
     def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:
         if (impl := cls.impl_store.get_impl(op, sig)) is not None:
             return impl
@@ -121,6 +135,15 @@ class TableImpl(AstNode):
                 f"operation `{op.name}` is not supported by the backend "
                 f"`{cls.__name__.lower()[:-4]}`"
             ) from err
+
+
+def get_backend(nd: AstNode) -> type[TableImpl]:
+    from pydiverse.transform._internal.tree.verbs import Verb
+
+    if isinstance(nd, Verb):
+        return get_backend(nd.child)
+    assert isinstance(nd, TableImpl) and nd is not TableImpl
+    return nd.__class__
 
 
 with TableImpl.impl_store.impl_manager as impl:

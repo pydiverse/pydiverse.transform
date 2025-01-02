@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 from collections.abc import Sequence
 from typing import Any
@@ -14,6 +15,12 @@ class Ftype(enum.IntEnum):
     WINDOW = 3
 
 
+@dataclasses.dataclass(slots=True)
+class ContextKwarg:
+    name: str
+    required: bool
+
+
 class Operator:
     __slots__ = (
         "name",
@@ -24,26 +31,29 @@ class Operator:
         "param_names",
         "default_values",
         "generate_expr_method",
+        "doc",
     )
 
     name: str
     trie: SignatureTrie
     signatures: list[Signature]
     ftype: Ftype
-    context_kwargs: list[str]
+    context_kwargs: list[ContextKwarg]
     param_names: list[str]
     default_values: list[str] | None
     generate_expr_method: bool
+    doc: str
 
     def __init__(
         self,
         name: str,
         *signatures: Signature,
         ftype: Ftype = Ftype.ELEMENT_WISE,
-        context_kwargs: list[str] | None = None,
+        context_kwargs: list[ContextKwarg] | None = None,
         param_names: list[str] | None = None,
         default_values: list[Any] | None = None,
         generate_expr_method: bool = True,
+        doc: str = "",
     ):
         self.name = name
         self.ftype = ftype
@@ -70,6 +80,7 @@ class Operator:
 
         self.param_names = param_names
         self.default_values = default_values
+        self.doc = doc
 
     def return_type(self, signature: Sequence[Dtype]) -> Dtype:
         match = self.trie.best_match(signature)

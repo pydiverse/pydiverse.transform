@@ -12,6 +12,10 @@ from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
+import pandas as pd
+import polars as pl
+
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops import ops, signature
 from pydiverse.transform._internal.ops.op import Ftype, Operator
@@ -38,9 +42,32 @@ from pydiverse.transform._internal.tree.types import (
 T = TypeVar("T")
 
 
-class ColExpr(Generic[T]):
-    __slots__ = ["_dtype", "_ftype"]
+# for proper documentation of .str
+class Accessor:
+    def __init__(self, name, accessor):
+        self._name = name
+        self._accessor = accessor
 
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self._accessor
+
+        accessor_obj = self._accessor(obj)
+        setattr(obj, self._name, accessor_obj)
+
+        return accessor_obj
+
+
+def register_accessor(name):
+    def func(accessor):
+        setattr(ColExpr, name, Accessor(name, accessor))
+
+        return accessor
+
+    return func
+
+
+class ColExpr(Generic[T]):
     __contains__ = None
     __iter__ = None
 
@@ -54,10 +81,6 @@ class ColExpr(Generic[T]):
             "converted to a boolean or used with the and, or, not keywords"
         )
 
-    def __setstate__(self, d):  # to avoid very annoying AttributeErrors
-        for slot, val in d[1].items():
-            setattr(self, slot, val)
-
     def _repr_html_(self) -> str:
         return f"<pre>{html.escape(repr(self))}</pre>"
 
@@ -65,6 +88,9 @@ class ColExpr(Generic[T]):
         p.text(str(self) if not cycle else "...")
 
     def dtype(self) -> Dtype:
+        """
+        Returns the data type of the expression.
+        """
         return self._dtype
 
     def ftype(self, *, agg_is_window: bool) -> Ftype:
@@ -114,6 +140,24 @@ class ColExpr(Generic[T]):
             )
         return rhs(self)
 
+    def rank(
+        self: ColExpr,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    ) -> ColExpr[Int]:
+        """
+        Alias for :doc:`/reference/operators/_generated/pydiverse.transform.rank`.
+        """
+        return ColFn(ops.rank, partition_by=partition_by, arrange=self)
+
+    def dense_rank(
+        self: ColExpr,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    ) -> ColExpr[Int]:
+        """
+        Alias for :doc:`/reference/operators/_generated/pydiverse.transform.dense_rank`.
+        """
+        return ColFn(ops.dense_rank, partition_by=partition_by, arrange=self)
+
     # --- generated code starts here, do not delete this comment ---
 
     @overload
@@ -126,6 +170,8 @@ class ColExpr(Generic[T]):
     def abs(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def abs(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.abs, self)
 
     @overload
@@ -146,6 +192,8 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Duration]: ...
 
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.add, self, rhs)
 
     @overload
@@ -166,6 +214,8 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Duration]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.add, rhs, self)
 
     def all(
@@ -174,6 +224,8 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.all, self, partition_by=partition_by, filter=filter)
 
     def any(
@@ -182,30 +234,53 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
     def ascending(self: ColExpr) -> ColExpr:
+        """
+        The default ordering.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
+
         return ColFn(ops.ascending, self)
 
     def __and__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.bool_and, self, rhs)
 
     def __rand__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.bool_and, rhs, self)
 
     def __invert__(self: ColExpr[Bool]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.bool_invert, self)
 
     def __or__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.bool_or, self, rhs)
 
     def __ror__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.bool_or, rhs, self)
 
     def __xor__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.bool_xor, self, rhs)
 
     def __rxor__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.bool_xor, rhs, self)
 
     @overload
@@ -215,6 +290,8 @@ class ColExpr(Generic[T]):
     def ceil(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def ceil(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.ceil, self)
 
     def count(
@@ -223,18 +300,35 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Int]:
+        """
+        Counts the number of non-null elements in the column.
+        """
+
         return ColFn(ops.count, self, partition_by=partition_by, filter=filter)
 
     def descending(self: ColExpr) -> ColExpr:
+        """
+        Reverses the default ordering.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
+
         return ColFn(ops.descending, self)
 
     def __eq__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.equal, self, rhs)
 
     def exp(self: ColExpr[Float]) -> ColExpr[Float]:
+        """"""
+
         return ColFn(ops.exp, self)
 
     def fill_null(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.fill_null, self, rhs)
 
     @overload
@@ -244,12 +338,86 @@ class ColExpr(Generic[T]):
     def floor(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def floor(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.floor, self)
 
     def __floordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
+        """
+        Integer division.
+
+        Warning
+        -------
+        The behavior of this operator differs from polars and python. Polars and python
+        always round towards negative infinity, whereas pydiverse.transform always
+        rounds towards zero, regardless of the sign. This behavior matches the one of C,
+        C++ and all currently supported SQL backends.
+
+        See also
+        --------
+        __mod__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 9   │
+        │ -65 ┆ 7   ┆ -9  │
+        │ 65  ┆ -7  ┆ -9  │
+        │ -65 ┆ -7  ┆ 9   │
+        └─────┴─────┴─────┘
+        """
+
         return ColFn(ops.floordiv, self, rhs)
 
     def __rfloordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
+        """
+        Integer division.
+
+        Warning
+        -------
+        The behavior of this operator differs from polars and python. Polars and python
+        always round towards negative infinity, whereas pydiverse.transform always
+        rounds towards zero, regardless of the sign. This behavior matches the one of C,
+        C++ and all currently supported SQL backends.
+
+        See also
+        --------
+        __mod__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 9   │
+        │ -65 ┆ 7   ┆ -9  │
+        │ 65  ┆ -7  ┆ -9  │
+        │ -65 ┆ -7  ┆ 9   │
+        └─────┴─────┴─────┘
+        """
+
         return ColFn(ops.floordiv, rhs, self)
 
     @overload
@@ -271,6 +439,8 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __ge__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.greater_equal, self, rhs)
 
     @overload
@@ -292,27 +462,43 @@ class ColExpr(Generic[T]):
     def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __gt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.greater_than, self, rhs)
 
     def is_in(self: ColExpr, *rhs: ColExpr) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.is_in, self, *rhs)
 
     def is_inf(self: ColExpr[Float]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.is_inf, self)
 
     def is_nan(self: ColExpr[Float]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.is_nan, self)
 
     def is_not_inf(self: ColExpr[Float]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.is_not_inf, self)
 
     def is_not_nan(self: ColExpr[Float]) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.is_not_nan, self)
 
     def is_not_null(self: ColExpr) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.is_not_null, self)
 
     def is_null(self: ColExpr) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.is_null, self)
 
     @overload
@@ -334,6 +520,8 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __le__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.less_equal, self, rhs)
 
     @overload
@@ -355,9 +543,15 @@ class ColExpr(Generic[T]):
     def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __lt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """
+        `<` as you know it.
+        """
+
         return ColFn(ops.less_than, self, rhs)
 
     def log(self: ColExpr[Float]) -> ColExpr[Float]:
+        """"""
+
         return ColFn(ops.log, self)
 
     @overload
@@ -414,6 +608,8 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
+        """"""
+
         return ColFn(ops.max, self, partition_by=partition_by, filter=filter)
 
     @overload
@@ -446,6 +642,8 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
+        """"""
+
         return ColFn(ops.mean, self, partition_by=partition_by, filter=filter)
 
     @overload
@@ -502,12 +700,88 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
+        """"""
+
         return ColFn(ops.min, self, partition_by=partition_by, filter=filter)
 
     def __mod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
+        """
+        Computes the remainder of integer division.
+
+        Warning
+        -------
+        This operator behaves differently than in polars. There are at least two
+        conventions how `%` and :doc:`// <pydiverse.transform.ColExpr.__floordiv__>`
+        should behave  for negative inputs. We follow the one that C, C++ and all
+        currently supported SQL backends follow. This means that the output has the same
+        sign as the left hand side of the input, regardless of the right hand side.
+
+        See also
+        --------
+        __floordiv__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 2   │
+        │ -65 ┆ 7   ┆ -2  │
+        │ 65  ┆ -7  ┆ 2   │
+        │ -65 ┆ -7  ┆ -2  │
+        └─────┴─────┴─────┘
+        """
+
         return ColFn(ops.mod, self, rhs)
 
     def __rmod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
+        """
+        Computes the remainder of integer division.
+
+        Warning
+        -------
+        This operator behaves differently than in polars. There are at least two
+        conventions how `%` and :doc:`// <pydiverse.transform.ColExpr.__floordiv__>`
+        should behave  for negative inputs. We follow the one that C, C++ and all
+        currently supported SQL backends follow. This means that the output has the same
+        sign as the left hand side of the input, regardless of the right hand side.
+
+        See also
+        --------
+        __floordiv__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 2   │
+        │ -65 ┆ 7   ┆ -2  │
+        │ 65  ┆ -7  ┆ 2   │
+        │ -65 ┆ -7  ┆ -2  │
+        └─────┴─────┴─────┘
+        """
+
         return ColFn(ops.mod, rhs, self)
 
     @overload
@@ -520,6 +794,8 @@ class ColExpr(Generic[T]):
     def __mul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __mul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.mul, self, rhs)
 
     @overload
@@ -532,6 +808,8 @@ class ColExpr(Generic[T]):
     def __rmul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __rmul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.mul, rhs, self)
 
     @overload
@@ -544,15 +822,47 @@ class ColExpr(Generic[T]):
     def __neg__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __neg__(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.neg, self)
 
     def __ne__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.not_equal, self, rhs)
 
     def nulls_first(self: ColExpr) -> ColExpr:
+        """
+        Specifies that nulls are placed at the beginning of the ordering.
+
+        This does not mean that nulls are considered to be `less` than any other
+        element. I.e. if both `nulls_first` and `descending` are given, nulls will still
+        be placed at the beginning.
+
+        If neither `nulls_first` nor `nulls_last` is specified, the position of nulls is
+        backend-dependent.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
+
         return ColFn(ops.nulls_first, self)
 
     def nulls_last(self: ColExpr) -> ColExpr:
+        """
+        Specifies that nulls are placed at the end of the ordering.
+
+        This does not mean that nulls are considered to be `greater` than any other
+        element. I.e. if both `nulls_last` and `descending` are given, nulls will still
+        be placed at the end.
+
+        If neither `nulls_first` nor `nulls_last` is specified, the position of nulls is
+        backend-dependent.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
+
         return ColFn(ops.nulls_last, self)
 
     @overload
@@ -565,19 +875,37 @@ class ColExpr(Generic[T]):
     def __pos__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __pos__(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.pos, self)
 
     @overload
-    def pow(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Float]: ...
+    def __pow__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Float]: ...
 
     @overload
-    def pow(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
+    def __pow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     @overload
-    def pow(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+    def __pow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
-    def pow(self: ColExpr, rhs: ColExpr) -> ColExpr:
+    def __pow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.pow, self, rhs)
+
+    @overload
+    def __rpow__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Float]: ...
+
+    @overload
+    def __rpow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
+
+    @overload
+    def __rpow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+    def __rpow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
+        return ColFn(ops.pow, rhs, self)
 
     @overload
     def round(self: ColExpr[Int], decimals: int = 0) -> ColExpr[Int]: ...
@@ -589,6 +917,8 @@ class ColExpr(Generic[T]):
     def round(self: ColExpr[Decimal], decimals: int = 0) -> ColExpr[Decimal]: ...
 
     def round(self: ColExpr, decimals: int = 0) -> ColExpr:
+        """"""
+
         return ColFn(ops.round, self, decimals)
 
     def shift(
@@ -597,8 +927,10 @@ class ColExpr(Generic[T]):
         fill_value: ColExpr = None,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
+        arrange: ColExpr | Iterable[ColExpr],
     ) -> ColExpr:
+        """"""
+
         return ColFn(
             ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange
         )
@@ -627,6 +959,8 @@ class ColExpr(Generic[T]):
     def __sub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __sub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.sub, self, rhs)
 
     @overload
@@ -653,6 +987,8 @@ class ColExpr(Generic[T]):
     def __rsub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __rsub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.sub, rhs, self)
 
     @overload
@@ -685,6 +1021,8 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
+        """"""
+
         return ColFn(ops.sum, self, partition_by=partition_by, filter=filter)
 
     @overload
@@ -699,6 +1037,8 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Decimal]: ...
 
     def __truediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.truediv, self, rhs)
 
     @overload
@@ -713,15 +1053,13 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Decimal]: ...
 
     def __rtruediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.truediv, rhs, self)
 
-    @property
-    def str(self):
-        return StrNamespace(self)
-
-    @property
-    def dt(self):
-        return DtNamespace(self)
+    str: StrNamespace
+    dt: DtNamespace
+    dur: DurNamespace
 
 
 @dataclasses.dataclass(slots=True)
@@ -729,46 +1067,70 @@ class FnNamespace:
     arg: ColExpr
 
 
+@register_accessor("str")
 @dataclasses.dataclass(slots=True)
 class StrNamespace(FnNamespace):
     def contains(self: ColExpr[String], substr: str) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.str_contains, self.arg, substr)
 
     def ends_with(self: ColExpr[String], suffix: str) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.str_ends_with, self.arg, suffix)
 
     def len(self: ColExpr[String]) -> ColExpr[Int]:
+        """"""
+
         return ColFn(ops.str_len, self.arg)
 
     def lower(self: ColExpr[String]) -> ColExpr[String]:
+        """"""
+
         return ColFn(ops.str_lower, self.arg)
 
     def replace_all(
         self: ColExpr[String], substr: str, replacement: str
     ) -> ColExpr[String]:
+        """"""
+
         return ColFn(ops.str_replace_all, self.arg, substr, replacement)
 
     def slice(
         self: ColExpr[String], offset: ColExpr[Int], n: ColExpr[Int]
     ) -> ColExpr[String]:
+        """"""
+
         return ColFn(ops.str_slice, self.arg, offset, n)
 
     def starts_with(self: ColExpr[String], prefix: str) -> ColExpr[Bool]:
+        """"""
+
         return ColFn(ops.str_starts_with, self.arg, prefix)
 
     def strip(self: ColExpr[String]) -> ColExpr[String]:
+        """"""
+
         return ColFn(ops.str_strip, self.arg)
 
     def to_date(self: ColExpr[String]) -> ColExpr[Date]:
+        """"""
+
         return ColFn(ops.str_to_date, self.arg)
 
     def to_datetime(self: ColExpr[String]) -> ColExpr[Datetime]:
+        """"""
+
         return ColFn(ops.str_to_datetime, self.arg)
 
     def upper(self: ColExpr[String]) -> ColExpr[String]:
+        """"""
+
         return ColFn(ops.str_upper, self.arg)
 
 
+@register_accessor("dt")
 @dataclasses.dataclass(slots=True)
 class DtNamespace(FnNamespace):
     @overload
@@ -778,6 +1140,8 @@ class DtNamespace(FnNamespace):
     def day(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.dt_day, self.arg)
 
     @overload
@@ -787,6 +1151,8 @@ class DtNamespace(FnNamespace):
     def day_of_week(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day_of_week(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.dt_day_of_week, self.arg)
 
     @overload
@@ -796,31 +1162,29 @@ class DtNamespace(FnNamespace):
     def day_of_year(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day_of_year(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.dt_day_of_year, self.arg)
 
-    def days(self: ColExpr[Duration]) -> ColExpr[Int]:
-        return ColFn(ops.dt_days, self.arg)
-
     def hour(self: ColExpr[Datetime]) -> ColExpr[Int]:
+        """"""
+
         return ColFn(ops.dt_hour, self.arg)
 
-    def hours(self: ColExpr[Duration]) -> ColExpr[Int]:
-        return ColFn(ops.dt_hours, self.arg)
-
     def microsecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
+        """"""
+
         return ColFn(ops.dt_microsecond, self.arg)
 
     def millisecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
+        """"""
+
         return ColFn(ops.dt_millisecond, self.arg)
 
-    def milliseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
-        return ColFn(ops.dt_milliseconds, self.arg)
-
     def minute(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        return ColFn(ops.dt_minute, self.arg)
+        """"""
 
-    def minutes(self: ColExpr[Duration]) -> ColExpr[Int]:
-        return ColFn(ops.dt_minutes, self.arg)
+        return ColFn(ops.dt_minute, self.arg)
 
     @overload
     def month(self: ColExpr[Date]) -> ColExpr[Int]: ...
@@ -829,13 +1193,14 @@ class DtNamespace(FnNamespace):
     def month(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def month(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.dt_month, self.arg)
 
     def second(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        return ColFn(ops.dt_second, self.arg)
+        """"""
 
-    def seconds(self: ColExpr[Duration]) -> ColExpr[Int]:
-        return ColFn(ops.dt_seconds, self.arg)
+        return ColFn(ops.dt_second, self.arg)
 
     @overload
     def year(self: ColExpr[Date]) -> ColExpr[Int]: ...
@@ -844,15 +1209,49 @@ class DtNamespace(FnNamespace):
     def year(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def year(self: ColExpr) -> ColExpr:
+        """"""
+
         return ColFn(ops.dt_year, self.arg)
+
+
+@register_accessor("dur")
+@dataclasses.dataclass(slots=True)
+class DurNamespace(FnNamespace):
+    def days(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_days, self.arg)
+
+    def hours(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_hours, self.arg)
+
+    def microseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_microseconds, self.arg)
+
+    def milliseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_milliseconds, self.arg)
+
+    def minutes(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_minutes, self.arg)
+
+    def seconds(self: ColExpr[Duration]) -> ColExpr[Int]:
+        """"""
+
+        return ColFn(ops.dur_seconds, self.arg)
 
 
 # --- generated code ends here, do not delete this comment ---
 
 
 class Col(ColExpr):
-    __slots__ = ["name", "_ast", "_uuid"]
-
     def __init__(
         self, name: str, _ast: AstNode, _uuid: UUID, _dtype: Dtype, _ftype: Ftype
     ):
@@ -882,10 +1281,56 @@ class Col(ColExpr):
     def __hash__(self) -> int:
         return hash(self._uuid)
 
+    def export(self, target: Target) -> Any:
+        """
+        Exports a column to a polars or pandas Series.
+
+        :param target:
+            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
+            object. The ``lazy`` kwarg for polars is ignored.
+
+        :return:
+            A polars or pandas Series.
+
+        Examples
+        --------
+        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
+        >>> t1.h.export(Polars())
+        shape: (6,)
+        Series: 'h' [f64]
+        [
+                2.465
+                0.22
+                -4.477
+                10.8
+                -81.2
+                0.0
+        ]
+        >>> t1.h.export(Pandas())
+        0    2.465
+        1     0.22
+        2   -4.477
+        3     10.8
+        4    -81.2
+        5      0.0
+        Name: h, dtype: double[pyarrow]
+        """
+
+        from pydiverse.transform._internal.backend.table_impl import get_backend
+        from pydiverse.transform._internal.tree.verbs import Select
+
+        ast = Select(self._ast, [self])
+        df = get_backend(self._ast).export(ast, target, [self], {})
+        if isinstance(target, Polars):
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(self.name)
+        else:
+            assert isinstance(target, Pandas)
+            return pd.Series(df[self.name])
+
 
 class ColName(ColExpr):
-    __slots__ = ["name"]
-
     def __init__(
         self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None
     ):
@@ -898,8 +1343,6 @@ class ColName(ColExpr):
 
 
 class LiteralCol(ColExpr):
-    __slots__ = ["val"]
-
     def __init__(self, val: Any, dtype: types.Dtype | None = None):
         self.val = val
         if dtype is None:
@@ -912,8 +1355,6 @@ class LiteralCol(ColExpr):
 
 
 class ColFn(ColExpr):
-    __slots__ = ("op", "args", "context_kwargs")
-
     def __init__(self, op: Operator, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.op = op
         # While building the expression tree, we have to allow markers.
@@ -924,7 +1365,7 @@ class ColFn(ColExpr):
 
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
-                assert self.op.name == "len"
+                assert self.op == ops.count_star
             else:
                 self.args[0] = CaseExpr(
                     [
@@ -1052,8 +1493,6 @@ class WhenClause:
 
 
 class CaseExpr(ColExpr):
-    __slots__ = ["cases", "default_val"]
-
     def __init__(
         self,
         cases: Iterable[tuple[ColExpr, ColExpr]],
@@ -1196,8 +1635,6 @@ class CaseExpr(ColExpr):
 
 
 class Cast(ColExpr):
-    __slots__ = ["val", "target_type"]
-
     def __init__(self, val: ColExpr, target_type: Dtype):
         if target_type.const:
             raise TypeError("cannot cast to `const` type")

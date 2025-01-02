@@ -43,7 +43,7 @@ class DuckDbPolarsImpl(TableImpl):
 
     @staticmethod
     def build_query(nd: AstNode, final_select: list[Col]) -> str | None:
-        return DuckDbImpl.build_query(nd, final_select)
+        return DuckDbImpl.build_query(nd, final_select, dialect=duckdb_engine.Dialect())
 
     @staticmethod
     def export(

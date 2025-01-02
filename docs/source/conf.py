@@ -10,6 +10,7 @@ import sys
 
 import sphinx.util
 from sphinx.ext.napoleon import GoogleDocstring
+import sphinx_autosummary_accessors
 
 
 sys.path.insert(0, os.path.abspath("../../src"))
@@ -38,7 +39,10 @@ extensions = [
     "sphinx.ext.intersphinx",
     # "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
+    "sphinx_autosummary_accessors"
 ]
+
+maximum_signature_line_length = 100
 
 myst_enable_extensions = [
     "fieldlist",
@@ -51,7 +55,12 @@ autodoc_default_options = {
     "member-order": "bysource",
 }
 
+autodoc_class_signature = "separated"
+autodoc_default_options = {"exclude-members": "__new__"}
+
 autosectionlabel_prefix_document = True
+
+toc_object_entries_show_parents = "all"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -64,7 +73,7 @@ napoleon_custom_sections = [
     "Config File",
 ]
 
-templates_path = ["_templates"]
+templates_path = ["_templates", sphinx_autosummary_accessors.templates_path]
 exclude_patterns = []
 
 

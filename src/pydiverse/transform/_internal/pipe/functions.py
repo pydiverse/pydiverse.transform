@@ -29,8 +29,6 @@ from pydiverse.transform._internal.tree.types import (
     String,
 )
 
-__all__ = ["len", "row_number", "rank", "when", "dense_rank", "min", "max"]
-
 
 def when(condition: ColExpr) -> WhenClause:
     condition = wrap_literal(condition)
@@ -81,14 +79,30 @@ def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
 
 
 def coalesce(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    """"""
+
     return ColFn(ops.coalesce, arg, *args)
+
+
+def count(
+    *,
+    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+) -> ColExpr[Int]:
+    """
+    Returns the number of rows of the current table, like :code:`COUNT(*)` in SQL.
+    """
+
+    return ColFn(ops.count_star, partition_by=partition_by, filter=filter)
 
 
 def dense_rank(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
+    """"""
+
     return ColFn(ops.dense_rank, partition_by=partition_by, arrange=arrange)
 
 
@@ -117,6 +131,8 @@ def max(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
 def max(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    """"""
+
     return ColFn(ops.horizontal_max, arg, *args)
 
 
@@ -145,28 +161,49 @@ def min(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
 def min(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    """"""
+
     return ColFn(ops.horizontal_min, arg, *args)
-
-
-def len(
-    *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-) -> ColExpr[Int]:
-    return ColFn(ops.len, partition_by=partition_by, filter=filter)
 
 
 def rank(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
+    """
+    The number of strictly smaller elements in the column plus one.
+
+    This is the same as ``rank("min")`` in polars.
+
+    Examples
+    --------
+    >>> t = pdt.Table({"a": [3, 1, 4, 1, 5, 9, 4]})
+    >>> t >> mutate(b=pdt.rank(arrange=t.a)) >> export(Polars(lazy=False))
+    shape: (7, 2)
+    ┌─────┬─────┐
+    │ a   ┆ b   │
+    │ --- ┆ --- │
+    │ i64 ┆ i64 │
+    ╞═════╪═════╡
+    │ 3   ┆ 3   │
+    │ 1   ┆ 1   │
+    │ 4   ┆ 4   │
+    │ 1   ┆ 1   │
+    │ 5   ┆ 6   │
+    │ 9   ┆ 7   │
+    │ 4   ┆ 4   │
+    └─────┴─────┘
+    """
+
     return ColFn(ops.rank, partition_by=partition_by, arrange=arrange)
 
 
 def row_number(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr] | None = None,
+    arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
+    """"""
+
     return ColFn(ops.row_number, partition_by=partition_by, arrange=arrange)

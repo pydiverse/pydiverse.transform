@@ -71,14 +71,8 @@ class PolarsImpl(TableImpl):
             lf.name = nd.name
             return lf
 
-        raise AssertionError
-
-    @staticmethod
-    def export_col(expr: ColExpr, target: Target) -> pl.Series:
-        if isinstance(target, Polars):
-            ...
         elif isinstance(target, Pandas):
-            ...
+            return lf.collect().to_pandas(use_pyarrow_extension_array=True)
 
         raise AssertionError
 
@@ -167,7 +161,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         # TODO: currently, count is the only aggregation function where we don't want
         # to return null for cols containing only null values. If this happens for more
         # aggregation functions, make this configurable in e.g. the operator spec.
-        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.len:
+        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.count_star:
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -583,24 +577,24 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _dt_day_of_year(x):
         return x.dt.ordinal_day().cast(pl.Int64)
 
-    @impl(ops.dt_days)
-    def _dt_days(x):
+    @impl(ops.dur_days)
+    def _dur_days(x):
         return x.dt.total_days()
 
-    @impl(ops.dt_hours)
-    def _dt_hours(x):
+    @impl(ops.dur_hours)
+    def _dur_hours(x):
         return x.dt.total_hours()
 
-    @impl(ops.dt_minutes)
-    def _dt_minutes(x):
+    @impl(ops.dur_minutes)
+    def _dur_minutes(x):
         return x.dt.total_minutes()
 
-    @impl(ops.dt_seconds)
-    def _dt_seconds(x):
+    @impl(ops.dur_seconds)
+    def _dur_seconds(x):
         return x.dt.total_seconds()
 
-    @impl(ops.dt_milliseconds)
-    def _dt_milliseconds(x):
+    @impl(ops.dur_milliseconds)
+    def _dur_milliseconds(x):
         return x.dt.total_milliseconds()
 
     @impl(ops.row_number)
@@ -668,7 +662,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _count(x):
         return x.count().cast(pl.Int64)
 
-    @impl(ops.len)
+    @impl(ops.count_star)
     def _len():
         return pl.len().cast(pl.Int64)
 

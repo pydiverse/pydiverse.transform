@@ -6,8 +6,8 @@ from pydiverse.transform._internal.tree.types import Bool, Date, Datetime, Int, 
 
 
 class StrUnary(Operator):
-    def __init__(self, name: str):
-        super().__init__(name, Signature(String(), return_type=String()))
+    def __init__(self, name: str, doc: str = ""):
+        super().__init__(name, Signature(String(), return_type=String()), doc=doc)
 
 
 str_strip = StrUnary("str.strip")

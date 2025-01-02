@@ -22,6 +22,7 @@ from ._internal.tree.types import (
 )
 
 __all__ = [
+    "Dtype",
     "Bool",
     "Date",
     "Datetime",

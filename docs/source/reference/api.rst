@@ -1,49 +1,34 @@
+===
 API
 ===
 
-Core
-----
+.. toctree::
+    :maxdepth: 1
 
-.. automodule:: pydiverse.transform
-    :members:
-    :undoc-members:
-
-    .. autodata:: pydiverse.transform.λ
-
-
-Builtin Verbs
--------------
-
-.. automodule:: pydiverse.transform.core.verbs
-    :members:
-    :undoc-members:
+    verbs
+    operators/index
+    targets
+    types
 
 
-Operators
----------
+.. currentmodule:: pydiverse.transform
 
-.. automodule:: pydiverse.transform.core.ops.aggregate
-    :members:
-.. automodule:: pydiverse.transform.core.ops.logical
-    :members:
-.. automodule:: pydiverse.transform.core.ops.numeric
-    :members:
-.. automodule:: pydiverse.transform.core.ops.string
-    :members:
-.. automodule:: pydiverse.transform.core.ops.window
-    :members:
+Table
+-----
 
+.. autoclass:: Table
 
-Functions
----------
+ColExpr
+-------
 
-.. automodule:: pydiverse.transform.core.functions
-    :members:
-    :undoc-members:
+.. autoclass:: ColExpr
+   :members: dtype
+   :exclude-members: __new__, __init__
 
+Col
+---
 
-Table Implementations
----------------------
-
-.. autoclass:: pydiverse.transform.eager.PandasTableImpl
-.. autoclass:: pydiverse.transform.lazy.SQLTableImpl
+.. autoclass:: Col
+   :no-index:
+   :members: export
+   :exclude-members: __new__, __init__
