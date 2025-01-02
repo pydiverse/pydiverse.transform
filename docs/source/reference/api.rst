@@ -8,6 +8,7 @@ API
     verbs
     operators/index
     targets
+    types
 
 
 .. currentmodule:: pydiverse.transform

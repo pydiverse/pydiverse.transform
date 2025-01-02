@@ -760,7 +760,51 @@ def summarize(**kwargs: ColExpr) -> Pipeable: ...
 
 @verb
 def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
-    """ """
+    """
+    Computes aggregates over groups of rows.
+
+    :param kwargs:
+        Each key is the name of a new column, and its value is the column
+        expression defining the new column. The column expression may not contain
+        columns that are neither part of the grouping columns nor wrapped in an
+        aggregation function.
+
+
+    In contrast to :doc:`pydiverse.transform.mutate`, this verb in general reduces the
+    number of rows and only keeps the grouping columns and the new columns defined in
+    the kwargs. One row for each unique combination of values in the grouping columns
+    is created.
+
+
+    Examples
+    --------
+    >>> t = pdt.Table(
+    ...     {
+    ...         "a": [1.2, 5.077, -2.29, -0.0, 3.0, -7.7],
+    ...         "b": ["a  ", "transform", "pipedag", "cdegh", "  -ade ", "  pq"],
+    ...         "c": [True, False, None, None, True, True],
+    ...     }
+    ... )
+    >>> (
+    ...     t
+    ...     >> group_by(t.c)
+    ...     >> summarize(
+    ...         u=t.b.str.len().mean(),
+    ...         v=t.a.sum(filter=t.a >= 0),
+    ...     )
+    ...     >> export(Polars())
+    ... )
+    shape: (3, 3)
+    ┌───────┬──────────┬───────┐
+    │ c     ┆ u        ┆ v     │
+    │ ---   ┆ ---      ┆ ---   │
+    │ bool  ┆ f64      ┆ f64   │
+    ╞═══════╪══════════╪═══════╡
+    │ true  ┆ 4.666667 ┆ 4.2   │
+    │ null  ┆ 6.0      ┆ -0.0  │
+    │ false ┆ 9.0      ┆ 5.077 │
+    └───────┴──────────┴───────┘
+    """
     names, values = map(list, zip(*kwargs.items(), strict=True))
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)

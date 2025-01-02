@@ -5,6 +5,10 @@ import inspect
 
 
 class Dtype:
+    """
+    Base class for all data types.
+    """
+
     __slots__ = ("const",)
 
     def __init__(self, *, const: bool = False):
@@ -37,9 +41,15 @@ class Dtype:
         return ("const " if self.const else "") + self.__class__.__name__
 
     def with_const(self) -> Dtype:
+        """
+        Adds a `const` modifier from the data type.
+        """
         return type(self)(const=True)
 
     def without_const(self) -> Dtype:
+        """
+        Removes a `const` modifier from the data type (if present).
+        """
         return type(self)()
 
     def converts_to(self, target: Dtype) -> bool:
