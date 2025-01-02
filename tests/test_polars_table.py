@@ -36,10 +36,10 @@ df3 = pl.DataFrame(
 
 df4 = pl.DataFrame(
     {
-        "col1": [None, 0, 0, 0, 0, None, 1, 1, 1, 2, 2, 2, 2],
-        "col2": [0, 0, 1, 1, 0, 0, 1, None, 1, 0, 0, 1, 1],
-        "col3": [None, None, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
-        "col4": [None, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        "col1": [None, 0, 4, 0, 44, None, 1, 2, 1, 50, 2, -4, 2],
+        "col2": [0, 0, 1, 31, 3, 0, 1, None, 1, 0, 0, 1, 1],
+        "col3": [None, None, None, 2, 3, 0, 13, 2, 3, -40, 1, 0, 3],
+        "col4": [None, 1, 122, -3, -554, 5, 6, 37, 8, -23, 1, 11, 12],
         "col5": list("abcdefghijkl") + [None],
     }
 )
@@ -595,6 +595,26 @@ class TestPolarsLazyImpl:
         assert_equal(
             e_ex["col2"] + e_ex["col1_df1"],
             (e >> mutate(j=e.col2 + tbl1.col1)).j.export(Polars()),
+        )
+
+    def test_align(self, tbl1: pdt.Table, tbl4: pdt.Table):
+        s = [
+            5.23,
+            3.5,
+            -0.0,
+            0.0,
+            None,
+            3.4,
+            1.00,
+            9.012324,
+            5.4,
+            4.22,
+            -124.33,
+            -55.2,
+            -0.22,
+        ]
+        assert_equal(
+            tbl4 >> mutate(j=align(s, with_=tbl4)), df4.with_columns(j=pl.Series(s))
         )
 
 

@@ -9,6 +9,7 @@ from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
+from pydiverse.transform._internal.pipe.align import AlignedCol
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
@@ -228,6 +229,9 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             compiled = compiled.replace("NaN", "nan")
 
         return compiled
+
+    elif isinstance(expr, AlignedCol):
+        return expr.data
 
     else:
         raise AssertionError
