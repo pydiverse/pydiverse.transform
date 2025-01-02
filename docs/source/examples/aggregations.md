@@ -8,8 +8,8 @@ from pydiverse.transform.extended import *
 
 tbl1 = pdt.Table(dict(a=[1, 1, 2], b=[4, 5, 6]))
 
-tbl1 >> summarize(sum_a=sum(a), sum_b=sum(b)) >> show()
-tbl1 >> group_by(tbl1.a) >> summarize(sum_b=sum(b)) >> show()
+tbl1 >> summarize(sum_a=a.sum(), sum_b=b.sum()) >> show()
+tbl1 >> group_by(tbl1.a) >> summarize(sum_b=b.sum()) >> show()
 ```
 
 Typical aggregation functions are `sum()`, `mean()`, `count()`, `min()`, `max()`, `any()`, and `all()`.

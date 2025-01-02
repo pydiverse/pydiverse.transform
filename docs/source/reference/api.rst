@@ -8,10 +8,27 @@ API
     verbs
     operators/index
     targets
+    types
+
+
+.. currentmodule:: pydiverse.transform
 
 Table
 -----
 
-.. currentmodule:: pydiverse.transform
 .. autoclass:: Table
-    :noindex:
+
+ColExpr
+-------
+
+.. autoclass:: ColExpr
+   :members: dtype
+   :exclude-members: __new__, __init__
+
+Col
+---
+
+.. autoclass:: Col
+   :no-index:
+   :members: export
+   :exclude-members: __new__, __init__

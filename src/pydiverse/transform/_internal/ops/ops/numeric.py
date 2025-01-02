@@ -4,9 +4,6 @@ from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import NUMERIC, Bool, Decimal, Float, Int
 
-mod = Operator("__mod__", Signature(Int(), Int(), return_type=Int()))
-
-
 pow = Operator(
     "__pow__",
     Signature(Int(), Int(), return_type=Float()),

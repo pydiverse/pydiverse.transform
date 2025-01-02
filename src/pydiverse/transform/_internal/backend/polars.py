@@ -71,14 +71,8 @@ class PolarsImpl(TableImpl):
             lf.name = nd.name
             return lf
 
-        raise AssertionError
-
-    @staticmethod
-    def export_col(expr: ColExpr, target: Target) -> pl.Series:
-        if isinstance(target, Polars):
-            ...
         elif isinstance(target, Pandas):
-            ...
+            return lf.collect().to_pandas(use_pyarrow_extension_array=True)
 
         raise AssertionError
 

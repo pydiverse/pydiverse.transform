@@ -12,6 +12,10 @@ from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
+import pandas as pd
+import polars as pl
+
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops import ops, signature
 from pydiverse.transform._internal.ops.op import Ftype, Operator
@@ -136,6 +140,24 @@ class ColExpr(Generic[T]):
             )
         return rhs(self)
 
+    def rank(
+        self: ColExpr,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    ) -> ColExpr[Int]:
+        """
+        Alias for :doc:`/reference/operators/_generated/pydiverse.transform.rank`.
+        """
+        return ColFn(ops.rank, partition_by=partition_by, arrange=self)
+
+    def dense_rank(
+        self: ColExpr,
+        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    ) -> ColExpr[Int]:
+        """
+        Alias for :doc:`/reference/operators/_generated/pydiverse.transform.dense_rank`.
+        """
+        return ColFn(ops.dense_rank, partition_by=partition_by, arrange=self)
+
     # --- generated code starts here, do not delete this comment ---
 
     @overload
@@ -217,7 +239,12 @@ class ColExpr(Generic[T]):
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
     def ascending(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        The default ordering.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.ascending, self)
 
@@ -280,7 +307,12 @@ class ColExpr(Generic[T]):
         return ColFn(ops.count, self, partition_by=partition_by, filter=filter)
 
     def descending(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        Reverses the default ordering.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.descending, self)
 
@@ -311,12 +343,80 @@ class ColExpr(Generic[T]):
         return ColFn(ops.floor, self)
 
     def __floordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Integer division.
+
+        Warning
+        -------
+        The behavior of this operator differs from polars and python. Polars and python
+        always round towards negative infinity, whereas pydiverse.transform always
+        rounds towards zero, regardless of the sign. This behavior matches the one of C,
+        C++ and all currently supported SQL backends.
+
+        See also
+        --------
+        __mod__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 9   │
+        │ -65 ┆ 7   ┆ -9  │
+        │ 65  ┆ -7  ┆ -9  │
+        │ -65 ┆ -7  ┆ 9   │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.floordiv, self, rhs)
 
     def __rfloordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Integer division.
+
+        Warning
+        -------
+        The behavior of this operator differs from polars and python. Polars and python
+        always round towards negative infinity, whereas pydiverse.transform always
+        rounds towards zero, regardless of the sign. This behavior matches the one of C,
+        C++ and all currently supported SQL backends.
+
+        See also
+        --------
+        __mod__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 9   │
+        │ -65 ┆ 7   ┆ -9  │
+        │ 65  ┆ -7  ┆ -9  │
+        │ -65 ┆ -7  ┆ 9   │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.floordiv, rhs, self)
 
@@ -605,12 +705,82 @@ class ColExpr(Generic[T]):
         return ColFn(ops.min, self, partition_by=partition_by, filter=filter)
 
     def __mod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Computes the remainder of integer division.
+
+        Warning
+        -------
+        This operator behaves differently than in polars. There are at least two
+        conventions how `%` and :doc:`// <pydiverse.transform.ColExpr.__floordiv__>`
+        should behave  for negative inputs. We follow the one that C, C++ and all
+        currently supported SQL backends follow. This means that the output has the same
+        sign as the left hand side of the input, regardless of the right hand side.
+
+        See also
+        --------
+        __floordiv__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 2   │
+        │ -65 ┆ 7   ┆ -2  │
+        │ 65  ┆ -7  ┆ 2   │
+        │ -65 ┆ -7  ┆ -2  │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.mod, self, rhs)
 
     def __rmod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
-        """"""
+        """
+        Computes the remainder of integer division.
+
+        Warning
+        -------
+        This operator behaves differently than in polars. There are at least two
+        conventions how `%` and :doc:`// <pydiverse.transform.ColExpr.__floordiv__>`
+        should behave  for negative inputs. We follow the one that C, C++ and all
+        currently supported SQL backends follow. This means that the output has the same
+        sign as the left hand side of the input, regardless of the right hand side.
+
+        See also
+        --------
+        __floordiv__
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [65, -65, 65, -65],
+        ...         "b": [7, 7, -7, -7],
+        ...     }
+        ... )
+        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        shape: (4, 3)
+        ┌─────┬─────┬─────┐
+        │ a   ┆ b   ┆ r   │
+        │ --- ┆ --- ┆ --- │
+        │ i64 ┆ i64 ┆ i64 │
+        ╞═════╪═════╪═════╡
+        │ 65  ┆ 7   ┆ 2   │
+        │ -65 ┆ 7   ┆ -2  │
+        │ 65  ┆ -7  ┆ 2   │
+        │ -65 ┆ -7  ┆ -2  │
+        └─────┴─────┴─────┘
+        """
 
         return ColFn(ops.mod, rhs, self)
 
@@ -662,12 +832,36 @@ class ColExpr(Generic[T]):
         return ColFn(ops.not_equal, self, rhs)
 
     def nulls_first(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        Specifies that nulls are placed at the beginning of the ordering.
+
+        This does not mean that nulls are considered to be `less` than any other
+        element. I.e. if both `nulls_first` and `descending` are given, nulls will still
+        be placed at the beginning.
+
+        If neither `nulls_first` nor `nulls_last` is specified, the position of nulls is
+        backend-dependent.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.nulls_first, self)
 
     def nulls_last(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        Specifies that nulls are placed at the end of the ordering.
+
+        This does not mean that nulls are considered to be `greater` than any other
+        element. I.e. if both `nulls_last` and `descending` are given, nulls will still
+        be placed at the end.
+
+        If neither `nulls_first` nor `nulls_last` is specified, the position of nulls is
+        backend-dependent.
+
+        Can only be used in expressions given to the `arrange` verb or as as an
+        `arrange` keyword argument.
+        """
 
         return ColFn(ops.nulls_last, self)
 
@@ -733,7 +927,7 @@ class ColExpr(Generic[T]):
         fill_value: ColExpr = None,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
+        arrange: ColExpr | Iterable[ColExpr],
     ) -> ColExpr:
         """"""
 
@@ -1086,6 +1280,54 @@ class Col(ColExpr):
 
     def __hash__(self) -> int:
         return hash(self._uuid)
+
+    def export(self, target: Target) -> Any:
+        """
+        Exports a column to a polars or pandas Series.
+
+        :param target:
+            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
+            object. The ``lazy`` kwarg for polars is ignored.
+
+        :return:
+            A polars or pandas Series.
+
+        Examples
+        --------
+        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
+        >>> t1.h.export(Polars())
+        shape: (6,)
+        Series: 'h' [f64]
+        [
+                2.465
+                0.22
+                -4.477
+                10.8
+                -81.2
+                0.0
+        ]
+        >>> t1.h.export(Pandas())
+        0    2.465
+        1     0.22
+        2   -4.477
+        3     10.8
+        4    -81.2
+        5      0.0
+        Name: h, dtype: double[pyarrow]
+        """
+
+        from pydiverse.transform._internal.backend.table_impl import get_backend
+        from pydiverse.transform._internal.tree.verbs import Select
+
+        ast = Select(self._ast, [self])
+        df = get_backend(self._ast).export(ast, target, [self], {})
+        if isinstance(target, Polars):
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(self.name)
+        else:
+            assert isinstance(target, Pandas)
+            return pd.Series(df[self.name])
 
 
 class ColName(ColExpr):

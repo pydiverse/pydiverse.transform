@@ -5,6 +5,7 @@ from ._internal.tree.types import (
     Date,
     Datetime,
     Decimal,
+    Dtype,
     Float,
     Float32,
     Float64,
@@ -21,6 +22,7 @@ from ._internal.tree.types import (
 )
 
 __all__ = [
+    "Dtype",
     "Bool",
     "Date",
     "Datetime",

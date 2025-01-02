@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydiverse.transform._internal.ops.op import Ftype, Operator
+from pydiverse.transform._internal.ops.op import ContextKwarg, Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import (
     COMPARABLE,
@@ -25,7 +25,10 @@ class Aggregation(Operator):
             name,
             *signatures,
             ftype=Ftype.AGGREGATE,
-            context_kwargs=["partition_by", "filter"],
+            context_kwargs=[
+                ContextKwarg("partition_by", False),
+                ContextKwarg("filter", False),
+            ],
             generate_expr_method=generate_expr_method,
             doc=doc,
         )

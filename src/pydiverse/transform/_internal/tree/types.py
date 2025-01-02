@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import datetime
 import inspect
-import warnings
 
 
 class Dtype:
+    """
+    Base class for all data types.
+    """
+
     __slots__ = ("const",)
 
     def __init__(self, *, const: bool = False):
@@ -16,14 +19,6 @@ class Dtype:
             return False
         if inspect.isclass(rhs) and issubclass(rhs, Dtype):
             rhs = rhs()
-        if is_supertype(rhs.without_const()) and not is_subtype(rhs.without_const()):
-            warnings.warn(
-                f"comparing to the supertype `{rhs}` for equality may yield unexpected "
-                "results.\n"
-                "hint: `==` is very strict, e.g. Int16() == Int() is False. Use the "
-                "`<=` operator to also match on subtypes (so Int16() <= Int() would "
-                "return True)."
-            )
 
         if isinstance(rhs, Dtype):
             return self.const == rhs.const and type(self) is type(rhs)
@@ -46,9 +41,15 @@ class Dtype:
         return ("const " if self.const else "") + self.__class__.__name__
 
     def with_const(self) -> Dtype:
+        """
+        Adds a `const` modifier from the data type.
+        """
         return type(self)(const=True)
 
     def without_const(self) -> Dtype:
+        """
+        Removes a `const` modifier from the data type (if present).
+        """
         return type(self)()
 
     def converts_to(self, target: Dtype) -> bool:

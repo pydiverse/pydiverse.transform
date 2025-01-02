@@ -11,7 +11,6 @@ Some examples how to use pydiverse.transform:
 * [Best practices / beware the flatfile & embrace working with entities](/examples/best_practices_entities)
 
 ```{toctree}
-/quickstart
 /examples/joining
 /examples/aggregations
 /examples/window_functions

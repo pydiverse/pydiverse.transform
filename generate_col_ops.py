@@ -15,6 +15,7 @@ from pydiverse.transform._internal.tree.types import (
 
 COL_EXPR_PATH = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 FNS_PATH = "./src/pydiverse/transform/_internal/pipe/functions.py"
+API_DOCS_PATH = "./docs/source/reference/operators/index.rst"
 
 NAMESPACES = ["str", "dt", "dur"]
 
@@ -78,7 +79,8 @@ def generate_fn_decl(
         }
 
         annotated_kwargs = "".join(
-            f", {kwarg}: {context_kwarg_annotation[kwarg]} | None = None"
+            f", {kwarg.name}: {context_kwarg_annotation[kwarg.name]}"
+            + f"{'' if kwarg.required else ' | None = None'}"
             for kwarg in op.context_kwargs
         )
 
@@ -116,7 +118,7 @@ def generate_fn_body(
         args = add_vararg_star(args)
 
     if op.context_kwargs is not None:
-        kwargs = "".join(f", {kwarg}={kwarg}" for kwarg in op.context_kwargs)
+        kwargs = "".join(f", {kwarg.name}={kwarg.name}" for kwarg in op.context_kwargs)
     else:
         kwargs = ""
 
@@ -246,3 +248,55 @@ with open(FNS_PATH, "r+") as file:
     file.truncate()
 
 os.system(f"ruff format {FNS_PATH}")
+
+with open(API_DOCS_PATH, "r+") as file:
+    new_file_contents = ""
+
+    for line in file:
+        new_file_contents += line
+        if line.startswith("Expression methods"):
+            new_file_contents += (
+                "------------------\n\n"
+                ".. currentmodule:: pydiverse.transform.ColExpr\n\n"
+                ".. autosummary::\n"
+                "   :nosignatures:\n\n   "
+            )
+
+            new_file_contents += "\n   ".join(
+                sorted(
+                    [
+                        op.name
+                        for op in ops.__dict__.values()
+                        if isinstance(op, Operator) and op.generate_expr_method
+                    ]
+                    + ["rank", "dense_rank", "map", "cast"]
+                )
+            )
+
+            new_file_contents += (
+                "\n\nGlobal functions\n"
+                "----------------\n\n"
+                ".. currentmodule:: pydiverse.transform\n\n"
+                ".. autosummary::\n"
+                "   :nosignatures:\n\n   "
+            )
+
+            new_file_contents += (
+                "\n   ".join(
+                    sorted(
+                        [
+                            op.name
+                            for op in ops.__dict__.values()
+                            if isinstance(op, Operator) and not op.generate_expr_method
+                        ]
+                        + ["when", "lit"]
+                    )
+                )
+                + "\n"
+            )
+
+            break
+
+    file.seek(0)
+    file.write(new_file_contents)
+    file.truncate()
