@@ -1,11 +1,15 @@
+# ruff: noqa: F405
+
 from __future__ import annotations
 
+import datetime
 import random
 import string
 from functools import partial
 
 import numpy as np
 import polars as pl
+from polars.testing import assert_frame_equal
 
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.ops import ops
@@ -13,6 +17,8 @@ from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.col_expr import ColFn
 from pydiverse.transform._internal.tree.types import Tvar
+from pydiverse.transform.extended import *  # noqa: F403
+from tests.util.backend import BACKEND_TABLES
 
 rng = np.random.default_rng()
 letters = list(string.printable)
@@ -20,25 +26,22 @@ letters = list(string.printable)
 ALL_TYPES = [pdt.Int(), pdt.Float(), pdt.Bool(), pdt.String()]
 MEAN_HEIGHT = 4
 
+RNG_FNS = {
+    pdt.Float(): rng.standard_normal,
+    pdt.Int(): partial(rng.integers, -(1 << 13), 1 << 13),
+    pdt.Bool(): partial(rng.integers, 0, 1, dtype=bool),
+    pdt.String(): (
+        lambda rows: np.array(
+            ["".join(random.choices(letters, k=rng.poisson(10))) for _ in range(rows)]
+        )
+    ),
+}
+
 
 def gen_table(rows: int, types: dict[pdt.Dtype, int]) -> pl.DataFrame:
     d = pl.DataFrame()
 
-    rng_fns = {
-        pdt.Float(): rng.standard_normal,
-        pdt.Int(): partial(rng.integers, -(1 << 13), 1 << 13),
-        pdt.Bool(): partial(rng.integers, 0, 1, dtype=bool),
-        pdt.String(): (
-            lambda rows: np.array(
-                [
-                    "".join(random.choices(letters, k=rng.poisson(10)))
-                    for _ in range(rows)
-                ]
-            )
-        ),
-    }
-
-    for ty, fn in rng_fns.items():
+    for ty, fn in RNG_FNS.items():
         if ty in types:
             d = d.with_columns(
                 **{
@@ -72,13 +75,18 @@ for op in ops.__dict__.values():
                         ),
                     )
                 )
-        else:
+        elif sig.return_type in ALL_TYPES and all(
+            param.without_const() in ALL_TYPES for param in sig.types
+        ):
             ops_with_return_type[sig.return_type].append((op, sig))
 
 
 def gen_expr(
     dtype: pdt.Dtype, cols: dict[pdt.Dtype, list[str]], q: float = 0.0
 ) -> pdt.ColExpr:
+    if dtype.const:
+        return RNG_FNS[dtype.without_const()](1).item()
+
     if q > 1:
         return rng.choice(cols[dtype])
 
@@ -98,3 +106,39 @@ def gen_expr(
             )
 
     return ColFn(op, *args)
+
+
+it = int(input("number of iterations: "))
+rows = int(input("number of rows: "))
+
+NUM_COLS_PER_TYPE = 5
+
+df = gen_table(rows, {dtype: NUM_COLS_PER_TYPE for dtype in ALL_TYPES})
+
+
+table_state = np.random.get_state(rng)
+tables = {backend: fn(df, "t") for backend, fn in BACKEND_TABLES.items()}
+cols = {
+    backend: {
+        dtype: [col for col in table if col.dtype() == dtype] for dtype in ALL_TYPES
+    }
+    for backend, table in tables.items()
+}
+
+for _ in range(it):
+    expr_state = np.random.get_state(rng)
+
+    try:
+        results = {
+            backend: table
+            >> mutate(y=gen_expr(rng.choice(ALL_TYPES), cols[backend]))
+            >> select(C.y)
+            >> export(Polars())
+            for backend, table in tables.items()
+        }
+        for _backend, res in results:
+            assert_frame_equal(results["polars"], res)
+
+    except Exception:
+        with open(f"fuzz_failures/{datetime.datetime.now()}", "w") as file:
+            file.write(f"table_state = {table_state}\nexpr_state = {expr_state}\n")
