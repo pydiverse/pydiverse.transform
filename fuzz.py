@@ -13,6 +13,7 @@ from polars.testing import assert_frame_equal
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype, Operator
+from pydiverse.transform._internal.ops.ops.markers import Marker
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.col_expr import ColFn
 from pydiverse.transform._internal.tree.types import Tvar
@@ -57,7 +58,11 @@ ops_with_return_type: dict[pdt.Dtype, list[tuple[Operator, Signature]]] = {
 }
 
 for op in ops.__dict__.values():
-    if not isinstance(op, Operator) or op.ftype != Ftype.ELEMENT_WISE:
+    if (
+        not isinstance(op, Operator)
+        or op.ftype != Ftype.ELEMENT_WISE
+        or isinstance(op, Marker)
+    ):
         continue
     for sig in op.signatures:
         if not all(t in (*ALL_TYPES, Tvar("T")) for t in (*sig.types, sig.return_type)):

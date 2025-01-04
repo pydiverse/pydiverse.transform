@@ -1769,14 +1769,18 @@ def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
             or (
                 # markers can only be at the top of an expression tree
                 not isinstance(expr.op, Marker)
-                and any(
-                    isinstance(arg, ColFn) and isinstance(arg.op, Marker)
-                    for arg in expr.args
+                and (
+                    marker_args := [
+                        arg
+                        for arg in expr.args
+                        if isinstance(arg, ColFn) and isinstance(arg.op, Marker)
+                    ]
                 )
             )
         ):
+            marker = expr.op if isinstance(expr.op, Marker) else marker_args[0].op
             raise TypeError(
-                f"invalid usage of `{expr.op.name}` in a column expression.\n"
+                f"invalid usage of `{marker.name}` in a column expression.\n"
                 "note: This marker function can only be used in arguments to the "
                 "`arrange` verb or the `arrange=` keyword argument to window "
                 "functions. Furthermore, all markers have to be at the top of the "
