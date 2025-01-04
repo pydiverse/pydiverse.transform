@@ -160,3 +160,9 @@ def test_is_nan(df_num):
             **{c.name + "is_not_nan": c.is_not_nan() for c in t},
         ),
     )
+
+
+def test_int_pow(df_int):
+    assert_result_equal(
+        df_int, lambda t: t >> mutate(u=pdt.min(t.a, 10) ** pdt.min(t.b.abs(), 5))
+    )

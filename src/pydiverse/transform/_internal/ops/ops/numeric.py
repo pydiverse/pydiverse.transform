@@ -9,6 +9,14 @@ pow = Operator(
     Signature(Int(), Int(), return_type=Float()),
     Signature(Float(), Float(), return_type=Float()),
     Signature(Decimal(), Decimal(), return_type=Decimal()),
+    doc="""
+Computes the power x ** y.
+
+Note
+----
+Polars throws on negative exponents in the integer case. A polars error like
+`failed to convert X to u32` may be due to negative inputs to this function.
+""",
 )
 
 neg = Operator("__neg__", *(Signature(t, return_type=t) for t in NUMERIC))

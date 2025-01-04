@@ -889,7 +889,14 @@ class ColExpr(Generic[T]):
     def __pow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __pow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """
+        Computes the power x ** y.
+
+        Note
+        ----
+        Polars throws on negative exponents in the integer case. A polars error like
+        `failed to convert X to u32` may be due to negative inputs to this function.
+        """
 
         return ColFn(ops.pow, self, rhs)
 
@@ -903,7 +910,14 @@ class ColExpr(Generic[T]):
     def __rpow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __rpow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """
+        Computes the power x ** y.
+
+        Note
+        ----
+        Polars throws on negative exponents in the integer case. A polars error like
+        `failed to convert X to u32` may be due to negative inputs to this function.
+        """
 
         return ColFn(ops.pow, rhs, self)
 

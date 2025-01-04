@@ -24,7 +24,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, String
+from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, Int, String
 
 
 class MsSqlImpl(SqlImpl):
@@ -302,3 +302,14 @@ with MsSqlImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return True
+
+    @impl(ops.pow)
+    def _pow(x, y):
+        return_type = sqa.Double()
+        if isinstance(x.type, sqa.Numeric) and isinstance(y.type, sqa.Numeric):
+            return_type = sqa.Numeric()
+        return sqa.func.POWER(x, y, type_=return_type)
+
+    @impl(ops.pow, Int(), Int())
+    def _pow_int(x, y):
+        return sqa.func.POWER(sqa.cast(x, type_=sqa.Double()), y)

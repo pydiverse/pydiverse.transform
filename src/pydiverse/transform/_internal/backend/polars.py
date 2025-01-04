@@ -733,3 +733,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.coalesce)
     def _coalesce(*x):
         return pl.coalesce(*x)
+
+    @impl(ops.pow, Int(), Int())
+    def _pow(x, y):
+        return x.cast(pl.Float64()) ** y

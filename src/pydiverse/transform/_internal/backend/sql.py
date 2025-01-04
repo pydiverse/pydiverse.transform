@@ -736,14 +736,10 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.pow)
     def _pow(lhs, rhs):
-        if isinstance(lhs.type, sqa.Float) or isinstance(rhs.type, sqa.Float):
-            type_ = sqa.Double()
-        elif isinstance(lhs.type, sqa.Numeric) or isinstance(rhs, sqa.Numeric):
-            type_ = sqa.Numeric()
-        else:
-            type_ = sqa.Double()
-
-        return sqa.func.POW(lhs, rhs, type_=type_)
+        return_type = sqa.Double()
+        if isinstance(lhs.type, sqa.Numeric) and isinstance(rhs.type, sqa.Numeric):
+            return_type = sqa.Numeric()
+        return sqa.func.POW(lhs, rhs, type_=return_type)
 
     @impl(ops.bool_xor)
     def _xor(lhs, rhs):
