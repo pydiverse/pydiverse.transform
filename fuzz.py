@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import random
 import string
 from functools import partial
@@ -13,11 +12,11 @@ from polars.testing import assert_frame_equal
 
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.ops.op import Operator
+from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.col_expr import ColFn
 from pydiverse.transform._internal.tree.types import Tvar
-from pydiverse.transform.extended import *  # noqa: F403
+from pydiverse.transform.common import *  # noqa: F403
 from tests.util.backend import BACKEND_TABLES
 
 rng = np.random.default_rng()
@@ -58,12 +57,18 @@ ops_with_return_type: dict[pdt.Dtype, list[tuple[Operator, Signature]]] = {
 }
 
 for op in ops.__dict__.values():
-    if not isinstance(op, Operator):
+    if not isinstance(op, Operator) or op.ftype != Ftype.ELEMENT_WISE:
         continue
     for sig in op.signatures:
-        if isinstance(sig.return_type, Tvar):
+        if not all(t in (*ALL_TYPES, Tvar("T")) for t in (*sig.types, sig.return_type)):
+            continue
+
+        if isinstance(sig.return_type, Tvar) or any(
+            isinstance(param, Tvar) for param in sig.types
+        ):
             for ty in ALL_TYPES:
-                ops_with_return_type[ty].append(
+                rtype = ty if isinstance(sig.return_type, Tvar) else sig.return_type
+                ops_with_return_type[rtype].append(
                     (
                         op,
                         Signature(
@@ -71,13 +76,11 @@ for op in ops.__dict__.values():
                                 ty if isinstance(param, Tvar) else param
                                 for param in sig.types
                             ),
-                            return_type=ty,
+                            return_type=rtype,
                         ),
                     )
                 )
-        elif sig.return_type in ALL_TYPES and all(
-            param.without_const() in ALL_TYPES for param in sig.types
-        ):
+        else:
             ops_with_return_type[sig.return_type].append((op, sig))
 
 
@@ -110,35 +113,29 @@ def gen_expr(
 
 it = int(input("number of iterations: "))
 rows = int(input("number of rows: "))
+seed = int(input("seed: "))
 
+rng = np.random.default_rng(seed)
 NUM_COLS_PER_TYPE = 5
 
 df = gen_table(rows, {dtype: NUM_COLS_PER_TYPE for dtype in ALL_TYPES})
 
 
-table_state = np.random.get_state(rng)
 tables = {backend: fn(df, "t") for backend, fn in BACKEND_TABLES.items()}
 cols = {
     backend: {
-        dtype: [col for col in table if col.dtype() == dtype] for dtype in ALL_TYPES
+        dtype: [col for col in table if col.dtype() <= dtype] for dtype in ALL_TYPES
     }
     for backend, table in tables.items()
 }
 
 for _ in range(it):
-    expr_state = np.random.get_state(rng)
-
-    try:
-        results = {
-            backend: table
-            >> mutate(y=gen_expr(rng.choice(ALL_TYPES), cols[backend]))
-            >> select(C.y)
-            >> export(Polars())
-            for backend, table in tables.items()
-        }
-        for _backend, res in results:
-            assert_frame_equal(results["polars"], res)
-
-    except Exception:
-        with open(f"fuzz_failures/{datetime.datetime.now()}", "w") as file:
-            file.write(f"table_state = {table_state}\nexpr_state = {expr_state}\n")
+    results = {
+        backend: table
+        >> mutate(y=gen_expr(rng.choice(ALL_TYPES), cols[backend]))
+        >> select(C.y)
+        >> export(Polars())
+        for backend, table in tables.items()
+    }
+    for _backend, res in results:
+        assert_frame_equal(results["polars"], res)
