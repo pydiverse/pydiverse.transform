@@ -286,7 +286,7 @@ class ColExpr(Generic[T]):
     def abs(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def abs(self: ColExpr) -> ColExpr:
-        """"""
+        """Computes the absolute value."""
 
         return ColFn(ops.abs, self)
 
@@ -365,37 +365,226 @@ class ColExpr(Generic[T]):
         return ColFn(ops.ascending, self)
 
     def __and__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean AND (__and__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a & t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ false │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ false │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_and, self, rhs)
 
     def __rand__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean AND (__and__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a & t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ false │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ false │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_and, rhs, self)
 
     def __invert__(self: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean inversion (__invert__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=~t.a) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ false │
+        │ true  ┆ false ┆ false │
+        │ true  ┆ null  ┆ false │
+        │ false ┆ false ┆ true  │
+        │ false ┆ null  ┆ true  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_invert, self)
 
     def __or__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean OR (__or__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a | t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ true  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_or, self, rhs)
 
     def __ror__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean OR (__or__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a | t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ true  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_or, rhs, self)
 
     def __xor__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean XOR (__xor__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a ^ t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ false │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_xor, self, rhs)
 
     def __rxor__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean XOR (__xor__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a ^ t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ false │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_xor, rhs, self)
 
@@ -406,7 +595,7 @@ class ColExpr(Generic[T]):
     def ceil(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def ceil(self: ColExpr) -> ColExpr:
-        """"""
+        """Returns the smallest integer greater than or equal to the input."""
 
         return ColFn(ops.ceil, self)
 
@@ -438,7 +627,7 @@ class ColExpr(Generic[T]):
         return ColFn(ops.equal, self, rhs)
 
     def exp(self: ColExpr[Float]) -> ColExpr[Float]:
-        """"""
+        """Computes the exponential function."""
 
         return ColFn(ops.exp, self)
 
@@ -454,7 +643,7 @@ class ColExpr(Generic[T]):
     def floor(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def floor(self: ColExpr) -> ColExpr:
-        """"""
+        """Returns the largest integer less than or equal to the input."""
 
         return ColFn(ops.floor, self)
 
@@ -597,7 +786,14 @@ class ColExpr(Generic[T]):
         return ColFn(ops.is_in, self, *rhs)
 
     def is_inf(self: ColExpr[Float]) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the number is infinite.
+
+        Note
+        ----
+        This is currently only useful for backends supporting IEEE 754-floats. On
+        other backends it always returns False.
+        """
 
         return ColFn(ops.is_inf, self)
 
@@ -673,7 +869,7 @@ class ColExpr(Generic[T]):
         return ColFn(ops.less_than, self, rhs)
 
     def log(self: ColExpr[Float]) -> ColExpr[Float]:
-        """"""
+        """Computes the natural logarithm."""
 
         return ColFn(ops.log, self)
 
@@ -945,7 +1141,7 @@ class ColExpr(Generic[T]):
     def __neg__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __neg__(self: ColExpr) -> ColExpr:
-        """"""
+        """The unary - (negation) operator (__neg__)"""
 
         return ColFn(ops.neg, self)
 
@@ -998,7 +1194,7 @@ class ColExpr(Generic[T]):
     def __pos__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __pos__(self: ColExpr) -> ColExpr:
-        """"""
+        """The unary + operator (__pos__)"""
 
         return ColFn(ops.pos, self)
 
@@ -1054,7 +1250,12 @@ class ColExpr(Generic[T]):
     def round(self: ColExpr[Decimal], decimals: int = 0) -> ColExpr[Decimal]: ...
 
     def round(self: ColExpr, decimals: int = 0) -> ColExpr:
-        """"""
+        """
+        Rounds to a given number of decimals.
+
+        :param decimals:
+            The number of decimals to round by.
+        """
 
         return ColFn(ops.round, self, decimals)
 

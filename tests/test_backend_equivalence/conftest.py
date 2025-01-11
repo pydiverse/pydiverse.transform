@@ -214,6 +214,12 @@ dataframes = {
             "null_s": [0] + [None] * 7,
         }
     ),
+    "df_bool": pl.DataFrame(
+        {
+            "a": [True, True, True, False, False, None],
+            "b": [True, False, None, False, None, None],
+        },
+    ),
 }
 
 # compare one dataframe and one SQL backend to all others
