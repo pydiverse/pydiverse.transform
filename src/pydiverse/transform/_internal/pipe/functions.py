@@ -109,7 +109,40 @@ def dense_rank(
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
     arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
-    """"""
+    """
+    The number of smaller or equal values in the column (not counting duplicates).
+
+    This function has two syntax alternatives, as shown in the example below. The
+    pdt. version is a bit more flexible, because it allows sorting by multiple
+    expressions.
+
+    Examples
+    --------
+    >>> t = pdt.Table({"a": [5, -1, 435, -1, 8, None, 8]})
+    >>> (
+    ...     t
+    ...     >> mutate(
+    ...         x=t.a.nulls_first().dense_rank(),
+    ...         y=pdt.dense_rank(arrange=t.a.nulls_first()),
+    ...     )
+    ...     >> show()
+    ... )
+    Table <unnamed>, backend: PolarsImpl
+    shape: (7, 3)
+    ┌──────┬─────┬─────┐
+    │ a    ┆ x   ┆ y   │
+    │ ---  ┆ --- ┆ --- │
+    │ i64  ┆ i64 ┆ i64 │
+    ╞══════╪═════╪═════╡
+    │ 5    ┆ 3   ┆ 3   │
+    │ -1   ┆ 2   ┆ 2   │
+    │ 435  ┆ 5   ┆ 5   │
+    │ -1   ┆ 2   ┆ 2   │
+    │ 8    ┆ 4   ┆ 4   │
+    │ null ┆ 1   ┆ 1   │
+    │ 8    ┆ 4   ┆ 4   │
+    └──────┴─────┴─────┘
+    """
 
     return ColFn(ops.dense_rank, partition_by=partition_by, arrange=arrange)
 
@@ -182,26 +215,37 @@ def rank(
     """
     The number of strictly smaller elements in the column plus one.
 
-    This is the same as ``rank("min")`` in polars.
+    This is the same as ``rank("min")`` in polars. This function has two syntax
+    alternatives, as shown in the example below. The pdt. version is a bit more
+    flexible, because it allows sorting by multiple expressions.
+
 
     Examples
     --------
-    >>> t = pdt.Table({"a": [3, 1, 4, 1, 5, 9, 4]})
-    >>> t >> mutate(b=pdt.rank(arrange=t.a)) >> export(Polars(lazy=False))
-    shape: (7, 2)
-    ┌─────┬─────┐
-    │ a   ┆ b   │
-    │ --- ┆ --- │
-    │ i64 ┆ i64 │
-    ╞═════╪═════╡
-    │ 3   ┆ 3   │
-    │ 1   ┆ 1   │
-    │ 4   ┆ 4   │
-    │ 1   ┆ 1   │
-    │ 5   ┆ 6   │
-    │ 9   ┆ 7   │
-    │ 4   ┆ 4   │
-    └─────┴─────┘
+    >>> t = pdt.Table({"a": [5, -1, 435, -1, 8, None, 8]})
+    >>> (
+    ...     t
+    ...     >> mutate(
+    ...         x=t.a.nulls_first().rank(),
+    ...         y=pdt.rank(arrange=t.a.nulls_first()),
+    ...     )
+    ...     >> show()
+    ... )
+    Table <unnamed>, backend: PolarsImpl
+    shape: (7, 3)
+    ┌──────┬─────┬─────┐
+    │ a    ┆ x   ┆ y   │
+    │ ---  ┆ --- ┆ --- │
+    │ i64  ┆ i64 ┆ i64 │
+    ╞══════╪═════╪═════╡
+    │ 5    ┆ 4   ┆ 4   │
+    │ -1   ┆ 2   ┆ 2   │
+    │ 435  ┆ 7   ┆ 7   │
+    │ -1   ┆ 2   ┆ 2   │
+    │ 8    ┆ 5   ┆ 5   │
+    │ null ┆ 1   ┆ 1   │
+    │ 8    ┆ 5   ┆ 5   │
+    └──────┴─────┴─────┘
     """
 
     return ColFn(ops.rank, partition_by=partition_by, arrange=arrange)
@@ -210,8 +254,41 @@ def rank(
 def row_number(
     *,
     partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-    arrange: ColExpr | Iterable[ColExpr],
+    arrange: ColExpr | Iterable[ColExpr] | None = None,
 ) -> ColExpr[Int]:
-    """"""
+    """
+    Computes the index of a row.
+
+    Via the *arrange* argument, this can be done relative to a different order of
+    the rows. But note that the result may not be unique if the argument of
+    *arrange* contains duplicates.
+
+    Examples
+    --------
+    >>> t = pdt.Table({"a": [5, -1, 435, -34, 8, None, 0]})
+    >>> (
+    ...     t
+    ...     >> mutate(
+    ...         x=pdt.row_number(),
+    ...         y=pdt.row_number(arrange=t.a),
+    ...     )
+    ...     >> show()
+    ... )
+    Table <unnamed>, backend: PolarsImpl
+    shape: (7, 3)
+    ┌──────┬─────┬─────┐
+    │ a    ┆ x   ┆ y   │
+    │ ---  ┆ --- ┆ --- │
+    │ i64  ┆ i64 ┆ i64 │
+    ╞══════╪═════╪═════╡
+    │ 5    ┆ 1   ┆ 5   │
+    │ -1   ┆ 2   ┆ 3   │
+    │ 435  ┆ 3   ┆ 7   │
+    │ -34  ┆ 4   ┆ 2   │
+    │ 8    ┆ 5   ┆ 6   │
+    │ null ┆ 6   ┆ 1   │
+    │ 0    ┆ 7   ┆ 4   │
+    └──────┴─────┴─────┘
+    """
 
     return ColFn(ops.row_number, partition_by=partition_by, arrange=arrange)

@@ -1265,9 +1265,50 @@ class ColExpr(Generic[T]):
         fill_value: ColExpr = None,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-        arrange: ColExpr | Iterable[ColExpr],
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
     ) -> ColExpr:
-        """"""
+        """
+        Shifts values in the column by an offset.
+
+        :param n:
+            The number of places to shift by. May be negative.
+
+        :param fill_value:
+            The value to write to the empty spaces created by the shift. Defaults to
+            null.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [5, -1, 435, -34, 8, None, 0],
+        ...         "b": ["r", "True", "??", ".  .", "-1/12", "abc", "#"],
+        ...     }
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         x=t.a.shift(2, -40),
+        ...         y=t.b.shift(1, arrange=t.a.nulls_last()),
+        ...     )
+        ...     >> show()
+        ... )
+        Table <unnamed>, backend: PolarsImpl
+        shape: (7, 4)
+        ┌──────┬───────┬─────┬───────┐
+        │ a    ┆ b     ┆ x   ┆ y     │
+        │ ---  ┆ ---   ┆ --- ┆ ---   │
+        │ i64  ┆ str   ┆ i64 ┆ str   │
+        ╞══════╪═══════╪═════╪═══════╡
+        │ 5    ┆ r     ┆ -40 ┆ #     │
+        │ -1   ┆ True  ┆ -40 ┆ .  .  │
+        │ 435  ┆ ??    ┆ 5   ┆ -1/12 │
+        │ -34  ┆ .  .  ┆ -1  ┆ null  │
+        │ 8    ┆ -1/12 ┆ 435 ┆ r     │
+        │ null ┆ abc   ┆ -34 ┆ ??    │
+        │ 0    ┆ #     ┆ 8   ┆ True  │
+        └──────┴───────┴─────┴───────┘
+        """
 
         return ColFn(
             ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange
