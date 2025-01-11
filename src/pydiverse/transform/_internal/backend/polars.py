@@ -215,10 +215,8 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
     elif isinstance(expr, Cast):
         if (
-            expr.target_type <= Int()
-            or expr.target_type <= Float()
-            and expr.val.dtype() <= String()
-        ):
+            expr.target_type <= Int() or expr.target_type <= Float()
+        ) and expr.val.dtype() <= String():
             expr.val = expr.val.str.strip()
         compiled = compile_col_expr(expr.val, name_in_df).cast(
             polars_type(expr.target_type)

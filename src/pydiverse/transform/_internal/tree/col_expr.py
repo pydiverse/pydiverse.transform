@@ -159,6 +159,80 @@ class ColExpr(Generic[T]):
         )
 
     def cast(self, target_type: Dtype) -> Cast:
+        """
+        Cast to a different data type.
+
+        :param target_type:
+            The type to cast to.
+
+        The following casts are possible:
+
+        .. list-table::
+            :header-rows: 1
+
+            * - Input type
+              - Target type
+              - Note
+            * - Float
+              - Int8, Int16, Int32, Int64
+              - Extracts the integer part (i.e. rounds towards 0).
+            * - String
+              - Int8, Int16, Int32, Int64
+              - Parses the string as an integer.
+            * - String
+              - Float32, Float64
+              - Parses the string as a floating point number.
+            * - Int
+              - String
+              - Writes the integer in base 10 as a string.
+            * - Float
+              - String
+              - Writes the floating point number in decimal notation in base 10.
+            * - Int
+              - Int8, Int16, Int32, Int64
+              - Casts to an integer with a specified number of bits. Behavior is
+                backend-dependent.
+            * - Float
+              - Float32, Float64
+              - Casts to a floating point number with a specified number of bits.
+                Behavior is backend-dependent.
+            * - Datetime
+              - Date
+              - Removes the time component of the Datetime.
+            * - Datetime
+              - String
+              - Writes the datetime in the format YYYY-MM-DD HH:MM:SS.SSSSSS.
+                Seconds are printed up to microsecond resolution.
+            * - Date
+              - String
+              - Writes the date in the format YYYY-MM-DD.
+
+
+        In addition to these casts, there are implicit conversion of integers to
+        floating point numbers and dates to datetimes. They happens automatically and
+        do not require an explicit cast.
+
+        Note
+        ----
+        In casts from strings, neither leading nor trailing whitespace is allowed.
+
+        Examples
+        --------
+        >>> t = pdt.Table({"a": [3.5, 10.3, -434.4, -0.2]}, name="T")
+        >>> t >> mutate(b=t.a.cast(pdt.Int32())) >> show()
+        Table T, backend: PolarsImpl
+        shape: (4, 2)
+        ┌────────┬──────┐
+        │ a      ┆ b    │
+        │ ---    ┆ ---  │
+        │ f64    ┆ i32  │
+        ╞════════╪══════╡
+        │ 3.5    ┆ 3    │
+        │ 10.3   ┆ 10   │
+        │ -434.4 ┆ -434 │
+        │ -0.2   ┆ 0    │
+        └────────┴──────┘
+        """
         return Cast(self, target_type)
 
     def iter_children(self) -> Iterable[ColExpr]:
