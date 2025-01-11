@@ -1208,46 +1208,313 @@ class FnNamespace:
 @dataclasses.dataclass(slots=True)
 class StrNamespace(FnNamespace):
     def contains(self: ColExpr[String], substr: str) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the string contains a given substring.
+
+        :param substr:
+            The substring to look for.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.contains(" "),
+        ...         k=t.b.str.contains("a"),
+        ...         l=t.b.str.contains(""),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 5)
+        ┌────────┬────────────┬───────┬───────┬──────┐
+        │ a      ┆ b          ┆ j     ┆ k     ┆ l    │
+        │ ---    ┆ ---        ┆ ---   ┆ ---   ┆ ---  │
+        │ str    ┆ str        ┆ bool  ┆ bool  ┆ bool │
+        ╞════════╪════════════╪═══════╪═══════╪══════╡
+        │   BCD  ┆ 12431      ┆ true  ┆ false ┆ true │
+        │ -- 00  ┆ transform  ┆ true  ┆ true  ┆ true │
+        │  A^^u  ┆ 12__*m     ┆ true  ┆ false ┆ true │
+        │ -O2    ┆            ┆ false ┆ false ┆ true │
+        │        ┆ abbabbabba ┆ false ┆ true  ┆ true │
+        └────────┴────────────┴───────┴───────┴──────┘
+        """
 
         return ColFn(ops.str_contains, self.arg, substr)
 
     def ends_with(self: ColExpr[String], suffix: str) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the string ends with a given suffix.
+
+        :param suffix:
+            The suffix to check.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.ends_with(""),
+        ...         k=t.b.str.ends_with("m"),
+        ...         l=t.a.str.ends_with("^u"),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 5)
+        ┌────────┬────────────┬──────┬───────┬───────┐
+        │ a      ┆ b          ┆ j    ┆ k     ┆ l     │
+        │ ---    ┆ ---        ┆ ---  ┆ ---   ┆ ---   │
+        │ str    ┆ str        ┆ bool ┆ bool  ┆ bool  │
+        ╞════════╪════════════╪══════╪═══════╪═══════╡
+        │   BCD  ┆ 12431      ┆ true ┆ false ┆ false │
+        │ -- 00  ┆ transform  ┆ true ┆ true  ┆ false │
+        │  A^^u  ┆ 12__*m     ┆ true ┆ true  ┆ true  │
+        │ -O2    ┆            ┆ true ┆ false ┆ false │
+        │        ┆ abbabbabba ┆ true ┆ false ┆ false │
+        └────────┴────────────┴──────┴───────┴───────┘
+        """
 
         return ColFn(ops.str_ends_with, self.arg, suffix)
 
     def len(self: ColExpr[String]) -> ColExpr[Int]:
-        """"""
+        """
+        Computes the length of the string.
+
+        Leading and trailing whitespace is included in the length.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.len(), k=t.b.str.len()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬─────┬─────┐
+        │ a      ┆ b         ┆ j   ┆ k   │
+        │ ---    ┆ ---       ┆ --- ┆ --- │
+        │ str    ┆ str       ┆ i64 ┆ i64 │
+        ╞════════╪═══════════╪═════╪═════╡
+        │   BCD  ┆ 12431     ┆ 6   ┆ 5   │
+        │ -- 00  ┆ transform ┆ 5   ┆ 9   │
+        │  A^^u  ┆ 12__*m    ┆ 5   ┆ 6   │
+        │ -O2    ┆           ┆ 3   ┆ 3   │
+        └────────┴───────────┴─────┴─────┘
+        """
 
         return ColFn(ops.str_len, self.arg)
 
     def lower(self: ColExpr[String]) -> ColExpr[String]:
-        """"""
+        """
+        Converts all alphabet letters to lower case.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.lower(), k=t.b.str.lower()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬────────┬───────────┐
+        │ a      ┆ b         ┆ j      ┆ k         │
+        │ ---    ┆ ---       ┆ ---    ┆ ---       │
+        │ str    ┆ str       ┆ str    ┆ str       │
+        ╞════════╪═══════════╪════════╪═══════════╡
+        │   BCD  ┆ 12431     ┆   bcd  ┆ 12431     │
+        │ -- 00  ┆ transform ┆ -- 00  ┆ transform │
+        │  A^^u  ┆ 12__*m    ┆  a^^u  ┆ 12__*m    │
+        │ -O2    ┆           ┆ -o2    ┆           │
+        └────────┴───────────┴────────┴───────────┘
+        """
 
         return ColFn(ops.str_lower, self.arg)
 
     def replace_all(
         self: ColExpr[String], substr: str, replacement: str
     ) -> ColExpr[String]:
-        """"""
+        """
+        Replaces all occurrences of a given substring by a different string.
+
+        :param substr:
+            The string to replace.
+
+        :param replacement:
+            The replacement string.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         r=t.a.str.replace_all("-", "?"),
+        ...         s=t.b.str.replace_all("ansf", "[---]"),
+        ...         u=t.b.str.replace_all("abba", "#"),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 5)
+        ┌────────┬────────────┬────────┬────────────┬───────────┐
+        │ a      ┆ b          ┆ r      ┆ s          ┆ u         │
+        │ ---    ┆ ---        ┆ ---    ┆ ---        ┆ ---       │
+        │ str    ┆ str        ┆ str    ┆ str        ┆ str       │
+        ╞════════╪════════════╪════════╪════════════╪═══════════╡
+        │   BCD  ┆ 12431      ┆   BCD  ┆ 12431      ┆ 12431     │
+        │ -- 00  ┆ transform  ┆ ?? 00  ┆ tr[---]orm ┆ transform │
+        │  A^^u  ┆ 12__*m     ┆  A^^u  ┆ 12__*m     ┆ 12__*m    │
+        │ -O2    ┆            ┆ ?O2    ┆            ┆           │
+        │        ┆ abbabbabba ┆        ┆ abbabbabba ┆ #bb#      │
+        └────────┴────────────┴────────┴────────────┴───────────┘
+        """
 
         return ColFn(ops.str_replace_all, self.arg, substr, replacement)
 
     def slice(
         self: ColExpr[String], offset: ColExpr[Int], n: ColExpr[Int]
     ) -> ColExpr[String]:
-        """"""
+        """
+        Returns a substring of the input string.
+
+        :param offset:
+            The 0-based index of the first character included in the result.
+
+        :param n:
+            The number of characters to include. If the string is shorter than *offset*
+            + *n*, the result only includes as many characters as there are.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.slice(0, 2),
+        ...         k=t.b.str.slice(4, 10),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 4)
+        ┌────────┬────────────┬─────┬────────┐
+        │ a      ┆ b          ┆ j   ┆ k      │
+        │ ---    ┆ ---        ┆ --- ┆ ---    │
+        │ str    ┆ str        ┆ str ┆ str    │
+        ╞════════╪════════════╪═════╪════════╡
+        │   BCD  ┆ 12431      ┆     ┆ 1      │
+        │ -- 00  ┆ transform  ┆ --  ┆ sform  │
+        │  A^^u  ┆ 12__*m     ┆  A  ┆ *m     │
+        │ -O2    ┆            ┆ -O  ┆        │
+        │        ┆ abbabbabba ┆     ┆ bbabba │
+        └────────┴────────────┴─────┴────────┘
+        """
 
         return ColFn(ops.str_slice, self.arg, offset, n)
 
     def starts_with(self: ColExpr[String], prefix: str) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the string starts with a given prefix.
+
+        :param prefix:
+            The prefix to check.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.starts_with("-"),
+        ...         k=t.b.str.starts_with("12"),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 4)
+        ┌────────┬────────────┬───────┬───────┐
+        │ a      ┆ b          ┆ j     ┆ k     │
+        │ ---    ┆ ---        ┆ ---   ┆ ---   │
+        │ str    ┆ str        ┆ bool  ┆ bool  │
+        ╞════════╪════════════╪═══════╪═══════╡
+        │   BCD  ┆ 12431      ┆ false ┆ true  │
+        │ -- 00  ┆ transform  ┆ true  ┆ false │
+        │  A^^u  ┆ 12__*m     ┆ false ┆ true  │
+        │ -O2    ┆            ┆ true  ┆ false │
+        │        ┆ abbabbabba ┆ false ┆ false │
+        └────────┴────────────┴───────┴───────┘
+        """
 
         return ColFn(ops.str_starts_with, self.arg, prefix)
 
     def strip(self: ColExpr[String]) -> ColExpr[String]:
-        """"""
+        """
+        Removes leading and trailing whitespace.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.strip(), k=t.b.str.strip()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬───────┬───────────┐
+        │ a      ┆ b         ┆ j     ┆ k         │
+        │ ---    ┆ ---       ┆ ---   ┆ ---       │
+        │ str    ┆ str       ┆ str   ┆ str       │
+        ╞════════╪═══════════╪═══════╪═══════════╡
+        │   BCD  ┆ 12431     ┆ BCD   ┆ 12431     │
+        │ -- 00  ┆ transform ┆ -- 00 ┆ transform │
+        │  A^^u  ┆ 12__*m    ┆ A^^u  ┆ 12__*m    │
+        │ -O2    ┆           ┆ -O2   ┆           │
+        └────────┴───────────┴───────┴───────────┘
+        """
 
         return ColFn(ops.str_strip, self.arg)
 
@@ -1262,7 +1529,32 @@ class StrNamespace(FnNamespace):
         return ColFn(ops.str_to_datetime, self.arg)
 
     def upper(self: ColExpr[String]) -> ColExpr[String]:
-        """"""
+        """
+        Converts all alphabet letters to upper case.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.upper(), k=t.b.str.upper()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬────────┬───────────┐
+        │ a      ┆ b         ┆ j      ┆ k         │
+        │ ---    ┆ ---       ┆ ---    ┆ ---       │
+        │ str    ┆ str       ┆ str    ┆ str       │
+        ╞════════╪═══════════╪════════╪═══════════╡
+        │   BCD  ┆ 12431     ┆   BCD  ┆ 12431     │
+        │ -- 00  ┆ transform ┆ -- 00  ┆ TRANSFORM │
+        │  A^^u  ┆ 12__*m    ┆  A^^U  ┆ 12__*M    │
+        │ -O2    ┆           ┆ -O2    ┆           │
+        └────────┴───────────┴────────┴───────────┘
+        """
 
         return ColFn(ops.str_upper, self.arg)
 
@@ -1277,7 +1569,7 @@ class DtNamespace(FnNamespace):
     def day(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day(self: ColExpr) -> ColExpr:
-        """"""
+        """Extracts the day component."""
 
         return ColFn(ops.dt_day, self.arg)
 
@@ -1288,7 +1580,11 @@ class DtNamespace(FnNamespace):
     def day_of_week(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day_of_week(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        The number of the current weekday.
+
+        This is one-based, so Monday is 1 and Sunday is 7.
+        """
 
         return ColFn(ops.dt_day_of_week, self.arg)
 
@@ -1299,27 +1595,31 @@ class DtNamespace(FnNamespace):
     def day_of_year(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day_of_year(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        The number of days since the beginning of the year.
+
+        This is one-based, so it returns 1 for the 1st of January.
+        """
 
         return ColFn(ops.dt_day_of_year, self.arg)
 
     def hour(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the hour component."""
 
         return ColFn(ops.dt_hour, self.arg)
 
     def microsecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the microsecond component."""
 
         return ColFn(ops.dt_microsecond, self.arg)
 
     def millisecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the millisecond component."""
 
         return ColFn(ops.dt_millisecond, self.arg)
 
     def minute(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the minute component."""
 
         return ColFn(ops.dt_minute, self.arg)
 
@@ -1330,12 +1630,12 @@ class DtNamespace(FnNamespace):
     def month(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def month(self: ColExpr) -> ColExpr:
-        """"""
+        """Extracts the month component."""
 
         return ColFn(ops.dt_month, self.arg)
 
     def second(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the second component."""
 
         return ColFn(ops.dt_second, self.arg)
 
@@ -1346,7 +1646,7 @@ class DtNamespace(FnNamespace):
     def year(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def year(self: ColExpr) -> ColExpr:
-        """"""
+        """Extracts the year component."""
 
         return ColFn(ops.dt_year, self.arg)
 

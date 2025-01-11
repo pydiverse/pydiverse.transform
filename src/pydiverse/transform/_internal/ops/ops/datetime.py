@@ -6,17 +6,21 @@ from pydiverse.transform._internal.tree.types import Date, Datetime, Duration, I
 
 
 class DatetimeExtract(Operator):
-    def __init__(self, name: str, doc: str = ""):
-        super().__init__(name, Signature(Datetime(), return_type=Int()), doc=doc)
+    def __init__(self, name: str, doc: str | None = None):
+        super().__init__(
+            name,
+            Signature(Datetime(), return_type=Int()),
+            doc=doc if doc is not None else f"Extracts the {name[3:]} component.",
+        )
 
 
 class DateExtract(Operator):
-    def __init__(self, name: str, doc: str = ""):
+    def __init__(self, name: str, doc: str | None = None):
         super().__init__(
             name,
             Signature(Date(), return_type=Int()),
             Signature(Datetime(), return_type=Int()),
-            doc=doc,
+            doc=doc if doc is not None else f"Extracts the {name[3:]} component.",
         )
 
 
@@ -36,9 +40,23 @@ dt_millisecond = DatetimeExtract("dt.millisecond")
 
 dt_microsecond = DatetimeExtract("dt.microsecond")
 
-dt_day_of_week = DateExtract("dt.day_of_week")
+dt_day_of_week = DateExtract(
+    "dt.day_of_week",
+    doc="""
+The number of the current weekday.
 
-dt_day_of_year = DateExtract("dt.day_of_year")
+This is one-based, so Monday is 1 and Sunday is 7.
+""",
+)
+
+dt_day_of_year = DateExtract(
+    "dt.day_of_year",
+    doc="""
+The number of days since the beginning of the year.
+
+This is one-based, so it returns 1 for the 1st of January.
+""",
+)
 
 
 class DurationToUnit(Operator):

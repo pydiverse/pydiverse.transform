@@ -99,6 +99,20 @@ dataframes = {
                 "-100110",
                 "   -56 ",
             ],
+            "e": [
+                "abbabbabbabba",
+                "------",
+                "012",
+                "",
+                "",
+                None,
+                None,
+                " AbAbA..",
+                "-354.2",
+                "??",
+                "11",
+                "$&/)",
+            ],
         }
     ),
     "df_datetime": pl.DataFrame(
