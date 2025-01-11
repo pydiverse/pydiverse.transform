@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import uuid
 from collections.abc import Generator, Iterable, Sequence
 from typing import TYPE_CHECKING, Any
@@ -227,3 +228,15 @@ with TableImpl.impl_store.impl_manager as impl:
     @impl(ops.greater_equal)
     def _ge(lhs, rhs):
         return lhs >= rhs
+
+    @impl(ops.horizontal_all)
+    def _horizontal_all(*args):
+        return functools.reduce(_and, args)
+
+    @impl(ops.horizontal_any)
+    def _horizontal_any(*args):
+        return functools.reduce(_or, args)
+
+    @impl(ops.horizontal_sum)
+    def _horizontal_sum(*args):
+        return functools.reduce(_add, args)

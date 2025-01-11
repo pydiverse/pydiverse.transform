@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import functools
-import operator
 from collections.abc import Iterable
 from typing import Any, overload
 
@@ -24,6 +22,7 @@ from pydiverse.transform._internal.tree.types import (
     Datetime,
     Decimal,
     Dtype,
+    Duration,
     Float,
     Int,
     String,
@@ -53,34 +52,6 @@ def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
     if dtype is not None and types.is_subtype(dtype):
         return LiteralCol(val, dtype).cast(dtype)
     return LiteralCol(val, dtype)
-
-
-def all(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
-    return functools.reduce(operator.and_, (arg, *args))
-
-
-def any(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
-    return functools.reduce(operator.or_, (arg, *args))
-
-
-@overload
-def sum(arg: ColExpr[Int], *args: ColExpr[Int]) -> ColExpr[Int]: ...
-
-
-@overload
-def sum(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
-
-
-@overload
-def sum(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-
-@overload
-def sum(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
-
-
-def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
-    return functools.reduce(operator.add, (arg, *args))
 
 
 # --- from here the code is generated, do not delete this comment ---
@@ -185,6 +156,18 @@ def dense_rank(
     """
 
     return ColFn(ops.dense_rank, partition_by=partition_by, arrange=arrange)
+
+
+def all(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
+    """"""
+
+    return ColFn(ops.horizontal_all, arg, *args)
+
+
+def any(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
+    """"""
+
+    return ColFn(ops.horizontal_any, arg, *args)
 
 
 @overload
@@ -299,6 +282,32 @@ def min(arg: ColExpr, *args: ColExpr) -> ColExpr:
     """
 
     return ColFn(ops.horizontal_min, arg, *args)
+
+
+@overload
+def sum(arg: ColExpr[Int], *args: ColExpr[Int]) -> ColExpr[Int]: ...
+
+
+@overload
+def sum(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
+
+
+@overload
+def sum(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
+
+
+@overload
+def sum(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
+
+
+@overload
+def sum(arg: ColExpr[Duration], *args: ColExpr[Duration]) -> ColExpr[Duration]: ...
+
+
+def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
+    """"""
+
+    return ColFn(ops.horizontal_sum, arg, *args)
 
 
 def rank(

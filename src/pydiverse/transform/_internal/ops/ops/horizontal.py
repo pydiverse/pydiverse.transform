@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import COMPARABLE, D
+from pydiverse.transform._internal.tree.types import (
+    COMPARABLE,
+    NUMERIC,
+    Bool,
+    D,
+    Duration,
+    String,
+)
 
 
 class Horizontal(Operator):
@@ -126,4 +133,15 @@ shape: (6, 5)
 │ null ┆ 0    ┆ null ┆ 0   ┆ 0   │
 └──────┴──────┴──────┴─────┴─────┘
 """,
+)
+
+horizontal_any = Horizontal("any", Signature(Bool(), Bool(), ..., return_type=Bool()))
+
+horizontal_all = Horizontal("all", Signature(Bool(), Bool(), ..., return_type=Bool()))
+
+horizontal_sum = Horizontal(
+    "sum",
+    *(Signature(dtype, dtype, ..., return_type=dtype) for dtype in NUMERIC),
+    Signature(String(), String(), ..., return_type=String()),
+    Signature(Duration(), Duration(), ..., return_type=Duration()),
 )
