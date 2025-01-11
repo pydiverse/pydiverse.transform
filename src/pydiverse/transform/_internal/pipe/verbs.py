@@ -224,7 +224,8 @@ def export(
 
     :param target:
         Can currently be either a ``Polars`` or ``Pandas`` object. For polars, one can
-        specify whether a DataFrame or LazyFrame is returned via the ``lazy`` kwarg.
+        specify whether a DataFrame or LazyFrame is returned via the ``lazy`` keyword
+        parameter.
         If ``lazy=True``, no actual computations are performed, they just get stored in
         the LazyFrame.
 
