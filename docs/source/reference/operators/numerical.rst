@@ -6,7 +6,7 @@ Numerical
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     __pow__
     abs

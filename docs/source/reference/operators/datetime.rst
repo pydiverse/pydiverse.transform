@@ -6,7 +6,7 @@ Datetime / Duration
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/accessor_method.rst
+    :template: accessor_method.rst
 
     dt.day
     dt.day_of_week

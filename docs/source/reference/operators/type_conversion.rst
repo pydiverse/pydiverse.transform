@@ -6,7 +6,7 @@ Type Conversion
 
 .. autosummary::
     :toctree: _generated/
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
     :nosignatures:
 
     lit

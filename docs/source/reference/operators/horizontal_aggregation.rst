@@ -6,7 +6,7 @@ Horizontal Aggregation
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     coalesce
     count

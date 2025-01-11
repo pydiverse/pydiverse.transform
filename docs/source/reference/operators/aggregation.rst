@@ -16,7 +16,7 @@ Aggregation functions take a ``partition_by`` and ``filter`` keyword argument. T
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     count
     all
