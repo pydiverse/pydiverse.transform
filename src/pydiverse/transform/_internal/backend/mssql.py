@@ -132,7 +132,6 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
 
     elif isinstance(expr, ColFn):
         wants_args_bool_as_bit = expr.op not in (
-            ops.bool_xor,
             ops.bool_and,
             ops.bool_or,
             ops.bool_invert,
