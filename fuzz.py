@@ -24,7 +24,7 @@ rng = np.random.default_rng()
 letters = list(string.printable)
 
 ALL_TYPES = [pdt.Int(), pdt.Float(), pdt.Bool(), pdt.String()]
-MEAN_HEIGHT = 4
+MEAN_HEIGHT = 3
 
 RNG_FNS = {
     pdt.Float(): rng.standard_normal,
@@ -96,7 +96,9 @@ def gen_expr(
         return RNG_FNS[dtype.without_const()](1).item()
 
     if q > 1:
-        return rng.choice(cols[dtype])
+        # we always use C here so the expression does not have to be generated for each
+        # backend
+        return C[rng.choice(cols[dtype])]
 
     op, sig = rng.choice(ops_with_return_type[dtype])
     assert isinstance(op, Operator)
@@ -107,7 +109,7 @@ def gen_expr(
         args.append(gen_expr(param, cols, q + rng.exponential(1 / MEAN_HEIGHT)))
 
     if sig.is_vararg:
-        nargs = int(rng.chisquare(4))
+        nargs = int(rng.normal(2.5, 1 / 1.5))
         for _ in range(nargs):
             args.append(
                 gen_expr(sig.types[-1], cols, q + rng.exponential(1 / MEAN_HEIGHT))
@@ -128,18 +130,14 @@ df = gen_table(rows, {dtype: NUM_COLS_PER_TYPE for dtype in ALL_TYPES})
 
 tables = {backend: fn(df, "t") for backend, fn in BACKEND_TABLES.items()}
 cols = {
-    backend: {
-        dtype: [col for col in table if col.dtype() <= dtype] for dtype in ALL_TYPES
-    }
-    for backend, table in tables.items()
+    dtype: [col.name for col in tables["polars"] if col.dtype() <= dtype]
+    for dtype in ALL_TYPES
 }
 
 for _ in range(it):
+    expr = gen_expr(rng.choice(ALL_TYPES), cols)
     results = {
-        backend: table
-        >> mutate(y=gen_expr(rng.choice(ALL_TYPES), cols[backend]))
-        >> select(C.y)
-        >> export(Polars())
+        backend: table >> mutate(y=expr) >> select(C.y) >> export(Polars())
         for backend, table in tables.items()
     }
     for _backend, res in results:
