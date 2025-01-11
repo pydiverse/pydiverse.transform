@@ -42,6 +42,14 @@ def when(condition: ColExpr) -> WhenClause:
 
 
 def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
+    """
+    Creates a pydiverse.transform expression from a python builtin type.
+
+    Usually, you can just use python builtins in expressions without wrapping them in
+    ``lit``. The pydiverse.transform data type of the value is then inferred. However,
+    ``lit`` allows to set the exact pydiverse.transform type, which may be useful
+    sometimes.
+    """
     if dtype is not None and types.is_subtype(dtype):
         return LiteralCol(val, dtype).cast(dtype)
     return LiteralCol(val, dtype)

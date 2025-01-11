@@ -31,11 +31,129 @@ class Table:
     which is a reference to the underlying abstract syntax tree.
     """
 
-    # TODO: define exactly what can be given for the two and do type checks
-    #       maybe call the second one execution_engine or similar?
     def __init__(
         self, resource: Any, backend: Target | None = None, *, name: str | None = None
     ):
+        """
+        Creates a new table.
+
+        :param resource:
+            The data source to construct the table from. This can be a polars or pandas
+            data frame, a python dictionary, a SQLAlchemy table or the name of a table
+            in a SQL database.
+
+        :param backend:
+            The execution backend. This must be one of the pydiverse.transform backend
+            objects, see :doc:`targets`. It may carry additional information how to
+            interpret the *resource* argument, such as a SQLAlchemy engine.
+
+        :param name:
+            The name of the table. It is not required to give the table a name, but may
+            make print output more readable.
+
+        Examples
+        --------
+        **Python dictionary**.
+
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [4, 3, -35, 24, 105],
+        ...         "b": [4, 4, 0, -23, 42],
+        ...     },
+        ...     name="T",
+        ... )
+        >>> t >> show()
+        Table T, backend: PolarsImpl
+        shape: (5, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 4   ┆ 4   │
+        │ 3   ┆ 4   │
+        │ -35 ┆ 0   │
+        │ 24  ┆ -23 │
+        │ 105 ┆ 42  │
+        └─────┴─────┘
+
+        **Polars data frame.**
+
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "a": [4, 3, -35, 24, 105],
+        ...         "b": ["a", "o", "---", "i23", "  "],
+        ...     },
+        ... )
+        >>> t = pdt.Table(df, name="T")
+        >>> t >> show()
+        Table T, backend: PolarsImpl
+        shape: (5, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ str │
+        ╞═════╪═════╡
+        │ 4   ┆ a   │
+        │ 3   ┆ o   │
+        │ -35 ┆ --- │
+        │ 24  ┆ i23 │
+        │ 105 ┆     │
+        └─────┴─────┘
+
+        **Pandas data frame.** Note that the data frame is converted to a polars data
+        frame and the backend is polars.
+
+        >>> import pandas as pd
+        >>> df = pd.DataFrame(
+        ...     {
+        ...         "a": [4, 3, -35, 24, 105],
+        ...         "b": ["a", "o", "---", "i23", "  "],
+        ...     },
+        ... )
+        >>> t = pdt.Table(df, name="T")
+        >>> t >> show()
+        Table T, backend: PolarsImpl
+        shape: (5, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ str │
+        ╞═════╪═════╡
+        │ 4   ┆ a   │
+        │ 3   ┆ o   │
+        │ -35 ┆ --- │
+        │ 24  ┆ i23 │
+        │ 105 ┆     │
+        └─────┴─────┘
+
+        **SQL.** Assuming you have a SQLAlchemy engine ``engine``, which is has a
+        connection to a database containing a table ``t1`` in a schema ``s1``, you can
+        create a pydiverse.transform Table from it as follows.
+
+        >>> t = pdt.Table("t1", SqlAlchemy(engine, schema="s1"))
+        >>> t >> show()
+        Table t1, backend: PostgresImpl
+        shape: (5, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ str │
+        ╞═════╪═════╡
+        │ 4   ┆ a   │
+        │ 3   ┆ o   │
+        │ -35 ┆ --- │
+        │ 24  ┆ i23 │
+        │ 105 ┆     │
+        └─────┴─────┘
+
+        Note that the name argument to the ``pdt.Table`` constructor was not specified,
+        so transform used the name of the SQL table. This example of course assumes that
+        a database connection is set up and the above table is already present in the
+        database. For more information on how to set up a connection, see
+        :doc:`/database_testing`.
+        """
+
         self._ast: AstNode = TableImpl.from_resource(resource, backend, name=name)
         self._cache = Cache(
             self._ast.cols,
@@ -79,7 +197,11 @@ class Table:
     def __len__(self) -> int:
         return len(self._cache.select)
 
-    def __rshift__(self, rhs):
+    def __rshift__(self, rhs) -> Table:
+        """
+        The pipe operator for chaining verbs.
+        """
+
         if isinstance(rhs, Pipeable):
             return rhs(self)
         if isinstance(rhs, Callable):
