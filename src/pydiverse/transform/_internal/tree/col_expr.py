@@ -99,6 +99,48 @@ class ColExpr(Generic[T]):
     def map(
         self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr | None = None
     ) -> CaseExpr:
+        """
+        Replaces given values by other expressions.
+
+        :param mapping:
+            A dictionary of expressions / tuples of expressions to expressions. The
+            input is compared against key of the dictionary, and if it matches, the
+            corresponding value of the key is inserted. If the key is a tuple, the input
+            is compared against each element of the tuple and required to equal at least
+            one of them.
+
+        :param default:
+            The value to insert if the input matches none of the keys of `mapping`.
+
+        Note
+        ----
+        If there are multiple columns in the key which have the same value at some row,
+        any of the corresponding values may be inserted (i.e. ensuring uniqueness of the
+        keys is your responsibility).
+
+        Example
+        -------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [4, 3, -35, 24, 105],
+        ...         "b": [4, 4, 0, -23, 42],
+        ...     }
+        ... )
+        >>> t >> mutate(c=t.a.is_in(t.b, 24)) >> show()
+        Table <unnamed>, backend: PolarsImpl
+        shape: (5, 3)
+        ┌─────┬─────┬───────┐
+        │ a   ┆ b   ┆ c     │
+        │ --- ┆ --- ┆ ---   │
+        │ i64 ┆ i64 ┆ bool  │
+        ╞═════╪═════╪═══════╡
+        │ 4   ┆ 4   ┆ true  │
+        │ 3   ┆ 4   ┆ false │
+        │ -35 ┆ 0   ┆ false │
+        │ 24  ┆ -23 ┆ true  │
+        │ 105 ┆ 42  ┆ false │
+        └─────┴─────┴───────┘
+        """
         return CaseExpr(
             (
                 (
@@ -117,6 +159,80 @@ class ColExpr(Generic[T]):
         )
 
     def cast(self, target_type: Dtype) -> Cast:
+        """
+        Cast to a different data type.
+
+        :param target_type:
+            The type to cast to.
+
+        The following casts are possible:
+
+        .. list-table::
+            :header-rows: 1
+
+            * - Input type
+              - Target type
+              - Note
+            * - Float
+              - Int8, Int16, Int32, Int64
+              - Extracts the integer part (i.e. rounds towards 0).
+            * - String
+              - Int8, Int16, Int32, Int64
+              - Parses the string as an integer.
+            * - String
+              - Float32, Float64
+              - Parses the string as a floating point number.
+            * - Int
+              - String
+              - Writes the integer in base 10 as a string.
+            * - Float
+              - String
+              - Writes the floating point number in decimal notation in base 10.
+            * - Int
+              - Int8, Int16, Int32, Int64
+              - Casts to an integer with a specified number of bits. Behavior is
+                backend-dependent.
+            * - Float
+              - Float32, Float64
+              - Casts to a floating point number with a specified number of bits.
+                Behavior is backend-dependent.
+            * - Datetime
+              - Date
+              - Removes the time component of the Datetime.
+            * - Datetime
+              - String
+              - Writes the datetime in the format YYYY-MM-DD HH:MM:SS.SSSSSS.
+                Seconds are printed up to microsecond resolution.
+            * - Date
+              - String
+              - Writes the date in the format YYYY-MM-DD.
+
+
+        In addition to these casts, there are implicit conversion of integers to
+        floating point numbers and dates to datetimes. They happens automatically and
+        do not require an explicit cast.
+
+        Note
+        ----
+        In casts from strings, neither leading nor trailing whitespace is allowed.
+
+        Examples
+        --------
+        >>> t = pdt.Table({"a": [3.5, 10.3, -434.4, -0.2]}, name="T")
+        >>> t >> mutate(b=t.a.cast(pdt.Int32())) >> show()
+        Table T, backend: PolarsImpl
+        shape: (4, 2)
+        ┌────────┬──────┐
+        │ a      ┆ b    │
+        │ ---    ┆ ---  │
+        │ f64    ┆ i32  │
+        ╞════════╪══════╡
+        │ 3.5    ┆ 3    │
+        │ 10.3   ┆ 10   │
+        │ -434.4 ┆ -434 │
+        │ -0.2   ┆ 0    │
+        └────────┴──────┘
+        """
         return Cast(self, target_type)
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -170,7 +286,7 @@ class ColExpr(Generic[T]):
     def abs(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def abs(self: ColExpr) -> ColExpr:
-        """"""
+        """Computes the absolute value."""
 
         return ColFn(ops.abs, self)
 
@@ -192,7 +308,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Duration]: ...
 
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Addition +"""
 
         return ColFn(ops.add, self, rhs)
 
@@ -214,7 +330,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Duration]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Addition +"""
 
         return ColFn(ops.add, rhs, self)
 
@@ -224,7 +340,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether every non-null value in a group is True."""
 
         return ColFn(ops.all, self, partition_by=partition_by, filter=filter)
 
@@ -234,7 +350,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether at least one value in a group is True."""
 
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
@@ -249,37 +365,226 @@ class ColExpr(Generic[T]):
         return ColFn(ops.ascending, self)
 
     def __and__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean AND (__and__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a & t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ false │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ false │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_and, self, rhs)
 
     def __rand__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean AND (__and__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a & t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ false │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ false │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_and, rhs, self)
 
     def __invert__(self: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean inversion (__invert__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=~t.a) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ false │
+        │ true  ┆ false ┆ false │
+        │ true  ┆ null  ┆ false │
+        │ false ┆ false ┆ true  │
+        │ false ┆ null  ┆ true  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_invert, self)
 
     def __or__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean OR (__or__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a | t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ true  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_or, self, rhs)
 
     def __ror__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean OR (__or__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a | t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ true  │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ true  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_or, rhs, self)
 
     def __xor__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean XOR (__xor__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a ^ t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ false │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_xor, self, rhs)
 
     def __rxor__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
-        """"""
+        """
+        Boolean XOR (__xor__)
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [True, True, True, False, False, None],
+        ...         "b": [True, False, None, False, None, None],
+        ...     },
+        ...     name="bool table",
+        ... )
+        >>> t >> mutate(x=t.a ^ t.b) >> show()
+        Table bool table, backend: PolarsImpl
+        shape: (6, 3)
+        ┌───────┬───────┬───────┐
+        │ a     ┆ b     ┆ x     │
+        │ ---   ┆ ---   ┆ ---   │
+        │ bool  ┆ bool  ┆ bool  │
+        ╞═══════╪═══════╪═══════╡
+        │ true  ┆ true  ┆ false │
+        │ true  ┆ false ┆ true  │
+        │ true  ┆ null  ┆ null  │
+        │ false ┆ false ┆ false │
+        │ false ┆ null  ┆ null  │
+        │ null  ┆ null  ┆ null  │
+        └───────┴───────┴───────┘
+        """
 
         return ColFn(ops.bool_xor, rhs, self)
 
@@ -290,7 +595,7 @@ class ColExpr(Generic[T]):
     def ceil(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def ceil(self: ColExpr) -> ColExpr:
-        """"""
+        """Returns the smallest integer greater than or equal to the input."""
 
         return ColFn(ops.ceil, self)
 
@@ -317,17 +622,17 @@ class ColExpr(Generic[T]):
         return ColFn(ops.descending, self)
 
     def __eq__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Equality comparison =="""
 
         return ColFn(ops.equal, self, rhs)
 
     def exp(self: ColExpr[Float]) -> ColExpr[Float]:
-        """"""
+        """Computes the exponential function."""
 
         return ColFn(ops.exp, self)
 
     def fill_null(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Replaces every null by the given value."""
 
         return ColFn(ops.fill_null, self, rhs)
 
@@ -338,13 +643,13 @@ class ColExpr(Generic[T]):
     def floor(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def floor(self: ColExpr) -> ColExpr:
-        """"""
+        """Returns the largest integer less than or equal to the input."""
 
         return ColFn(ops.floor, self)
 
     def __floordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Integer division.
+        Integer division //
 
         Warning
         -------
@@ -365,7 +670,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a // t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -383,7 +688,7 @@ class ColExpr(Generic[T]):
 
     def __rfloordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Integer division.
+        Integer division //
 
         Warning
         -------
@@ -404,7 +709,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a // t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -439,7 +744,7 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __ge__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Greater than or equal to comparison >="""
 
         return ColFn(ops.greater_equal, self, rhs)
 
@@ -462,17 +767,33 @@ class ColExpr(Generic[T]):
     def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __gt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Greater than comparison >"""
 
         return ColFn(ops.greater_than, self, rhs)
 
     def is_in(self: ColExpr, *rhs: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the value equals one of the given.
+
+        Note
+        ----
+        The expression ``t.c.is_in(a1, a2, ...)`` is equivalent to
+        ``(t.c == a1) | (t.c == a2) | ...``, so passing null to ``is_in`` will result in
+        null. To compare for equality with null, use
+        :doc:`pydiverse.transform.ColExpr.is_null`.
+        """
 
         return ColFn(ops.is_in, self, *rhs)
 
     def is_inf(self: ColExpr[Float]) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the number is infinite.
+
+        Note
+        ----
+        This is currently only useful for backends supporting IEEE 754-floats. On
+        other backends it always returns False.
+        """
 
         return ColFn(ops.is_inf, self)
 
@@ -492,12 +813,12 @@ class ColExpr(Generic[T]):
         return ColFn(ops.is_not_nan, self)
 
     def is_not_null(self: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether the value is not null."""
 
         return ColFn(ops.is_not_null, self)
 
     def is_null(self: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether the value is null."""
 
         return ColFn(ops.is_null, self)
 
@@ -520,7 +841,7 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __le__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Less than or equal to comparison <="""
 
         return ColFn(ops.less_equal, self, rhs)
 
@@ -543,14 +864,12 @@ class ColExpr(Generic[T]):
     def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __lt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """
-        `<` as you know it.
-        """
+        """Less than comparison <"""
 
         return ColFn(ops.less_than, self, rhs)
 
     def log(self: ColExpr[Float]) -> ColExpr[Float]:
-        """"""
+        """Computes the natural logarithm."""
 
         return ColFn(ops.log, self)
 
@@ -608,7 +927,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the maximum value in each group."""
 
         return ColFn(ops.max, self, partition_by=partition_by, filter=filter)
 
@@ -642,7 +961,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the average value in each group."""
 
         return ColFn(ops.mean, self, partition_by=partition_by, filter=filter)
 
@@ -700,13 +1019,13 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the minimum value in each group."""
 
         return ColFn(ops.min, self, partition_by=partition_by, filter=filter)
 
     def __mod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Computes the remainder of integer division.
+        The remainder of integer division %
 
         Warning
         -------
@@ -728,7 +1047,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a % t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -746,7 +1065,7 @@ class ColExpr(Generic[T]):
 
     def __rmod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Computes the remainder of integer division.
+        The remainder of integer division %
 
         Warning
         -------
@@ -768,7 +1087,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a % t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -794,7 +1113,7 @@ class ColExpr(Generic[T]):
     def __mul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __mul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Multiplication *"""
 
         return ColFn(ops.mul, self, rhs)
 
@@ -808,7 +1127,7 @@ class ColExpr(Generic[T]):
     def __rmul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __rmul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Multiplication *"""
 
         return ColFn(ops.mul, rhs, self)
 
@@ -822,12 +1141,12 @@ class ColExpr(Generic[T]):
     def __neg__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __neg__(self: ColExpr) -> ColExpr:
-        """"""
+        """The unary - (negation) operator (__neg__)"""
 
         return ColFn(ops.neg, self)
 
     def __ne__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Non-equality comparison !="""
 
         return ColFn(ops.not_equal, self, rhs)
 
@@ -875,7 +1194,7 @@ class ColExpr(Generic[T]):
     def __pos__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __pos__(self: ColExpr) -> ColExpr:
-        """"""
+        """The unary + operator (__pos__)"""
 
         return ColFn(ops.pos, self)
 
@@ -889,7 +1208,14 @@ class ColExpr(Generic[T]):
     def __pow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __pow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """
+        Computes the power x ** y.
+
+        Note
+        ----
+        Polars throws on negative exponents in the integer case. A polars error like
+        `failed to convert X to u32` may be due to negative inputs to this function.
+        """
 
         return ColFn(ops.pow, self, rhs)
 
@@ -903,7 +1229,14 @@ class ColExpr(Generic[T]):
     def __rpow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __rpow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """
+        Computes the power x ** y.
+
+        Note
+        ----
+        Polars throws on negative exponents in the integer case. A polars error like
+        `failed to convert X to u32` may be due to negative inputs to this function.
+        """
 
         return ColFn(ops.pow, rhs, self)
 
@@ -917,7 +1250,12 @@ class ColExpr(Generic[T]):
     def round(self: ColExpr[Decimal], decimals: int = 0) -> ColExpr[Decimal]: ...
 
     def round(self: ColExpr, decimals: int = 0) -> ColExpr:
-        """"""
+        """
+        Rounds to a given number of decimals.
+
+        :param decimals:
+            The number of decimals to round by.
+        """
 
         return ColFn(ops.round, self, decimals)
 
@@ -927,9 +1265,50 @@ class ColExpr(Generic[T]):
         fill_value: ColExpr = None,
         *,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
-        arrange: ColExpr | Iterable[ColExpr],
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
     ) -> ColExpr:
-        """"""
+        """
+        Shifts values in the column by an offset.
+
+        :param n:
+            The number of places to shift by. May be negative.
+
+        :param fill_value:
+            The value to write to the empty spaces created by the shift. Defaults to
+            null.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [5, -1, 435, -34, 8, None, 0],
+        ...         "b": ["r", "True", "??", ".  .", "-1/12", "abc", "#"],
+        ...     }
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         x=t.a.shift(2, -40),
+        ...         y=t.b.shift(1, arrange=t.a.nulls_last()),
+        ...     )
+        ...     >> show()
+        ... )
+        Table <unnamed>, backend: PolarsImpl
+        shape: (7, 4)
+        ┌──────┬───────┬─────┬───────┐
+        │ a    ┆ b     ┆ x   ┆ y     │
+        │ ---  ┆ ---   ┆ --- ┆ ---   │
+        │ i64  ┆ str   ┆ i64 ┆ str   │
+        ╞══════╪═══════╪═════╪═══════╡
+        │ 5    ┆ r     ┆ -40 ┆ #     │
+        │ -1   ┆ True  ┆ -40 ┆ .  .  │
+        │ 435  ┆ ??    ┆ 5   ┆ -1/12 │
+        │ -34  ┆ .  .  ┆ -1  ┆ null  │
+        │ 8    ┆ -1/12 ┆ 435 ┆ r     │
+        │ null ┆ abc   ┆ -34 ┆ ??    │
+        │ 0    ┆ #     ┆ 8   ┆ True  │
+        └──────┴───────┴─────┴───────┘
+        """
 
         return ColFn(
             ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange
@@ -959,7 +1338,7 @@ class ColExpr(Generic[T]):
     def __sub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __sub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Subtraction -"""
 
         return ColFn(ops.sub, self, rhs)
 
@@ -987,7 +1366,7 @@ class ColExpr(Generic[T]):
     def __rsub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __rsub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Subtraction -"""
 
         return ColFn(ops.sub, rhs, self)
 
@@ -1021,7 +1400,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the sum of values in each group."""
 
         return ColFn(ops.sum, self, partition_by=partition_by, filter=filter)
 
@@ -1037,7 +1416,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Decimal]: ...
 
     def __truediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """True division /"""
 
         return ColFn(ops.truediv, self, rhs)
 
@@ -1053,7 +1432,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Decimal]: ...
 
     def __rtruediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """True division /"""
 
         return ColFn(ops.truediv, rhs, self)
 
@@ -1071,46 +1450,313 @@ class FnNamespace:
 @dataclasses.dataclass(slots=True)
 class StrNamespace(FnNamespace):
     def contains(self: ColExpr[String], substr: str) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the string contains a given substring.
+
+        :param substr:
+            The substring to look for.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.contains(" "),
+        ...         k=t.b.str.contains("a"),
+        ...         l=t.b.str.contains(""),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 5)
+        ┌────────┬────────────┬───────┬───────┬──────┐
+        │ a      ┆ b          ┆ j     ┆ k     ┆ l    │
+        │ ---    ┆ ---        ┆ ---   ┆ ---   ┆ ---  │
+        │ str    ┆ str        ┆ bool  ┆ bool  ┆ bool │
+        ╞════════╪════════════╪═══════╪═══════╪══════╡
+        │   BCD  ┆ 12431      ┆ true  ┆ false ┆ true │
+        │ -- 00  ┆ transform  ┆ true  ┆ true  ┆ true │
+        │  A^^u  ┆ 12__*m     ┆ true  ┆ false ┆ true │
+        │ -O2    ┆            ┆ false ┆ false ┆ true │
+        │        ┆ abbabbabba ┆ false ┆ true  ┆ true │
+        └────────┴────────────┴───────┴───────┴──────┘
+        """
 
         return ColFn(ops.str_contains, self.arg, substr)
 
     def ends_with(self: ColExpr[String], suffix: str) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the string ends with a given suffix.
+
+        :param suffix:
+            The suffix to check.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.ends_with(""),
+        ...         k=t.b.str.ends_with("m"),
+        ...         l=t.a.str.ends_with("^u"),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 5)
+        ┌────────┬────────────┬──────┬───────┬───────┐
+        │ a      ┆ b          ┆ j    ┆ k     ┆ l     │
+        │ ---    ┆ ---        ┆ ---  ┆ ---   ┆ ---   │
+        │ str    ┆ str        ┆ bool ┆ bool  ┆ bool  │
+        ╞════════╪════════════╪══════╪═══════╪═══════╡
+        │   BCD  ┆ 12431      ┆ true ┆ false ┆ false │
+        │ -- 00  ┆ transform  ┆ true ┆ true  ┆ false │
+        │  A^^u  ┆ 12__*m     ┆ true ┆ true  ┆ true  │
+        │ -O2    ┆            ┆ true ┆ false ┆ false │
+        │        ┆ abbabbabba ┆ true ┆ false ┆ false │
+        └────────┴────────────┴──────┴───────┴───────┘
+        """
 
         return ColFn(ops.str_ends_with, self.arg, suffix)
 
     def len(self: ColExpr[String]) -> ColExpr[Int]:
-        """"""
+        """
+        Computes the length of the string.
+
+        Leading and trailing whitespace is included in the length.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.len(), k=t.b.str.len()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬─────┬─────┐
+        │ a      ┆ b         ┆ j   ┆ k   │
+        │ ---    ┆ ---       ┆ --- ┆ --- │
+        │ str    ┆ str       ┆ i64 ┆ i64 │
+        ╞════════╪═══════════╪═════╪═════╡
+        │   BCD  ┆ 12431     ┆ 6   ┆ 5   │
+        │ -- 00  ┆ transform ┆ 5   ┆ 9   │
+        │  A^^u  ┆ 12__*m    ┆ 5   ┆ 6   │
+        │ -O2    ┆           ┆ 3   ┆ 3   │
+        └────────┴───────────┴─────┴─────┘
+        """
 
         return ColFn(ops.str_len, self.arg)
 
     def lower(self: ColExpr[String]) -> ColExpr[String]:
-        """"""
+        """
+        Converts all alphabet letters to lower case.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.lower(), k=t.b.str.lower()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬────────┬───────────┐
+        │ a      ┆ b         ┆ j      ┆ k         │
+        │ ---    ┆ ---       ┆ ---    ┆ ---       │
+        │ str    ┆ str       ┆ str    ┆ str       │
+        ╞════════╪═══════════╪════════╪═══════════╡
+        │   BCD  ┆ 12431     ┆   bcd  ┆ 12431     │
+        │ -- 00  ┆ transform ┆ -- 00  ┆ transform │
+        │  A^^u  ┆ 12__*m    ┆  a^^u  ┆ 12__*m    │
+        │ -O2    ┆           ┆ -o2    ┆           │
+        └────────┴───────────┴────────┴───────────┘
+        """
 
         return ColFn(ops.str_lower, self.arg)
 
     def replace_all(
         self: ColExpr[String], substr: str, replacement: str
     ) -> ColExpr[String]:
-        """"""
+        """
+        Replaces all occurrences of a given substring by a different string.
+
+        :param substr:
+            The string to replace.
+
+        :param replacement:
+            The replacement string.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         r=t.a.str.replace_all("-", "?"),
+        ...         s=t.b.str.replace_all("ansf", "[---]"),
+        ...         u=t.b.str.replace_all("abba", "#"),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 5)
+        ┌────────┬────────────┬────────┬────────────┬───────────┐
+        │ a      ┆ b          ┆ r      ┆ s          ┆ u         │
+        │ ---    ┆ ---        ┆ ---    ┆ ---        ┆ ---       │
+        │ str    ┆ str        ┆ str    ┆ str        ┆ str       │
+        ╞════════╪════════════╪════════╪════════════╪═══════════╡
+        │   BCD  ┆ 12431      ┆   BCD  ┆ 12431      ┆ 12431     │
+        │ -- 00  ┆ transform  ┆ ?? 00  ┆ tr[---]orm ┆ transform │
+        │  A^^u  ┆ 12__*m     ┆  A^^u  ┆ 12__*m     ┆ 12__*m    │
+        │ -O2    ┆            ┆ ?O2    ┆            ┆           │
+        │        ┆ abbabbabba ┆        ┆ abbabbabba ┆ #bb#      │
+        └────────┴────────────┴────────┴────────────┴───────────┘
+        """
 
         return ColFn(ops.str_replace_all, self.arg, substr, replacement)
 
     def slice(
         self: ColExpr[String], offset: ColExpr[Int], n: ColExpr[Int]
     ) -> ColExpr[String]:
-        """"""
+        """
+        Returns a substring of the input string.
+
+        :param offset:
+            The 0-based index of the first character included in the result.
+
+        :param n:
+            The number of characters to include. If the string is shorter than *offset*
+            + *n*, the result only includes as many characters as there are.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.slice(0, 2),
+        ...         k=t.b.str.slice(4, 10),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 4)
+        ┌────────┬────────────┬─────┬────────┐
+        │ a      ┆ b          ┆ j   ┆ k      │
+        │ ---    ┆ ---        ┆ --- ┆ ---    │
+        │ str    ┆ str        ┆ str ┆ str    │
+        ╞════════╪════════════╪═════╪════════╡
+        │   BCD  ┆ 12431      ┆     ┆ 1      │
+        │ -- 00  ┆ transform  ┆ --  ┆ sform  │
+        │  A^^u  ┆ 12__*m     ┆  A  ┆ *m     │
+        │ -O2    ┆            ┆ -O  ┆        │
+        │        ┆ abbabbabba ┆     ┆ bbabba │
+        └────────┴────────────┴─────┴────────┘
+        """
 
         return ColFn(ops.str_slice, self.arg, offset, n)
 
     def starts_with(self: ColExpr[String], prefix: str) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the string starts with a given prefix.
+
+        :param prefix:
+            The prefix to check.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2", ""],
+        ...         "b": ["12431", "transform", "12__*m", "   ", "abbabbabba"],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> (
+        ...     t
+        ...     >> mutate(
+        ...         j=t.a.str.starts_with("-"),
+        ...         k=t.b.str.starts_with("12"),
+        ...     )
+        ...     >> show()
+        ... )
+        Table string table, backend: PolarsImpl
+        shape: (5, 4)
+        ┌────────┬────────────┬───────┬───────┐
+        │ a      ┆ b          ┆ j     ┆ k     │
+        │ ---    ┆ ---        ┆ ---   ┆ ---   │
+        │ str    ┆ str        ┆ bool  ┆ bool  │
+        ╞════════╪════════════╪═══════╪═══════╡
+        │   BCD  ┆ 12431      ┆ false ┆ true  │
+        │ -- 00  ┆ transform  ┆ true  ┆ false │
+        │  A^^u  ┆ 12__*m     ┆ false ┆ true  │
+        │ -O2    ┆            ┆ true  ┆ false │
+        │        ┆ abbabbabba ┆ false ┆ false │
+        └────────┴────────────┴───────┴───────┘
+        """
 
         return ColFn(ops.str_starts_with, self.arg, prefix)
 
     def strip(self: ColExpr[String]) -> ColExpr[String]:
-        """"""
+        """
+        Removes leading and trailing whitespace.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.strip(), k=t.b.str.strip()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬───────┬───────────┐
+        │ a      ┆ b         ┆ j     ┆ k         │
+        │ ---    ┆ ---       ┆ ---   ┆ ---       │
+        │ str    ┆ str       ┆ str   ┆ str       │
+        ╞════════╪═══════════╪═══════╪═══════════╡
+        │   BCD  ┆ 12431     ┆ BCD   ┆ 12431     │
+        │ -- 00  ┆ transform ┆ -- 00 ┆ transform │
+        │  A^^u  ┆ 12__*m    ┆ A^^u  ┆ 12__*m    │
+        │ -O2    ┆           ┆ -O2   ┆           │
+        └────────┴───────────┴───────┴───────────┘
+        """
 
         return ColFn(ops.str_strip, self.arg)
 
@@ -1125,7 +1771,32 @@ class StrNamespace(FnNamespace):
         return ColFn(ops.str_to_datetime, self.arg)
 
     def upper(self: ColExpr[String]) -> ColExpr[String]:
-        """"""
+        """
+        Converts all alphabet letters to upper case.
+
+        Examples
+        --------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": ["  BCD ", "-- 00", " A^^u", "-O2"],
+        ...         "b": ["12431", "transform", "12__*m", "   "],
+        ...     },
+        ...     name="string table",
+        ... )
+        >>> t >> mutate(j=t.a.str.upper(), k=t.b.str.upper()) >> show()
+        Table string table, backend: PolarsImpl
+        shape: (4, 4)
+        ┌────────┬───────────┬────────┬───────────┐
+        │ a      ┆ b         ┆ j      ┆ k         │
+        │ ---    ┆ ---       ┆ ---    ┆ ---       │
+        │ str    ┆ str       ┆ str    ┆ str       │
+        ╞════════╪═══════════╪════════╪═══════════╡
+        │   BCD  ┆ 12431     ┆   BCD  ┆ 12431     │
+        │ -- 00  ┆ transform ┆ -- 00  ┆ TRANSFORM │
+        │  A^^u  ┆ 12__*m    ┆  A^^U  ┆ 12__*M    │
+        │ -O2    ┆           ┆ -O2    ┆           │
+        └────────┴───────────┴────────┴───────────┘
+        """
 
         return ColFn(ops.str_upper, self.arg)
 
@@ -1140,7 +1811,7 @@ class DtNamespace(FnNamespace):
     def day(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day(self: ColExpr) -> ColExpr:
-        """"""
+        """Extracts the day component."""
 
         return ColFn(ops.dt_day, self.arg)
 
@@ -1151,7 +1822,11 @@ class DtNamespace(FnNamespace):
     def day_of_week(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day_of_week(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        The number of the current weekday.
+
+        This is one-based, so Monday is 1 and Sunday is 7.
+        """
 
         return ColFn(ops.dt_day_of_week, self.arg)
 
@@ -1162,27 +1837,31 @@ class DtNamespace(FnNamespace):
     def day_of_year(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day_of_year(self: ColExpr) -> ColExpr:
-        """"""
+        """
+        The number of days since the beginning of the year.
+
+        This is one-based, so it returns 1 for the 1st of January.
+        """
 
         return ColFn(ops.dt_day_of_year, self.arg)
 
     def hour(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the hour component."""
 
         return ColFn(ops.dt_hour, self.arg)
 
     def microsecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the microsecond component."""
 
         return ColFn(ops.dt_microsecond, self.arg)
 
     def millisecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the millisecond component."""
 
         return ColFn(ops.dt_millisecond, self.arg)
 
     def minute(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the minute component."""
 
         return ColFn(ops.dt_minute, self.arg)
 
@@ -1193,12 +1872,12 @@ class DtNamespace(FnNamespace):
     def month(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def month(self: ColExpr) -> ColExpr:
-        """"""
+        """Extracts the month component."""
 
         return ColFn(ops.dt_month, self.arg)
 
     def second(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """"""
+        """Extracts the second component."""
 
         return ColFn(ops.dt_second, self.arg)
 
@@ -1209,7 +1888,7 @@ class DtNamespace(FnNamespace):
     def year(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def year(self: ColExpr) -> ColExpr:
-        """"""
+        """Extracts the year component."""
 
         return ColFn(ops.dt_year, self.arg)
 
@@ -1295,7 +1974,7 @@ class Col(ColExpr):
         Examples
         --------
         >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
-        >>> t1.h.export(Polars())
+        >>> t1.h.show()
         shape: (6,)
         Series: 'h' [f64]
         [
@@ -1769,14 +2448,18 @@ def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
             or (
                 # markers can only be at the top of an expression tree
                 not isinstance(expr.op, Marker)
-                and any(
-                    isinstance(arg, ColFn) and isinstance(arg.op, Marker)
-                    for arg in expr.args
+                and (
+                    marker_args := [
+                        arg
+                        for arg in expr.args
+                        if isinstance(arg, ColFn) and isinstance(arg.op, Marker)
+                    ]
                 )
             )
         ):
+            marker = expr.op if isinstance(expr.op, Marker) else marker_args[0].op
             raise TypeError(
-                f"invalid usage of `{expr.op.name}` in a column expression.\n"
+                f"invalid usage of `{marker.name}` in a column expression.\n"
                 "note: This marker function can only be used in arguments to the "
                 "`arrange` verb or the `arrange=` keyword argument to window "
                 "functions. Furthermore, all markers have to be at the top of the "

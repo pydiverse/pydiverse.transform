@@ -99,6 +99,8 @@ def test_replace_all(df_strings):
         >> mutate(
             x=C.col1.str.replace_all(" ", "").str.replace_all("foo", "fOO"),
             y=C.col2.str.replace_all("Ab", "ab"),
+            z=C.e.str.replace_all("abba", "#"),
+            q=C.e.str.replace_all("--", "="),
         ),
     )
 

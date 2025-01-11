@@ -24,7 +24,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, String
+from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, Int, String
 
 
 class MsSqlImpl(SqlImpl):
@@ -132,7 +132,6 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
 
     elif isinstance(expr, ColFn):
         wants_args_bool_as_bit = expr.op not in (
-            ops.bool_xor,
             ops.bool_and,
             ops.bool_or,
             ops.bool_invert,
@@ -302,3 +301,14 @@ with MsSqlImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return True
+
+    @impl(ops.pow)
+    def _pow(x, y):
+        return_type = sqa.Double()
+        if isinstance(x.type, sqa.Numeric) and isinstance(y.type, sqa.Numeric):
+            return_type = sqa.Numeric()
+        return sqa.func.POWER(x, y, type_=return_type)
+
+    @impl(ops.pow, Int(), Int())
+    def _pow_int(x, y):
+        return sqa.func.POWER(sqa.cast(x, type_=sqa.Double()), y)

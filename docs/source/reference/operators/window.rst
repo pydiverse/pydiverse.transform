@@ -6,7 +6,7 @@ Window
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     shift
 
@@ -14,7 +14,7 @@ Window
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     dense_rank
     rank

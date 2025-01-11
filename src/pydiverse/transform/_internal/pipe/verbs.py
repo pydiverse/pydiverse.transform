@@ -93,7 +93,7 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
     >>> (
     ...     t
     ...     >> join(s := t >> alias(), t.a == s.a, how="inner", suffix="_right")
-    ...     >> export(Polars())
+    ...     >> show()
     ... )
     shape: (6, 4)
     ┌─────┬────────┬─────────┬─────────┐
@@ -175,7 +175,7 @@ def collect(table: Table, target: Target | None = None) -> Pipeable:
     ...     >> mutate(z=t.a + t.b.str.len())
     ...     >> collect()
     ...     >> arrange(C.z, t.a)
-    ...     >> export(Polars())
+    ...     >> show()
     ... )
     shape: (4, 3)
     ┌─────┬────────┬─────┐
@@ -256,7 +256,7 @@ def export(
     3  1   10.8  transform
     4  5  -81.2       '  '
     5  9    0.0        -22
-    >>> t1 >> export(Polars())
+    >>> t1 >> show()
     shape: (6, 3)
     ┌─────┬────────┬───────────┐
     │ a   ┆ b      ┆ c         │
@@ -332,7 +332,7 @@ def select(table: Table, *cols: Col | ColName) -> Pipeable:
     Examples
     --------
     >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
-    >>> t >> select(t.a) >> export(Polars())
+    >>> t >> select(t.a) >> show()
     shape: (4, 1)
     ┌─────┐
     │ a   │
@@ -372,7 +372,7 @@ def drop(table: Table, *cols: Col | ColName) -> Pipeable:
     Examples
     --------
     >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
-    >>> t >> drop(t.a) >> export(Polars())
+    >>> t >> drop(t.a) >> show()
     shape: (4, 1)
     ┌───────┐
     │ b     │
@@ -410,7 +410,7 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     Renaming one column:
 
     >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
-    >>> t >> rename({"a": "h"}) >> export(Polars())
+    >>> t >> rename({"a": "h"}) >> show()
     shape: (4, 2)
     ┌─────┬───────┐
     │ h   ┆ b     │
@@ -446,7 +446,7 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     column ``C.a``, however, refers to the column with name *a* in the *current*
     table.
 
-    >>> s >> mutate(u=t.a, v=C.a) >> export(Polars())
+    >>> s >> mutate(u=t.a, v=C.a) >> show()
     shape: (4, 4)
     ┌─────┬───────┬─────┬───────┐
     │ b   ┆ a     ┆ u   ┆ v     │
@@ -497,7 +497,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     >>> t1 = pdt.Table(
     ...     dict(a=[3, 1, 4, 1, 5, 9], b=[2.465, 0.22, -4.477, 10.8, -81.2, 0.0])
     ... )
-    >>> t1 >> mutate(u=t1.a * t1.b) >> export(Polars())
+    >>> t1 >> mutate(u=t1.a * t1.b) >> show()
     shape: (6, 3)
     ┌─────┬────────┬─────────┐
     │ a   ┆ b      ┆ u       │
@@ -549,7 +549,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     Examples
     --------
     >>> t = pdt.Table({"a": [3, 2, 6, 4], "b": ["lll", "g", "u0", "__**_"]})
-    >>> t >> filter(t.a <= 4, ~t.b.str.contains("_")) >> export(Polars())
+    >>> t >> filter(t.a <= 4, ~t.b.str.contains("_")) >> show()
     shape: (2, 2)
     ┌─────┬─────┐
     │ a   ┆ b   │
@@ -613,7 +613,7 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     ...         "p": [0.655, -4.33, None, 143.6, 0.0, 1.0, 4.5],
     ...     }
     ... )
-    >>> t >> arrange(t.r.nulls_first(), t.p) >> export(Polars())
+    >>> t >> arrange(t.r.nulls_first(), t.p) >> show()
     shape: (7, 3)
     ┌──────┬─────┬───────┐
     │ r    ┆ s   ┆ p     │
@@ -628,7 +628,7 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     │ 6    ┆ s   ┆ 0.0   │
     │ 7    ┆ o   ┆ -4.33 │
     └──────┴─────┴───────┘
-    >>> t >> arrange(t.p.nulls_last().descending(), t.s) >> export(Polars())
+    >>> t >> arrange(t.p.nulls_last().descending(), t.s) >> show()
     shape: (7, 3)
     ┌──────┬─────┬───────┐
     │ r    ┆ s   ┆ p     │
@@ -732,7 +732,7 @@ def ungroup(table: Table) -> Pipeable:
     ...         v=t.d.mean(filter=t.a >= 0),
     ...     )
     ...     >> ungroup()
-    ...     >> export(Polars())
+    ...     >> show()
     ... )
     shape: (6, 6)
     ┌───────┬───────────┬───────┬─────┬────────┬─────┐
@@ -793,7 +793,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     ...         u=t.b.str.len().mean(),
     ...         v=t.a.sum(filter=t.a >= 0),
     ...     )
-    ...     >> export(Polars())
+    ...     >> show()
     ... )
     shape: (3, 3)
     ┌───────┬──────────┬───────┐
@@ -874,7 +874,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
     ...         "b": ["l", "r", "srq", "---", " "],
     ...     }
     ... )
-    >>> t >> slice_head(3, offset=1) >> export(Polars())
+    >>> t >> slice_head(3, offset=1) >> show()
     shape: (3, 2)
     ┌─────┬─────┐
     │ a   ┆ b   │
@@ -976,7 +976,7 @@ def join(
     --------
     >>> t1 = pdt.Table({"a": [3, 1, 4, 1, 5, 9, 4]}, name="t1")
     >>> t2 = pdt.Table({"a": [4, 4, 1, 7], "b": ["f", "g", "h", "i"]}, name="t2")
-    >>> t1 >> join(t2, t1.a == t2.a, how="left") >> export(Polars())
+    >>> t1 >> join(t2, t1.a == t2.a, how="left") >> show()
     shape: (9, 3)
     ┌─────┬──────┬──────┐
     │ a   ┆ a_t2 ┆ b_t2 │

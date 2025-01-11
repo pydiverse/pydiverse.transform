@@ -215,10 +215,8 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
     elif isinstance(expr, Cast):
         if (
-            expr.target_type <= Int()
-            or expr.target_type <= Float()
-            and expr.val.dtype() <= String()
-        ):
+            expr.target_type <= Int() or expr.target_type <= Float()
+        ) and expr.val.dtype() <= String():
             expr.val = expr.val.str.strip()
         compiled = compile_col_expr(expr.val, name_in_df).cast(
             polars_type(expr.target_type)
@@ -614,13 +612,10 @@ with PolarsImpl.impl_store.impl_manager as impl:
         return x.shift(n, fill_value=fill_value)
 
     @impl(ops.is_in)
-    def _is_in(x, *values, _pdt_args):
+    def _is_in(x, *values):
         if len(values) == 0:
             return pl.lit(False)
-        return pl.any_horizontal(
-            (x == val if not arg.dtype() <= NullType() else x.is_null())
-            for val, arg in zip(values, _pdt_args[1:], strict=True)
-        )
+        return pl.any_horizontal(x == val for val in values)
 
     @impl(ops.str_contains)
     def _str_contains(x, y):
@@ -733,3 +728,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.coalesce)
     def _coalesce(*x):
         return pl.coalesce(*x)
+
+    @impl(ops.pow, Int(), Int())
+    def _pow(x, y):
+        return x.cast(pl.Float64()) ** y

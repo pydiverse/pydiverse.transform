@@ -6,13 +6,13 @@ Arithmetic
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     __add__
-    __floordiv__
-    __mod__
+    __sub__
     __mul__
+    __truediv__
     __neg__
     __pos__
-    __sub__
-    __truediv__
+    __floordiv__
+    __mod__

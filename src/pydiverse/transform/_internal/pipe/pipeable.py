@@ -14,9 +14,9 @@ class Pipeable:
 
     def __rshift__(self, other) -> Pipeable:
         """
-        Pipeable >> other
-        -> Lazy. Extend pipe.
+        The pipe operator for chaining verbs.
         """
+
         if isinstance(other, Pipeable):
             return Pipeable(calls=self.calls + other.calls)
         elif callable(other):

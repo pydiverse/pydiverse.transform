@@ -113,6 +113,8 @@ Global functions
 .. autosummary::
    :nosignatures:
 
+   all
+   any
    coalesce
    count
    dense_rank
@@ -121,4 +123,5 @@ Global functions
    min
    rank
    row_number
+   sum
    when

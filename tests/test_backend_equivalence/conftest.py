@@ -99,6 +99,20 @@ dataframes = {
                 "-100110",
                 "   -56 ",
             ],
+            "e": [
+                "abbabbabbabba",
+                "------",
+                "012",
+                "",
+                "",
+                None,
+                None,
+                " AbAbA..",
+                "-354.2",
+                "??",
+                "11",
+                "$&/)",
+            ],
         }
     ),
     "df_datetime": pl.DataFrame(
@@ -199,6 +213,12 @@ dataframes = {
             ],
             "null_s": [0] + [None] * 7,
         }
+    ),
+    "df_bool": pl.DataFrame(
+        {
+            "a": [True, True, True, False, False, None],
+            "b": [True, False, None, False, None, None],
+        },
     ),
 }
 

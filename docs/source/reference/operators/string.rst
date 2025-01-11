@@ -6,7 +6,7 @@ String
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/accessor_method.rst
+    :template: accessor_method.rst
 
     str.contains
     str.ends_with

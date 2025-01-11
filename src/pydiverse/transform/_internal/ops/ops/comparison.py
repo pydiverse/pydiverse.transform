@@ -4,35 +4,68 @@ from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import COMPARABLE, Bool, D
 
-equal = Operator("__eq__", Signature(D, D, return_type=Bool()))
+equal = Operator(
+    "__eq__", Signature(D, D, return_type=Bool()), doc="Equality comparison =="
+)
 
-not_equal = Operator("__ne__", Signature(D, D, return_type=Bool()))
+not_equal = Operator(
+    "__ne__", Signature(D, D, return_type=Bool()), doc="Non-equality comparison !="
+)
 
 
 less_than = Operator(
     "__lt__",
     *(Signature(t, t, return_type=Bool()) for t in COMPARABLE),
-    doc="""
-`<` as you know it.
-""",
+    doc="Less than comparison <",
 )
 
 less_equal = Operator(
-    "__le__", *(Signature(t, t, return_type=Bool()) for t in COMPARABLE)
+    "__le__",
+    *(Signature(t, t, return_type=Bool()) for t in COMPARABLE),
+    doc="Less than or equal to comparison <=",
 )
 
 greater_than = Operator(
-    "__gt__", *(Signature(t, t, return_type=Bool()) for t in COMPARABLE)
+    "__gt__",
+    *(Signature(t, t, return_type=Bool()) for t in COMPARABLE),
+    doc="Greater than comparison >",
 )
 
 greater_equal = Operator(
-    "__ge__", *(Signature(t, t, return_type=Bool()) for t in COMPARABLE)
+    "__ge__",
+    *(Signature(t, t, return_type=Bool()) for t in COMPARABLE),
+    doc="Greater than or equal to comparison >=",
 )
 
-is_null = Operator("is_null", Signature(D, return_type=Bool()))
+is_null = Operator(
+    "is_null",
+    Signature(D, return_type=Bool()),
+    doc="Indicates whether the value is null.",
+)
 
-is_not_null = Operator("is_not_null", Signature(D, return_type=Bool()))
+is_not_null = Operator(
+    "is_not_null",
+    Signature(D, return_type=Bool()),
+    doc="Indicates whether the value is not null.",
+)
 
-fill_null = Operator("fill_null", Signature(D, D, return_type=D))
+fill_null = Operator(
+    "fill_null",
+    Signature(D, D, return_type=D),
+    doc="Replaces every null by the given value.",
+)
 
-is_in = Operator("is_in", Signature(D, D, ..., return_type=Bool()))
+is_in = Operator(
+    "is_in",
+    Signature(D, D, ..., return_type=Bool()),
+    doc="""
+Whether the value equals one of the given.
+
+Note
+----
+The expression ``t.c.is_in(a1, a2, ...)`` is equivalent to
+``(t.c == a1) | (t.c == a2) | ...``, so passing null to ``is_in`` will result in
+null. To compare for equality with null, use
+:doc:`pydiverse.transform.ColExpr.is_null`.
+""",
+)

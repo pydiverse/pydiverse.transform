@@ -34,21 +34,42 @@ class Aggregation(Operator):
         )
 
 
-min = Aggregation("min", *(Signature(dtype, return_type=dtype) for dtype in COMPARABLE))
+min = Aggregation(
+    "min",
+    *(Signature(dtype, return_type=dtype) for dtype in COMPARABLE),
+    doc="Computes the minimum value in each group.",
+)
 
-max = Aggregation("max", *(Signature(dtype, return_type=dtype) for dtype in COMPARABLE))
+max = Aggregation(
+    "max",
+    *(Signature(dtype, return_type=dtype) for dtype in COMPARABLE),
+    doc="Computes the maximum value in each group.",
+)
 
 mean = Aggregation(
     "mean",
     *(Signature(dtype, return_type=dtype) for dtype in (Float(), Decimal())),
     Signature(Int(), return_type=Float()),
+    doc="Computes the average value in each group.",
 )
 
-sum = Aggregation("sum", *(Signature(dtype, return_type=dtype) for dtype in NUMERIC))
+sum = Aggregation(
+    "sum",
+    *(Signature(dtype, return_type=dtype) for dtype in NUMERIC),
+    doc="Computes the sum of values in each group.",
+)
 
-any = Aggregation("any", Signature(Bool(), return_type=Bool()))
+any = Aggregation(
+    "any",
+    Signature(Bool(), return_type=Bool()),
+    doc="Indicates whether at least one value in a group is True.",
+)
 
-all = Aggregation("all", Signature(Bool(), return_type=Bool()))
+all = Aggregation(
+    "all",
+    Signature(Bool(), return_type=Bool()),
+    doc="Indicates whether every non-null value in a group is True.",
+)
 
 count = Aggregation(
     "count",

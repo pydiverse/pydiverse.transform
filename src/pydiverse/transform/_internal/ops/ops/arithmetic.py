@@ -18,6 +18,7 @@ add = Operator(
     *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC),
     Signature(String(), String(), return_type=String()),
     Signature(Duration(), Duration(), return_type=Duration()),
+    doc="Addition +",
 )
 
 sub = Operator(
@@ -27,10 +28,13 @@ sub = Operator(
     Signature(Date(), Date(), return_type=Duration()),
     Signature(Datetime(), Date(), return_type=Duration()),
     Signature(Date(), Datetime(), return_type=Duration()),
+    doc="Subtraction -",
 )
 
 mul = Operator(
-    "__mul__", *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC)
+    "__mul__",
+    *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC),
+    doc="Multiplication *",
 )
 
 truediv = Operator(
@@ -38,13 +42,14 @@ truediv = Operator(
     Signature(Int(), Int(), return_type=Float()),
     Signature(Float(), Float(), return_type=Float()),
     Signature(Decimal(), Decimal(), return_type=Decimal()),
+    doc="True division /",
 )
 
 floordiv = Operator(
     "__floordiv__",
     Signature(Int(), Int(), return_type=Int()),
     doc="""
-Integer division.
+Integer division //
 
 Warning
 -------
@@ -65,7 +70,7 @@ Examples
 ...         "b": [7, 7, -7, -7],
 ...     }
 ... )
->>> t >> mutate(r=t.a // t.b) >> export(Polars())
+>>> t >> mutate(r=t.a // t.b) >> show()
 shape: (4, 3)
 ┌─────┬─────┬─────┐
 │ a   ┆ b   ┆ r   │
@@ -84,7 +89,7 @@ mod = Operator(
     "__mod__",
     Signature(Int(), Int(), return_type=Int()),
     doc="""
-Computes the remainder of integer division.
+The remainder of integer division %
 
 Warning
 -------
@@ -106,7 +111,7 @@ Examples
 ...         "b": [7, 7, -7, -7],
 ...     }
 ... )
->>> t >> mutate(r=t.a % t.b) >> export(Polars())
+>>> t >> mutate(r=t.a % t.b) >> show()
 shape: (4, 3)
 ┌─────┬─────┬─────┐
 │ a   ┆ b   ┆ r   │

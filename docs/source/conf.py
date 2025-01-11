@@ -37,9 +37,8 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.intersphinx",
-    # "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
-    "sphinx_autosummary_accessors"
+    "sphinx_autosummary_accessors",
 ]
 
 maximum_signature_line_length = 100

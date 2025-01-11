@@ -6,7 +6,7 @@ Sorting Markers
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     ascending
     descending

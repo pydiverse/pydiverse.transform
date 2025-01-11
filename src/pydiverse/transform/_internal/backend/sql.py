@@ -736,14 +736,10 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.pow)
     def _pow(lhs, rhs):
-        if isinstance(lhs.type, sqa.Float) or isinstance(rhs.type, sqa.Float):
-            type_ = sqa.Double()
-        elif isinstance(lhs.type, sqa.Numeric) or isinstance(rhs, sqa.Numeric):
-            type_ = sqa.Numeric()
-        else:
-            type_ = sqa.Double()
-
-        return sqa.func.POW(lhs, rhs, type_=type_)
+        return_type = sqa.Double()
+        if isinstance(lhs.type, sqa.Numeric) and isinstance(rhs.type, sqa.Numeric):
+            return_type = sqa.Numeric()
+        return sqa.func.POW(lhs, rhs, type_=return_type)
 
     @impl(ops.bool_xor)
     def _xor(lhs, rhs):
@@ -763,10 +759,7 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.is_in)
     def _is_in(x, *values):
-        res = x.in_(v for v in values if not isinstance(v.type, sqa.types.NullType))
-        if any(isinstance(v.type, sqa.types.NullType) for v in values):
-            res = res | x.is_(sqa.null())
-        return res
+        return x.in_(v for v in values)
 
     @impl(ops.is_null)
     def _is_null(x):

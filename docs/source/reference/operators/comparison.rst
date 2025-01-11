@@ -6,7 +6,7 @@ Comparison
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: autosummary/short_title.rst
+    :template: short_title.rst
 
     __eq__
     __ge__
