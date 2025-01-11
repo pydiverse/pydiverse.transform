@@ -759,10 +759,7 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.is_in)
     def _is_in(x, *values):
-        res = x.in_(v for v in values if not isinstance(v.type, sqa.types.NullType))
-        if any(isinstance(v.type, sqa.types.NullType) for v in values):
-            res = res | x.is_(sqa.null())
-        return res
+        return x.in_(v for v in values)
 
     @impl(ops.is_null)
     def _is_null(x):

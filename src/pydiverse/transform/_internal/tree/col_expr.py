@@ -99,6 +99,48 @@ class ColExpr(Generic[T]):
     def map(
         self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr | None = None
     ) -> CaseExpr:
+        """
+        Replaces given values by other expressions.
+
+        :param mapping:
+            A dictionary of expressions / tuples of expressions to expressions. The
+            input is compared against key of the dictionary, and if it matches, the
+            corresponding value of the key is inserted. If the key is a tuple, the input
+            is compared against each element of the tuple and required to equal at least
+            one of them.
+
+        :param default:
+            The value to insert if the input matches none of the keys of `mapping`.
+
+        Note
+        ----
+        If there are multiple columns in the key which have the same value at some row,
+        any of the corresponding values may be inserted (i.e. ensuring uniqueness of the
+        keys is your responsibility).
+
+        Example
+        -------
+        >>> t = pdt.Table(
+        ...     {
+        ...         "a": [4, 3, -35, 24, 105],
+        ...         "b": [4, 4, 0, -23, 42],
+        ...     }
+        ... )
+        >>> t >> mutate(c=t.a.is_in(t.b, 24)) >> show()
+        Table <unnamed>, backend: PolarsImpl
+        shape: (5, 3)
+        ┌─────┬─────┬───────┐
+        │ a   ┆ b   ┆ c     │
+        │ --- ┆ --- ┆ ---   │
+        │ i64 ┆ i64 ┆ bool  │
+        ╞═════╪═════╪═══════╡
+        │ 4   ┆ 4   ┆ true  │
+        │ 3   ┆ 4   ┆ false │
+        │ -35 ┆ 0   ┆ false │
+        │ 24  ┆ -23 ┆ true  │
+        │ 105 ┆ 42  ┆ false │
+        └─────┴─────┴───────┘
+        """
         return CaseExpr(
             (
                 (
@@ -192,7 +234,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Duration]: ...
 
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Addition +"""
 
         return ColFn(ops.add, self, rhs)
 
@@ -214,7 +256,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Duration]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Addition +"""
 
         return ColFn(ops.add, rhs, self)
 
@@ -224,7 +266,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether every non-null value in a group is True."""
 
         return ColFn(ops.all, self, partition_by=partition_by, filter=filter)
 
@@ -234,7 +276,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether at least one value in a group is True."""
 
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
@@ -317,7 +359,7 @@ class ColExpr(Generic[T]):
         return ColFn(ops.descending, self)
 
     def __eq__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Equality comparison =="""
 
         return ColFn(ops.equal, self, rhs)
 
@@ -327,7 +369,7 @@ class ColExpr(Generic[T]):
         return ColFn(ops.exp, self)
 
     def fill_null(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Replaces every null by the given value."""
 
         return ColFn(ops.fill_null, self, rhs)
 
@@ -344,7 +386,7 @@ class ColExpr(Generic[T]):
 
     def __floordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Integer division.
+        Integer division //
 
         Warning
         -------
@@ -365,7 +407,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a // t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -383,7 +425,7 @@ class ColExpr(Generic[T]):
 
     def __rfloordiv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Integer division.
+        Integer division //
 
         Warning
         -------
@@ -404,7 +446,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a // t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a // t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -439,7 +481,7 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __ge__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Greater than or equal to comparison >="""
 
         return ColFn(ops.greater_equal, self, rhs)
 
@@ -462,12 +504,21 @@ class ColExpr(Generic[T]):
     def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __gt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Greater than comparison >"""
 
         return ColFn(ops.greater_than, self, rhs)
 
     def is_in(self: ColExpr, *rhs: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """
+        Whether the value equals one of the given.
+
+        Note
+        ----
+        The expression ``t.c.is_in(a1, a2, ...)`` is equivalent to
+        ``(t.c == a1) | (t.c == a2) | ...``, so passing null to ``is_in`` will result in
+        null. To compare for equality with null, use
+        :doc:`pydiverse.transform.ColExpr.is_null`.
+        """
 
         return ColFn(ops.is_in, self, *rhs)
 
@@ -492,12 +543,12 @@ class ColExpr(Generic[T]):
         return ColFn(ops.is_not_nan, self)
 
     def is_not_null(self: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether the value is not null."""
 
         return ColFn(ops.is_not_null, self)
 
     def is_null(self: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Indicates whether the value is null."""
 
         return ColFn(ops.is_null, self)
 
@@ -520,7 +571,7 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __le__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Less than or equal to comparison <="""
 
         return ColFn(ops.less_equal, self, rhs)
 
@@ -543,9 +594,7 @@ class ColExpr(Generic[T]):
     def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     def __lt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """
-        `<` as you know it.
-        """
+        """Less than comparison <"""
 
         return ColFn(ops.less_than, self, rhs)
 
@@ -608,7 +657,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the maximum value in each group."""
 
         return ColFn(ops.max, self, partition_by=partition_by, filter=filter)
 
@@ -642,7 +691,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the average value in each group."""
 
         return ColFn(ops.mean, self, partition_by=partition_by, filter=filter)
 
@@ -700,13 +749,13 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the minimum value in each group."""
 
         return ColFn(ops.min, self, partition_by=partition_by, filter=filter)
 
     def __mod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Computes the remainder of integer division.
+        The remainder of integer division %
 
         Warning
         -------
@@ -728,7 +777,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a % t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -746,7 +795,7 @@ class ColExpr(Generic[T]):
 
     def __rmod__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]:
         """
-        Computes the remainder of integer division.
+        The remainder of integer division %
 
         Warning
         -------
@@ -768,7 +817,7 @@ class ColExpr(Generic[T]):
         ...         "b": [7, 7, -7, -7],
         ...     }
         ... )
-        >>> t >> mutate(r=t.a % t.b) >> export(Polars())
+        >>> t >> mutate(r=t.a % t.b) >> show()
         shape: (4, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ r   │
@@ -794,7 +843,7 @@ class ColExpr(Generic[T]):
     def __mul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __mul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Multiplication *"""
 
         return ColFn(ops.mul, self, rhs)
 
@@ -808,7 +857,7 @@ class ColExpr(Generic[T]):
     def __rmul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __rmul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Multiplication *"""
 
         return ColFn(ops.mul, rhs, self)
 
@@ -827,7 +876,7 @@ class ColExpr(Generic[T]):
         return ColFn(ops.neg, self)
 
     def __ne__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
-        """"""
+        """Non-equality comparison !="""
 
         return ColFn(ops.not_equal, self, rhs)
 
@@ -973,7 +1022,7 @@ class ColExpr(Generic[T]):
     def __sub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __sub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Subtraction -"""
 
         return ColFn(ops.sub, self, rhs)
 
@@ -1001,7 +1050,7 @@ class ColExpr(Generic[T]):
     def __rsub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __rsub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """Subtraction -"""
 
         return ColFn(ops.sub, rhs, self)
 
@@ -1035,7 +1084,7 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """"""
+        """Computes the sum of values in each group."""
 
         return ColFn(ops.sum, self, partition_by=partition_by, filter=filter)
 
@@ -1051,7 +1100,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Decimal]: ...
 
     def __truediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """True division /"""
 
         return ColFn(ops.truediv, self, rhs)
 
@@ -1067,7 +1116,7 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Decimal]: ...
 
     def __rtruediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """"""
+        """True division /"""
 
         return ColFn(ops.truediv, rhs, self)
 
@@ -1309,7 +1358,7 @@ class Col(ColExpr):
         Examples
         --------
         >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
-        >>> t1.h.export(Polars())
+        >>> t1.h.show()
         shape: (6,)
         Series: 'h' [f64]
         [
