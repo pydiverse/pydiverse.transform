@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import functools
+import operator
 import uuid
 from typing import Any, Literal, overload
 
@@ -904,7 +906,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 @overload
 def join(
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
@@ -916,7 +918,7 @@ def join(
 def join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
@@ -932,8 +934,9 @@ def join(
         The right table to join with.
 
     :param on:
-        The join condition. See the note below for more information on which expressions
-        are allowed here.
+        The join condition. If this is a list, the elements are joined via AND. Strings
+        are interpreted as an equality condition on the columns with that name. See the
+        note below for more information on which expressions are allowed.
 
     :param how:
         The join type.
@@ -996,11 +999,23 @@ def join(
     """
 
     errors.check_arg_type(Table, "join", "right", right)
+    errors.check_arg_type(ColExpr | list | str, "join", "on", on)
     errors.check_arg_type(str | None, "join", "suffix", suffix)
     errors.check_literal_type(["inner", "left", "full"], "join", "how", how)
     errors.check_literal_type(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
+
+    if isinstance(on, str):
+        on = [on]
+    if isinstance(on, list):
+        on = functools.reduce(
+            operator.and_,
+            (
+                left[expr] == right[expr] if isinstance(expr, str) else expr
+                for expr in on
+            ),
+        )
 
     if left._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
@@ -1061,7 +1076,7 @@ def join(
 @overload
 def inner_join(
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1072,7 +1087,7 @@ def inner_join(
 def inner_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1087,7 +1102,7 @@ def inner_join(
 @overload
 def left_join(
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1098,7 +1113,7 @@ def left_join(
 def left_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1113,7 +1128,7 @@ def left_join(
 @overload
 def full_join(
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1124,7 +1139,7 @@ def full_join(
 def full_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool],
+    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
