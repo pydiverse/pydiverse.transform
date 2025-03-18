@@ -320,11 +320,11 @@ def show_query(table: Table) -> Pipeable:
 
 
 @overload
-def select(*cols: Col | ColName) -> Pipeable: ...
+def select(*cols: Col | ColName | str) -> Pipeable: ...
 
 
 @verb
-def select(table: Table, *cols: Col | ColName) -> Pipeable:
+def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     """
     Selects a subset of columns.
 
@@ -348,7 +348,8 @@ def select(table: Table, *cols: Col | ColName) -> Pipeable:
     └─────┘
     """
 
-    errors.check_vararg_type(Col | ColName, "select", *cols)
+    errors.check_vararg_type(Col | ColName | str, "select", *cols)
+    cols = [ColName(col) if isinstance(col, str) else col for col in cols]
 
     new = copy.copy(table)
     new._ast = Select(table._ast, [preprocess_arg(col, table) for col in cols])
@@ -360,11 +361,11 @@ def select(table: Table, *cols: Col | ColName) -> Pipeable:
 
 
 @overload
-def drop(*cols: Col | ColName) -> Pipeable: ...
+def drop(*cols: Col | ColName | str) -> Pipeable: ...
 
 
 @verb
-def drop(table: Table, *cols: Col | ColName) -> Pipeable:
+def drop(table: Table, *cols: Col | ColName | str) -> Pipeable:
     """
     Removes a subset of the columns.
 
@@ -387,7 +388,8 @@ def drop(table: Table, *cols: Col | ColName) -> Pipeable:
     │ __**_ │
     └───────┘
     """
-    errors.check_vararg_type(Col | ColName, "drop", *cols)
+    errors.check_vararg_type(Col | ColName | str, "drop", *cols)
+    cols = [ColName(col) if isinstance(col, str) else col for col in cols]
 
     dropped_uuids = {preprocess_arg(col, table)._uuid for col in cols}
     return table >> select(
@@ -662,11 +664,11 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
 
 
 @overload
-def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable: ...
+def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable: ...
 
 
 @verb
-def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable:
+def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
     """
     Add a grouping state to the table.
 
@@ -688,8 +690,9 @@ def group_by(table: Table, *cols: Col | ColName, add=False) -> Pipeable:
     if len(cols) == 0:
         return table
 
-    errors.check_vararg_type(Col | ColName, "group_by", *cols)
+    errors.check_vararg_type(Col | ColName | str, "group_by", *cols)
     errors.check_arg_type(bool, "group_by", "add", add)
+    cols = [ColName(col) if isinstance(col, str) else col for col in cols]
 
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, [preprocess_arg(col, table) for col in cols], add)

@@ -162,12 +162,13 @@ class Table:
         :doc:`/database_testing`.
         """
 
-        errors.check_arg_type(
-            pl.DataFrame | pl.LazyFrame | pd.DataFrame | sqa.Table | str | dict,
-            "Table.__init__",
-            "resource",
-            resource,
-        )
+        if not isinstance(resource, TableImpl):
+            errors.check_arg_type(
+                pl.DataFrame | pl.LazyFrame | pd.DataFrame | sqa.Table | str | dict,
+                "Table.__init__",
+                "resource",
+                resource,
+            )
         errors.check_arg_type(Target | None, "Table.__init__", "backend", backend)
         errors.check_arg_type(str | None, "Table.__init__", "name", name)
 
