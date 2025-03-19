@@ -914,6 +914,7 @@ def join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce=False,
 ) -> Pipeable: ...
 
 
@@ -926,6 +927,7 @@ def join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce=False,
 ) -> Pipeable:
     """
     Joins two tables on a boolean expression.
@@ -1008,10 +1010,18 @@ def join(
     errors.check_literal_type(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
+    errors.check_arg_type(bool, "join", "coalesce", coalesce)
 
     if isinstance(on, str):
         on = [on]
+    ignore_right = set()
     if isinstance(on, list):
+        if not all(type(cond) is str for cond in on) and coalesce:
+            raise ValueError(
+                "`coalesce` can only be set to True if `on` is a list of strings"
+            )
+        elif coalesce:
+            ignore_right = set(on)
         on = functools.reduce(
             operator.and_,
             (
@@ -1050,7 +1060,7 @@ def join(
                 )
     else:
         cnt = 0
-        for name in right._cache.cols.keys():
+        for name in set(right._cache.cols.keys()) - ignore_right:
             suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
             while suffixed in left_names:
                 cnt += 1
@@ -1060,7 +1070,7 @@ def join(
             suffix += f"_{cnt}"
 
     new = copy.copy(left)
-    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
+    new._ast = Join(left._ast, right._ast, on, how, validate, suffix, coalesce)
     # The join condition must be preprocessed with respect to both tables
     new._ast.on = resolve_C_columns(
         resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
@@ -1069,6 +1079,11 @@ def join(
     new._cache = copy.copy(left._cache)
     new._cache.update(new._ast, rcache=right._cache)
     new._ast.on = preprocess_arg(new._ast.on, new)
+    ignore_uuids = set(right[col]._uuid for col in ignore_right)
+    new._cache._update(
+        new_select=left._cache.select
+        + [col for col in right._cache.select if col._uuid not in ignore_uuids]
+    )
 
     return new
 
@@ -1083,6 +1098,7 @@ def inner_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1094,12 +1110,15 @@ def inner_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="inner"``.
     """
 
-    return left >> join(right, on, "inner", validate=validate, suffix=suffix)
+    return left >> join(
+        right, on, "inner", validate=validate, suffix=suffix, coalesce=coalesce
+    )
 
 
 @overload
@@ -1109,6 +1128,7 @@ def left_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1120,12 +1140,15 @@ def left_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="left"``.
     """
 
-    return left >> join(right, on, "left", validate=validate, suffix=suffix)
+    return left >> join(
+        right, on, "left", validate=validate, suffix=suffix, coalesce=coalesce
+    )
 
 
 @overload
@@ -1135,6 +1158,7 @@ def full_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1146,12 +1170,15 @@ def full_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
     """
 
-    return left >> join(right, on, "full", validate=validate, suffix=suffix)
+    return left >> join(
+        right, on, "full", validate=validate, suffix=suffix, coalesce=coalesce
+    )
 
 
 @overload

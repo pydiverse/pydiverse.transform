@@ -5,7 +5,7 @@ from uuid import UUID
 
 import polars as pl
 
-from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.backend.table_impl import TableImpl, split_join_cond
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
@@ -231,14 +231,6 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         raise AssertionError
 
 
-def split_join_cond(expr: ColFn) -> list[ColFn]:
-    assert isinstance(expr, ColFn)
-    if expr.op == ops.bool_and:
-        return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
-    else:
-        return [expr]
-
-
 def compile_ast(
     nd: AstNode,
 ) -> tuple[pl.LazyFrame, dict[UUID, str], list[str], list[UUID]]:
@@ -383,7 +375,7 @@ def compile_ast(
                 right_on=[compile_col_expr(col, name_in_df) for col in right_on],
                 how=nd.how,
                 validate=nd.validate,
-                coalesce=False,
+                coalesce=nd.coalesce,
             )
         else:
             if nd.how in ("left", "full"):
@@ -411,7 +403,26 @@ def compile_ast(
 
             df = joined
 
-        select += [col_name + nd.suffix for col_name in right_select]
+        ignore_right = set()
+        if nd.coalesce:
+            assert all(
+                type(pred.args[0]) is Col and type(pred.args[1]) is Col
+                for pred in predicates
+            )
+            ignore_right = {name_in_df[pred.args[0]._uuid] for pred in predicates}
+            name_in_df.update(
+                {
+                    uid: right_name_in_df[uid]
+                    for uid, name in name_in_df.items()
+                    if uid in right_name_in_df and name in ignore_right
+                }
+            )
+
+        select += [
+            col_name + nd.suffix
+            for col_name in right_select
+            if col_name not in ignore_right
+        ]
 
     elif isinstance(nd, PolarsImpl):
         df = nd.df

@@ -14,7 +14,7 @@ import polars as pl
 import sqlalchemy as sqa
 
 from pydiverse.transform._internal.backend.polars import polars_type
-from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.backend.table_impl import TableImpl, split_join_cond
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
 from pydiverse.transform._internal.ops import ops
@@ -544,8 +544,22 @@ class SqlImpl(TableImpl):
                     raise ValueError("invalid filter before full join")
 
             query.join.append(j)
+            ignore_right = set()
+            if nd.coalesce:
+                predicates = split_join_cond(nd.on)
+                ignore_right = {sqa_col[pred.args[0]._uuid].name for pred in predicates}
+                sqa_col.update(
+                    {
+                        uid: right_sqa_col[uid]
+                        for uid, lb in sqa_col.items()
+                        if uid in right_sqa_col and lb.name in ignore_right
+                    }
+                )
+
             query.select += [
-                sqa.Label(lb.name + nd.suffix, lb) for lb in right_query.select
+                sqa.Label(lb.name + nd.suffix, lb)
+                for lb in right_query.select
+                if lb.name not in ignore_right
             ]
 
         elif isinstance(nd, TableImpl):
