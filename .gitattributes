@@ -4,4 +4,5 @@
 
 *.{py,yaml,yml,sh} text eol=lf
 *.bat text eol=crlf
-pixi.lock linguist-language=YAML linguist-generated=true
+
+pixi.lock merge=binary linguist-language=YAML linguist-generated=true
