@@ -307,6 +307,16 @@ class ColExpr(Generic[T]):
         self: ColExpr[Duration], rhs: ColExpr[Duration]
     ) -> ColExpr[Duration]: ...
 
+    @overload
+    def __add__(
+        self: ColExpr[Datetime], rhs: ColExpr[Duration]
+    ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def __add__(
+        self: ColExpr[Duration], rhs: ColExpr[Datetime]
+    ) -> ColExpr[Datetime]: ...
+
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Addition +"""
 
@@ -328,6 +338,16 @@ class ColExpr(Generic[T]):
     def __radd__(
         self: ColExpr[Duration], rhs: ColExpr[Duration]
     ) -> ColExpr[Duration]: ...
+
+    @overload
+    def __radd__(
+        self: ColExpr[Datetime], rhs: ColExpr[Duration]
+    ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def __radd__(
+        self: ColExpr[Duration], rhs: ColExpr[Datetime]
+    ) -> ColExpr[Datetime]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Addition +"""
