@@ -73,7 +73,7 @@ def generate_fn_decl(
 
     if len(op.context_kwargs) > 0:
         context_kwarg_annotation = {
-            "partition_by": "Col | ColName | Iterable[Col | ColName]",
+            "partition_by": "Col | ColName | str | Iterable[Col | ColName | str]",
             "arrange": "ColExpr | Iterable[ColExpr]",
             "filter": "ColExpr[Bool] | Iterable[ColExpr[Bool]]",
         }

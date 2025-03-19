@@ -105,7 +105,7 @@ def coalesce(arg: ColExpr, *args: ColExpr) -> ColExpr:
 
 def count(
     *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
     filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
 ) -> ColExpr[Int]:
     """
@@ -117,7 +117,7 @@ def count(
 
 def dense_rank(
     *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
     arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
     """
@@ -312,7 +312,7 @@ def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
 
 def rank(
     *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
     arrange: ColExpr | Iterable[ColExpr],
 ) -> ColExpr[Int]:
     """
@@ -356,7 +356,7 @@ def rank(
 
 def row_number(
     *,
-    partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+    partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
     arrange: ColExpr | Iterable[ColExpr] | None = None,
 ) -> ColExpr[Int]:
     """
