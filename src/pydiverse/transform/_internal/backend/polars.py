@@ -355,10 +355,14 @@ def compile_ast(
             {name: name + nd.suffix for name in right_df.columns}
         )
 
-        if all(pred.op == ops.equal for pred in predicates):
+        # Do equality predicates separately because polars coalesces on them.
+        eq_predicates = [pred for pred in predicates if pred.op == ops.equal]
+        other_predicates = [pred for pred in predicates if pred.op != ops.equal]
+
+        if eq_predicates:
             left_on = []
             right_on = []
-            for pred in predicates:
+            for pred in eq_predicates:
                 left_on.append(pred.args[0])
                 right_on.append(pred.args[1])
 
@@ -392,7 +396,8 @@ def compile_ast(
                 )
 
             joined = df.join_where(
-                right_df, *(compile_col_expr(pred, name_in_df) for pred in predicates)
+                right_df,
+                *(compile_col_expr(pred, name_in_df) for pred in other_predicates),
             )
 
             if nd.how in ("left", "full"):

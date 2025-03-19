@@ -9,6 +9,7 @@ from tests.util import assert_result_equal
 def test_simple_select(df1):
     assert_result_equal(df1, lambda t: t >> select(t.col1))
     assert_result_equal(df1, lambda t: t >> select(t.col2))
+    assert_result_equal(df1, lambda t: t >> select("col1"))
 
 
 def test_reorder(df1):

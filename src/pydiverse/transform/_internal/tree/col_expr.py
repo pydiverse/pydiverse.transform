@@ -337,7 +337,7 @@ class ColExpr(Generic[T]):
     def all(
         self: ColExpr[Bool],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
         """Indicates whether every non-null value in a group is True."""
@@ -347,7 +347,7 @@ class ColExpr(Generic[T]):
     def any(
         self: ColExpr[Bool],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
         """Indicates whether at least one value in a group is True."""
@@ -602,7 +602,7 @@ class ColExpr(Generic[T]):
     def count(
         self: ColExpr,
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Int]:
         """
@@ -877,7 +877,7 @@ class ColExpr(Generic[T]):
     def max(
         self: ColExpr[Int],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Int]: ...
 
@@ -885,7 +885,7 @@ class ColExpr(Generic[T]):
     def max(
         self: ColExpr[Float],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Float]: ...
 
@@ -893,7 +893,7 @@ class ColExpr(Generic[T]):
     def max(
         self: ColExpr[Decimal],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Decimal]: ...
 
@@ -901,7 +901,7 @@ class ColExpr(Generic[T]):
     def max(
         self: ColExpr[String],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[String]: ...
 
@@ -909,7 +909,7 @@ class ColExpr(Generic[T]):
     def max(
         self: ColExpr[Datetime],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Datetime]: ...
 
@@ -917,14 +917,14 @@ class ColExpr(Generic[T]):
     def max(
         self: ColExpr[Date],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Date]: ...
 
     def max(
         self: ColExpr,
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
         """Computes the maximum value in each group."""
@@ -935,7 +935,7 @@ class ColExpr(Generic[T]):
     def mean(
         self: ColExpr[Float],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Float]: ...
 
@@ -943,7 +943,7 @@ class ColExpr(Generic[T]):
     def mean(
         self: ColExpr[Decimal],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Decimal]: ...
 
@@ -951,14 +951,14 @@ class ColExpr(Generic[T]):
     def mean(
         self: ColExpr[Int],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Float]: ...
 
     def mean(
         self: ColExpr,
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
         """Computes the average value in each group."""
@@ -969,7 +969,7 @@ class ColExpr(Generic[T]):
     def min(
         self: ColExpr[Int],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Int]: ...
 
@@ -977,7 +977,7 @@ class ColExpr(Generic[T]):
     def min(
         self: ColExpr[Float],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Float]: ...
 
@@ -985,7 +985,7 @@ class ColExpr(Generic[T]):
     def min(
         self: ColExpr[Decimal],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Decimal]: ...
 
@@ -993,7 +993,7 @@ class ColExpr(Generic[T]):
     def min(
         self: ColExpr[String],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[String]: ...
 
@@ -1001,7 +1001,7 @@ class ColExpr(Generic[T]):
     def min(
         self: ColExpr[Datetime],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Datetime]: ...
 
@@ -1009,14 +1009,14 @@ class ColExpr(Generic[T]):
     def min(
         self: ColExpr[Date],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Date]: ...
 
     def min(
         self: ColExpr,
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
         """Computes the minimum value in each group."""
@@ -1264,7 +1264,7 @@ class ColExpr(Generic[T]):
         n: int,
         fill_value: ColExpr = None,
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         arrange: ColExpr | Iterable[ColExpr] | None = None,
     ) -> ColExpr:
         """
@@ -1374,7 +1374,7 @@ class ColExpr(Generic[T]):
     def sum(
         self: ColExpr[Int],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Int]: ...
 
@@ -1382,7 +1382,7 @@ class ColExpr(Generic[T]):
     def sum(
         self: ColExpr[Float],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Float]: ...
 
@@ -1390,14 +1390,14 @@ class ColExpr(Generic[T]):
     def sum(
         self: ColExpr[Decimal],
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Decimal]: ...
 
     def sum(
         self: ColExpr,
         *,
-        partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
         """Computes the sum of values in each group."""
@@ -2473,10 +2473,19 @@ def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
 
 def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
     kwargs = {
-        key: [val] if not isinstance(val, Iterable) else val
+        key: [val]
+        if not isinstance(val, Iterable) or isinstance(val, str)
+        else list(val)
         for key, val in kwargs.items()
         if val is not None
     }
+    if (partition_by := kwargs.get("partition_by")) is not None:
+        kwargs["partition_by"] = [
+            ColName(col) if isinstance(col, str) else col for col in partition_by
+        ]
     if (arrange := kwargs.get("arrange")) is not None:
-        kwargs["arrange"] = [Order.from_col_expr(ord) for ord in arrange]
+        kwargs["arrange"] = [
+            Order.from_col_expr(ColName(ord) if isinstance(ord, str) else ord)
+            for ord in arrange
+        ]
     return {key: [wrap_literal(val) for val in arr] for key, arr in kwargs.items()}

@@ -5,9 +5,13 @@ import dataclasses
 import inspect
 from collections.abc import Callable, Iterable
 from html import escape
-from typing import Any
 from uuid import UUID
 
+import pandas as pd
+import polars as pl
+import sqlalchemy as sqa
+
+from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.pipe.pipeable import Pipeable
@@ -32,7 +36,11 @@ class Table:
     """
 
     def __init__(
-        self, resource: Any, backend: Target | None = None, *, name: str | None = None
+        self,
+        resource: pl.DataFrame | pl.LazyFrame | pd.DataFrame | sqa.Table | str | dict,
+        backend: Target | None = None,
+        *,
+        name: str | None = None,
     ):
         """
         Creates a new table.
@@ -153,6 +161,16 @@ class Table:
         database. For more information on how to set up a connection, see
         :doc:`/database_testing`.
         """
+
+        if not isinstance(resource, TableImpl):
+            errors.check_arg_type(
+                pl.DataFrame | pl.LazyFrame | pd.DataFrame | sqa.Table | str | dict,
+                "Table.__init__",
+                "resource",
+                resource,
+            )
+        errors.check_arg_type(Target | None, "Table.__init__", "backend", backend)
+        errors.check_arg_type(str | None, "Table.__init__", "name", name)
 
         self._ast: AstNode = TableImpl.from_resource(resource, backend, name=name)
         self._cache = Cache(
