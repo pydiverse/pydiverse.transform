@@ -175,7 +175,7 @@ class TestPolarsLazyImpl:
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
             >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b_df_right": [1, 2, 2, None, None]}),
+            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
             check_row_order=False,
         )
 

@@ -346,8 +346,11 @@ class Cache:
         elif isinstance(vb, Rename):
             self._update(
                 new_cols=[
-                    (new_name if (new_name := vb.name_map.get(name)) else name, col)
-                    for name, col in self.name_to_uuid.items()
+                    (
+                        new_name if (new_name := vb.name_map.get(name)) else name,
+                        self.all_cols[uid],
+                    )
+                    for name, uid in self.name_to_uuid.items()
                 ]
             )
 

@@ -203,7 +203,7 @@ def collect(table: Table, target: Target | None = None) -> Pipeable:
             target,
             name=table._ast.name,
             # preserve UUIDs and by this column references across collect()
-            uuids={name: col._uuid for name, col in table._cache.cols.items()},
+            uuids={name: uid for name, uid in table._cache.name_to_uuid.items()},
         )
     )
     new._cache.derived_from = table._cache.derived_from | {new._ast}
@@ -471,12 +471,14 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     new._ast = Rename(table._ast, name_map)
     new._cache = copy.copy(table._cache)
 
-    if d := set(name_map) - set(table._cache.cols):
+    if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(
             f"no column with name `{next(iter(d))}` in table `{table._ast.name}`"
         )
 
-    if d := (set(table._cache.cols) - set(name_map)) & set(name_map.values()):
+    if d := (set(table._cache.name_to_uuid).difference(name_map)) & set(
+        name_map.values()
+    ):
         raise ValueError(f"duplicate column name `{next(iter(d))}`")
 
     new._cache.update(new._ast)
