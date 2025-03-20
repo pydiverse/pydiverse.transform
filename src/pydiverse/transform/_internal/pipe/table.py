@@ -326,9 +326,7 @@ class Cache:
                 for name, uid in self.name_to_uuid.items()
             }
             self.uuid_to_name = self.uuid_to_name | {
-                uid: new_name
-                for name, uid in self.name_to_uuid.items()
-                if (new_name := vb.name_map.get(name))
+                uid: name for name, uid in self.name_to_uuid.items()
             }
 
         elif isinstance(vb, Mutate | Summarize):

@@ -1051,7 +1051,9 @@ def join(
     if suffix is None:
         suffix = "_right"
 
-    left_names = set(left._cache.name_to_uuid.keys())
+    left_names = set(left._cache.uuid_to_name[col._uuid] for col in left)
+    right_names = set(right._cache.uuid_to_name[col._uuid] for col in right)
+
     if user_suffix is not None:
         for name in right._cache.name_to_uuid.keys():
             if name + suffix in left_names:
@@ -1061,9 +1063,9 @@ def join(
                     "hint: Specify a different suffix to prevent name collisions or "
                     "none at all for automatic name collision resolution."
                 )
-    elif (set(right._cache.name_to_uuid.keys()) - ignore_right) & left_names:
+    elif (right_names - ignore_right) & left_names:
         cnt = 0
-        for name in set(right._cache.name_to_uuid.keys()) - ignore_right:
+        for name in right_names - ignore_right:
             suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
             while suffixed in left_names:
                 cnt += 1
