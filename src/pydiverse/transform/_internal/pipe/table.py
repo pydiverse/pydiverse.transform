@@ -174,8 +174,8 @@ class Table:
 
         self._ast: AstNode = TableImpl.from_resource(resource, backend, name=name)
         self._cache = Cache(
-            self._ast.cols,
             list(self._ast.cols.values()),
+            {col.name: col._uuid for col in self._ast.cols.values()},
             {col._uuid: col.name for col in self._ast.cols.values()},
             [],
             {self._ast},
@@ -198,7 +198,7 @@ class Table:
             raise ValueError(
                 f"column `{name}` does not exist in table `{self._ast.name}`"
             )
-        col = self._cache.cols[name]
+        col = self._cache.all_cols[self._cache.name_to_uuid[name]]
         return Col(name, self._ast, col._uuid, col._dtype, col._ftype)
 
     def __setstate__(self, d):  # to avoid very annoying AttributeErrors
@@ -257,7 +257,11 @@ class Table:
         return table_str
 
     def __dir__(self) -> list[str]:
-        return [name for name in self._cache.cols.keys() if self._cache.has_col(name)]
+        return [
+            name
+            for name in self._cache.name_to_uuid.keys()
+            if self._cache.has_col(name)
+        ]
 
     def _repr_html_(self) -> str | None:
         html = (
@@ -287,8 +291,8 @@ class Table:
 class Cache:
     # TODO: think about what sets of columns are in the respective structures and
     # write this here.
-    cols: dict[str, Col]
     select: list[Col]
+    name_to_uuid: dict[str, UUID]
     uuid_to_name: dict[UUID, str]  # only the selected UUIDs
     partition_by: list[Col]
     # all nodes that this table is derived from (it cannot be joined with another node
@@ -301,21 +305,19 @@ class Cache:
             return col._uuid in self.uuid_to_name
         if isinstance(col, ColName):
             col = col.name
-        return col in self.cols and self.cols[col]._uuid in self.uuid_to_name
+        return col in self.name_to_uuid and self.name_to_uuid[col] in self.uuid_to_name
 
     def _update(
         self,
         *,
         new_select: list[Col] | None = None,
-        new_cols: dict[str, Col] | None = None,
+        new_cols: list[tuple[str, Col]] | None = None,
     ):
         if new_select is not None:
             self.select = new_select
         if new_cols is not None:
-            self.cols = new_cols
-            self.all_cols = self.all_cols | {
-                col._uuid: col for col in new_cols.values()
-            }
+            self.name_to_uuid = {name: col._uuid for name, col in new_cols}
+            self.all_cols = self.all_cols | {col._uuid: col for _, col in new_cols}
 
         if new_select is not None or new_cols is not None:
             selected_uuids = (
@@ -323,11 +325,19 @@ class Cache:
                 if new_select is None
                 else set(col._uuid for col in new_select)
             )
-            self.uuid_to_name = {
-                col._uuid: name
-                for name, col in self.cols.items()
-                if col._uuid in selected_uuids
-            }
+
+            if new_cols is None:
+                self.uuid_to_name = {
+                    uid: name
+                    for name, uid in self.name_to_uuid.items()
+                    if uid in selected_uuids
+                }
+            else:
+                self.uuid_to_name = {
+                    col._uuid: name
+                    for name, col in new_cols
+                    if col._uuid in selected_uuids
+                }
 
     def update(self, vb: Verb, rcache: Cache | None = None):
         if isinstance(vb, Select):
@@ -335,14 +345,16 @@ class Cache:
 
         elif isinstance(vb, Rename):
             self._update(
-                new_cols={
-                    (new_name if (new_name := vb.name_map.get(name)) else name): col
-                    for name, col in self.cols.items()
-                }
+                new_cols=[
+                    (new_name if (new_name := vb.name_map.get(name)) else name, col)
+                    for name, col in self.name_to_uuid.items()
+                ]
             )
 
         elif isinstance(vb, Mutate | Summarize):
-            new_cols = self.cols | {
+            new_cols = {
+                name: self.all_cols[uid] for name, uid in self.name_to_uuid.items()
+            } | {
                 name: Col(
                     name,
                     vb,
@@ -353,7 +365,9 @@ class Cache:
                 for name, val, uid in zip(vb.names, vb.values, vb.uuids, strict=True)
             }
 
-            overwritten = {col_name for col_name in vb.names if col_name in self.cols}
+            overwritten = {
+                col_name for col_name in vb.names if col_name in self.name_to_uuid
+            }
 
             self._update(
                 new_select=(
@@ -366,7 +380,7 @@ class Cache:
                     else self.partition_by
                 )
                 + [new_cols[name] for name in vb.names],
-                new_cols=new_cols,
+                new_cols=list(new_cols.items()),
             )
 
             if isinstance(vb, Summarize):
@@ -374,8 +388,14 @@ class Cache:
 
         elif isinstance(vb, Join):
             self._update(
-                new_cols=self.cols
-                | {name + vb.suffix: col for name, col in rcache.cols.items()},
+                new_cols=[
+                    (name, self.all_cols[uid])
+                    for name, uid in self.name_to_uuid.items()
+                ]
+                + [
+                    (name + vb.suffix, rcache.all_cols[uid])
+                    for name, uid in rcache.name_to_uuid.items()
+                ],
                 new_select=self.select + rcache.select,
             )
 

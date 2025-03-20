@@ -134,10 +134,10 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
         new_select=[
             new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
         ],
-        new_cols={
-            name: new._cache.all_cols[uuid_map[col._uuid]]
-            for name, col in table._cache.cols.items()
-        },
+        new_cols=[
+            (name, new._cache.all_cols[uuid_map[uid]])
+            for name, uid in table._cache.name_to_uuid.items()
+        ],
     )
 
     new._cache.derived_from = set(new._ast.iter_subtree_postorder())
@@ -1048,9 +1048,9 @@ def join(
     if suffix is None:
         suffix = "_right"
 
-    left_names = set(left._cache.cols.keys())
+    left_names = set(left._cache.name_to_uuid.keys())
     if user_suffix is not None:
-        for name in right._cache.cols.keys():
+        for name in right._cache.name_to_uuid.keys():
             if name + suffix in left_names:
                 raise ValueError(
                     f"column name `{name + suffix}` appears both in the left and right "
@@ -1058,9 +1058,9 @@ def join(
                     "hint: Specify a different suffix to prevent name collisions or "
                     "none at all for automatic name collision resolution."
                 )
-    else:
+    elif (set(right._cache.name_to_uuid.keys()) - ignore_right) & left_names:
         cnt = 0
-        for name in set(right._cache.cols.keys()) - ignore_right:
+        for name in set(right._cache.name_to_uuid.keys()) - ignore_right:
             suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
             while suffixed in left_names:
                 cnt += 1
@@ -1068,6 +1068,8 @@ def join(
 
         if cnt > 0:
             suffix += f"_{cnt}"
+    else:
+        suffix = ""
 
     new = copy.copy(left)
     new._ast = Join(left._ast, right._ast, on, how, validate, suffix, coalesce)

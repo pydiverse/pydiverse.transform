@@ -344,7 +344,7 @@ def compile_ast(
 
         predicates = split_join_cond(nd.on)
         right_df = right_df.rename(
-            {name: name + nd.suffix for name in right_df.columns}
+            {name: name + nd.suffix for name in right_df.collect_schema().names()}
         )
 
         # Do equality predicates separately because polars coalesces on them.
