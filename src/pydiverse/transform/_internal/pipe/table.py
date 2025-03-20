@@ -307,52 +307,29 @@ class Cache:
             col = col.name
         return col in self.name_to_uuid and self.name_to_uuid[col] in self.uuid_to_name
 
-    def _update(
-        self,
-        *,
-        new_select: list[Col] | None = None,
-        new_cols: list[tuple[str, Col]] | None = None,
-    ):
-        if new_select is not None:
-            self.select = new_select
-        if new_cols is not None:
-            self.name_to_uuid = {name: col._uuid for name, col in new_cols}
-            self.all_cols = self.all_cols | {col._uuid: col for _, col in new_cols}
-
-        if new_select is not None or new_cols is not None:
-            selected_uuids = (
-                self.uuid_to_name
-                if new_select is None
-                else set(col._uuid for col in new_select)
-            )
-
-            if new_cols is None:
-                self.uuid_to_name = {
-                    uid: name
-                    for name, uid in self.name_to_uuid.items()
-                    if uid in selected_uuids
-                }
-            else:
-                self.uuid_to_name = {
-                    col._uuid: name
-                    for name, col in new_cols
-                    if col._uuid in selected_uuids
-                }
-
     def update(self, vb: Verb, rcache: Cache | None = None):
         if isinstance(vb, Select):
-            self._update(new_select=vb.select)
+            self.select = vb.select
+            selected_uuids = set(col._uuid for col in self.select)
+            selected_names = set(
+                name for uid, name in self.uuid_to_name.items() if uid in selected_uuids
+            )
+            self.uuid_to_name = {
+                uid: name
+                for uid, name in self.uuid_to_name.items()
+                if name in selected_names
+            }
 
         elif isinstance(vb, Rename):
-            self._update(
-                new_cols=[
-                    (
-                        new_name if (new_name := vb.name_map.get(name)) else name,
-                        self.all_cols[uid],
-                    )
-                    for name, uid in self.name_to_uuid.items()
-                ]
-            )
+            self.name_to_uuid = {
+                (new_name if (new_name := vb.name_map.get(name)) else name): uid
+                for name, uid in self.name_to_uuid.items()
+            }
+            self.uuid_to_name = self.uuid_to_name | {
+                uid: new_name
+                for name, uid in self.name_to_uuid.items()
+                if (new_name := vb.name_map.get(name))
+            }
 
         elif isinstance(vb, Mutate | Summarize):
             new_cols = {
@@ -372,35 +349,39 @@ class Cache:
                 col_name for col_name in vb.names if col_name in self.name_to_uuid
             }
 
-            self._update(
-                new_select=(
-                    [
-                        col
-                        for col in self.select
-                        if self.uuid_to_name[col._uuid] not in overwritten
-                    ]
-                    if isinstance(vb, Mutate)
-                    else self.partition_by
-                )
-                + [new_cols[name] for name in vb.names],
-                new_cols=list(new_cols.items()),
-            )
+            if isinstance(vb, Mutate):
+                self.select = [
+                    col
+                    for col in self.select
+                    if self.uuid_to_name[col._uuid] not in overwritten
+                ]
+            else:
+                self.select = self.partition_by
+            self.select = self.select + [new_cols[name] for name in vb.names]
+
+            self.all_cols = self.all_cols | {
+                col._uuid: col for _, col in new_cols.items()
+            }
+            self.name_to_uuid = {name: col._uuid for name, col in new_cols.items()}
+            self.uuid_to_name = {
+                uid: name
+                for uid, name in self.uuid_to_name.items()
+                if name not in overwritten
+            } | {uid: name for uid, name in zip(vb.uuids, vb.names, strict=False)}
 
             if isinstance(vb, Summarize):
                 self.partition_by = []
 
         elif isinstance(vb, Join):
-            self._update(
-                new_cols=[
-                    (name, self.all_cols[uid])
-                    for name, uid in self.name_to_uuid.items()
-                ]
-                + [
-                    (name + vb.suffix, rcache.all_cols[uid])
-                    for name, uid in rcache.name_to_uuid.items()
-                ],
-                new_select=self.select + rcache.select,
-            )
+            self.select = self.select + rcache.select
+            self.all_cols = self.all_cols | rcache.all_cols
+            self.name_to_uuid = self.name_to_uuid | {
+                name + vb.suffix: uid for name, uid in rcache.name_to_uuid.items()
+            }
+
+            self.uuid_to_name = self.uuid_to_name | {
+                uid: name + vb.suffix for uid, name in rcache.uuid_to_name.items()
+            }
 
             self.derived_from = self.derived_from | rcache.derived_from
 

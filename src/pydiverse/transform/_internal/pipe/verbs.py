@@ -130,15 +130,15 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
         new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.partition_by
     ]
 
-    new._cache._update(
-        new_select=[
-            new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
-        ],
-        new_cols=[
-            (name, new._cache.all_cols[uuid_map[uid]])
-            for name, uid in table._cache.name_to_uuid.items()
-        ],
-    )
+    new._cache.select = [
+        new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
+    ]
+    new._cache.name_to_uuid = {
+        name: uuid_map[uid] for name, uid in table._cache.name_to_uuid.items()
+    }
+    new._cache.uuid_to_name = {
+        uuid_map[uid]: name for uid, name in table._cache.uuid_to_name.items()
+    }
 
     new._cache.derived_from = set(new._ast.iter_subtree_postorder())
 
@@ -357,6 +357,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     new._cache.update(new._ast)
     # TODO: prevent selection of overwritten columns
 
+    assert len(new) == len(cols)
     return new
 
 
@@ -1084,10 +1085,9 @@ def join(
     new._cache.update(new._ast, rcache=right._cache)
     new._ast.on = preprocess_arg(new._ast.on, new)
     ignore_uuids = set(right[col]._uuid for col in ignore_right)
-    new._cache._update(
-        new_select=left._cache.select
-        + [col for col in right._cache.select if col._uuid not in ignore_uuids]
-    )
+    new._cache.select = left._cache.select + [
+        col for col in right._cache.select if col._uuid not in ignore_uuids
+    ]
 
     return new
 
