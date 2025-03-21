@@ -35,6 +35,7 @@ from pydiverse.transform._internal.tree.types import (
     Int16,
     Int32,
     Int64,
+    List,
     NullType,
     String,
     Uint8,
@@ -469,6 +470,8 @@ def pdt_type(pl_type: pl.DataType) -> Dtype:
         return Date()
     elif isinstance(pl_type, pl.Duration):
         return Duration()
+    elif isinstance(pl_type, pl.List):
+        return List()
     elif isinstance(pl_type, pl.Null):
         return NullType()
 
@@ -511,6 +514,8 @@ def polars_type(pdt_type: Dtype) -> pl.DataType:
         return pl.Date()
     elif pdt_type <= Duration():
         return pl.Duration()
+    elif pdt_type <= List():
+        return pl.List
     elif pdt_type <= NullType():
         return pl.Null()
 

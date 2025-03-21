@@ -597,6 +597,19 @@ class TestPolarsLazyImpl:
             (e >> mutate(j=e.col2 + tbl1.col1)).j.export(Polars()),
         )
 
+    def test_list(self, tbl1):
+        df = tbl1 >> export(Polars())
+        df = df.with_columns(l=[[1, 2], [], [4, 5, 5], [2, 3]])
+        assert_equal(pdt.Table(df), df)
+        d = {"a": [["b", "aa"], ["a"], []]}
+        t = pdt.Table(d)
+        s = pl.DataFrame(d)
+        assert_equal(t, s)
+        assert_equal(
+            t >> mutate(b=[[5], [0.3, 3.66], []]),
+            s.with_columns(b=[[5], [0.3, 3.66], []]),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
