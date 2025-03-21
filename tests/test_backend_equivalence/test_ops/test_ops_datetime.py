@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pydiverse.transform as pdt
 from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
@@ -153,6 +154,17 @@ def test_day_of_year(df_datetime):
         >> mutate(
             x=C.col1.dt.day_of_year(),
             y=C.col2.dt.day_of_year(),
+        ),
+    )
+
+
+def test_cast(df_datetime):
+    assert_result_equal(
+        df_datetime,
+        lambda t: t
+        >> mutate(
+            x=t.cdate.cast(pdt.Datetime()),
+            y=t.col1.cast(pdt.Date()),
         ),
     )
 

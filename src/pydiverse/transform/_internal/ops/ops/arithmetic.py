@@ -28,8 +28,6 @@ sub = Operator(
     *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC),
     Signature(Datetime(), Datetime(), return_type=Duration()),
     Signature(Date(), Date(), return_type=Duration()),
-    Signature(Datetime(), Date(), return_type=Duration()),
-    Signature(Date(), Datetime(), return_type=Duration()),
     doc="Subtraction -",
 )
 

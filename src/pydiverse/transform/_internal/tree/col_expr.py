@@ -1351,12 +1351,6 @@ class ColExpr(Generic[T]):
     @overload
     def __sub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
 
-    @overload
-    def __sub__(self: ColExpr[Datetime], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
-
-    @overload
-    def __sub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
-
     def __sub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Subtraction -"""
 
@@ -1378,12 +1372,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rsub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
-
-    @overload
-    def __rsub__(self: ColExpr[Datetime], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
-
-    @overload
-    def __rsub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __rsub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Subtraction -"""
@@ -2382,6 +2370,7 @@ class Cast(ColExpr):
                     for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)
                 ),
                 (Datetime(), Date()),
+                (Date(), Datetime()),
                 *(
                     (t, String())
                     for t in (
