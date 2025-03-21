@@ -912,7 +912,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 @overload
 def join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
@@ -925,7 +925,7 @@ def join(
 def join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
@@ -1100,7 +1100,7 @@ def join(
 @overload
 def inner_join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1112,7 +1112,7 @@ def inner_join(
 def inner_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1130,7 +1130,7 @@ def inner_join(
 @overload
 def left_join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1142,7 +1142,7 @@ def left_join(
 def left_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1160,7 +1160,7 @@ def left_join(
 @overload
 def full_join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
@@ -1172,7 +1172,7 @@ def full_join(
 def full_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,

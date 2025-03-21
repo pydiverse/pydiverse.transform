@@ -25,3 +25,4 @@ Aggregation functions take a ``partition_by`` and ``filter`` keyword argument. T
     mean
     min
     sum
+    str.join

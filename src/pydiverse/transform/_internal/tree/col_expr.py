@@ -1553,6 +1553,29 @@ class StrNamespace(FnNamespace):
 
         return ColFn(ops.str_ends_with, self.arg, suffix)
 
+    def join(
+        self: ColExpr[String],
+        delimiter: str = "",
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[String]:
+        """
+        Concatenates all strings in a group to a single string.
+
+        :param delimiter:
+            The string to insert between the elements."""
+
+        return ColFn(
+            ops.str_join,
+            self.arg,
+            delimiter,
+            partition_by=partition_by,
+            filter=filter,
+            arrange=arrange,
+        )
+
     def len(self: ColExpr[String]) -> ColExpr[Int]:
         """
         Computes the length of the string.

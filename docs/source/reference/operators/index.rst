@@ -94,6 +94,7 @@ Expression methods
    shift
    str.contains
    str.ends_with
+   str.join
    str.len
    str.lower
    str.replace_all

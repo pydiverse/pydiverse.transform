@@ -63,7 +63,7 @@ def generate_fn_decl(
         name
         + ": "
         + type_annotation(dtype, specialize_generic)
-        + (f" = {default_val}" if default_val is not ... else "")
+        + (f" = {repr(default_val)}" if default_val is not ... else "")
         for dtype, name, default_val in zip(
             sig.types, op.param_names, defaults, strict=True
         )

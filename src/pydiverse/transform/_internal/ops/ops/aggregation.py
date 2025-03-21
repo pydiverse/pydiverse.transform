@@ -10,6 +10,7 @@ from pydiverse.transform._internal.tree.types import (
     Decimal,
     Float,
     Int,
+    String,
 )
 
 
@@ -18,17 +19,24 @@ class Aggregation(Operator):
         self,
         name: str,
         *signatures: Signature,
+        context_kwargs=None,
+        param_names=None,
+        default_values=None,
         generate_expr_method: bool = True,
         doc: str = "",
     ):
+        if context_kwargs is None:
+            context_kwargs = [
+                ContextKwarg("partition_by", False),
+                ContextKwarg("filter", False),
+            ]
         super().__init__(
             name,
             *signatures,
             ftype=Ftype.AGGREGATE,
-            context_kwargs=[
-                ContextKwarg("partition_by", False),
-                ContextKwarg("filter", False),
-            ],
+            context_kwargs=context_kwargs,
+            param_names=param_names,
+            default_values=default_values,
             generate_expr_method=generate_expr_method,
             doc=doc,
         )
@@ -86,4 +94,21 @@ count_star = Aggregation(
     doc="""
 Returns the number of rows of the current table, like :code:`COUNT(*)` in SQL.
 """,
+)
+
+str_join = Aggregation(
+    "str.join",
+    Signature(String(), String(const=True), return_type=String()),
+    param_names=["self", "delimiter"],
+    default_values=[..., ""],
+    context_kwargs=[
+        ContextKwarg("partition_by"),
+        ContextKwarg("filter"),
+        ContextKwarg("arrange"),
+    ],
+    doc="""
+Concatenates all strings in a group to a single string.
+
+:param delimiter:
+    The string to insert between the elements.""",
 )

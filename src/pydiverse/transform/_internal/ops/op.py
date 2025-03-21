@@ -18,7 +18,7 @@ class Ftype(enum.IntEnum):
 @dataclasses.dataclass(slots=True)
 class ContextKwarg:
     name: str
-    required: bool
+    required: bool = False
 
 
 class Operator:

@@ -953,3 +953,7 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.coalesce)
     def _coalesce(*x):
         return sqa.func.coalesce(*x)
+
+    @impl(ops.str_join)
+    def _str_join(x, delim):
+        return sqa.func.aggregate_strings(x, delim)

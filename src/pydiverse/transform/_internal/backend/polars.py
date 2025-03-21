@@ -748,3 +748,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.pow, Int(), Int())
     def _pow(x, y):
         return x.cast(pl.Float64()) ** y
+
+    @impl(ops.str_join)
+    def _str_join(x, delim):
+        return x.str.join(delim)
