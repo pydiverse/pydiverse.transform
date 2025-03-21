@@ -751,4 +751,4 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.str_join)
     def _str_join(x, delim):
-        return x.str.join(delim)
+        return x.str.join(pl.select(delim).item())

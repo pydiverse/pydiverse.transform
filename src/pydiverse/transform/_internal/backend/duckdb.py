@@ -78,3 +78,7 @@ with DuckDbImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return ~sqa.func.isnan(x)
+
+    @impl(ops.str_join)
+    def _str_join(x, delim):
+        return sqa.func.string_agg(x, delim)

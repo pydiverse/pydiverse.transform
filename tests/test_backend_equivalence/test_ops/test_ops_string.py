@@ -154,3 +154,9 @@ def test_slice(df_strings):
             w=t.col1.str.slice(2, t.col1.str.len()),
         ),
     )
+
+
+def test_str_join(df_strings):
+    assert_result_equal(
+        df_strings, lambda t: t >> group_by(t.e) >> summarize(con=t.c.str.join(", "))
+    )
