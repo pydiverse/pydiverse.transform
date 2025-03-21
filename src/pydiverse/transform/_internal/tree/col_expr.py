@@ -15,6 +15,7 @@ from uuid import UUID
 import pandas as pd
 import polars as pl
 
+from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops import ops, signature
@@ -158,7 +159,7 @@ class ColExpr(Generic[T]):
             wrap_literal(default) if default is not None else self,
         )
 
-    def cast(self, target_type: Dtype) -> Cast:
+    def cast(self, target_type: Dtype | type) -> Cast:
         """
         Cast to a different data type.
 
@@ -233,6 +234,13 @@ class ColExpr(Generic[T]):
         │ -0.2   ┆ 0    │
         └────────┴──────┘
         """
+
+        errors.check_arg_type(Dtype | type, "ColExpr.cast", "target_type", target_type)
+        if type(target_type) is type and not issubclass(target_type, Dtype):
+            TypeError(
+                "argument for parameter `target_type` of `ColExpr.cast` must be an"
+                "instance or subclass of pdt.Dtype"
+            )
         return Cast(self, target_type)
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -2061,7 +2069,7 @@ class LiteralCol(ColExpr):
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
     def __repr__(self):
-        return f"lit({self.val}, {self.dtype()})"
+        return f"lit({repr(self.val)}, {self.dtype()})"
 
 
 class ColFn(ColExpr):
@@ -2346,6 +2354,8 @@ class CaseExpr(ColExpr):
 
 class Cast(ColExpr):
     def __init__(self, val: ColExpr, target_type: Dtype):
+        if type(target_type) is type:
+            target_type = target_type()
         if target_type.const:
             raise TypeError("cannot cast to `const` type")
 
@@ -2468,6 +2478,9 @@ class Order:
 
     def iter_subtree(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_subtree()
+
+    def iter_children(self) -> Iterable[ColExpr]:
+        yield from self.order_by.iter_children()
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> Order:
         return Order(self.order_by.map_subtree(g), self.descending, self.nulls_last)
