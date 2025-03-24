@@ -238,8 +238,20 @@ def compile_ast(
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
-    if isinstance(nd, verbs.Mutate | verbs.Summarize):
-        overwritten = set(name for name in nd.names if name in set(select))
+        if isinstance(nd, verbs.Join):
+            right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
+
+    if isinstance(nd, verbs.Mutate | verbs.Summarize | verbs.Join):
+        all_names = set(name_in_df.values())
+        if isinstance(nd, verbs.Mutate | verbs.Summarize):
+            overwritten = set(name for name in nd.names if name in all_names)
+        else:
+            overwritten = set(
+                name + nd.suffix
+                for name in right_select
+                if name + nd.suffix in all_names
+            )
+
         if overwritten:
             # We rename overwritten cols to some unique dummy name
             name_map = {name: f"{name}_{str(hex(id(nd)))[2:]}" for name in overwritten}
@@ -335,7 +347,6 @@ def compile_ast(
         partition_by = []
 
     elif isinstance(nd, verbs.Join):
-        right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
         assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
         name_in_df.update(
             {uid: name + nd.suffix for uid, name in right_name_in_df.items()}
