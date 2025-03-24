@@ -544,22 +544,44 @@ class SqlImpl(TableImpl):
                     raise ValueError("invalid filter before full join")
 
             query.join.append(j)
-            ignore_right = set()
+            join_cols = set()
             if nd.coalesce:
                 predicates = split_join_cond(nd.on)
-                ignore_right = {sqa_col[pred.args[0]._uuid].name for pred in predicates}
+                join_cols = {sqa_col[pred.args[0]._uuid].name for pred in predicates}
+
+                left_join_uid = {
+                    lb.name: uid
+                    for uid, lb in sqa_col.items()
+                    if lb.name in join_cols and uid not in right_sqa_col
+                }
+                right_join_uid = {
+                    lb.name[: -len(nd.suffix)]: uid
+                    for uid, lb in sqa_col.items()
+                    if lb.name[: -len(nd.suffix)] in join_cols and uid in right_sqa_col
+                }
+                merged = {
+                    name: sqa.func.coalesce(
+                        sqa_col[left_uid], sqa_col[right_join_uid[name]]
+                    )
+                    for name, left_uid in left_join_uid.items()
+                }
+
                 sqa_col.update(
-                    {
-                        uid: right_sqa_col[uid]
-                        for uid, lb in sqa_col.items()
-                        if uid in right_sqa_col and lb.name in ignore_right
+                    {left_uid: merged[name] for name, left_uid in left_join_uid.items()}
+                    | {
+                        right_uid: merged[name]
+                        for name, right_uid in right_join_uid.items()
                     }
                 )
+
+                query.select = [
+                    sqa.Label(name, col) for name, col in merged.items()
+                ] + [lb for lb in query.select if lb.name not in join_cols]
 
             query.select += [
                 sqa.Label(lb.name + nd.suffix, lb)
                 for lb in right_query.select
-                if lb.name not in ignore_right
+                if lb.name not in join_cols
             ]
 
         elif isinstance(nd, TableImpl):

@@ -969,8 +969,7 @@ def join(
     :param coalesce:
         If `on` is a list of strings and `coalesce=True`, the join columns are merged.
         If there are no column name collisions apart from the join columns, no suffix is
-        appended to columns of the right table. Can currently only be used with inner
-        and left join.
+        appended to columns of the right table.
 
 
     Note
@@ -1022,9 +1021,6 @@ def join(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
     errors.check_arg_type(bool, "join", "coalesce", coalesce)
-
-    if how == "full" and coalesce:
-        raise ValueError("cannot use `coalesce=True` with full join")
 
     if isinstance(on, str):
         on = [on]
