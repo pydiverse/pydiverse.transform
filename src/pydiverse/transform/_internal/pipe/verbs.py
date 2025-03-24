@@ -654,6 +654,8 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     if len(order_by) == 0:
         return table
 
+    order_by = [ColName(col) if isinstance(col, str) else col for col in order_by]
+
     new = copy.copy(table)
     new._ast = Arrange(
         table._ast,
@@ -964,6 +966,12 @@ def join(
         name collisions, additionally an integer is appended to the column names of the
         right table.
 
+    :param coalesce:
+        If `on` is a list of strings and `coalesce=True`, the join columns are merged.
+        If there are no column name collisions apart from the join columns, no suffix is
+        appended to columns of the right table. Can currently only be used with inner
+        and left join.
+
 
     Note
     ----
@@ -1014,6 +1022,9 @@ def join(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
     errors.check_arg_type(bool, "join", "coalesce", coalesce)
+
+    if how == "full" and coalesce:
+        raise ValueError("cannot use `coalesce=True` with full join")
 
     if isinstance(on, str):
         on = [on]
