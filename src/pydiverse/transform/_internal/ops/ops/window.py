@@ -4,7 +4,7 @@ from typing import Any
 
 from pydiverse.transform._internal.ops.op import ContextKwarg, Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import D, Int, Tvar
+from pydiverse.transform._internal.tree.types import NUMERIC, D, Int, Tvar
 
 
 class Window(Operator):
@@ -200,5 +200,15 @@ shape: (7, 3)
 │ null ┆ 1   ┆ 1   │
 │ 8    ┆ 4   ┆ 4   │
 └──────┴─────┴─────┘
+""",
+)
+
+prefix_sum = Window(
+    "prefix_sum",
+    *(Signature(dtype, return_type=dtype) for dtype in NUMERIC),
+    generate_expr_method=True,
+    arrange_required=False,
+    doc="""
+The sum of all preceding elements and the current element.
 """,
 )

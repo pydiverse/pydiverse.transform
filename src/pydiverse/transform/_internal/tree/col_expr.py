@@ -1269,6 +1269,42 @@ class ColExpr(Generic[T]):
         return ColFn(ops.pow, rhs, self)
 
     @overload
+    def prefix_sum(
+        self: ColExpr[Int],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[Int]: ...
+
+    @overload
+    def prefix_sum(
+        self: ColExpr[Float],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[Float]: ...
+
+    @overload
+    def prefix_sum(
+        self: ColExpr[Decimal],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[Decimal]: ...
+
+    def prefix_sum(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr:
+        """
+        The sum of all preceding elements and the current element.
+        """
+
+        return ColFn(ops.prefix_sum, self, partition_by=partition_by, arrange=arrange)
+
+    @overload
     def round(self: ColExpr[Int], decimals: int = 0) -> ColExpr[Int]: ...
 
     @overload

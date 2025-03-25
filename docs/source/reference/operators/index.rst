@@ -89,6 +89,7 @@ Expression methods
    min
    nulls_first
    nulls_last
+   prefix_sum
    rank
    round
    shift

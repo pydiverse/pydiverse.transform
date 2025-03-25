@@ -617,6 +617,12 @@ class TestPolarsLazyImpl:
             s.with_columns(b=[[5], [0.3, 3.66], []]),
         )
 
+    def test_prefix_sum(self, tbl1):
+        assert_equal(
+            tbl1 >> mutate(p=tbl1.col1.prefix_sum()),
+            df1.with_columns(p=pl.col("col1").cum_sum()),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
