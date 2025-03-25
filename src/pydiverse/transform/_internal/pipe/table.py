@@ -330,9 +330,16 @@ class Cache:
             }
 
         elif isinstance(vb, Mutate | Summarize):
-            new_cols = {
-                name: self.all_cols[uid] for name, uid in self.name_to_uuid.items()
-            } | {
+            if isinstance(vb, Mutate):
+                new_cols = {
+                    name: self.all_cols[uid] for name, uid in self.name_to_uuid.items()
+                }
+            else:
+                # Summarize
+                new_cols = {
+                    self.uuid_to_name[col._uuid]: col for col in self.partition_by
+                }
+            new_cols |= {
                 name: Col(
                     name,
                     vb,

@@ -15,7 +15,7 @@ from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Col, ColFn
+from pydiverse.transform._internal.tree.col_expr import Col, ColFn, LiteralCol
 from pydiverse.transform._internal.tree.types import Dtype
 
 try:
@@ -148,8 +148,10 @@ def get_backend(nd: AstNode) -> type[TableImpl]:
 
 
 def split_join_cond(expr: ColFn) -> list[ColFn]:
-    assert isinstance(expr, ColFn)
-    if expr.op == ops.bool_and:
+    assert isinstance(expr, ColFn | LiteralCol)
+    if isinstance(expr, LiteralCol):
+        return []
+    elif expr.op == ops.bool_and:
         return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
     else:
         return [expr]

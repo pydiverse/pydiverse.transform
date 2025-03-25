@@ -242,7 +242,10 @@ def compile_ast(
             right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
 
     if isinstance(nd, verbs.Mutate | verbs.Summarize | verbs.Join):
-        all_names = set(name_in_df.values())
+        if isinstance(nd, verbs.Summarize):
+            all_names = set(partition_by)
+        else:
+            all_names = set(name_in_df.values())
         if isinstance(nd, verbs.Mutate | verbs.Summarize):
             overwritten = set(name for name in nd.names if name in all_names)
         else:
@@ -330,6 +333,11 @@ def compile_ast(
         else:
             df = df.select(**aggregations)
 
+        # remove columns dropped by summarize after they might have been used in
+        # expressions
+        name_in_df = {
+            name: uuid for name, uuid in name_in_df.items() if name in all_names
+        }
         name_in_df.update(
             {uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)}
         )
