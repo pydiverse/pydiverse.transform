@@ -194,7 +194,7 @@ class Table:
         if name in ("__copy__", "__deepcopy__", "__setstate__", "__getstate__"):
             # for hasattr to work correctly on dunder methods
             raise AttributeError
-        if not self._cache.has_col(name):
+        if name not in self._cache.name_to_uuid:
             raise ValueError(
                 f"column `{name}` does not exist in table `{self._ast.name}`"
             )
@@ -335,7 +335,6 @@ class Cache:
                     name: self.all_cols[uid] for name, uid in self.name_to_uuid.items()
                 }
             else:
-                # Summarize
                 new_cols = {
                     self.uuid_to_name[col._uuid]: col for col in self.partition_by
                 }

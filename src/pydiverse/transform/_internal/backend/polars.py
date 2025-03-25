@@ -240,12 +240,15 @@ def compile_ast(
 
         if isinstance(nd, verbs.Join):
             right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
+            predicates = split_join_cond(nd.on)
 
     if isinstance(nd, verbs.Mutate | verbs.Summarize | verbs.Join):
-        if isinstance(nd, verbs.Summarize):
-            all_names = set(partition_by)
-        else:
-            all_names = set(name_in_df.values())
+        all_names = (
+            set(partition_by)
+            if isinstance(nd, verbs.Summarize)
+            else set(name_in_df.values())
+        )
+
         if isinstance(nd, verbs.Mutate | verbs.Summarize):
             overwritten = set(name for name in nd.names if name in all_names)
         else:
@@ -254,6 +257,9 @@ def compile_ast(
                 for name in right_select
                 if name + nd.suffix in all_names
             )
+            if nd.coalesce:
+                join_cols = {name_in_df[pred.args[0]._uuid] for pred in predicates}
+                overwritten = overwritten.difference(join_cols)
 
         if overwritten:
             # We rename overwritten cols to some unique dummy name
@@ -362,7 +368,6 @@ def compile_ast(
 
         assert len(partition_by) == 0
 
-        predicates = split_join_cond(nd.on)
         right_df = right_df.rename(
             {name: name + nd.suffix for name in right_df.collect_schema().names()}
         )
@@ -423,25 +428,25 @@ def compile_ast(
 
             df = joined
 
-        ignore_right = set()
         if nd.coalesce:
             assert all(
                 type(pred.args[0]) is Col and type(pred.args[1]) is Col
                 for pred in predicates
             )
-            ignore_right = {name_in_df[pred.args[0]._uuid] for pred in predicates}
             name_in_df.update(
                 {
                     uid: right_name_in_df[uid]
                     for uid, name in name_in_df.items()
-                    if uid in right_name_in_df and name in ignore_right
+                    if uid in right_name_in_df and name in join_cols
                 }
             )
+        else:
+            join_cols = set()
 
         select += [
             col_name + nd.suffix
             for col_name in right_select
-            if col_name not in ignore_right
+            if col_name not in join_cols
         ]
 
     elif isinstance(nd, PolarsImpl):

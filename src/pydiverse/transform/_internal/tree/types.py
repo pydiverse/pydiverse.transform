@@ -275,6 +275,7 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
         **{t: (1, 0) for t in ALL_TYPES if t != NullType()},
     },
     Duration(): {Duration(): (0, 0)},
+    List(): {List(): (0, 0)},
 }
 
 # compute transitive closure of cost graph
