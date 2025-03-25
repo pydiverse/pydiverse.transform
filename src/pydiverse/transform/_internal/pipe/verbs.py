@@ -18,6 +18,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColExpr,
     ColFn,
     ColName,
+    LiteralCol,
     Order,
     wrap_literal,
 )
@@ -1044,6 +1045,7 @@ def join(
                 left[expr] == right[expr] if isinstance(expr, str) else expr
                 for expr in on
             ),
+            LiteralCol(True),  # initial value
         )
 
     if left._cache.partition_by:
@@ -1198,6 +1200,21 @@ def full_join(
     return left >> join(
         right, on, "full", validate=validate, suffix=suffix, coalesce=coalesce
     )
+
+
+@verb
+def cross_join(
+    left: Table,
+    right: Table,
+    *,
+    suffix: str | None = None,
+    coalesce: bool = False,
+) -> Pipeable:
+    """
+    Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
+    """
+
+    return left >> full_join(right, on=[], suffix=suffix, coalesce=coalesce)
 
 
 @overload
