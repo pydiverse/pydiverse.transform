@@ -523,7 +523,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     if len(kwargs) == 0:
         return table
 
-    names, values = map(list, zip(*kwargs.items(), strict=True))
+    names, values = kwargs.keys(), kwargs.values()
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
 
@@ -816,7 +816,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     │ false ┆ 9.0      ┆ 5.077 │
     └───────┴──────────┴───────┘
     """
-    names, values = map(list, zip(*kwargs.items(), strict=True))
+    names, values = kwargs.keys(), kwargs.values()
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
 
@@ -828,6 +828,12 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     )
 
     partition_by_uuids = {col._uuid for col in table._cache.partition_by}
+
+    if len(kwargs) == 0 and len(partition_by_uuids) == 0:
+        raise ValueError(
+            "summarize without preceding group_by needs at least one column to "
+            "summarize"
+        )
 
     def check_summarize_col_expr(expr: ColExpr, agg_fn_above: bool):
         if (

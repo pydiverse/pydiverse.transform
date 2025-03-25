@@ -12,7 +12,9 @@ def test_ungrouped(df3):
         lambda t: t >> summarize(mean3=t.col3.mean(), mean4=t.col4.mean()),
     )
 
-    assert_result_equal(df3, lambda t: t >> summarize())
+
+def test_empty_ungrouped_fail(df3):
+    assert_result_equal(df3, lambda t: t >> summarize(), exception=ValueError)
 
 
 def test_simple_grouped(df3):

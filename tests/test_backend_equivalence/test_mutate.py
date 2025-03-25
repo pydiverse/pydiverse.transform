@@ -39,6 +39,10 @@ def test_literals(df1):
     assert_result_equal(df1, lambda t: t >> mutate(u=pdt.lit(None)))
 
 
+def test_empty(df1):
+    assert_result_equal(df1, lambda t: t >> mutate())
+
+
 def test_none(df4):
     assert_result_equal(df4, lambda t: t >> mutate(x=None))
     assert_result_equal(
