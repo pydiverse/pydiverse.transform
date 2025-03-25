@@ -12,12 +12,16 @@ def test_ungrouped(df3):
         lambda t: t >> summarize(mean3=t.col3.mean(), mean4=t.col4.mean()),
     )
 
+    assert_result_equal(df3, lambda t: t >> summarize())
+
 
 def test_simple_grouped(df3):
     assert_result_equal(
         df3,
         lambda t: t >> group_by(t.col1) >> summarize(mean3=t.col3.mean()),
     )
+
+    assert_result_equal(df3, lambda t: t >> group_by(t.col1) >> summarize())
 
 
 def test_multi_grouped(df3):
