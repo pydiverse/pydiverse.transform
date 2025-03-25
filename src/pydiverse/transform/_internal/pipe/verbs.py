@@ -837,6 +837,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
         )
 
     def check_summarize_col_expr(expr: ColExpr, agg_fn_above: bool):
+        # TODO: does not catch everything (test_alias_window)
         if (
             isinstance(expr, Col)
             and expr._uuid not in partition_by_uuids
@@ -1100,6 +1101,8 @@ def join(
 
     new._cache = copy.copy(left._cache)
     new._cache.update(new._ast, rcache=right._cache)
+    # TODO: make sure that error messages (e.g. for non-existent columns) use the
+    # correct table name.
     new._ast.on = preprocess_arg(new._ast.on, new)
     ignore_uuids = set(right[col]._uuid for col in ignore_right)
     new._cache.select = left._cache.select + [
