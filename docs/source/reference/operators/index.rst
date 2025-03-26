@@ -82,6 +82,7 @@ Expression methods
    is_not_nan
    is_not_null
    is_null
+   list.agg
    log
    map
    max

@@ -17,7 +17,7 @@ COL_EXPR_PATH = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 FNS_PATH = "./src/pydiverse/transform/_internal/pipe/functions.py"
 API_DOCS_PATH = "./docs/source/reference/operators/index.rst"
 
-NAMESPACES = ["str", "dt", "dur"]
+NAMESPACES = ["str", "dt", "dur", "list"]
 
 RVERSIONS = {
     "__add__",

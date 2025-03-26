@@ -36,6 +36,7 @@ from pydiverse.transform._internal.tree.types import (
     Duration,
     Float,
     Int,
+    List,
     String,
     python_type_to_pdt,
 )
@@ -1491,6 +1492,7 @@ class ColExpr(Generic[T]):
     str: StrNamespace
     dt: DtNamespace
     dur: DurNamespace
+    list: ListNamespace
 
 
 @dataclasses.dataclass(slots=True)
@@ -2000,6 +2002,29 @@ class DurNamespace(FnNamespace):
         """"""
 
         return ColFn(ops.dur_seconds, self.arg)
+
+
+@register_accessor("list")
+@dataclasses.dataclass(slots=True)
+class ListNamespace(FnNamespace):
+    def agg(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[List]:
+        """
+        Collect the elements of each group in a list.
+        """
+
+        return ColFn(
+            ops.list_agg,
+            self.arg,
+            partition_by=partition_by,
+            arrange=arrange,
+            filter=filter,
+        )
 
 
 # --- generated code ends here, do not delete this comment ---

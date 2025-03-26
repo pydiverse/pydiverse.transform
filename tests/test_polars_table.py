@@ -604,7 +604,7 @@ class TestPolarsLazyImpl:
             (e >> mutate(j=e.col2 + tbl1.col1)).j.export(Polars()),
         )
 
-    def test_list(self, tbl1):
+    def test_list(self, tbl1, tbl3):
         df = tbl1 >> export(Polars())
         df = df.with_columns(l=[[1, 2], [], [4, 5, 5], [2, 3]])
         assert_equal(pdt.Table(df), df)
@@ -615,6 +615,16 @@ class TestPolarsLazyImpl:
         assert_equal(
             t >> mutate(b=[[5], [0.3, 3.66], []]),
             s.with_columns(b=[[5], [0.3, 3.66], []]),
+        )
+
+        assert_equal(
+            tbl3
+            >> group_by(tbl3.col1)
+            >> summarize(x=tbl3.col3.list.agg(arrange="col4"))
+            >> arrange(tbl3.col1),
+            df3.group_by(pl.col("col1"))
+            .agg(x=pl.col("col3").sort_by("col4"))
+            .sort("col1"),
         )
 
     def test_prefix_sum(self, tbl1):

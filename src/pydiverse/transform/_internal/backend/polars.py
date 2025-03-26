@@ -167,10 +167,14 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
         value: pl.Expr = impl(*args, _pdt_args=expr.args)
 
-        # TODO: currently, count is the only aggregation function where we don't want
-        # to return null for cols containing only null values. If this happens for more
-        # aggregation functions, make this configurable in e.g. the operator spec.
-        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.count_star:
+        # TODO: currently, count and list_agg are the only aggregation function where we
+        # don't want to return null for cols containing only null values. If this
+        # happens for more aggregation functions, make this configurable in e.g. the
+        # operator spec.     --> do we want it for str.join??
+        if expr.op.ftype == Ftype.AGGREGATE and expr.op not in (
+            ops.count_star,
+            ops.list_agg,
+        ):
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -190,11 +194,6 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             value = value.over(partition_by, order_by=order_by)
 
         elif arrange:
-            if expr.op.ftype == Ftype.AGGREGATE:
-                # TODO: don't fail, but give a warning that `arrange` is useless
-                # here
-                ...
-
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
@@ -819,3 +818,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.prefix_sum)
     def _prefix_sum(x):
         return x.cum_sum()
+
+    @impl(ops.list_agg)
+    def _list_agg(x):
+        return x
