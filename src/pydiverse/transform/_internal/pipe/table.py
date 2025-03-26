@@ -319,6 +319,11 @@ class Cache:
                 for uid, name in self.uuid_to_name.items()
                 if name in selected_names
             }
+            self.name_to_uuid = {
+                name: uid
+                for name, uid in self.name_to_uuid.items()
+                if name in selected_names
+            }
 
         elif isinstance(vb, Rename):
             self.name_to_uuid = {

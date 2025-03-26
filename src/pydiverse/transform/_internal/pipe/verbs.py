@@ -524,7 +524,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     if len(kwargs) == 0:
         return table
 
-    names, values = kwargs.keys(), kwargs.values()
+    names, values = list(kwargs.keys()), list(kwargs.values())
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
 
@@ -817,7 +817,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     │ false ┆ 9.0      ┆ 5.077 │
     └───────┴──────────┴───────┘
     """
-    names, values = kwargs.keys(), kwargs.values()
+    names, values = list(kwargs.keys()), list(kwargs.values())
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
 

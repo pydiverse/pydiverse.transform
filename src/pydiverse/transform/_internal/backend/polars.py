@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
@@ -73,7 +75,7 @@ class PolarsImpl(TableImpl):
         lf, _, select, _ = compile_ast(nd)
         lf = lf.select(*select)
         if isinstance(target, Polars):
-            if not target.lazy:
+            if not target.lazy and isinstance(lf, pl.LazyFrame):
                 lf = lf.collect()
             lf.name = nd.name
             return lf
@@ -238,45 +240,48 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         raise AssertionError
 
 
+def rename_overwritten_cols(
+    new_names: Iterable[str],
+    df: pl.LazyFrame,
+    name_in_df: dict[UUID, str],
+    *,
+    names_to_consider: set[str] | None = None,
+) -> tuple[pl.LazyFrame, dict[UUID, str]]:
+    if names_to_consider is None:
+        names_to_consider = set(name_in_df.values())
+    overwritten = names_to_consider.intersection(new_names)
+
+    if overwritten:
+        name_map = {
+            name: f"{name}:{str(hex(uuid.uuid1().int))[2:]}" for name in overwritten
+        }
+        name_in_df = {
+            uid: (name_map[name] if name in name_map else name)
+            for uid, name in name_in_df.items()
+        }
+        df = df.rename(name_map)
+
+    return df, name_in_df
+
+
 def compile_ast(
     nd: AstNode,
 ) -> tuple[pl.LazyFrame, dict[UUID, str], list[str], list[UUID]]:
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
-        if isinstance(nd, verbs.Join):
-            right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
-            predicates = split_join_cond(nd.on)
-
-    if isinstance(nd, verbs.Mutate | verbs.Summarize | verbs.Join):
-        all_names = (
+    if isinstance(nd, verbs.Mutate | verbs.Summarize):
+        names_to_consider = (
             set(partition_by)
             if isinstance(nd, verbs.Summarize)
             else set(name_in_df.values())
         )
-
-        if isinstance(nd, verbs.Mutate | verbs.Summarize):
-            overwritten = set(name for name in nd.names if name in all_names)
-        else:
-            overwritten = set(
-                name + nd.suffix
-                for name in right_select
-                if name + nd.suffix in all_names
-            )
-            if nd.coalesce:
-                join_cols = {name_in_df[pred.args[0]._uuid] for pred in predicates}
-                overwritten = overwritten.difference(join_cols)
-
-        if overwritten:
-            # We rename overwritten cols to some unique dummy name
-            name_map = {name: f"{name}_{str(hex(id(nd)))[2:]}" for name in overwritten}
-            name_in_df = {
-                uid: (name_map[name] if name in name_map else name)
-                for uid, name in name_in_df.items()
-            }
-            df = df.rename(name_map)
-
-        select = [col_name for col_name in select if col_name not in overwritten]
+        df, name_in_df = rename_overwritten_cols(
+            set(name for name in nd.names if name in names_to_consider),
+            df,
+            name_in_df,
+            names_to_consider=names_to_consider,
+        )
 
     if isinstance(nd, verbs.Select):
         select = [name_in_df[col._uuid] for col in nd.select]
@@ -303,7 +308,7 @@ def compile_ast(
         name_in_df.update(
             {uid: name for uid, name in zip(nd.uuids, nd.names, strict=True)}
         )
-        select += nd.names
+        select = [name for name in select if name not in nd.names] + nd.names
 
     elif isinstance(nd, verbs.Filter):
         df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.predicates])
@@ -348,7 +353,7 @@ def compile_ast(
         # remove columns dropped by summarize after they might have been used in
         # expressions
         name_in_df = {
-            name: uuid for name, uuid in name_in_df.items() if name in all_names
+            name: uuid for name, uuid in name_in_df.items() if name in partition_by
         }
         name_in_df.update(
             {uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)}
@@ -367,16 +372,58 @@ def compile_ast(
         partition_by = []
 
     elif isinstance(nd, verbs.Join):
-        assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
-        name_in_df.update(
-            {uid: name + nd.suffix for uid, name in right_name_in_df.items()}
-        )
-
         assert len(partition_by) == 0
 
+        right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
+        predicates = split_join_cond(nd.on)
+
+        # check for name collisions among hidden columns
+        # we maintain sensible names in the dataframe for all visible columns and try
+        # to do so for hidden columns, too. If a hidden column has the same name as a
+        # visible column, it gets a hash suffix. If two hidden columns collide, the
+        # right one gets a hash. (this is all after applying `nd.suffix`; we don't want
+        # to bother the user to provide a suffix only to prevent name collisions of
+        # hidden columns)
+
+        coalesce_join_cols = set()
+        if nd.coalesce:
+            assert all(
+                type(pred.args[0]) is Col and type(pred.args[1]) is Col
+                for pred in predicates
+            )
+            coalesce_join_cols = {name_in_df[pred.args[0]._uuid] for pred in predicates}
+
+        suffix_name_map = {
+            name: (name + nd.suffix if name not in coalesce_join_cols else name)
+            for name in right_name_in_df.values()
+        }
+        right_select = [suffix_name_map[name] for name in right_select]
+        right_name_in_df = {
+            uid: suffix_name_map[name] for uid, name in right_name_in_df.items()
+        }
         right_df = right_df.rename(
-            {name: name + nd.suffix for name in right_df.collect_schema().names()}
+            {name: suffix_name_map[name] for name in right_df.collect_schema().names()}
         )
+
+        # visible columns
+        right_df, right_name_in_df = rename_overwritten_cols(
+            set(select).difference(coalesce_join_cols),
+            right_df,
+            right_name_in_df,
+        )
+        df, name_in_df = rename_overwritten_cols(
+            set(right_select).difference(coalesce_join_cols), df, name_in_df
+        )
+
+        # hidden columns
+        right_df, right_name_in_df = rename_overwritten_cols(
+            set(name_in_df.values()).difference(coalesce_join_cols),
+            right_df,
+            right_name_in_df,
+        )
+
+        assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
+        name_in_df.update(right_name_in_df)
 
         # Do equality predicates separately because polars coalesces on them.
         eq_predicates = [pred for pred in predicates if pred.op == ops.equal]
@@ -434,29 +481,10 @@ def compile_ast(
 
             df = joined
 
-        if nd.coalesce:
-            assert all(
-                type(pred.args[0]) is Col and type(pred.args[1]) is Col
-                for pred in predicates
-            )
-            name_in_df.update(
-                {
-                    uid: right_name_in_df[uid]
-                    for uid, name in name_in_df.items()
-                    if uid in right_name_in_df and name in join_cols
-                }
-            )
-        else:
-            join_cols = set()
-
-        select += [
-            col_name + nd.suffix
-            for col_name in right_select
-            if col_name not in join_cols
-        ]
+        select += [name for name in right_select if name not in coalesce_join_cols]
 
     elif isinstance(nd, PolarsImpl):
-        df = nd.df
+        df = nd.df.collect()
         name_in_df = {col._uuid: col.name for col in nd.cols.values()}
         select = list(nd.cols.keys())
         partition_by = []
