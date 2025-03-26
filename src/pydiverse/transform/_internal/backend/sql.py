@@ -747,7 +747,7 @@ def get_engine(nd: AstNode) -> sqa.Engine:
 
         if isinstance(nd, verbs.Join):
             right_engine = get_engine(nd.right)
-            if engine != right_engine:
+            if engine.url != right_engine.url:
                 raise NotImplementedError  # TODO: find some good error for this
 
     else:

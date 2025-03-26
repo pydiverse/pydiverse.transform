@@ -48,6 +48,12 @@ from pydiverse.transform._internal.tree.types import (
 class PolarsImpl(TableImpl):
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
+        self.df = self.df.cast(
+            {
+                pl.Datetime("ns"): pl.Datetime("us"),
+                pl.Datetime("ms"): pl.Datetime("us"),
+            }
+        )
         super().__init__(
             name,
             {name: pdt_type(dtype) for name, dtype in df.collect_schema().items()},
