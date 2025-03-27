@@ -11,6 +11,7 @@ def test_ungrouped(df3):
         df3,
         lambda t: t >> summarize(mean3=t.col3.mean(), mean4=t.col4.mean()),
     )
+    assert_result_equal(df3, lambda t: t >> group_by() >> summarize(y=t.col1.sum()))
 
 
 def test_empty_ungrouped_fail(df3):
@@ -147,12 +148,6 @@ def test_not_summarising(df4):
 
 def test_none(df4):
     assert_result_equal(df4, lambda t: t >> summarize(x=None))
-
-
-# TODO: Implement more test cases for summarize verb
-
-
-# Test specific operations
 
 
 def test_op_min(df4):

@@ -114,7 +114,3 @@ with PostgresImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x != PostgresImpl.nan()
-
-    @impl(ops.list_agg)
-    def _list_agg(x):
-        return sqa.func.array_agg(x)

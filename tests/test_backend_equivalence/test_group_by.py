@@ -98,3 +98,9 @@ def test_group_by_bool_col(df4):
         >> group_by(C.x)
         >> mutate(y=C.col4.mean()),
     )
+
+
+def test_group_by_scalar(df3):
+    assert_result_equal(
+        df3, lambda t: t >> mutate(x=0) >> group_by(C.x) >> summarize(y=t.col1.sum())
+    )

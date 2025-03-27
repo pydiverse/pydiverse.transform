@@ -150,7 +150,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
 
-        value: pl.Expr = impl(*args, _pdt_args=expr.args)
+        value: pl.Expr = impl(*args, _partition_by=partition_by)
 
         # TODO: currently, count and list_agg are the only aggregation function where we
         # don't want to return null for cols containing only null values. If this
@@ -178,7 +178,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
                 order_by = None
             value = value.over(partition_by, order_by=order_by)
 
-        elif arrange:
+        elif arrange and expr.op.ftype == Ftype.WINDOW:
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
@@ -335,12 +335,12 @@ def compile_ast(
                 compiled = compiled.first()
             aggregations[name] = compiled
 
-        if partition_by:
-            df = df.group_by(*(name_in_df[uid] for uid in partition_by)).agg(
-                **aggregations
-            )
-        else:
-            df = df.select(**aggregations)
+        group_by = [name_in_df[uid] for uid in partition_by]
+        # polars complains about an empty group_by, so we insert a dummy constant
+        # (which will get deselected later)
+        df = df.group_by(*(group_by or [pl.lit(0).alias(str(uuid.uuid1()))])).agg(
+            **aggregations
+        )
 
         # remove columns dropped by summarize after they might have been used in
         # expressions
@@ -476,7 +476,7 @@ def compile_ast(
         select += [name for name in right_select if name not in coalesce_join_cols]
 
     elif isinstance(nd, PolarsImpl):
-        df = nd.df.collect()
+        df = nd.df
         name_in_df = {col._uuid: col.name for col in nd.cols.values()}
         select = list(nd.cols.keys())
         partition_by = []
