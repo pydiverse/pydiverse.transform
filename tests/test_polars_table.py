@@ -140,6 +140,11 @@ class TestPolarsLazyImpl:
 
     def test_mutate(self, tbl1):
         assert_equal(
+            tbl1 >> select() >> mutate(col1=4) >> mutate(col1=C.col1 + tbl1.col1),
+            df1.with_columns(col1=pl.col("col1") + 4).select("col1"),
+        )
+
+        assert_equal(
             tbl1 >> mutate(col1times2=tbl1.col1 * 2),
             pl.DataFrame(
                 {
@@ -175,7 +180,7 @@ class TestPolarsLazyImpl:
             tbl_left
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
             >> select(tbl_left.a, tbl_right.b),
-            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b_df_right": [1, 2, 2, None, None]}),
+            pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
             check_row_order=False,
         )
 
@@ -487,7 +492,7 @@ class TestPolarsLazyImpl:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left"),
+            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_df2"),
         )
 
         # Filter
@@ -541,7 +546,9 @@ class TestPolarsLazyImpl:
             >> mutate(
                 u=(tbl_dt.dt1 - tbl_dt.dt2),
                 v=tbl_dt.d1 - tbl_dt.d1,
-                w=(tbl_dt.d1 - tbl_dt.dt2) + tbl_dt.dur1 + dt.timedelta(days=1),
+                w=(tbl_dt.d1.cast(pdt.Datetime) - tbl_dt.dt2)
+                + tbl_dt.dur1
+                + dt.timedelta(days=1),
             ),
             df_dt.with_columns(
                 (pl.col("dt1") - pl.col("dt2")).alias("u"),
@@ -595,6 +602,35 @@ class TestPolarsLazyImpl:
         assert_equal(
             e_ex["col2"] + e_ex["col1_df1"],
             (e >> mutate(j=e.col2 + tbl1.col1)).j.export(Polars()),
+        )
+
+    def test_list(self, tbl1, tbl3):
+        df = tbl1 >> export(Polars())
+        df = df.with_columns(l=[[1, 2], [], [4, 5, 5], [2, 3]])
+        assert_equal(pdt.Table(df), df)
+        d = {"a": [["b", "aa"], ["a"], []]}
+        t = pdt.Table(d)
+        s = pl.DataFrame(d)
+        assert_equal(t, s)
+        assert_equal(
+            t >> mutate(b=[[5], [0.3, 3.66], []]),
+            s.with_columns(b=[[5], [0.3, 3.66], []]),
+        )
+
+        assert_equal(
+            tbl3
+            >> group_by(tbl3.col1)
+            >> summarize(x=tbl3.col3.list.agg(arrange="col4"))
+            >> arrange(tbl3.col1),
+            df3.group_by(pl.col("col1"))
+            .agg(x=pl.col("col3").sort_by("col4"))
+            .sort("col1"),
+        )
+
+    def test_prefix_sum(self, tbl1):
+        assert_equal(
+            tbl1 >> mutate(p=tbl1.col1.prefix_sum()),
+            df1.with_columns(p=pl.col("col1").cum_sum()),
         )
 
 

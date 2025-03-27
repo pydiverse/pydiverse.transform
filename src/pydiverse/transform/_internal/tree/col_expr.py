@@ -15,6 +15,7 @@ from uuid import UUID
 import pandas as pd
 import polars as pl
 
+from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops import ops, signature
@@ -35,6 +36,7 @@ from pydiverse.transform._internal.tree.types import (
     Duration,
     Float,
     Int,
+    List,
     String,
     python_type_to_pdt,
 )
@@ -158,7 +160,7 @@ class ColExpr(Generic[T]):
             wrap_literal(default) if default is not None else self,
         )
 
-    def cast(self, target_type: Dtype) -> Cast:
+    def cast(self, target_type: Dtype | type) -> Cast:
         """
         Cast to a different data type.
 
@@ -233,6 +235,13 @@ class ColExpr(Generic[T]):
         │ -0.2   ┆ 0    │
         └────────┴──────┘
         """
+
+        errors.check_arg_type(Dtype | type, "ColExpr.cast", "target_type", target_type)
+        if type(target_type) is type and not issubclass(target_type, Dtype):
+            TypeError(
+                "argument for parameter `target_type` of `ColExpr.cast` must be an"
+                "instance or subclass of pdt.Dtype"
+            )
         return Cast(self, target_type)
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -307,6 +316,16 @@ class ColExpr(Generic[T]):
         self: ColExpr[Duration], rhs: ColExpr[Duration]
     ) -> ColExpr[Duration]: ...
 
+    @overload
+    def __add__(
+        self: ColExpr[Datetime], rhs: ColExpr[Duration]
+    ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def __add__(
+        self: ColExpr[Duration], rhs: ColExpr[Datetime]
+    ) -> ColExpr[Datetime]: ...
+
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Addition +"""
 
@@ -328,6 +347,16 @@ class ColExpr(Generic[T]):
     def __radd__(
         self: ColExpr[Duration], rhs: ColExpr[Duration]
     ) -> ColExpr[Duration]: ...
+
+    @overload
+    def __radd__(
+        self: ColExpr[Datetime], rhs: ColExpr[Duration]
+    ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def __radd__(
+        self: ColExpr[Duration], rhs: ColExpr[Datetime]
+    ) -> ColExpr[Datetime]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Addition +"""
@@ -1241,6 +1270,42 @@ class ColExpr(Generic[T]):
         return ColFn(ops.pow, rhs, self)
 
     @overload
+    def prefix_sum(
+        self: ColExpr[Int],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[Int]: ...
+
+    @overload
+    def prefix_sum(
+        self: ColExpr[Float],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[Float]: ...
+
+    @overload
+    def prefix_sum(
+        self: ColExpr[Decimal],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[Decimal]: ...
+
+    def prefix_sum(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr:
+        """
+        The sum of all preceding elements and the current element.
+        """
+
+        return ColFn(ops.prefix_sum, self, partition_by=partition_by, arrange=arrange)
+
+    @overload
     def round(self: ColExpr[Int], decimals: int = 0) -> ColExpr[Int]: ...
 
     @overload
@@ -1331,12 +1396,6 @@ class ColExpr(Generic[T]):
     @overload
     def __sub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
 
-    @overload
-    def __sub__(self: ColExpr[Datetime], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
-
-    @overload
-    def __sub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
-
     def __sub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Subtraction -"""
 
@@ -1358,12 +1417,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rsub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
-
-    @overload
-    def __rsub__(self: ColExpr[Datetime], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
-
-    @overload
-    def __rsub__(self: ColExpr[Date], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     def __rsub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Subtraction -"""
@@ -1439,6 +1492,7 @@ class ColExpr(Generic[T]):
     str: StrNamespace
     dt: DtNamespace
     dur: DurNamespace
+    list: ListNamespace
 
 
 @dataclasses.dataclass(slots=True)
@@ -1532,6 +1586,29 @@ class StrNamespace(FnNamespace):
         """
 
         return ColFn(ops.str_ends_with, self.arg, suffix)
+
+    def join(
+        self: ColExpr[String],
+        delimiter: str = "",
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+    ) -> ColExpr[String]:
+        """
+        Concatenates all strings in a group to a single string.
+
+        :param delimiter:
+            The string to insert between the elements."""
+
+        return ColFn(
+            ops.str_join,
+            self.arg,
+            delimiter,
+            partition_by=partition_by,
+            filter=filter,
+            arrange=arrange,
+        )
 
     def len(self: ColExpr[String]) -> ColExpr[Int]:
         """
@@ -1927,6 +2004,29 @@ class DurNamespace(FnNamespace):
         return ColFn(ops.dur_seconds, self.arg)
 
 
+@register_accessor("list")
+@dataclasses.dataclass(slots=True)
+class ListNamespace(FnNamespace):
+    def agg(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[List]:
+        """
+        Collect the elements of each group in a list.
+        """
+
+        return ColFn(
+            ops.list_agg,
+            self.arg,
+            partition_by=partition_by,
+            arrange=arrange,
+            filter=filter,
+        )
+
+
 # --- generated code ends here, do not delete this comment ---
 
 
@@ -2030,7 +2130,7 @@ class LiteralCol(ColExpr):
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
     def __repr__(self):
-        return f"lit({self.val}, {self.dtype()})"
+        return f"lit({repr(self.val)}, {self.dtype()})"
 
 
 class ColFn(ColExpr):
@@ -2315,6 +2415,8 @@ class CaseExpr(ColExpr):
 
 class Cast(ColExpr):
     def __init__(self, val: ColExpr, target_type: Dtype):
+        if type(target_type) is type:
+            target_type = target_type()
         if target_type.const:
             raise TypeError("cannot cast to `const` type")
 
@@ -2339,6 +2441,7 @@ class Cast(ColExpr):
                     for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)
                 ),
                 (Datetime(), Date()),
+                (Date(), Datetime()),
                 *(
                     (t, String())
                     for t in (
@@ -2436,6 +2539,9 @@ class Order:
 
     def iter_subtree(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_subtree()
+
+    def iter_children(self) -> Iterable[ColExpr]:
+        yield from self.order_by.iter_children()
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> Order:
         return Order(self.order_by.map_subtree(g), self.descending, self.nulls_last)

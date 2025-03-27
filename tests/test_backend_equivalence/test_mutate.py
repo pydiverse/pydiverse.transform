@@ -39,6 +39,10 @@ def test_literals(df1):
     assert_result_equal(df1, lambda t: t >> mutate(u=pdt.lit(None)))
 
 
+def test_empty(df1):
+    assert_result_equal(df1, lambda t: t >> mutate())
+
+
 def test_none(df4):
     assert_result_equal(df4, lambda t: t >> mutate(x=None))
     assert_result_equal(
@@ -57,4 +61,11 @@ def test_mutate_bool_expr(df4):
         lambda t: t
         >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= C.col4)
         >> mutate(xAndY=C.x & C.y),
+    )
+
+
+def test_hidden_cols(df1):
+    assert_result_equal(
+        df1,
+        lambda t: t >> select() >> mutate(col1=4) >> mutate(col1=C.col1 + t.col1),
     )

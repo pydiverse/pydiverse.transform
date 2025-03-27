@@ -13,11 +13,17 @@ def test_ungrouped(df3):
     )
 
 
+def test_empty_ungrouped_fail(df3):
+    assert_result_equal(df3, lambda t: t >> summarize(), exception=ValueError)
+
+
 def test_simple_grouped(df3):
     assert_result_equal(
         df3,
         lambda t: t >> group_by(t.col1) >> summarize(mean3=t.col3.mean()),
     )
+
+    assert_result_equal(df3, lambda t: t >> group_by(t.col1) >> summarize())
 
 
 def test_multi_grouped(df3):
@@ -45,6 +51,12 @@ def test_chained_summarized(df3):
         >> summarize(x=C.col4.mean())
         >> alias()  # TODO: I think we could prevent a subquery here.
         >> summarize(y=C.k.mean()),
+    )
+
+
+def test_summarize_name_drop(df3):
+    assert_result_equal(
+        df3, lambda t: t >> summarize(x=t.col1.count()) >> mutate(col1=1, col2=2)
     )
 
 

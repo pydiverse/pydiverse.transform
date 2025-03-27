@@ -334,7 +334,7 @@ class TestSqlTable:
             tbl1
             >> select()
             >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left"),
+            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_df2"),
         )
 
         # Filter

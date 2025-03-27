@@ -14,7 +14,7 @@ import polars as pl
 import sqlalchemy as sqa
 
 from pydiverse.transform._internal.backend.polars import polars_type
-from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.backend.table_impl import TableImpl, split_join_cond
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
 from pydiverse.transform._internal.ops import ops
@@ -544,8 +544,44 @@ class SqlImpl(TableImpl):
                     raise ValueError("invalid filter before full join")
 
             query.join.append(j)
+            join_cols = set()
+            if nd.coalesce:
+                predicates = split_join_cond(nd.on)
+                join_cols = {sqa_col[pred.args[0]._uuid].name for pred in predicates}
+
+                left_join_uid = {
+                    lb.name: uid
+                    for uid, lb in sqa_col.items()
+                    if lb.name in join_cols and uid not in right_sqa_col
+                }
+                right_join_uid = {
+                    lb.name[: -len(nd.suffix)]: uid
+                    for uid, lb in sqa_col.items()
+                    if lb.name[: -len(nd.suffix)] in join_cols and uid in right_sqa_col
+                }
+                merged = {
+                    name: sqa.func.coalesce(
+                        sqa_col[left_uid], sqa_col[right_join_uid[name]]
+                    )
+                    for name, left_uid in left_join_uid.items()
+                }
+
+                sqa_col.update(
+                    {left_uid: merged[name] for name, left_uid in left_join_uid.items()}
+                    | {
+                        right_uid: merged[name]
+                        for name, right_uid in right_join_uid.items()
+                    }
+                )
+
+                query.select = [
+                    sqa.Label(name, col) for name, col in merged.items()
+                ] + [lb for lb in query.select if lb.name not in join_cols]
+
             query.select += [
-                sqa.Label(lb.name + nd.suffix, lb) for lb in right_query.select
+                sqa.Label(lb.name + nd.suffix, lb)
+                for lb in right_query.select
+                if lb.name not in join_cols
             ]
 
         elif isinstance(nd, TableImpl):
@@ -711,7 +747,7 @@ def get_engine(nd: AstNode) -> sqa.Engine:
 
         if isinstance(nd, verbs.Join):
             right_engine = get_engine(nd.right)
-            if engine != right_engine:
+            if engine.url != right_engine.url:
                 raise NotImplementedError  # TODO: find some good error for this
 
     else:
@@ -939,3 +975,7 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.coalesce)
     def _coalesce(*x):
         return sqa.func.coalesce(*x)
+
+    @impl(ops.str_join)
+    def _str_join(x, delim):
+        return sqa.func.aggregate_strings(x, delim)

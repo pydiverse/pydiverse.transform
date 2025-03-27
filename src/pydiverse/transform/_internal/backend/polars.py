@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import uuid
+from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
 import polars as pl
 
-from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.backend.table_impl import TableImpl, split_join_cond
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
@@ -35,6 +37,7 @@ from pydiverse.transform._internal.tree.types import (
     Int16,
     Int32,
     Int64,
+    List,
     NullType,
     String,
     Uint8,
@@ -47,6 +50,12 @@ from pydiverse.transform._internal.tree.types import (
 class PolarsImpl(TableImpl):
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
+        self.df = self.df.cast(
+            {
+                pl.Datetime("ns"): pl.Datetime("us"),
+                pl.Datetime("ms"): pl.Datetime("us"),
+            }
+        )
         super().__init__(
             name,
             {name: pdt_type(dtype) for name, dtype in df.collect_schema().items()},
@@ -66,7 +75,7 @@ class PolarsImpl(TableImpl):
         lf, _, select, _ = compile_ast(nd)
         lf = lf.select(*select)
         if isinstance(target, Polars):
-            if not target.lazy:
+            if not target.lazy and isinstance(lf, pl.LazyFrame):
                 lf = lf.collect()
             lf.name = nd.name
             return lf
@@ -158,10 +167,14 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
 
         value: pl.Expr = impl(*args, _pdt_args=expr.args)
 
-        # TODO: currently, count is the only aggregation function where we don't want
-        # to return null for cols containing only null values. If this happens for more
-        # aggregation functions, make this configurable in e.g. the operator spec.
-        if expr.op.ftype == Ftype.AGGREGATE and expr.op != ops.count_star:
+        # TODO: currently, count and list_agg are the only aggregation function where we
+        # don't want to return null for cols containing only null values. If this
+        # happens for more aggregation functions, make this configurable in e.g. the
+        # operator spec.     --> do we want it for str.join??
+        if expr.op.ftype == Ftype.AGGREGATE and expr.op not in (
+            ops.count_star,
+            ops.list_agg,
+        ):
             # In `sum` / `any` and other aggregation functions, polars puts a
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
@@ -181,11 +194,6 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             value = value.over(partition_by, order_by=order_by)
 
         elif arrange:
-            if expr.op.ftype == Ftype.AGGREGATE:
-                # TODO: don't fail, but give a warning that `arrange` is useless
-                # here
-                ...
-
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
@@ -231,12 +239,28 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         raise AssertionError
 
 
-def split_join_cond(expr: ColFn) -> list[ColFn]:
-    assert isinstance(expr, ColFn)
-    if expr.op == ops.bool_and:
-        return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
-    else:
-        return [expr]
+def rename_overwritten_cols(
+    new_names: Iterable[str],
+    df: pl.LazyFrame,
+    name_in_df: dict[UUID, str],
+    *,
+    names_to_consider: set[str] | None = None,
+) -> tuple[pl.LazyFrame, dict[UUID, str]]:
+    if names_to_consider is None:
+        names_to_consider = set(name_in_df.values())
+    overwritten = names_to_consider.intersection(new_names)
+
+    if overwritten:
+        name_map = {
+            name: f"{name}:{str(hex(uuid.uuid1().int))[2:]}" for name in overwritten
+        }
+        name_in_df = {
+            uid: (name_map[name] if name in name_map else name)
+            for uid, name in name_in_df.items()
+        }
+        df = df.rename(name_map)
+
+    return df, name_in_df
 
 
 def compile_ast(
@@ -246,17 +270,17 @@ def compile_ast(
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
     if isinstance(nd, verbs.Mutate | verbs.Summarize):
-        overwritten = set(name for name in nd.names if name in set(select))
-        if overwritten:
-            # We rename overwritten cols to some unique dummy name
-            name_map = {name: f"{name}_{str(hex(id(nd)))[2:]}" for name in overwritten}
-            name_in_df = {
-                uid: (name_map[name] if name in name_map else name)
-                for uid, name in name_in_df.items()
-            }
-            df = df.rename(name_map)
-
-        select = [col_name for col_name in select if col_name not in overwritten]
+        names_to_consider = (
+            set(partition_by)
+            if isinstance(nd, verbs.Summarize)
+            else set(name_in_df.values())
+        )
+        df, name_in_df = rename_overwritten_cols(
+            set(name for name in nd.names if name in names_to_consider),
+            df,
+            name_in_df,
+            names_to_consider=names_to_consider,
+        )
 
     if isinstance(nd, verbs.Select):
         select = [name_in_df[col._uuid] for col in nd.select]
@@ -283,7 +307,7 @@ def compile_ast(
         name_in_df.update(
             {uid: name for uid, name in zip(nd.uuids, nd.names, strict=True)}
         )
-        select += nd.names
+        select = [name for name in select if name not in nd.names] + nd.names
 
     elif isinstance(nd, verbs.Filter):
         df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.predicates])
@@ -325,6 +349,11 @@ def compile_ast(
         else:
             df = df.select(**aggregations)
 
+        # remove columns dropped by summarize after they might have been used in
+        # expressions
+        name_in_df = {
+            name: uuid for name, uuid in name_in_df.items() if name in partition_by
+        }
         name_in_df.update(
             {uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)}
         )
@@ -342,18 +371,58 @@ def compile_ast(
         partition_by = []
 
     elif isinstance(nd, verbs.Join):
-        right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
-        assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
-        name_in_df.update(
-            {uid: name + nd.suffix for uid, name in right_name_in_df.items()}
-        )
-
         assert len(partition_by) == 0
 
+        right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
         predicates = split_join_cond(nd.on)
+
+        # check for name collisions among hidden columns
+        # we maintain sensible names in the dataframe for all visible columns and try
+        # to do so for hidden columns, too. If a hidden column has the same name as a
+        # visible column, it gets a hash suffix. If two hidden columns collide, the
+        # right one gets a hash. (this is all after applying `nd.suffix`; we don't want
+        # to bother the user to provide a suffix only to prevent name collisions of
+        # hidden columns)
+
+        coalesce_join_cols = set()
+        if nd.coalesce:
+            assert all(
+                type(pred.args[0]) is Col and type(pred.args[1]) is Col
+                for pred in predicates
+            )
+            coalesce_join_cols = {name_in_df[pred.args[0]._uuid] for pred in predicates}
+
+        suffix_name_map = {
+            name: (name + nd.suffix if name not in coalesce_join_cols else name)
+            for name in right_name_in_df.values()
+        }
+        right_select = [suffix_name_map[name] for name in right_select]
+        right_name_in_df = {
+            uid: suffix_name_map[name] for uid, name in right_name_in_df.items()
+        }
         right_df = right_df.rename(
-            {name: name + nd.suffix for name in right_df.columns}
+            {name: suffix_name_map[name] for name in right_df.collect_schema().names()}
         )
+
+        # visible columns
+        right_df, right_name_in_df = rename_overwritten_cols(
+            set(select).difference(coalesce_join_cols),
+            right_df,
+            right_name_in_df,
+        )
+        df, name_in_df = rename_overwritten_cols(
+            set(right_select).difference(coalesce_join_cols), df, name_in_df
+        )
+
+        # hidden columns
+        right_df, right_name_in_df = rename_overwritten_cols(
+            set(name_in_df.values()).difference(coalesce_join_cols),
+            right_df,
+            right_name_in_df,
+        )
+
+        assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
+        name_in_df.update(right_name_in_df)
 
         # Do equality predicates separately because polars coalesces on them.
         eq_predicates = [pred for pred in predicates if pred.op == ops.equal]
@@ -383,7 +452,7 @@ def compile_ast(
                 right_on=[compile_col_expr(col, name_in_df) for col in right_on],
                 how=nd.how,
                 validate=nd.validate,
-                coalesce=False,
+                coalesce=nd.coalesce,
             )
         else:
             if nd.how in ("left", "full"):
@@ -411,10 +480,10 @@ def compile_ast(
 
             df = joined
 
-        select += [col_name + nd.suffix for col_name in right_select]
+        select += [name for name in right_select if name not in coalesce_join_cols]
 
     elif isinstance(nd, PolarsImpl):
-        df = nd.df
+        df = nd.df.collect()
         name_in_df = {col._uuid: col.name for col in nd.cols.values()}
         select = list(nd.cols.keys())
         partition_by = []
@@ -458,6 +527,8 @@ def pdt_type(pl_type: pl.DataType) -> Dtype:
         return Date()
     elif isinstance(pl_type, pl.Duration):
         return Duration()
+    elif isinstance(pl_type, pl.List):
+        return List()
     elif isinstance(pl_type, pl.Null):
         return NullType()
 
@@ -500,6 +571,8 @@ def polars_type(pdt_type: Dtype) -> pl.DataType:
         return pl.Date()
     elif pdt_type <= Duration():
         return pl.Duration()
+    elif pdt_type <= List():
+        return pl.List
     elif pdt_type <= NullType():
         return pl.Null()
 
@@ -737,3 +810,15 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.pow, Int(), Int())
     def _pow(x, y):
         return x.cast(pl.Float64()) ** y
+
+    @impl(ops.str_join)
+    def _str_join(x, delim):
+        return x.str.join(pl.select(delim).item())
+
+    @impl(ops.prefix_sum)
+    def _prefix_sum(x):
+        return x.cum_sum()
+
+    @impl(ops.list_agg)
+    def _list_agg(x):
+        return x

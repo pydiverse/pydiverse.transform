@@ -14,6 +14,7 @@ from ._internal.tree.types import (
     Int16,
     Int32,
     Int64,
+    List,
     String,
     Uint8,
     Uint16,
@@ -41,4 +42,5 @@ __all__ = [
     "Uint32",
     "Uint64",
     "Dtype",
+    "List",
 ]

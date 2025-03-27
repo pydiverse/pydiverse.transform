@@ -4,6 +4,7 @@ from ._internal.backend.targets import DuckDb, Pandas, Polars, SqlAlchemy
 from ._internal.pipe.pipeable import verb
 from ._internal.pipe.verbs import (
     arrange,
+    cross_join,
     drop,
     full_join,
     group_by,
@@ -25,11 +26,12 @@ __all__ = __base + [
     "arrange",
     "drop",
     "group_by",
-    "inner_join",
     "join",
+    "inner_join",
     "left_join",
-    "mutate",
     "full_join",
+    "cross_join",
+    "mutate",
     "rename",
     "select",
     "slice_head",

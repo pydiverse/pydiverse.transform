@@ -41,6 +41,8 @@ class SqliteImpl(SqlImpl):
 
         elif cast.val.dtype() <= Datetime() and cast.target_type == Date():
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
+        elif cast.val.dtype() <= Date() and cast.target_type == Datetime():
+            return sqa.type_coerce(sqa.func.datetime(compiled_val), sqa.DateTime())
 
         elif cast.val.dtype() <= Float() and cast.target_type == String():
             return sqa.case(

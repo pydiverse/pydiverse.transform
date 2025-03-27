@@ -112,6 +112,9 @@ class Date(Dtype): ...
 class Duration(Dtype): ...
 
 
+class List(Dtype): ...
+
+
 class NullType(Dtype): ...
 
 
@@ -159,6 +162,8 @@ def python_type_to_pdt(t: type) -> Dtype:
         return Date()
     elif t is datetime.timedelta:
         return Duration()
+    elif t is list:
+        return List()
     elif t is type(None):
         return NullType()
 
@@ -183,6 +188,8 @@ def pdt_type_to_python(t: Dtype) -> type:
         return datetime.date
     elif t <= Duration():
         return datetime.timedelta
+    elif t <= List():
+        return list
     elif t <= NullType():
         return type(None)
 
@@ -235,6 +242,7 @@ ALL_TYPES = (
     Bool(),
     NullType(),
     Duration(),
+    List(),
 )
 
 
@@ -267,6 +275,7 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
         **{t: (1, 0) for t in ALL_TYPES if t != NullType()},
     },
     Duration(): {Duration(): (0, 0)},
+    List(): {List(): (0, 0)},
 }
 
 # compute transitive closure of cost graph

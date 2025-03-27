@@ -180,6 +180,7 @@ class Join(Verb):
     how: Literal["inner", "left", "full"]
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
     suffix: str
+    coalesce: bool
 
     def _clone(self) -> tuple[Join, dict[AstNode, AstNode], dict[UUID, UUID]]:
         child, nd_map, uuid_map = self.child._clone()

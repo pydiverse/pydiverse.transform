@@ -8,6 +8,7 @@ Window
     :nosignatures:
     :template: short_title.rst
 
+    prefix_sum
     shift
 
 .. currentmodule:: pydiverse.transform

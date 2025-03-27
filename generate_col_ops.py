@@ -17,7 +17,7 @@ COL_EXPR_PATH = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 FNS_PATH = "./src/pydiverse/transform/_internal/pipe/functions.py"
 API_DOCS_PATH = "./docs/source/reference/operators/index.rst"
 
-NAMESPACES = ["str", "dt", "dur"]
+NAMESPACES = ["str", "dt", "dur", "list"]
 
 RVERSIONS = {
     "__add__",
@@ -63,7 +63,7 @@ def generate_fn_decl(
         name
         + ": "
         + type_annotation(dtype, specialize_generic)
-        + (f" = {default_val}" if default_val is not ... else "")
+        + (f" = {repr(default_val)}" if default_val is not ... else "")
         for dtype, name, default_val in zip(
             sig.types, op.param_names, defaults, strict=True
         )

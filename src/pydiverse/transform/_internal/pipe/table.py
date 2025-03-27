@@ -174,8 +174,8 @@ class Table:
 
         self._ast: AstNode = TableImpl.from_resource(resource, backend, name=name)
         self._cache = Cache(
-            self._ast.cols,
             list(self._ast.cols.values()),
+            {col.name: col._uuid for col in self._ast.cols.values()},
             {col._uuid: col.name for col in self._ast.cols.values()},
             [],
             {self._ast},
@@ -194,11 +194,11 @@ class Table:
         if name in ("__copy__", "__deepcopy__", "__setstate__", "__getstate__"):
             # for hasattr to work correctly on dunder methods
             raise AttributeError
-        if not self._cache.has_col(name):
+        if name not in self._cache.name_to_uuid:
             raise ValueError(
                 f"column `{name}` does not exist in table `{self._ast.name}`"
             )
-        col = self._cache.cols[name]
+        col = self._cache.all_cols[self._cache.name_to_uuid[name]]
         return Col(name, self._ast, col._uuid, col._dtype, col._ftype)
 
     def __setstate__(self, d):  # to avoid very annoying AttributeErrors
@@ -257,7 +257,11 @@ class Table:
         return table_str
 
     def __dir__(self) -> list[str]:
-        return [name for name in self._cache.cols.keys() if self._cache.has_col(name)]
+        return [
+            name
+            for name in self._cache.name_to_uuid.keys()
+            if self._cache.has_col(name)
+        ]
 
     def _repr_html_(self) -> str | None:
         html = (
@@ -287,8 +291,8 @@ class Table:
 class Cache:
     # TODO: think about what sets of columns are in the respective structures and
     # write this here.
-    cols: dict[str, Col]
     select: list[Col]
+    name_to_uuid: dict[str, UUID]
     uuid_to_name: dict[UUID, str]  # only the selected UUIDs
     partition_by: list[Col]
     # all nodes that this table is derived from (it cannot be joined with another node
@@ -301,48 +305,45 @@ class Cache:
             return col._uuid in self.uuid_to_name
         if isinstance(col, ColName):
             col = col.name
-        return col in self.cols and self.cols[col]._uuid in self.uuid_to_name
-
-    def _update(
-        self,
-        *,
-        new_select: list[Col] | None = None,
-        new_cols: dict[str, Col] | None = None,
-    ):
-        if new_select is not None:
-            self.select = new_select
-        if new_cols is not None:
-            self.cols = new_cols
-            self.all_cols = self.all_cols | {
-                col._uuid: col for col in new_cols.values()
-            }
-
-        if new_select is not None or new_cols is not None:
-            selected_uuids = (
-                self.uuid_to_name
-                if new_select is None
-                else set(col._uuid for col in new_select)
-            )
-            self.uuid_to_name = {
-                col._uuid: name
-                for name, col in self.cols.items()
-                if col._uuid in selected_uuids
-            }
+        return col in self.name_to_uuid and self.name_to_uuid[col] in self.uuid_to_name
 
     def update(self, vb: Verb, rcache: Cache | None = None):
         if isinstance(vb, Select):
-            self._update(new_select=vb.select)
+            self.select = vb.select
+            selected_uuids = set(col._uuid for col in self.select)
+            selected_names = set(
+                name for uid, name in self.uuid_to_name.items() if uid in selected_uuids
+            )
+            self.uuid_to_name = {
+                uid: name
+                for uid, name in self.uuid_to_name.items()
+                if name in selected_names
+            }
+            self.name_to_uuid = {
+                name: uid
+                for name, uid in self.name_to_uuid.items()
+                if name in selected_names
+            }
 
         elif isinstance(vb, Rename):
-            self._update(
-                new_cols={
-                    (new_name if (new_name := vb.name_map.get(name)) else name): col
-                    for name, col in self.cols.items()
-                }
-            )
+            self.name_to_uuid = {
+                (new_name if (new_name := vb.name_map.get(name)) else name): uid
+                for name, uid in self.name_to_uuid.items()
+            }
+            self.uuid_to_name = self.uuid_to_name | {
+                uid: name for name, uid in self.name_to_uuid.items()
+            }
 
         elif isinstance(vb, Mutate | Summarize):
-            new_cols = self.cols | {
+            if isinstance(vb, Mutate):
+                new_cols = {
+                    name: self.all_cols[uid] for name, uid in self.name_to_uuid.items()
+                }
+            else:
+                new_cols = {
+                    self.uuid_to_name[col._uuid]: col for col in self.partition_by
+                }
+            new_cols |= {
                 name: Col(
                     name,
                     vb,
@@ -353,31 +354,43 @@ class Cache:
                 for name, val, uid in zip(vb.names, vb.values, vb.uuids, strict=True)
             }
 
-            overwritten = {col_name for col_name in vb.names if col_name in self.cols}
+            overwritten = {
+                col_name for col_name in vb.names if col_name in self.name_to_uuid
+            }
 
-            self._update(
-                new_select=(
-                    [
-                        col
-                        for col in self.select
-                        if self.uuid_to_name[col._uuid] not in overwritten
-                    ]
-                    if isinstance(vb, Mutate)
-                    else self.partition_by
-                )
-                + [new_cols[name] for name in vb.names],
-                new_cols=new_cols,
-            )
+            if isinstance(vb, Mutate):
+                self.select = [
+                    col
+                    for col in self.select
+                    if self.uuid_to_name[col._uuid] not in overwritten
+                ]
+            else:
+                self.select = self.partition_by
+            self.select = self.select + [new_cols[name] for name in vb.names]
+
+            self.all_cols = self.all_cols | {
+                col._uuid: col for _, col in new_cols.items()
+            }
+            self.name_to_uuid = {name: col._uuid for name, col in new_cols.items()}
+            self.uuid_to_name = {
+                uid: name
+                for uid, name in self.uuid_to_name.items()
+                if name not in overwritten
+            } | {uid: name for uid, name in zip(vb.uuids, vb.names, strict=False)}
 
             if isinstance(vb, Summarize):
                 self.partition_by = []
 
         elif isinstance(vb, Join):
-            self._update(
-                new_cols=self.cols
-                | {name + vb.suffix: col for name, col in rcache.cols.items()},
-                new_select=self.select + rcache.select,
-            )
+            self.select = self.select + rcache.select
+            self.all_cols = self.all_cols | rcache.all_cols
+            self.name_to_uuid = self.name_to_uuid | {
+                name + vb.suffix: uid for name, uid in rcache.name_to_uuid.items()
+            }
+
+            self.uuid_to_name = self.uuid_to_name | {
+                uid: name + vb.suffix for uid, name in rcache.uuid_to_name.items()
+            }
 
             self.derived_from = self.derived_from | rcache.derived_from
 

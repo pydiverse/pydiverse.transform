@@ -18,6 +18,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColExpr,
     ColFn,
     ColName,
+    LiteralCol,
     Order,
     wrap_literal,
 )
@@ -130,15 +131,15 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
         new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.partition_by
     ]
 
-    new._cache._update(
-        new_select=[
-            new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
-        ],
-        new_cols={
-            name: new._cache.all_cols[uuid_map[col._uuid]]
-            for name, col in table._cache.cols.items()
-        },
-    )
+    new._cache.select = [
+        new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
+    ]
+    new._cache.name_to_uuid = {
+        name: uuid_map[uid] for name, uid in table._cache.name_to_uuid.items()
+    }
+    new._cache.uuid_to_name = {
+        uuid_map[uid]: name for uid, name in table._cache.uuid_to_name.items()
+    }
 
     new._cache.derived_from = set(new._ast.iter_subtree_postorder())
 
@@ -203,7 +204,7 @@ def collect(table: Table, target: Target | None = None) -> Pipeable:
             target,
             name=table._ast.name,
             # preserve UUIDs and by this column references across collect()
-            uuids={name: col._uuid for name, col in table._cache.cols.items()},
+            uuids={name: uid for name, uid in table._cache.name_to_uuid.items()},
         )
     )
     new._cache.derived_from = table._cache.derived_from | {new._ast}
@@ -357,6 +358,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     new._cache.update(new._ast)
     # TODO: prevent selection of overwritten columns
 
+    assert len(new) == len(cols)
     return new
 
 
@@ -471,12 +473,14 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     new._ast = Rename(table._ast, name_map)
     new._cache = copy.copy(table._cache)
 
-    if d := set(name_map) - set(table._cache.cols):
+    if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(
             f"no column with name `{next(iter(d))}` in table `{table._ast.name}`"
         )
 
-    if d := (set(table._cache.cols) - set(name_map)) & set(name_map.values()):
+    if d := (set(table._cache.name_to_uuid).difference(name_map)) & set(
+        name_map.values()
+    ):
         raise ValueError(f"duplicate column name `{next(iter(d))}`")
 
     new._cache.update(new._ast)
@@ -520,7 +524,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     if len(kwargs) == 0:
         return table
 
-    names, values = map(list, zip(*kwargs.items(), strict=True))
+    names, values = list(kwargs.keys()), list(kwargs.values())
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
 
@@ -650,6 +654,8 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     """
     if len(order_by) == 0:
         return table
+
+    order_by = [ColName(col) if isinstance(col, str) else col for col in order_by]
 
     new = copy.copy(table)
     new._ast = Arrange(
@@ -811,7 +817,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     │ false ┆ 9.0      ┆ 5.077 │
     └───────┴──────────┴───────┘
     """
-    names, values = map(list, zip(*kwargs.items(), strict=True))
+    names, values = list(kwargs.keys()), list(kwargs.values())
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
 
@@ -824,7 +830,14 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
 
     partition_by_uuids = {col._uuid for col in table._cache.partition_by}
 
+    if len(kwargs) == 0 and len(partition_by_uuids) == 0:
+        raise ValueError(
+            "summarize without preceding group_by needs at least one column to "
+            "summarize"
+        )
+
     def check_summarize_col_expr(expr: ColExpr, agg_fn_above: bool):
+        # TODO: does not catch everything (test_alias_window)
         if (
             isinstance(expr, Col)
             and expr._uuid not in partition_by_uuids
@@ -909,11 +922,12 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 @overload
 def join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce=False,
 ) -> Pipeable: ...
 
 
@@ -921,11 +935,12 @@ def join(
 def join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     how: Literal["inner", "left", "full"],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce=False,
 ) -> Pipeable:
     """
     Joins two tables on a boolean expression.
@@ -958,6 +973,11 @@ def join(
         appended to all columns of the right table. If this still does not resolve all
         name collisions, additionally an integer is appended to the column names of the
         right table.
+
+    :param coalesce:
+        If `on` is a list of strings and `coalesce=True`, the join columns are merged.
+        If there are no column name collisions apart from the join columns, no suffix is
+        appended to columns of the right table.
 
 
     Note
@@ -1008,16 +1028,25 @@ def join(
     errors.check_literal_type(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
+    errors.check_arg_type(bool, "join", "coalesce", coalesce)
 
     if isinstance(on, str):
         on = [on]
+    ignore_right = set()
     if isinstance(on, list):
+        if not all(type(cond) is str for cond in on) and coalesce:
+            raise ValueError(
+                "`coalesce` can only be set to True if `on` is a list of strings"
+            )
+        elif coalesce:
+            ignore_right = set(on)
         on = functools.reduce(
             operator.and_,
             (
                 left[expr] == right[expr] if isinstance(expr, str) else expr
                 for expr in on
             ),
+            LiteralCol(True),  # initial value
         )
 
     if left._cache.partition_by:
@@ -1038,9 +1067,11 @@ def join(
     if suffix is None:
         suffix = "_right"
 
-    left_names = set(left._cache.cols.keys())
+    left_names = set(left._cache.uuid_to_name[col._uuid] for col in left)
+    right_names = set(right._cache.uuid_to_name[col._uuid] for col in right)
+
     if user_suffix is not None:
-        for name in right._cache.cols.keys():
+        for name in right._cache.name_to_uuid.keys():
             if name + suffix in left_names:
                 raise ValueError(
                     f"column name `{name + suffix}` appears both in the left and right "
@@ -1048,9 +1079,9 @@ def join(
                     "hint: Specify a different suffix to prevent name collisions or "
                     "none at all for automatic name collision resolution."
                 )
-    else:
+    elif (right_names - ignore_right) & left_names:
         cnt = 0
-        for name in right._cache.cols.keys():
+        for name in right_names - ignore_right:
             suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
             while suffixed in left_names:
                 cnt += 1
@@ -1058,9 +1089,11 @@ def join(
 
         if cnt > 0:
             suffix += f"_{cnt}"
+    else:
+        suffix = ""
 
     new = copy.copy(left)
-    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
+    new._ast = Join(left._ast, right._ast, on, how, validate, suffix, coalesce)
     # The join condition must be preprocessed with respect to both tables
     new._ast.on = resolve_C_columns(
         resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
@@ -1068,7 +1101,13 @@ def join(
 
     new._cache = copy.copy(left._cache)
     new._cache.update(new._ast, rcache=right._cache)
+    # TODO: make sure that error messages (e.g. for non-existent columns) use the
+    # correct table name.
     new._ast.on = preprocess_arg(new._ast.on, new)
+    ignore_uuids = set(right[col]._uuid for col in ignore_right)
+    new._cache.select = left._cache.select + [
+        col for col in right._cache.select if col._uuid not in ignore_uuids
+    ]
 
     return new
 
@@ -1079,10 +1118,11 @@ def join(
 @overload
 def inner_join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1090,25 +1130,29 @@ def inner_join(
 def inner_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="inner"``.
     """
 
-    return left >> join(right, on, "inner", validate=validate, suffix=suffix)
+    return left >> join(
+        right, on, "inner", validate=validate, suffix=suffix, coalesce=coalesce
+    )
 
 
 @overload
 def left_join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1116,25 +1160,29 @@ def left_join(
 def left_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="left"``.
     """
 
-    return left >> join(right, on, "left", validate=validate, suffix=suffix)
+    return left >> join(
+        right, on, "left", validate=validate, suffix=suffix, coalesce=coalesce
+    )
 
 
 @overload
 def full_join(
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1142,16 +1190,34 @@ def full_join(
 def full_join(
     left: Table,
     right: Table,
-    on: ColExpr[Bool] | str | list[ColExpr[bool] | str],
+    on: ColExpr[Bool] | str | list[ColExpr[Bool] | str],
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
+    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
     """
 
-    return left >> join(right, on, "full", validate=validate, suffix=suffix)
+    return left >> join(
+        right, on, "full", validate=validate, suffix=suffix, coalesce=coalesce
+    )
+
+
+@verb
+def cross_join(
+    left: Table,
+    right: Table,
+    *,
+    suffix: str | None = None,
+    coalesce: bool = False,
+) -> Pipeable:
+    """
+    Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
+    """
+
+    return left >> full_join(right, on=[], suffix=suffix, coalesce=coalesce)
 
 
 @overload

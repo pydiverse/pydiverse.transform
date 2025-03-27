@@ -82,6 +82,7 @@ Expression methods
    is_not_nan
    is_not_null
    is_null
+   list.agg
    log
    map
    max
@@ -89,11 +90,13 @@ Expression methods
    min
    nulls_first
    nulls_last
+   prefix_sum
    rank
    round
    shift
    str.contains
    str.ends_with
+   str.join
    str.len
    str.lower
    str.replace_all

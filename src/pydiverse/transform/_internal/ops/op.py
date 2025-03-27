@@ -18,7 +18,7 @@ class Ftype(enum.IntEnum):
 @dataclasses.dataclass(slots=True)
 class ContextKwarg:
     name: str
-    required: bool
+    required: bool = False
 
 
 class Operator:
@@ -55,12 +55,26 @@ class Operator:
         generate_expr_method: bool = True,
         doc: str = "",
     ):
+        assert isinstance(name, str)
+        assert all(isinstance(sig, Signature) for sig in signatures)
+        assert isinstance(ftype, Ftype)
+        assert isinstance(doc, str)
+        assert isinstance(generate_expr_method, bool)
+        if isinstance(param_names, list):
+            assert all(isinstance(param, str) for param in param_names)
+        else:
+            assert param_names is None
+        if isinstance(context_kwargs, list):
+            assert all(isinstance(kwarg, ContextKwarg) for kwarg in context_kwargs)
+        else:
+            assert context_kwargs is None
+        assert isinstance(default_values, list | type(None))
+
         self.name = name
         self.ftype = ftype
         self.context_kwargs = context_kwargs if context_kwargs is not None else []
         self.generate_expr_method = generate_expr_method
 
-        assert all(isinstance(sig, Signature) for sig in signatures)
         self.signatures = signatures
         self.trie = SignatureTrie()
         assert len(signatures) > 0
