@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import sqlalchemy as sqa
 
+from pydiverse.common import Dtype, String
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
-from pydiverse.transform._internal.tree.types import Float, Int, String
 
 
 class PostgresImpl(SqlImpl):
@@ -13,8 +14,8 @@ class PostgresImpl(SqlImpl):
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
 
-        if cast.val.dtype() <= Float():
-            if cast.target_type <= Int():
+        if types.without_const(cast.val.dtype()).is_float():
+            if cast.target_type.is_int():
                 return sqa.func.trunc(compiled_val).cast(sqa.BigInteger())
 
             if cast.target_type == String():
@@ -27,6 +28,13 @@ class PostgresImpl(SqlImpl):
                 )
 
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
+
+    @classmethod
+    def sqa_type(cls, pdt_type: Dtype):
+        if isinstance(pdt_type, types.List):
+            return sqa.types.ARRAY(item_type=cls.sqa_type())
+
+        return super().sqa_type(pdt_type)
 
     @classmethod
     def past_over_clause(
@@ -106,3 +114,7 @@ with PostgresImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x != PostgresImpl.nan()
+
+    @impl(ops.list_agg)
+    def _list_agg(x):
+        return sqa.func.array_agg(x)

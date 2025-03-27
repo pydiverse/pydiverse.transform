@@ -4,7 +4,7 @@ from typing import Any
 
 from pydiverse.transform._internal.ops.op import ContextKwarg, Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import NUMERIC, D, Int, Tvar
+from pydiverse.transform._internal.tree.types import NUMERIC, Const, Int, S
 
 
 class Window(Operator):
@@ -35,7 +35,7 @@ class Window(Operator):
 
 shift = Window(
     "shift",
-    Signature(D, Int(const=True), Tvar("D", const=True), return_type=D),
+    Signature(S, Const(Int()), Const(S), return_type=S),
     param_names=["self", "n", "fill_value"],
     default_values=[..., ..., None],
     generate_expr_method=True,

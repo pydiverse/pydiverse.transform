@@ -8,7 +8,7 @@ import duckdb_engine
 import polars as pl
 import sqlalchemy as sqa
 
-from pydiverse.transform._internal.backend import polars
+from pydiverse.common import Dtype
 from pydiverse.transform._internal.backend.duckdb import DuckDbImpl
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
@@ -27,7 +27,7 @@ class DuckDbPolarsImpl(TableImpl):
         super().__init__(
             name,
             {
-                name: polars.pdt_type(dtype)
+                name: Dtype.from_polars(dtype)
                 for name, dtype in df.collect_schema().items()
             },
         )

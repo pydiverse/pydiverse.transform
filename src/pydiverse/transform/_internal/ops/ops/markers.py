@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import D
+from pydiverse.transform._internal.tree.types import S
 
 
 class Marker(Operator):
     def __init__(self, name: str, doc: str = ""):
         super().__init__(
             name,
-            Signature(D, return_type=D),
+            Signature(S, return_type=S),
             doc=doc
             + """
 Can only be used in expressions given to the `arrange` verb or as as an

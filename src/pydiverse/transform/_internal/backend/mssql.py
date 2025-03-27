@@ -7,13 +7,13 @@ from typing import Any
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import DATETIME2
 
+from pydiverse.common import Bool, Int, String
 from pydiverse.transform._internal.backend import sql
-from pydiverse.transform._internal.backend.polars import polars_type
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.tree import verbs
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
@@ -24,7 +24,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, Int, String
 
 
 class MsSqlImpl(SqlImpl):
@@ -45,9 +44,9 @@ class MsSqlImpl(SqlImpl):
         schema_overrides: dict[Col, Any],
     ) -> Any:
         for col in final_select:
-            if col.dtype() <= Bool():
+            if types.without_const(col.dtype()) == Bool():
                 if col not in schema_overrides:
-                    schema_overrides[col] = polars_type(col.dtype())
+                    schema_overrides[col] = col.dtype().to_polars()
 
         return super().export(nd, target, final_select, schema_overrides)
 
@@ -79,13 +78,6 @@ class MsSqlImpl(SqlImpl):
         sql.create_aliases(nd, {})
         table, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
         return cls.compile_query(table, query)
-
-    @classmethod
-    def sqa_type(cls, pdt_type: Dtype):
-        if pdt_type <= Datetime():
-            return DATETIME2
-
-        return super().sqa_type(pdt_type)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
@@ -126,7 +118,7 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
         )
 
     elif isinstance(expr, Col):
-        if not wants_bool_as_bit and expr.dtype() <= Bool():
+        if not wants_bool_as_bit and types.without_const(expr.dtype()) == Bool():
             return ColFn(ops.equal, expr, LiteralCol(True))
         return expr
 
@@ -146,7 +138,12 @@ def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr 
             for key, arr in expr.context_kwargs.items()
         }
 
-        if expr.op.return_type(tuple(arg.dtype() for arg in expr.args)) <= Bool():
+        if (
+            types.without_const(
+                expr.op.return_type(tuple(arg.dtype() for arg in expr.args))
+            )
+            == Bool()
+        ):
             # most operations return bits, except for `any`, `all`
             returns_bool_as_bit = isinstance(expr.op, ops.Aggregation | ops.Window)
 

@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import Bool, Date, Datetime, Int, String
+from pydiverse.transform._internal.tree.types import (
+    Bool,
+    Const,
+    Date,
+    Datetime,
+    Int,
+    String,
+)
 
 
 class StrUnary(Operator):
@@ -134,7 +141,7 @@ shape: (4, 4)
 
 str_replace_all = Operator(
     "str.replace_all",
-    Signature(String(), String(const=True), String(const=True), return_type=String()),
+    Signature(String(), Const(String()), Const(String()), return_type=String()),
     param_names=["self", "substr", "replacement"],
     doc="""
 Replaces all occurrences of a given substring by a different string.
@@ -181,7 +188,7 @@ shape: (5, 5)
 
 str_starts_with = Operator(
     "str.starts_with",
-    Signature(String(), String(const=True), return_type=Bool()),
+    Signature(String(), Const(String()), return_type=Bool()),
     param_names=["self", "prefix"],
     doc="""
 Whether the string starts with a given prefix.
@@ -224,7 +231,7 @@ shape: (5, 4)
 
 str_ends_with = Operator(
     "str.ends_with",
-    Signature(String(), String(const=True), return_type=Bool()),
+    Signature(String(), Const(String()), return_type=Bool()),
     param_names=["self", "suffix"],
     doc="""
 Whether the string ends with a given suffix.
@@ -269,7 +276,7 @@ shape: (5, 5)
 
 str_contains = Operator(
     "str.contains",
-    Signature(String(), String(const=True), return_type=Bool()),
+    Signature(String(), Const(String()), return_type=Bool()),
     param_names=["self", "substr"],
     doc="""
 Whether the string contains a given substring.

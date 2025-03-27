@@ -6,10 +6,11 @@ from pydiverse.transform._internal.tree.types import (
     COMPARABLE,
     NUMERIC,
     Bool,
-    D,
+    Const,
     Decimal,
     Float,
     Int,
+    S,
     String,
 )
 
@@ -81,7 +82,7 @@ all = Aggregation(
 
 count = Aggregation(
     "count",
-    Signature(D, return_type=Int()),
+    Signature(S, return_type=Int()),
     doc="""
 Counts the number of non-null elements in the column.
 """,
@@ -98,7 +99,7 @@ Returns the number of rows of the current table, like :code:`COUNT(*)` in SQL.
 
 str_join = Aggregation(
     "str.join",
-    Signature(String(), String(const=True), return_type=String()),
+    Signature(String(), Const(String()), return_type=String()),
     param_names=["self", "delimiter"],
     default_values=[..., ""],
     context_kwargs=[

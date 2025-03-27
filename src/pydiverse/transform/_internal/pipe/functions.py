@@ -31,7 +31,10 @@ from pydiverse.transform._internal.tree.types import (
 
 def when(condition: ColExpr) -> WhenClause:
     condition = wrap_literal(condition)
-    if condition.dtype() is not None and not condition.dtype() <= Bool():
+    if (
+        condition.dtype() is not None
+        and not types.without_const(condition.dtype()) == Bool()
+    ):
         raise TypeError(
             "argument for `when` must be of boolean type, but has type "
             f"`{condition.dtype()}`"

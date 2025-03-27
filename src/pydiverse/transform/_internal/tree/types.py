@@ -1,202 +1,263 @@
 from __future__ import annotations
 
-import pydiverse.common as pdc
+import copy
+import datetime
+import functools
+import operator
+from types import NoneType
+from typing import Any
+
+from pydiverse.common import (
+    Bool,
+    Date,
+    Datetime,
+    Decimal,
+    Dtype,
+    Duration,
+    Float,
+    Float32,
+    Float64,
+    Int,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    List,
+    NullType,
+    String,
+    Time,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+)
 from pydiverse.transform._internal import errors
+from pydiverse.transform._internal.ops import signature
 
 
-class Const(pdc.Dtype):
+class Const(Dtype):
     __slots__ = ("base",)
 
-    def __init__(self, base: pdc.Dtype):
+    def __init__(self, base: Dtype):
+        if isinstance(base, Const):
+            raise TypeError("the base type of a const type may not be const")
         self.base = base
 
     def __repr__(self):
         return "const " + repr(self.base)
 
+    def __hash__(self):
+        return hash((Const, self.base))
 
-def without_const(dtype: pdc.Dtype):
+    def is_int(self):
+        return self.base.is_int()
+
+    def is_float(self):
+        return self.base.is_float()
+
+    def to_polars(self):
+        return self.base.to_polars()
+
+    def to_sql(self):
+        return self.base.to_sql()
+
+    def is_subtype(self, rhs):
+        if is_const(rhs):
+            return self.base.is_subtype(rhs.base)
+        return self.base.is_subtype(rhs)
+
+
+def is_const(dtype: Dtype):
+    return isinstance(dtype, Const)
+
+
+def without_const(dtype: Dtype):
     """
     Removes a `const` modifier from the data type (if present).
     """
-    errors.check_arg_type(pdc.Dtype, "without_const", "dtype", dtype)
+    errors.check_arg_type(Dtype, "without_const", "dtype", dtype)
     if isinstance(dtype, Const):
         return dtype.base
     return dtype
 
 
-def with_const(dtype: pdc.Dtype) -> pdc.Dtype:
+def with_const(dtype: Dtype) -> Dtype:
     """
     Adds a `const` modifier from the data type.
     """
-    errors.check_arg_type(pdc.Dtype, "with_const", "dtype", dtype)
+    errors.check_arg_type(Dtype, "with_const", "dtype", dtype)
     if isinstance(dtype, Const):
         return dtype
     return Const(dtype)
 
 
-def converts_to(self, target: pdc.Dtype) -> bool:
-    return (
-        not target.const or self.const
-    ) and target.without_const() in IMPLICIT_CONVS[self.without_const()]
+def converts_to(source: Dtype, target: Dtype) -> bool:
+    if isinstance(source, List):
+        return isinstance(target, List) and converts_to(source.inner, target.inner)
+    return (not is_const(target) or is_const(source)) and (
+        without_const(target) in IMPLICIT_CONVS[without_const(source)]
+    )
 
 
-class Tvar(pdc.Dtype):
+def to_python(dtype: Dtype):
+    if isinstance(dtype, Const):
+        return to_python(dtype.base)
+    if dtype.is_int():
+        return int
+    elif dtype.is_float():
+        return float
+    elif isinstance(dtype, List):
+        return list
+
+    return {
+        String(): str,
+        Bool(): bool,
+        Datetime(): datetime.datetime,
+        Time(): datetime.time,
+        Date(): datetime.date,
+        Duration(): datetime.timedelta,
+        NullType(): NoneType,
+    }[dtype]
+
+
+def from_python(value: Any):
+    assert not isinstance(value, type)
+
+    if isinstance(value, list):
+        if len(value) == 0:
+            return List(NullType())
+        return List(lca_type([from_python(elem) for elem in value]))
+
+    return {
+        int: Int64(),
+        float: Float64(),
+        bool: Bool(),
+        str: String(),
+        datetime.datetime: Datetime(),
+        datetime.date: Date(),
+        datetime.time: Time(),
+        datetime.timedelta: Duration(),
+        NoneType: NullType(),
+    }[type(value)]
+
+
+class Tyvar(Dtype):
     __slots__ = ("name",)
 
-    def __init__(self, name: str, *, const: bool = False):
+    def __init__(self, name: str):
         self.name = name
-        super().__init__(const=const)
+        super().__init__()
 
-    def __eq__(self, rhs: pdc.Dtype) -> bool:
-        if rhs is None:
-            return False
-        if not isinstance(rhs, pdc.Dtype):
-            raise TypeError(f"cannot compare type `Dtype` with type `{type(rhs)}`")
-        return (
-            self.const == rhs.const and isinstance(rhs, Tvar) and rhs.name == self.name
-        )
+    def __eq__(self, rhs: Dtype) -> bool:
+        return isinstance(rhs, Tyvar) and rhs.name == self.name
 
     def __hash__(self):
-        return hash((Tvar, self.const, self.name))
+        return hash((Tyvar, self.name))
 
-    def with_const(self) -> pdc.Dtype:
-        return Tvar(self.name, const=True)
-
-    def without_const(self) -> pdc.Dtype:
-        return Tvar(self.name)
+    def __repr__(self):
+        return f'Tyvar "{self.name}"'
 
 
-D = Tvar("T")
+S = Tyvar("S")
 
 
-# def python_type_to_pdt(t: type) -> Dtype:
-#     if t is int:
-#         return Int64()
-#     elif t is float:
-#         return Float64()
-#     elif t is bool:
-#         return Bool()
-#     elif t is str:
-#         return String()
-#     elif t is datetime.datetime:
-#         return Datetime()
-#     elif t is datetime.date:
-#         return Date()
-#     elif t is datetime.timedelta:
-#         return Duration()
-#     elif t is list:
-#         return List()
-#     elif t is type(None):
-#         return NullType()
-
-#     raise TypeError(
-#         "objects used in a column expression must have type `ColExpr` or "
-#         f"a suitable python builtin type, found `{t.__name__}` instead"
-#     )
-
-
-# def pdt_type_to_python(t: Dtype) -> type:
-#     if t <= Int():
-#         return int
-#     elif t <= Float():
-#         return float
-#     elif t <= Bool():
-#         return bool
-#     elif t <= String():
-#         return str
-#     elif t <= Datetime():
-#         return datetime.datetime
-#     elif t <= Date():
-#         return datetime.date
-#     elif t <= Duration():
-#         return datetime.timedelta
-#     elif t <= List():
-#         return list
-#     elif t <= NullType():
-#         return type(None)
-
-#     raise AssertionError
-
-
-def promote_dtypes(dtypes: list[pdc.Dtype]) -> pdc.Dtype:
+def lca_type(dtypes: list[Dtype]) -> Dtype:
     if len(dtypes) == 0:
-        raise ValueError("expected non empty list of dtypes")
+        return NullType()
 
-    promoted = dtypes[0]
-    for dtype in dtypes[1:]:
-        if isinstance(dtype, pdc.NullType):
-            continue
-        if isinstance(promoted, pdc.NullType):
-            promoted = dtype
-            continue
+    # reduce to simple types
+    if isinstance(dtypes[0], List):
+        if diff := next(
+            (dtype for dtype in dtypes if not isinstance(dtype, List)), None
+        ):
+            raise TypeError(
+                f"type `{diff.__name__}` is not compatible with `List` type"
+            )
 
-        if dtype.converts_to(promoted):
-            continue
-        if promoted.converts_to(dtype):
-            promoted = dtype
-            continue
+        return List(lca_type([dtype.inner for dtype in dtypes]))
 
-        raise TypeError(f"incompatible types {dtype} and {promoted}")
+    if not (
+        common_ancestors := functools.reduce(
+            operator.and_,
+            (set(IMPLICIT_CONVS[t].keys()) for t in dtypes[1:]),
+            IMPLICIT_CONVS[dtypes[0]].keys(),
+        )
+    ):
+        raise TypeError(f'incompatible types `{", ".join(dtypes)}`')
 
-    return promoted
+    common_ancestors: list[Dtype] = list(common_ancestors)
+    return copy.copy(
+        common_ancestors[
+            signature.best_signature_match(
+                dtypes,
+                [[ancestor] * len(dtypes) for ancestor in common_ancestors],
+            )
+        ]
+    )
 
 
 INT_SUBTYPES = (
-    pdc.Uint8(),
-    pdc.Uint16(),
-    pdc.Uint32(),
-    pdc.Uint64(),
-    pdc.Int8(),
-    pdc.Int16(),
-    pdc.Int32(),
-    pdc.Int64(),
+    Uint8(),
+    Uint16(),
+    Uint32(),
+    Uint64(),
+    Int8(),
+    Int16(),
+    Int32(),
+    Int64(),
 )
-FLOAT_SUBTYPES = (pdc.Float32(), pdc.Float64())
+FLOAT_SUBTYPES = (Float32(), Float64())
 SIMPLE_TYPES = (
     *INT_SUBTYPES,
     *FLOAT_SUBTYPES,
-    pdc.Int(),
-    pdc.Float(),
-    pdc.Decimal(),
-    pdc.String(),
-    pdc.Date(),
-    pdc.Datetime(),
-    pdc.Bool(),
-    pdc.NullType(),
-    pdc.Duration(),
+    Int(),
+    Float(),
+    Decimal(),
+    String(),
+    Date(),
+    Datetime(),
+    Bool(),
+    NullType(),
+    Duration(),
 )
 
 
-def is_supertype(dtype: pdc.Dtype) -> bool:
-    return not any(isinstance(dtype, type(t)) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES))
+def is_subtype(dtype: Dtype) -> bool:
+    if isinstance(dtype, List):
+        return is_subtype(dtype.inner)
+    if isinstance(dtype, Const):
+        return is_subtype(dtype.base)
+    return type(dtype) is not Int and type(dtype) is not Float
 
 
-def is_subtype(dtype: pdc.Dtype) -> bool:
-    return type(dtype) is not pdc.Int and type(dtype) is not pdc.Float
+# all types the given type can implicitly convert to
+def implicit_conversions(dtype: Dtype) -> list[Dtype]:
+    if isinstance(dtype, List):
+        return [List(inner) for inner in implicit_conversions(dtype.inner)]
+    return list(IMPLICIT_CONVS[dtype].keys())
 
 
-IMPLICIT_CONVS: dict[pdc.Dtype, dict[pdc.Dtype, tuple[int, int]]] = {
-    pdc.Int(): {pdc.Float(): (1, 0), pdc.Decimal(): (2, 0), pdc.Int(): (0, 0)},
+IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
+    Int(): {Float(): (1, 0), Decimal(): (2, 0), Int(): (0, 0)},
     **{
-        int_subtype: {pdc.Int(): (0, 1), int_subtype: (0, 0)}
+        int_subtype: {Int(): (0, 1), int_subtype: (0, 0)}
         for int_subtype in INT_SUBTYPES
     },
     **{
-        float_subtype: {pdc.Float(): (0, 1), float_subtype: (0, 0)}
+        float_subtype: {Float(): (0, 1), float_subtype: (0, 0)}
         for float_subtype in FLOAT_SUBTYPES
     },
-    pdc.Float(): {pdc.Float(): (0, 0)},
-    pdc.String(): {pdc.String(): (0, 0)},
-    pdc.Decimal(): {pdc.Decimal(): (0, 0)},
-    pdc.Datetime(): {pdc.Datetime(): (0, 0)},
-    pdc.Date(): {pdc.Date(): (0, 0)},
-    pdc.Bool(): {pdc.Bool(): (0, 0)},
-    pdc.NullType(): {
-        pdc.NullType(): (0, 0),
+    Float(): {Float(): (0, 0)},
+    String(): {String(): (0, 0)},
+    Decimal(): {Decimal(): (0, 0)},
+    Datetime(): {Datetime(): (0, 0)},
+    Date(): {Date(): (0, 0)},
+    Bool(): {Bool(): (0, 0)},
+    NullType(): {
+        NullType(): (0, 0),
         **{t: (1, 0) for t in SIMPLE_TYPES if t != NullType()},
     },
-    pdc.Duration(): {pdc.Duration(): (0, 0)},
-    **{List(t): {List(t): (0, 0)} for t in SIMPLE_TYPES},
+    Duration(): {Duration(): (0, 0)},
 }
 
 # compute transitive closure of cost graph
@@ -213,16 +274,18 @@ for start_type in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
     IMPLICIT_CONVS[start_type] |= added_edges
 
 
-def conversion_cost(dtype: pdc.Dtype, target: pdc.Dtype) -> tuple[int, int]:
-    return IMPLICIT_CONVS[dtype.without_const()][target.without_const()]
+def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
+    if isinstance(dtype, List):
+        return conversion_cost(dtype.inner, target.inner)
+    return IMPLICIT_CONVS[without_const(dtype)][without_const(target)]
 
 
-NUMERIC = (pdc.Int(), pdc.Float(), pdc.Decimal())
+NUMERIC = (Int(), Float(), Decimal())
 COMPARABLE = (
-    pdc.Int(),
-    pdc.Float(),
-    pdc.Decimal(),
-    pdc.String(),
-    pdc.Datetime(),
-    pdc.Date(),
+    Int(),
+    Float(),
+    Decimal(),
+    String(),
+    Datetime(),
+    Date(),
 )

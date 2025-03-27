@@ -83,8 +83,8 @@ def test_sum(df4):
         df4,
         lambda t: t
         >> mutate(
-            w=pdt.min(*(c for c in t if c.dtype() <= pdt.Int())),
-            u=pdt.sum(*(c for c in t if c.dtype() <= pdt.Int())),
+            w=pdt.min(*(c for c in t if c.dtype().is_int())),
+            u=pdt.sum(*(c for c in t if c.dtype().is_int())),
             h=pdt.sum(t.col1 * t.col4, t.col5.str.len() * 2, t.col2 - t.col1),
         ),
     )
@@ -97,6 +97,5 @@ def test_coalesce(df4):
 
     assert_result_equal(
         df4,
-        lambda t: t
-        >> mutate(w=pdt.coalesce(*(c for c in t if c.dtype() <= pdt.Int()))),
+        lambda t: t >> mutate(w=pdt.coalesce(*(c for c in t if c.dtype().is_int()))),
     )

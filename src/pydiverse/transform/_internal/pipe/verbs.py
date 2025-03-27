@@ -13,6 +13,7 @@ from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
 from pydiverse.transform._internal.pipe.table import Table
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
@@ -575,7 +576,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     new._ast = Filter(table._ast, [preprocess_arg(pred, table) for pred in predicates])
 
     for cond in new._ast.predicates:
-        if not cond.dtype() <= Bool():
+        if not types.without_const(cond.dtype()) == Bool():
             raise TypeError(
                 "predicates given to `filter` must be of boolean type.\n"
                 f"hint: {cond} is of type {cond.dtype()} instead."

@@ -7,6 +7,11 @@ from uuid import UUID
 
 import polars as pl
 
+from pydiverse.common import (
+    Dtype,
+    Int,
+    String,
+)
 from pydiverse.transform._internal.backend.table_impl import TableImpl, split_join_cond
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
@@ -22,29 +27,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import (
-    Bool,
-    Date,
-    Datetime,
-    Decimal,
-    Dtype,
-    Duration,
-    Float,
-    Float32,
-    Float64,
-    Int,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    List,
-    NullType,
-    String,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-)
 
 
 class PolarsImpl(TableImpl):
@@ -58,7 +40,10 @@ class PolarsImpl(TableImpl):
         )
         super().__init__(
             name,
-            {name: pdt_type(dtype) for name, dtype in df.collect_schema().items()},
+            {
+                name: Dtype.from_polars(pl_type)
+                for name, pl_type in df.collect_schema().items()
+            },
         )
 
     @staticmethod
@@ -179,7 +164,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
             # `fill_null` if he likes to set one.
-            assert all(arg.dtype().const for arg in expr.args[1:])
+            assert all(types.is_const(arg.dtype()) for arg in expr.args[1:])
             value = pl.when(args[0].count() == 0).then(None).otherwise(value)
 
         if partition_by:
@@ -219,18 +204,26 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return pl.lit(expr.val, dtype=polars_type(expr.dtype()))
+        return pl.lit(
+            expr.val,
+            # only give the type explicitly if we can still be sure about it
+            # in nested lists with ints / floats mixed we do not give guarantees
+            dtype=expr.dtype().to_polars() if types.is_subtype(expr.dtype()) else None,
+        )
 
     elif isinstance(expr, Cast):
         if (
-            expr.target_type <= Int() or expr.target_type <= Float()
-        ) and expr.val.dtype() <= String():
+            expr.target_type.is_int() or expr.target_type.is_float()
+        ) and types.without_const(expr.val.dtype()) == String():
             expr.val = expr.val.str.strip()
         compiled = compile_col_expr(expr.val, name_in_df).cast(
-            polars_type(expr.target_type)
+            expr.target_type.to_polars()
         )
 
-        if expr.val.dtype() <= Float() and expr.target_type == String():
+        if (
+            types.without_const(expr.val.dtype()).is_float()
+            and expr.target_type == String()
+        ):
             compiled = compiled.replace("NaN", "nan")
 
         return compiled
@@ -489,94 +482,6 @@ def compile_ast(
         partition_by = []
 
     return df, name_in_df, select, partition_by
-
-
-def pdt_type(pl_type: pl.DataType) -> Dtype:
-    if pl_type == pl.Float64():
-        return Float64()
-    elif pl_type == pl.Float32():
-        return Float32()
-
-    elif pl_type == pl.Int64():
-        return Int64()
-    elif pl_type == pl.Int32():
-        return Int32()
-    elif pl_type == pl.Int16():
-        return Int16()
-    elif pl_type == pl.Int8():
-        return Int8()
-
-    elif pl_type == pl.UInt64():
-        return Uint64()
-    elif pl_type == pl.UInt32():
-        return Uint32()
-    elif pl_type == pl.UInt16():
-        return Uint16()
-    elif pl_type == pl.UInt8():
-        return Uint8()
-
-    elif pl_type.is_decimal():
-        return Decimal()
-    elif isinstance(pl_type, pl.Boolean):
-        return Bool()
-    elif isinstance(pl_type, pl.String):
-        return String()
-    elif isinstance(pl_type, pl.Datetime):
-        return Datetime()
-    elif isinstance(pl_type, pl.Date):
-        return Date()
-    elif isinstance(pl_type, pl.Duration):
-        return Duration()
-    elif isinstance(pl_type, pl.List):
-        return List()
-    elif isinstance(pl_type, pl.Null):
-        return NullType()
-
-    raise TypeError(f"polars type {pl_type} is not supported by pydiverse.transform")
-
-
-def polars_type(pdt_type: Dtype) -> pl.DataType:
-    assert types.is_subtype(pdt_type)
-
-    if pdt_type <= Float64():
-        return pl.Float64()
-    elif pdt_type <= Float32():
-        return pl.Float32()
-
-    elif pdt_type <= Int64():
-        return pl.Int64()
-    elif pdt_type <= Int32():
-        return pl.Int32()
-    elif pdt_type <= Int16():
-        return pl.Int16()
-    elif pdt_type <= Int8():
-        return pl.Int8()
-
-    elif pdt_type <= Uint64():
-        return pl.UInt64()
-    elif pdt_type <= Uint32():
-        return pl.UInt32()
-    elif pdt_type <= Uint16():
-        return pl.UInt16()
-    elif pdt_type <= Uint8():
-        return pl.UInt8()
-
-    elif pdt_type <= Bool():
-        return pl.Boolean()
-    elif pdt_type <= String():
-        return pl.String()
-    elif pdt_type <= Datetime():
-        return pl.Datetime()
-    elif pdt_type <= Date():
-        return pl.Date()
-    elif pdt_type <= Duration():
-        return pl.Duration()
-    elif pdt_type <= List():
-        return pl.List
-    elif pdt_type <= NullType():
-        return pl.Null()
-
-    raise AssertionError
 
 
 with PolarsImpl.impl_store.impl_manager as impl:

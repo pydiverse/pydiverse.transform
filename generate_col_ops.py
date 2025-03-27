@@ -4,14 +4,12 @@ import os
 from collections.abc import Iterable
 from types import NoneType
 
+from pydiverse.common import Dtype
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import (
-    Dtype,
-    Tvar,
-    pdt_type_to_python,
-)
+from pydiverse.transform._internal.tree import types
+from pydiverse.transform._internal.tree.types import Tyvar
 
 COL_EXPR_PATH = "./src/pydiverse/transform/_internal/tree/col_expr.py"
 FNS_PATH = "./src/pydiverse/transform/_internal/pipe/functions.py"
@@ -39,10 +37,12 @@ def add_vararg_star(formatted_args: str) -> str:
 
 
 def type_annotation(dtype: Dtype, specialize_generic: bool) -> str:
-    if (not specialize_generic and not dtype.const) or isinstance(dtype, Tvar):
+    if (not specialize_generic and not types.is_const(dtype)) or isinstance(
+        types.without_const(dtype), Tyvar
+    ):
         return "ColExpr"
-    if dtype.const:
-        python_type = pdt_type_to_python(dtype)
+    if types.is_const(dtype):
+        python_type = types.to_python(dtype)
         return python_type.__name__ if python_type is not NoneType else "None"
     return f"ColExpr[{dtype.__class__.__name__}]"
 

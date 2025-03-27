@@ -15,19 +15,7 @@ from uuid import UUID
 import pandas as pd
 import polars as pl
 
-from pydiverse.transform._internal import errors
-from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
-from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops import ops, signature
-from pydiverse.transform._internal.ops.op import Ftype, Operator
-from pydiverse.transform._internal.ops.ops.markers import Marker
-from pydiverse.transform._internal.pipe.pipeable import Pipeable
-from pydiverse.transform._internal.tree import types
-from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.types import (
-    FLOAT_SUBTYPES,
-    IMPLICIT_CONVS,
-    INT_SUBTYPES,
+from pydiverse.common import (
     Bool,
     Date,
     Datetime,
@@ -38,8 +26,17 @@ from pydiverse.transform._internal.tree.types import (
     Int,
     List,
     String,
-    python_type_to_pdt,
 )
+from pydiverse.transform._internal import errors
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
+from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops.op import Ftype, Operator
+from pydiverse.transform._internal.ops.ops.markers import Marker
+from pydiverse.transform._internal.pipe.pipeable import Pipeable
+from pydiverse.transform._internal.tree import types
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.types import FLOAT_SUBTYPES, INT_SUBTYPES, Const
 
 T = TypeVar("T")
 
@@ -2122,11 +2119,18 @@ class ColName(ColExpr):
 
 
 class LiteralCol(ColExpr):
-    def __init__(self, val: Any, dtype: types.Dtype | None = None):
+    def __init__(self, val: Any, dtype: Dtype | None = None):
         self.val = val
         if dtype is None:
-            dtype = python_type_to_pdt(type(val))
-        dtype.const = True
+            try:
+                dtype = types.from_python(val)
+            except KeyError as ke:
+                raise TypeError(
+                    f"invalid type `{type(val).__name__}` found in column expression. "
+                    "Objects used in a column expression must have type `ColExpr` or a "
+                    "suitable python builtin type"
+                ) from ke
+        dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
     def __repr__(self):
@@ -2188,7 +2192,8 @@ class ColFn(ColExpr):
             return None
 
         self._dtype = self.op.return_type(arg_dtypes)
-        self._dtype.const = all(argt.const for argt in arg_dtypes)
+        if all(types.is_const(argt) for argt in arg_dtypes):
+            self._dtype = Const(self._dtype)
 
         return self._dtype
 
@@ -2315,7 +2320,10 @@ class CaseExpr(ColExpr):
             return self._dtype
 
         for cond, _ in self.cases:
-            if cond.dtype() is not None and not cond.dtype() <= types.Bool():
+            if (
+                cond.dtype() is not None
+                and not types.without_const(cond.dtype()) == types.Bool()
+            ):
                 raise TypeError(
                     f"argument `{cond}` for `when` must be of boolean type, but has "
                     f"type `{cond.dtype()}`"
@@ -2326,37 +2334,23 @@ class CaseExpr(ColExpr):
             val_types.append(self.default_val.dtype())
         if None in val_types:
             return None
-        val_types = [t.without_const() for t in val_types]
-
-        if not (
-            common_ancestors := functools.reduce(
-                operator.and_,
-                (set(IMPLICIT_CONVS[t].keys()) for t in val_types[1:]),
-                IMPLICIT_CONVS[val_types[0]].keys(),
-            )
-        ):
-            raise TypeError(
-                f'incompatible types `{", ".join(val_types)}` in case expression.'
-            )
+        val_types = [types.without_const(t) for t in val_types]
 
         if any(cond.dtype() is None for cond, _ in self.cases):
             return None
 
-        common_ancestors: list[Dtype] = list(common_ancestors)
-        self._dtype = copy.copy(
-            common_ancestors[
-                signature.best_signature_match(
-                    val_types,
-                    [[ancestor] * len(val_types) for ancestor in common_ancestors],
-                )
-            ]
-        )
-        self._dtype.const = all(
+        self._dtype = types.lca_type(val_types)
+
+        if all(
             (
-                *(cond.dtype().const and val.dtype().const for cond, val in self.cases),
-                self.default_val is None or self.default_val.dtype().const,
+                *(
+                    types.is_const(cond.dtype()) and types.is_const(val.dtype())
+                    for cond, val in self.cases
+                ),
+                self.default_val is None or types.is_const(self.default_val.dtype()),
             )
-        )
+        ):
+            self._dtype = types.with_const(self._dtype)
 
         return self._dtype
 
@@ -2367,11 +2361,13 @@ class CaseExpr(ColExpr):
         val_ftypes = set()
         # TODO: does it actually matter if we add stuff that is const? it should be
         # elemwise anyway...
-        if self.default_val is not None and not self.default_val.dtype().const:
+        if self.default_val is not None and not types.is_const(
+            self.default_val.dtype()
+        ):
             val_ftypes.add(self.default_val.ftype(agg_is_window=agg_is_window))
 
         for _, val in self.cases:
-            if val.dtype() is not None and not val.dtype().const:
+            if val.dtype() is not None and not types.is_const(val.dtype()):
                 val_ftypes.add(val.ftype(agg_is_window=agg_is_window))
 
         if None in val_ftypes:
@@ -2417,7 +2413,7 @@ class Cast(ColExpr):
     def __init__(self, val: ColExpr, target_type: Dtype):
         if type(target_type) is type:
             target_type = target_type()
-        if target_type.const:
+        if types.is_const(target_type):
             raise TypeError("cannot cast to `const` type")
 
         self.val = val
@@ -2431,9 +2427,9 @@ class Cast(ColExpr):
         if self.val.dtype() is None:
             return None
 
-        assert not self.target_type.const
+        assert not types.is_const(self.target_type)
 
-        if not self.val.dtype().converts_to(self.target_type):
+        if not types.converts_to(self.val.dtype(), self.target_type):
             valid_casts = {
                 *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
                 *(
@@ -2467,11 +2463,13 @@ class Cast(ColExpr):
             }
 
             if (
-                self.val.dtype().without_const(),
+                types.without_const(self.val.dtype()),
                 self.target_type,
             ) not in valid_casts:
                 hint = ""
-                if self.val.dtype() <= String() and self.target_type in (
+                if types.without_const(
+                    self.val.dtype()
+                ) == String() and self.target_type in (
                     Datetime(),
                     Date(),
                 ):
@@ -2486,7 +2484,8 @@ class Cast(ColExpr):
                     f"{hint}"
                 )
 
-        self._dtype.const = self.val.dtype().const
+        if types.is_const(self.val.dtype()):
+            self._dtype = types.with_const(self._dtype)
         return self._dtype
 
     def ftype(self, *, agg_is_window: bool) -> Ftype:

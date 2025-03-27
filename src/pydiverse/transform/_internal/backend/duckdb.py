@@ -10,9 +10,10 @@ from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Cast, Col, LiteralCol
-from pydiverse.transform._internal.tree.types import Float, Int, Int64
+from pydiverse.transform._internal.tree.types import Int64
 
 
 class DuckDbImpl(SqlImpl):
@@ -36,7 +37,7 @@ class DuckDbImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        if cast.val.dtype() <= Float() and cast.target_type <= Int():
+        if cast.val.dtype().is_float() and cast.target_type.is_int():
             return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
                 cls.sqa_type(cast.target_type)
             )
@@ -44,7 +45,7 @@ class DuckDbImpl(SqlImpl):
 
     @classmethod
     def compile_lit(cls, lit: LiteralCol) -> sqa.ColumnElement:
-        if lit.dtype() <= Int64():
+        if types.without_const(lit.dtype()) == Int64():
             return sqa.cast(lit.val, sqa.BigInteger)
         return super().compile_lit(lit)
 

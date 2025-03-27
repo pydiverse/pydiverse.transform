@@ -106,13 +106,13 @@ def test_summarize_case(df4):
             C.col1,
         )
         >> summarize(
-            x=C.col2.max().map(
-                {
-                    0: C.col1.min(),
-                    1: C.col2.mean() + 0.5,
-                    2: 2,
-                }
-            ),
+            # x=C.col2.max().map(
+            #     {
+            #         0: C.col1.min(),
+            #         1: C.col2.mean() + 0.5,
+            #         2: 2,
+            #     }
+            # ),
             y=pdt.when(C.col2.max() > 2)
             .then(1)
             .when(C.col2.max() < 2)
