@@ -114,3 +114,7 @@ with PostgresImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x != PostgresImpl.nan()
+
+    @impl(ops.dur_days)
+    def _dur_days(x):
+        sqa.func.extract("DAYS", x)

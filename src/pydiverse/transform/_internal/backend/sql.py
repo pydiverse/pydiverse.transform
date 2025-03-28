@@ -557,13 +557,17 @@ class SqlImpl(TableImpl):
                     if lb.name in join_cols and uid not in right_sqa_col
                 }
                 right_join_uid = {
-                    lb.name[: -len(nd.suffix)]: uid
+                    lb.name[: len(lb.name) - len(nd.suffix)]: uid
                     for uid, lb in sqa_col.items()
-                    if lb.name[: -len(nd.suffix)] in join_cols and uid in right_sqa_col
+                    if lb.name[: len(lb.name) - len(nd.suffix)] in join_cols
+                    and uid in right_sqa_col
                 }
                 merged = {
-                    name: sqa.func.coalesce(
-                        sqa_col[left_uid], sqa_col[right_join_uid[name]]
+                    name: sqa.Label(
+                        name,
+                        sqa.func.coalesce(
+                            sqa_col[left_uid], sqa_col[right_join_uid[name]]
+                        ),
                     )
                     for name, left_uid in left_join_uid.items()
                 }
@@ -576,9 +580,9 @@ class SqlImpl(TableImpl):
                     }
                 )
 
-                query.select = [
-                    sqa.Label(name, col) for name, col in merged.items()
-                ] + [lb for lb in query.select if lb.name not in join_cols]
+                query.select = list(merged.values()) + [
+                    lb for lb in query.select if lb.name not in join_cols
+                ]
 
             query.select += [
                 sqa.Label(lb.name + nd.suffix, lb)

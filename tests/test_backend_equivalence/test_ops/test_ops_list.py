@@ -17,6 +17,8 @@ def test_list_agg(df3):
     )
 
 
+# to make this work, use array(SELECT col5 FROM t ORDER BY col1)
+# we can implement this with SELECT scalar
 @skip_backends("mssql", "sqlite")
 def test_list_agg_no_grouping(df3):
     assert_result_equal(
