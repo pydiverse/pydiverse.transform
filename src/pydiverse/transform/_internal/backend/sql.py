@@ -429,7 +429,7 @@ class SqlImpl(TableImpl):
 
             # rewire col refs to the subquery
             query = Query(
-                [
+                select=[
                     sqa.Label(lb.name, col)
                     for lb in orig_select
                     if (col := table.columns.get(lb.name)) is not None

@@ -183,11 +183,7 @@ class Table:
         )
 
     def __getitem__(self, key: str) -> Col:
-        if not isinstance(key, str):
-            raise TypeError(
-                f"argument to __getitem__ (bracket `[]` operator) on a Table must be a "
-                f"str, got {type(key)} instead."
-            )
+        errors.check_arg_type(str, "Table.__getitem__", "key", key)
         return self.__getattr__(key)
 
     def __getattr__(self, name: str) -> Col:
