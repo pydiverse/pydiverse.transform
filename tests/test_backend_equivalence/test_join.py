@@ -168,3 +168,22 @@ def test_ineq_join(df3, df4, df_strings):
             & (s.col4 >= pdt.when(t.col1.str.starts_with(" ")).then(10).otherwise(7)),
         ),
     )
+
+
+def test_join_summarize(df3, df4):
+    assert_result_equal(
+        (df3, df4),
+        lambda t3, t4: t3
+        >> group_by(t3.col2)
+        >> summarize(j=t3.col4.sum())
+        >> alias()
+        >> inner_join(t4, on="col2"),
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda t3, t4: t4
+        >> left_join(
+            t3 >> group_by(t3.col2) >> summarize(j=t3.col4.sum()) >> alias(), on="col2"
+        ),
+    )
