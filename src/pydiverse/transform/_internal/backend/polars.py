@@ -377,39 +377,25 @@ def compile_ast(
         # to bother the user to provide a suffix only to prevent name collisions of
         # hidden columns)
 
-        coalesce_join_cols = set()
-        if nd.coalesce:
-            assert all(
-                type(pred.args[0]) is Col and type(pred.args[1]) is Col
-                for pred in predicates
-            )
-            coalesce_join_cols = {name_in_df[pred.args[0]._uuid] for pred in predicates}
-
-        suffix_name_map = {
-            name: (name + nd.suffix if name not in coalesce_join_cols else name)
-            for name in right_name_in_df.values()
-        }
-        right_select = [suffix_name_map[name] for name in right_select]
+        right_select = [name + nd.suffix for name in right_select]
         right_name_in_df = {
-            uid: suffix_name_map[name] for uid, name in right_name_in_df.items()
+            uid: name + nd.suffix for uid, name in right_name_in_df.items()
         }
         right_df = right_df.rename(
-            {name: suffix_name_map[name] for name in right_df.collect_schema().names()}
+            {name: name + nd.suffix for name in right_df.collect_schema().names()}
         )
 
         # visible columns
         right_df, right_name_in_df = rename_overwritten_cols(
-            set(select).difference(coalesce_join_cols),
+            set(select),
             right_df,
             right_name_in_df,
         )
-        df, name_in_df = rename_overwritten_cols(
-            set(right_select).difference(coalesce_join_cols), df, name_in_df
-        )
+        df, name_in_df = rename_overwritten_cols(set(right_select), df, name_in_df)
 
         # hidden columns
         right_df, right_name_in_df = rename_overwritten_cols(
-            set(name_in_df.values()).difference(coalesce_join_cols),
+            set(name_in_df.values()),
             right_df,
             right_name_in_df,
         )
@@ -445,7 +431,7 @@ def compile_ast(
                 right_on=[compile_col_expr(col, name_in_df) for col in right_on],
                 how=nd.how,
                 validate=nd.validate,
-                coalesce=nd.coalesce,
+                coalesce=False,
             )
         else:
             if nd.how in ("left", "full"):
@@ -473,7 +459,7 @@ def compile_ast(
 
             df = joined
 
-        select += [name for name in right_select if name not in coalesce_join_cols]
+        select += [name for name in right_select]
 
     elif isinstance(nd, PolarsImpl):
         df = nd.df

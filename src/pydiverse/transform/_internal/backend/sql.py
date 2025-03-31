@@ -7,7 +7,7 @@ import itertools
 import math
 import operator
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 import polars as pl
@@ -418,41 +418,12 @@ class SqlImpl(TableImpl):
             right_table, right_query, right_sqa_col = cls.check_for_subquery(
                 nd, right_table, right_sqa_col, right_query, needed_cols, child=nd.right
             )
-
-            names = set(lb.name for lb in query.select)
-            right_names = set(lb.name + nd.suffix for lb in right_query.select)
-            right_sqa_col = {
-                uid: sqa.label(lb.name + nd.suffix, lb)
-                for uid, lb in right_sqa_col.items()
-            }
-            sqa_col = dict(
-                itertools.chain(
-                    (
-                        (uid, lb)
-                        for uid, lb in sqa_col.items()
-                        if lb.name not in right_names
-                    ),
-                    (
-                        (uid, lb)
-                        for uid, lb in right_sqa_col.items()
-                        if lb.name not in names
-                    ),
-                )
-            ) | {
-                uid: sqa.Label(lb.name + str(uid), lb)
-                for uid, lb in itertools.chain(
-                    (
-                        (uid, lb)
-                        for uid, lb in sqa_col.items()
-                        if lb.name in right_names
-                    ),
-                    (
-                        (uid, lb)
-                        for uid, lb in right_sqa_col.items()
-                        if lb.name in names
-                    ),
-                )
-            }
+            sqa_col.update(
+                {
+                    uid: sqa.label(lb.name + nd.suffix, lb)
+                    for uid, lb in right_sqa_col.items()
+                }
+            )
 
             compiled_on = cls.compile_col_expr(nd.on, sqa_col)
 
@@ -588,21 +559,31 @@ class SqlImpl(TableImpl):
                 # user only 0-ary functions after the subquery, e.g. `count`.
                 needed_cols[next(iter(sqa_col.keys()))] = 1
 
-            # TODO: do we want `alias` to automatically create a subquery? or add a
-            # flag to the node that a subquery would be allowed? or special verb to
-            # mark subquery?
-
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
+
             orig_select = query.select
-            query.select = [
-                sqa_col[uid] for uid in needed_cols.keys() if uid in sqa_col
-            ]
+            query.select = []
+            cnt = dict()
+            name_in_subquery = dict()
+
+            # resolve potential column name collisions in the subquery
+            for uid in needed_cols.keys():
+                if uid in sqa_col:
+                    name = sqa_col[uid].name
+                    if c := cnt.get(name):
+                        name_in_subquery[uid] = f"{name}_{c}"
+                        cnt[name] = c + 1
+                    else:
+                        name_in_subquery[uid] = name
+                        cnt[name] = 1
+                    query.select.append(sqa.Label(name_in_subquery[uid], sqa_col[uid]))
+
             table = cls.compile_query(table, query).subquery()
             sqa_col.update(
                 {
                     uid: sqa.label(
-                        sqa_col[uid].name, table.columns.get(sqa_col[uid].name)
+                        sqa_col[uid].name, table.columns.get(name_in_subquery[uid])
                     )
                     for uid in needed_cols.keys()
                     if uid in sqa_col
@@ -647,13 +628,6 @@ class Query:
     offset: int | None = None
 
 
-@dataclasses.dataclass(slots=True)
-class SqlJoin:
-    right: sqa.Subquery
-    on: sqa.ColumnElement
-    how: Literal["inner", "left", "full"]
-
-
 # MSSQL complains about duplicates in ORDER BY.
 def dedup_order_by(
     order_by: Iterable[sqa.UnaryExpression],
@@ -686,7 +660,7 @@ def create_aliases(nd: AstNode, num_occurrences: dict[str, int]) -> dict[str, in
     elif isinstance(nd, TableImpl):
         table_name = nd.table.name
         if cnt := num_occurrences.get(table_name):
-            nd.table = nd.table.alias(f"{table_name}:{cnt}")
+            nd.table = nd.table.alias(f"{table_name}__{cnt}")
         else:
             # always set alias to shorten queries with schemas
             nd.table = nd.table.alias(table_name)

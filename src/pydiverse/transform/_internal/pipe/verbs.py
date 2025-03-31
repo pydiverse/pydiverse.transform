@@ -928,7 +928,6 @@ def join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce=False,
 ) -> Pipeable: ...
 
 
@@ -941,7 +940,6 @@ def join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce=False,
 ) -> Pipeable:
     """
     Joins two tables on a boolean expression.
@@ -974,12 +972,6 @@ def join(
         appended to all columns of the right table. If this still does not resolve all
         name collisions, additionally an integer is appended to the column names of the
         right table.
-
-    :param coalesce:
-        If `on` is a list of strings and `coalesce=True`, the join columns are merged.
-        If there are no column name collisions apart from the join columns, no suffix is
-        appended to columns of the right table.
-
 
     Note
     ----
@@ -1029,18 +1021,11 @@ def join(
     errors.check_literal_type(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
-    errors.check_arg_type(bool, "join", "coalesce", coalesce)
 
     if isinstance(on, str):
         on = [on]
     ignore_right = set()
     if isinstance(on, list):
-        if not all(type(cond) is str for cond in on) and coalesce:
-            raise ValueError(
-                "`coalesce` can only be set to True if `on` is a list of strings"
-            )
-        elif coalesce:
-            ignore_right = set(on)
         on = functools.reduce(
             operator.and_,
             (
@@ -1094,7 +1079,7 @@ def join(
         suffix = ""
 
     new = copy.copy(left)
-    new._ast = Join(left._ast, right._ast, on, how, validate, suffix, coalesce)
+    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
     # The join condition must be preprocessed with respect to both tables
     new._ast.on = resolve_C_columns(
         resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
@@ -1123,7 +1108,6 @@ def inner_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1135,15 +1119,12 @@ def inner_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="inner"``.
     """
 
-    return left >> join(
-        right, on, "inner", validate=validate, suffix=suffix, coalesce=coalesce
-    )
+    return left >> join(right, on, "inner", validate=validate, suffix=suffix)
 
 
 @overload
@@ -1153,7 +1134,6 @@ def left_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1165,15 +1145,12 @@ def left_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="left"``.
     """
 
-    return left >> join(
-        right, on, "left", validate=validate, suffix=suffix, coalesce=coalesce
-    )
+    return left >> join(right, on, "left", validate=validate, suffix=suffix)
 
 
 @overload
@@ -1183,7 +1160,6 @@ def full_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1195,15 +1171,12 @@ def full_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
     """
 
-    return left >> join(
-        right, on, "full", validate=validate, suffix=suffix, coalesce=coalesce
-    )
+    return left >> join(right, on, "full", validate=validate, suffix=suffix)
 
 
 @verb
@@ -1212,13 +1185,12 @@ def cross_join(
     right: Table,
     *,
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
     """
 
-    return left >> full_join(right, on=[], suffix=suffix, coalesce=coalesce)
+    return left >> full_join(right, on=[], suffix=suffix)
 
 
 @overload

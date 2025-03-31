@@ -36,11 +36,6 @@ def test_join(df1, df2, how):
 
     assert_result_equal(
         (df1, df2),
-        lambda t, u: t >> join(u, on="col1", how=how, coalesce=True),
-    )
-
-    assert_result_equal(
-        (df1, df2),
         lambda t, u: t
         >> join(u, on=["col1", t.col1.cast(pdt.Float64()) >= u.col3], how=how),
     )
