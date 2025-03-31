@@ -294,14 +294,6 @@ class SqlImpl(TableImpl):
     def compile_query(cls, table: sqa.Table, query: Query) -> sqa.sql.Select:
         sel = table.select().select_from(table)
 
-        for j in query.join:
-            sel = sel.join(
-                j.right,
-                onclause=j.on,
-                isouter=j.how != "inner",
-                full=j.how == "full",
-            )
-
         if query.where:
             sel = sel.where(*query.where)
 
@@ -531,21 +523,25 @@ class SqlImpl(TableImpl):
                 }
             )
 
-            j = SqlJoin(
-                right_table,
-                cls.compile_col_expr(nd.on, sqa_col),
-                nd.how,
-            )
+            compiled_on = cls.compile_col_expr(nd.on, sqa_col)
 
             if nd.how == "inner":
                 query.where.extend(right_query.where)
             elif nd.how == "left":
-                j.on = functools.reduce(operator.and_, (j.on, *right_query.where))
+                compiled_on = functools.reduce(
+                    operator.and_, (compiled_on, *right_query.where)
+                )
             elif nd.how == "full":
                 if query.where or right_query.where:
                     raise ValueError("invalid filter before full join")
 
-            query.join.append(j)
+            table = table.join(
+                right_table,
+                onclause=compiled_on,
+                isouter=nd.how != "inner",
+                full=nd.how == "full",
+            )
+
             join_cols = set()
             if nd.coalesce:
                 predicates = split_join_cond(nd.on)
@@ -629,7 +625,6 @@ class SqlImpl(TableImpl):
 @dataclasses.dataclass(slots=True)
 class Query:
     select: list[sqa.Label]
-    join: list[SqlJoin] = dataclasses.field(default_factory=list)
     partition_by: list[sqa.Label] = dataclasses.field(default_factory=list)
     group_by: list[sqa.Label] = dataclasses.field(default_factory=list)
     where: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
