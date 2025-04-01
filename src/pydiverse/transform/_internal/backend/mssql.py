@@ -28,12 +28,16 @@ from pydiverse.transform._internal.tree.col_expr import (
 
 class MsSqlImpl(SqlImpl):
     @classmethod
-    def inf():
+    def inf(cls):
         raise NotSupportedError("SQL Server does not support `inf`")
 
     @classmethod
-    def nan():
+    def nan(cls):
         raise NotSupportedError("SQL Server does not support `nan`")
+
+    @classmethod
+    def default_collation(cls):
+        return "Latin1_General_bin"
 
     @classmethod
     def export(

@@ -4,6 +4,7 @@ from typing import Any
 
 import polars as pl
 import sqlalchemy as sqa
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
 from pydiverse.transform._internal.backend import sql
@@ -56,6 +57,12 @@ class DuckDbImpl(SqlImpl):
         if fn.op == ops.sum:
             return sqa.cast(val, type_=args[0].type)
         return val
+
+    @classmethod
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
+    ) -> sqa.ColumnElement:
+        return impl(*args[:-1], aggregate_order_by(args[-1], *order_by))
 
 
 with DuckDbImpl.impl_store.impl_manager as impl:

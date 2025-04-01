@@ -13,6 +13,7 @@ from uuid import UUID
 import polars as pl
 import sqlalchemy as sqa
 
+from pydiverse.common import String
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.errors import SubqueryError
@@ -127,6 +128,10 @@ class SqlImpl(TableImpl):
         return sqa.cast(sqa.literal("nan"), sqa.Double)
 
     @classmethod
+    def default_collation(cls):
+        return "POSIX"
+
+    @classmethod
     def build_select(cls, nd: AstNode, final_select: list[Col]) -> sqa.Select:
         create_aliases(nd, {})
         nd, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
@@ -187,6 +192,8 @@ class SqlImpl(TableImpl):
         cls, order: Order, sqa_col: dict[str, sqa.Label]
     ) -> sqa.UnaryExpression:
         order_expr = cls.compile_col_expr(order.order_by, sqa_col)
+        if types.without_const(order.order_by.dtype()) == String():
+            order_expr = order_expr.collate(cls.default_collation())
         order_expr = order_expr.desc() if order.descending else order_expr.asc()
         if order.nulls_last is not None:
             order_expr = (
@@ -209,6 +216,12 @@ class SqlImpl(TableImpl):
         return val
 
     @classmethod
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: sqa.UnaryExpression, impl
+    ) -> sqa.ColumnElement:
+        raise NotImplementedError
+
+    @classmethod
     def compile_col_expr(
         cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], *, compile_literals=True
     ) -> sqa.ColumnElement:
@@ -229,29 +242,49 @@ class SqlImpl(TableImpl):
 
             partition_by = expr.context_kwargs.get("partition_by")
             if partition_by is not None:
+                assert expr.ftype() == Ftype.WINDOW
                 partition_by = sqa.sql.expression.ClauseList(
                     *(cls.compile_col_expr(col, sqa_col) for col in partition_by)
                 )
 
             arrange = expr.context_kwargs.get("arrange")
-
             if arrange:
-                order_by = sqa.sql.expression.ClauseList(
-                    *(
-                        dedup_order_by(
-                            cls.compile_order(order, sqa_col) for order in arrange
-                        )
-                    )
+                order_by = dedup_order_by(
+                    cls.compile_order(order, sqa_col) for order in arrange
                 )
             else:
                 order_by = None
 
             impl = cls.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
-            value: sqa.ColumnElement = impl(*args, _Impl=cls)
-            if partition_by is not None or order_by is not None:
-                value = sqa.over(value, partition_by=partition_by, order_by=order_by)
+            impl = functools.partial(impl, _Impl=cls)
 
-            return cls.past_over_clause(expr, value, *args)
+            if order_by is not None and expr.ftype() == Ftype.AGGREGATE:
+                # some backends need to do preprocessing and some postprocessing here,
+                # so we just give them full control by passing the responsibility of
+                # calling the `impl`.
+                value = cls.compile_ordered_aggregation(
+                    *args, order_by=order_by, impl=impl
+                )
+
+            else:
+                value: sqa.FunctionElement = impl(*args)
+
+                if (
+                    partition_by is not None
+                    or order_by is not None
+                    and expr.ftype() == Ftype.WINDOW
+                ):
+                    value = cls.past_over_clause(
+                        expr,
+                        sqa.over(
+                            value,
+                            partition_by=partition_by,
+                            order_by=sqa.sql.expression.ClauseList(*order_by),
+                        ),
+                        *args,
+                    )
+
+            return value
 
         elif isinstance(expr, CaseExpr):
             res = sqa.case(
@@ -911,10 +944,6 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.str_join)
     def _str_join(x, delim):
         return sqa.func.string_agg(x, delim)
-
-    @impl(ops.list_agg)
-    def _list_agg(x):
-        return sqa.func.array_agg(x)
 
     @impl(ops.fill_null)
     def _fill_null(x, y):

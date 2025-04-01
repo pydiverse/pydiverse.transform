@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sqa
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 
 from pydiverse.common import Dtype, String
 from pydiverse.transform._internal.backend.sql import SqlImpl
@@ -46,6 +47,12 @@ class PostgresImpl(SqlImpl):
             # postgres sometimes switches types for `sum`
             return sqa.cast(val, args[0].type)
         return val
+
+    @classmethod
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
+    ) -> sqa.ColumnElement:
+        return impl(*args[:-1], aggregate_order_by(args[-1], *order_by))
 
 
 with PostgresImpl.impl_store.impl_manager as impl:
@@ -118,3 +125,7 @@ with PostgresImpl.impl_store.impl_manager as impl:
     @impl(ops.dur_days)
     def _dur_days(x):
         sqa.func.extract("DAYS", x)
+
+    @impl(ops.list_agg)
+    def _list_agg(x):
+        return sqa.func.array_agg(x)
