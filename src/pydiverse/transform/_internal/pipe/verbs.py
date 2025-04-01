@@ -536,6 +536,10 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
         uuids,
     )
 
+    # make sure the ftypes are written in there
+    for val in new._ast.values:
+        val.ftype(agg_is_window=True)
+
     new._cache = copy.copy(table._cache)
     new._cache.update(new._ast)
 

@@ -51,7 +51,7 @@ class DuckDbImpl(SqlImpl):
         return super().compile_lit(lit)
 
     @classmethod
-    def past_over_clause(
+    def fix_fn_types(
         cls, fn: sql.ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
     ) -> sqa.ColumnElement:
         if fn.op == ops.sum:

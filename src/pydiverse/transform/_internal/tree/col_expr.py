@@ -2368,7 +2368,8 @@ class CaseExpr(ColExpr):
         ):
             val_ftypes.add(self.default_val.ftype(agg_is_window=agg_is_window))
 
-        for _, val in self.cases:
+        for cond, val in self.cases:
+            cond.ftype(agg_is_window=agg_is_window)
             if val.dtype() is not None and not types.is_const(val.dtype()):
                 val_ftypes.add(val.ftype(agg_is_window=agg_is_window))
 

@@ -210,7 +210,7 @@ class SqlImpl(TableImpl):
         )
 
     @classmethod
-    def past_over_clause(
+    def fix_fn_types(
         cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
     ) -> sqa.ColumnElement:
         return val
@@ -240,8 +240,10 @@ class SqlImpl(TableImpl):
                 )
             ]
 
+            assert expr.ftype() is not None
+
             partition_by = expr.context_kwargs.get("partition_by")
-            if partition_by is not None:
+            if partition_by:
                 assert expr.ftype() == Ftype.WINDOW
                 partition_by = sqa.sql.expression.ClauseList(
                     *(cls.compile_col_expr(col, sqa_col) for col in partition_by)
@@ -274,17 +276,15 @@ class SqlImpl(TableImpl):
                     or order_by is not None
                     and expr.ftype() == Ftype.WINDOW
                 ):
-                    value = cls.past_over_clause(
-                        expr,
-                        sqa.over(
-                            value,
-                            partition_by=partition_by,
-                            order_by=sqa.sql.expression.ClauseList(*order_by),
-                        ),
-                        *args,
+                    value = sqa.over(
+                        value,
+                        partition_by=partition_by,
+                        order_by=sqa.sql.expression.ClauseList(*order_by)
+                        if order_by
+                        else None,
                     )
 
-            return value
+            return cls.fix_fn_types(expr, value, *args)
 
         elif isinstance(expr, CaseExpr):
             res = sqa.case(

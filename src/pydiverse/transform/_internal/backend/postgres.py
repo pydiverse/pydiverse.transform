@@ -38,7 +38,7 @@ class PostgresImpl(SqlImpl):
         return super().sqa_type(pdt_type)
 
     @classmethod
-    def past_over_clause(
+    def fix_fn_types(
         cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
     ) -> sqa.ColumnElement:
         if isinstance(fn.op, ops.DatetimeExtract | ops.DateExtract):

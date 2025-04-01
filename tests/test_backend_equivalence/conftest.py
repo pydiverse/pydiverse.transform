@@ -290,7 +290,7 @@ def generate_df_fixtures():
         @pytest.fixture(scope="function")
         def table_fixture(request):
             df = dataframes[table_name]
-            name = f"equiv_{table_name}"
+            name = table_name
 
             table_x = BACKEND_TABLES[request.param[0]](df, name)
             table_y = BACKEND_TABLES[request.param[1]](df, name)

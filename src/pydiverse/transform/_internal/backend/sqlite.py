@@ -26,6 +26,10 @@ class SqliteImpl(SqlImpl):
         raise NotSupportedError("SQLite does not have `nan`, use `null` instead.")
 
     @classmethod
+    def default_collation(cls):
+        return "BINARY"
+
+    @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
         val_type = types.without_const(cast.val.dtype())
@@ -55,7 +59,7 @@ class SqliteImpl(SqlImpl):
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
     @classmethod
-    def past_over_clause(
+    def fix_fn_types(
         cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
     ) -> sqa.ColumnElement:
         if (
