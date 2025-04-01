@@ -85,17 +85,13 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
     for ord in order_list:
         # is True / is False are important here since we don't want to do this costly
         # workaround if nulls_last is None (i.e. the user doesn't care)
-        if ord.nulls_last is True and not ord.descending:
+        if ord.nulls_last is not None and (ord.nulls_last ^ ord.descending):
             new_list.append(
                 Order(
-                    CaseExpr([(ord.order_by.is_null(), LiteralCol(1))], LiteralCol(0)),
-                )
-            )
-
-        elif ord.nulls_last is False and ord.descending:
-            new_list.append(
-                Order(
-                    CaseExpr([(ord.order_by.is_null(), LiteralCol(0))], LiteralCol(1)),
+                    CaseExpr(
+                        [(ord.order_by.is_null(), LiteralCol(int(ord.nulls_last)))],
+                        LiteralCol(int(not ord.nulls_last)),
+                    )
                 )
             )
 

@@ -160,3 +160,11 @@ def test_str_join(df_strings):
     assert_result_equal(
         df_strings, lambda t: t >> group_by(t.e) >> summarize(con=t.c.str.join(", "))
     )
+
+
+def test_str_arrange(df_strings):
+    def bind(col):
+        assert_result_equal(df_strings, lambda t: t >> arrange(t[col].nulls_last()))
+
+    for col in ["col1", "col2", "c", "d", "e", "gb"]:
+        bind(col)

@@ -113,6 +113,7 @@ dataframes = {
                 "11",
                 "$&/)",
             ],
+            "gb": ["a", "b", "a", "a", "0", "", "", "a", "", "c", "d", "b"],
         }
     ),
     "df_datetime": pl.DataFrame(

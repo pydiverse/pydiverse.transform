@@ -92,7 +92,7 @@ class ColExpr(Generic[T]):
         """
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool) -> Ftype:
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self._ftype
 
     def map(
@@ -2146,6 +2146,8 @@ class ColFn(ColExpr):
         ]
         self.context_kwargs = clean_kwargs(**kwargs)
 
+        # TODO: probably it is faster and produces nicer SQL code if we put this in
+        # WITHIN GROUP for aggregation functions. On polars use col.filter().
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
                 assert self.op == ops.count_star
@@ -2197,7 +2199,7 @@ class ColFn(ColExpr):
 
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool):
+    def ftype(self, *, agg_is_window: bool | None = None):
         """
         Determine the ftype based on the arguments.
 
@@ -2209,10 +2211,10 @@ class ColFn(ColExpr):
         an Exception.
         """
 
-        # TODO: This causes wrong results if ftype is called once with
-        # agg_is_window=True and then with agg_is_window=False.
         if self._ftype is not None:
             return self._ftype
+        if self.op.ftype == Ftype.AGGREGATE and agg_is_window is None:
+            return None
 
         ftypes = [arg.ftype(agg_is_window=agg_is_window) for arg in self.args]
         if None in ftypes:
@@ -2354,7 +2356,7 @@ class CaseExpr(ColExpr):
 
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool):
+    def ftype(self, *, agg_is_window: bool | None = None):
         if self._ftype is not None:
             return self._ftype
 
@@ -2488,7 +2490,7 @@ class Cast(ColExpr):
             self._dtype = types.with_const(self._dtype)
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool) -> Ftype:
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self.val.ftype(agg_is_window=agg_is_window)
 
     def iter_children(self) -> Iterable[ColExpr]:
