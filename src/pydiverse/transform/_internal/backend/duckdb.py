@@ -90,3 +90,7 @@ with DuckDbImpl.impl_store.impl_manager as impl:
     @impl(ops.str_join)
     def _str_join(x, delim):
         return sqa.func.string_agg(x, delim)
+
+    @impl(ops.list_agg)
+    def _list_agg(x):
+        return sqa.func.array_agg(x)

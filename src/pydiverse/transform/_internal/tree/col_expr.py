@@ -2511,6 +2511,12 @@ class Order:
     # translated normally.
     @staticmethod
     def from_col_expr(expr: ColExpr) -> Order:
+        if not isinstance(expr, ColExpr):
+            raise TypeError(
+                f"argument to `arrange` must be a `ColExpr`, found `{type(expr)}` "
+                "instead.\n"
+                "hint: maybe you forgot to close parentheses `()`?"
+            )
         descending = None
         nulls_last = None
         while isinstance(expr, ColFn):
