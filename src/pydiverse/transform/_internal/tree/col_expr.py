@@ -2190,11 +2190,20 @@ class ColFn(ColExpr):
             return self._dtype
 
         arg_dtypes = [arg.dtype() for arg in self.args]
-        if None in arg_dtypes:
+        context_kwarg_dtypes = [
+            elem.dtype() for elem in itertools.chain(*self.context_kwargs.values())
+        ]
+
+        # we don't need the context_kwargs' types but we need to make sure type checks
+        # are run on them
+        if None in arg_dtypes or None in context_kwarg_dtypes:
             return None
 
         self._dtype = self.op.return_type(arg_dtypes)
-        if all(types.is_const(argt) for argt in arg_dtypes):
+        if self.op.ftype == Ftype.ELEMENT_WISE and all(
+            types.is_const(argt)
+            for argt in itertools.chain(arg_dtypes, context_kwarg_dtypes)
+        ):
             self._dtype = Const(self._dtype)
 
         return self._dtype
@@ -2544,6 +2553,9 @@ class Order:
             descending = False
 
         return Order(expr, descending, nulls_last)
+
+    def dtype(self) -> Dtype:
+        return self.order_by.dtype()
 
     def iter_subtree(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_subtree()

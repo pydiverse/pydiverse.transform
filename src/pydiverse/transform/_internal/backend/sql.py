@@ -394,7 +394,18 @@ class SqlImpl(TableImpl):
 
         elif isinstance(nd, verbs.Mutate):
             for name, val, uid in zip(nd.names, nd.values, nd.uuids, strict=True):
-                sqa_col[uid] = sqa.label(name, cls.compile_col_expr(val, sqa_col))
+                if types.is_const(val.dtype()):
+                    # TODO: this is incorrect (e.g. for a window functions of a constant
+                    # column, transform does not determine the data type of the result
+                    # to be constant, then left joins fail)
+                    const_table = sqa.select(
+                        sqa.label(name, cls.compile_col_expr(val, sqa_col))
+                    ).subquery()
+                    sqa_col[uid] = sqa.label(name, const_table.columns.get(name))
+                    table = table.join(const_table, onclause=sqa.literal(True))
+                else:
+                    sqa_col[uid] = sqa.label(name, cls.compile_col_expr(val, sqa_col))
+
                 query.select.append(sqa_col[uid])
 
         elif isinstance(nd, verbs.Filter):

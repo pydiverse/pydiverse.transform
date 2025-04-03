@@ -182,3 +182,22 @@ def test_join_summarize(df3, df4):
             t3 >> group_by(t3.col2) >> summarize(j=t3.col4.sum()) >> alias(), on="col2"
         ),
     )
+
+
+def test_join_const_col(df3, df4):
+    assert_result_equal(
+        (df3, df4), lambda s, t: s >> left_join(t >> mutate(y=0), on="col1")
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda s, t: s >> mutate(z=2) >> full_join(t >> mutate(j=True), on="col2"),
+    )
+
+    assert_result_equal(
+        df3,
+        lambda t: t
+        >> mutate(x=4, y=5)
+        >> mutate(z=C.x + C.y)
+        >> full_join(t_ := t >> alias(), on=t.col1 == t_.col2),
+    )
