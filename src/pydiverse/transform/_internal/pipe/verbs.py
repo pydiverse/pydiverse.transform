@@ -1183,6 +1183,14 @@ def full_join(
     return left >> join(right, on, "full", validate=validate, suffix=suffix)
 
 
+@overload
+def cross_join(
+    right: Table,
+    *,
+    suffix: str | None = None,
+) -> Pipeable: ...
+
+
 @verb
 def cross_join(
     left: Table,
@@ -1191,10 +1199,10 @@ def cross_join(
     suffix: str | None = None,
 ) -> Pipeable:
     """
-    Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
+    Alias for the :doc:`pydiverse.transform.join` verb with an empty ``on`` clause.
     """
 
-    return left >> full_join(right, on=[], suffix=suffix)
+    return left >> join(right, how="inner", on=[], suffix=suffix)
 
 
 @overload

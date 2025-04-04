@@ -164,6 +164,10 @@ def test_ineq_join(df3, df4, df_strings):
         ),
     )
 
+    assert_result_equal(
+        (df3, df4), lambda s, t: s >> inner_join(t, on=["col1", s.col2 <= t.col2])
+    )
+
 
 def test_join_summarize(df3, df4):
     assert_result_equal(
@@ -201,3 +205,7 @@ def test_join_const_col(df3, df4):
         >> mutate(z=C.x + C.y)
         >> full_join(t_ := t >> alias(), on=t.col1 == t_.col2),
     )
+
+
+def test_cross_join(df2, df3):
+    assert_result_equal((df2, df3), lambda s, t: s >> cross_join(t))

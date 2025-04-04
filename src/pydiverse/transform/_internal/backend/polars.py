@@ -403,36 +403,43 @@ def compile_ast(
         assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
         name_in_df.update(right_name_in_df)
 
-        # Do equality predicates separately because polars coalesces on them.
         eq_predicates = [pred for pred in predicates if pred.op == ops.equal]
-        other_predicates = [pred for pred in predicates if pred.op != ops.equal]
+        left_on = []
+        right_on = []
+        for pred in eq_predicates:
+            left_on.append(pred.args[0])
+            right_on.append(pred.args[1])
 
-        if eq_predicates:
-            left_on = []
-            right_on = []
-            for pred in eq_predicates:
-                left_on.append(pred.args[0])
-                right_on.append(pred.args[1])
+            must_swap_cols = None
+            for e in pred.args[0].iter_subtree():
+                if isinstance(e, Col):
+                    must_swap_cols = e._uuid in right_name_in_df
+                    assert e._uuid in name_in_df
+                    break
+            # TODO: find a good place to throw an error if one side of an equality
+            # predicate is constant. or do not consider such predicates as equality
+            # predicates and put them in join_where
+            assert must_swap_cols is not None
 
-                left_is_left = None
-                for e in pred.args[0].iter_subtree():
-                    if isinstance(e, Col):
-                        left_is_left = e._uuid not in right_name_in_df
-                        assert e._uuid in name_in_df
-                        break
-                assert left_is_left is not None
+            if must_swap_cols:
+                left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
 
-                if not left_is_left:
-                    left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
+        # If there are only equality predicates, use normal join. Else use join_where
+        if len(eq_predicates) == len(predicates):
+            if len(predicates) == 0:
+                # cross join, polars does not like an empty join condition
+                df = df.join(right_df, how="cross")
 
-            df = df.join(
-                right_df,
-                left_on=[compile_col_expr(col, name_in_df) for col in left_on],
-                right_on=[compile_col_expr(col, name_in_df) for col in right_on],
-                how=nd.how,
-                validate=nd.validate,
-                coalesce=False,
-            )
+            else:
+                df = df.join(
+                    right_df,
+                    left_on=[compile_col_expr(col, name_in_df) for col in left_on],
+                    right_on=[compile_col_expr(col, name_in_df) for col in right_on],
+                    how=nd.how,
+                    validate=nd.validate,
+                    coalesce=False,
+                )
+
         else:
             if nd.how in ("left", "full"):
                 df = df.with_columns(
@@ -445,7 +452,12 @@ def compile_ast(
 
             joined = df.join_where(
                 right_df,
-                *(compile_col_expr(pred, name_in_df) for pred in other_predicates),
+                *(compile_col_expr(pred, name_in_df) for pred in predicates),
+            ).with_columns(
+                # polars deletes the right column in equality predicates...
+                pl.col(name_in_df[left_col._uuid]).alias(name_in_df[right_col._uuid])
+                for left_col, right_col in zip(left_on, right_on, strict=True)
+                if isinstance(left_col, Col) and isinstance(right_col, Col)
             )
 
             if nd.how in ("left", "full"):
