@@ -57,8 +57,8 @@ class PolarsImpl(TableImpl):
         final_select: list[Col],
         schema_overrides: dict,
     ) -> Any:
-        lf, _, select, _ = compile_ast(nd)
-        lf = lf.select(*select)
+        lf, name_in_df, select, _ = compile_ast(nd)
+        lf = lf.select(*(name_in_df[uid] for uid in select))
         if isinstance(target, Polars):
             if not target.lazy and isinstance(lf, pl.LazyFrame):
                 lf = lf.collect()
@@ -237,7 +237,7 @@ def rename_overwritten_cols(
     df: pl.LazyFrame,
     name_in_df: dict[UUID, str],
     *,
-    names_to_consider: set[str] | None = None,
+    names_to_consider: set[UUID] | None = None,
 ) -> tuple[pl.LazyFrame, dict[UUID, str]]:
     if names_to_consider is None:
         names_to_consider = set(name_in_df.values())
@@ -258,13 +258,21 @@ def rename_overwritten_cols(
 
 def compile_ast(
     nd: AstNode,
-) -> tuple[pl.LazyFrame, dict[UUID, str], list[str], list[UUID]]:
+) -> tuple[pl.LazyFrame, dict[UUID, str], list[UUID], list[UUID]]:
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
     if isinstance(nd, verbs.Mutate | verbs.Summarize):
+        nd_names_set = set(nd.names)
+        # we need to do this before name_in_df is changed
+        select = [
+            uid
+            for uid in (select if isinstance(nd, verbs.Mutate) else partition_by)
+            if name_in_df[uid] not in nd_names_set
+        ] + nd.uuids
+
         names_to_consider = (
-            set(partition_by)
+            set(name_in_df[uid] for uid in partition_by)
             if isinstance(nd, verbs.Summarize)
             else set(name_in_df.values())
         )
@@ -276,7 +284,7 @@ def compile_ast(
         )
 
     if isinstance(nd, verbs.Select):
-        select = [name_in_df[col._uuid] for col in nd.select]
+        select = [col._uuid for col in nd.select]
 
     elif isinstance(nd, verbs.Rename):
         df = df.rename(nd.name_map)
@@ -284,10 +292,6 @@ def compile_ast(
             uid: (nd.name_map[name] if name in nd.name_map else name)
             for uid, name in name_in_df.items()
         }
-        select = [
-            nd.name_map[col_name] if col_name in nd.name_map else col_name
-            for col_name in select
-        ]
 
     elif isinstance(nd, verbs.Mutate):
         df = df.with_columns(
@@ -300,7 +304,6 @@ def compile_ast(
         name_in_df.update(
             {uid: name for uid, name in zip(nd.uuids, nd.names, strict=True)}
         )
-        select = [name for name in select if name not in nd.names] + nd.names
 
     elif isinstance(nd, verbs.Filter):
         df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.predicates])
@@ -342,15 +345,14 @@ def compile_ast(
             **aggregations
         )
 
-        # remove columns dropped by summarize after they might have been used in
-        # expressions
+        # we have to remove the columns here for the join hidden column rename to work
+        # correctly (otherwise it would try to rename hidden columns that do not exist)
         name_in_df = {
             name: uuid for name, uuid in name_in_df.items() if name in partition_by
         }
         name_in_df.update(
             {uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)}
         )
-        select = [*(name_in_df[uid] for uid in partition_by), *nd.names]
         partition_by = []
 
     elif isinstance(nd, verbs.SliceHead):
@@ -377,7 +379,6 @@ def compile_ast(
         # to bother the user to provide a suffix only to prevent name collisions of
         # hidden columns)
 
-        right_select = [name + nd.suffix for name in right_select]
         right_name_in_df = {
             uid: name + nd.suffix for uid, name in right_name_in_df.items()
         }
@@ -387,11 +388,11 @@ def compile_ast(
 
         # visible columns
         right_df, right_name_in_df = rename_overwritten_cols(
-            set(select),
-            right_df,
-            right_name_in_df,
+            set(name_in_df[uid] for uid in select), right_df, right_name_in_df
         )
-        df, name_in_df = rename_overwritten_cols(set(right_select), df, name_in_df)
+        df, name_in_df = rename_overwritten_cols(
+            set(right_name_in_df[uid] for uid in right_select), df, name_in_df
+        )
 
         # hidden columns
         right_df, right_name_in_df = rename_overwritten_cols(
@@ -471,12 +472,12 @@ def compile_ast(
 
             df = joined
 
-        select += [name for name in right_select]
+        select += right_select
 
     elif isinstance(nd, PolarsImpl):
         df = nd.df
         name_in_df = {col._uuid: col.name for col in nd.cols.values()}
-        select = list(nd.cols.keys())
+        select = list(name_in_df.keys())
         partition_by = []
 
     return df, name_in_df, select, partition_by
