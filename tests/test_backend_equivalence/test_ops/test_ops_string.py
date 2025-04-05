@@ -158,7 +158,12 @@ def test_slice(df_strings):
 
 def test_str_join(df_strings):
     assert_result_equal(
-        df_strings, lambda t: t >> group_by(t.e) >> summarize(con=t.c.str.join(", "))
+        df_strings,
+        lambda t: t
+        >> group_by(t.e)
+        >> summarize(
+            con=t.c.str.join(", ", arrange=[t.d.nulls_first(), t.c.nulls_last()])
+        ),
     )
 
     assert_result_equal(

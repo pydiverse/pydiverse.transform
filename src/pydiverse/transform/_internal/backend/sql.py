@@ -150,7 +150,7 @@ class SqlImpl(TableImpl):
         if isinstance(target, Polars):
             with engine.connect() as conn:
                 df = pl.read_database(
-                    sel,
+                    sel.compile(engine, compile_kwargs={"literal_binds": True}),
                     connection=conn,
                     schema_overrides={
                         sql_col.name: schema_overrides[col]

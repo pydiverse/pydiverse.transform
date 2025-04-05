@@ -83,6 +83,12 @@ class MsSqlImpl(SqlImpl):
         table, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
         return cls.compile_query(table, query)
 
+    @classmethod
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
+    ):
+        return impl(*args).within_group(*order_by)
+
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
     new_list: list[Order] = []

@@ -70,6 +70,27 @@ class SqliteImpl(SqlImpl):
             return sqa.cast(val, sqa.Double)
         return val
 
+    @classmethod
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
+    ):
+        from sqlalchemy.dialects import postgresql
+        from sqlalchemy.dialects.postgresql import aggregate_order_by
+
+        # TODO: this is hacky but there is currently no other way except writing raw
+        # SQL.
+        return impl(
+            *args[:-1],
+            sqa.text(
+                str(
+                    aggregate_order_by(args[-1], *order_by).compile(
+                        dialect=postgresql.psycopg2.PGDialect_psycopg2(),
+                        compile_kwargs={"literal_binds": True},
+                    )
+                )
+            ),
+        )
+
 
 with SqliteImpl.impl_store.impl_manager as impl:
 
