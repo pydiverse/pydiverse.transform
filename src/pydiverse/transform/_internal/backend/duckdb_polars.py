@@ -49,7 +49,7 @@ class DuckDbPolarsImpl(TableImpl):
         nd: AstNode,
         target: Target,
         *,
-        schema_overrides: dict[str, Any],  # TODO: use this
+        schema_overrides: dict[UUID, Any],  # TODO: use this
     ) -> pl.DataFrame:
         if isinstance(target, Polars):
             sel = DuckDbImpl.build_select(nd)

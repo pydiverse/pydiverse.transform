@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import polars as pl
 import sqlalchemy as sqa
@@ -23,7 +24,8 @@ class DuckDbImpl(SqlImpl):
         cls,
         nd: AstNode,
         target: Target,
-        schema_overrides: dict[str, Any],
+        *,
+        schema_overrides: dict[UUID, Any],
     ):
         if isinstance(target, Polars):
             engine = sql.get_engine(nd)
@@ -33,7 +35,7 @@ class DuckDbImpl(SqlImpl):
                     connection=conn,
                     schema_overrides=schema_overrides,
                 )
-        return SqlImpl.export(nd, target, schema_overrides)
+        return SqlImpl.export(nd, target, schema_overrides=schema_overrides)
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:

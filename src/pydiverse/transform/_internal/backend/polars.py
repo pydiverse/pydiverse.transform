@@ -54,10 +54,12 @@ class PolarsImpl(TableImpl):
     def export(
         nd: AstNode,
         target: Target,
-        schema_overrides: dict,
+        *,
+        schema_overrides: dict[UUID, Any],  # TODO: use this
     ) -> Any:
         lf, name_in_df, select, _ = compile_ast(nd)
         lf = lf.select(*(name_in_df[uid] for uid in select))
+
         if isinstance(target, Polars):
             if not target.lazy and isinstance(lf, pl.LazyFrame):
                 lf = lf.collect()

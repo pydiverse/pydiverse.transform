@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import functools
 from typing import Any
+from uuid import UUID
 
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import DATETIME2
@@ -46,18 +47,16 @@ class MsSqlImpl(SqlImpl):
         nd: AstNode,
         target: Target,
         *,
-        schema_overrides: dict[Col, Any],
+        schema_overrides: dict[UUID, Any],
     ) -> Any:
         final_select = Cache.from_ast(nd).get_selected_cols()
 
         for col in final_select:
             if types.without_const(col.dtype()) == Bool():
-                if col not in schema_overrides:
-                    schema_overrides[col] = col.dtype().to_polars()
+                if col._uuid not in schema_overrides:
+                    schema_overrides[col._uuid] = col.dtype().to_polars()
 
-        return super().export(
-            nd, target, final_select=final_select, schema_overrides=schema_overrides
-        )
+        return super().export(nd, target, schema_overrides=schema_overrides)
 
     @classmethod
     def build_select(cls, nd: AstNode, *, final_select: list[Col] | None = None) -> Any:

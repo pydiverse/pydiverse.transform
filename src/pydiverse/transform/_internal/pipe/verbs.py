@@ -12,7 +12,7 @@ from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
-from pydiverse.transform._internal.pipe.table import Cache, Table
+from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
@@ -122,34 +122,14 @@ def alias(
         new_name = table._ast.name
 
     new = copy.copy(table)
-    if keep_col_refs:
-        new._ast = Alias(new._ast, None)
-        new._ast.name = new_name
-        return new
-
-    new._ast = Alias(new._ast, {uid: uuid.uuid1() for uid in table._cache.cols.keys()})
-    new._ast.name = new_name
-    new._cache = Cache(
-        name_to_uuid={
-            name: new._ast.uuid_map[uid]
-            for name, uid in table._cache.name_to_uuid.items()
-        },
-        uuid_to_name={
-            new._ast.uuid_map[uid]: name
-            for uid, name in table._cache.uuid_to_name.items()
-        },
-        partition_by=[
-            table._cache.cols[new._ast.uuid_map[col._uuid]]
-            for col in table._cache.partition_by
-        ],
-        derived_from={new._ast},
-        cols={
-            new._ast.uuid_map[uid]: Col(
-                col.name, new._ast, new._ast.uuid_map[uid], col._dtype, col._ftype
-            )
-            for uid, col in table._cache.cols.items()
-        },
+    new._ast = Alias(
+        new._ast,
+        {uid: uuid.uuid1() for uid in table._cache.cols.keys()}
+        if not keep_col_refs
+        else None,
     )
+    new._ast.name = new_name
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -229,12 +209,17 @@ def collect(
 
 
 @overload
-def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable: ...
+def export(
+    target: Target, *, schema_overrides: dict[str, Any] | None = None
+) -> Pipeable: ...
 
 
 @verb
 def export(
-    data: Table, target: Target, *, schema_overrides: dict[Col, Any] | None = None
+    table: Table,
+    target: Target,
+    *,
+    schema_overrides: dict[str, Any] | None = None,
 ) -> Pipeable:
     """Convert a pydiverse.transform Table to a data frame.
 
@@ -246,8 +231,8 @@ def export(
         the LazyFrame.
 
     :param schema_overrides:
-        A dictionary of columns to backend-specific data types. This controls which data
-        types are used when writing to the backend. Because the data types are not
+        A dictionary of column names to backend-specific data types. This controls which
+        data types are used when writing to the backend. Because the data types are not
         constrained by pydiverse.transform's type system, this may sometimes be
         preferred over a cast.
 
@@ -290,13 +275,15 @@ def export(
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
-    SourceBackend: type[TableImpl] = get_backend(data._ast)
+    SourceBackend: type[TableImpl] = get_backend(table._ast)
     if schema_overrides is None:
-        schema_overrides = {}
+        schema_overrides = dict()
     return SourceBackend.export(
-        data._ast.clone(),
+        table._ast.clone(),
         target,
-        schema_overrides=schema_overrides,
+        schema_overrides={
+            table[col_name]._uuid: dtype for col_name, dtype in schema_overrides.items()
+        },
     )
 
 
@@ -313,12 +300,7 @@ def build_query(table: Table) -> Pipeable:
         The SQL query as a string.
     """
 
-    table = table >> alias()
-    SourceBackend: type[TableImpl] = get_backend(table._ast)
-    return SourceBackend.build_query(
-        table._ast,
-        [table._cache.cols[uid] for uid in table._cache.name_to_uuid.values()],
-    )
+    return get_backend(table._ast).build_query(table._ast.clone())
 
 
 @overload
@@ -386,7 +368,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = Select(table._ast, [preprocess_arg(col, table) for col in cols])
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     assert len(new) == len(cols)
     return new
@@ -515,7 +497,7 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = Rename(table._ast, name_map)
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -564,7 +546,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     new._ast = Mutate(
         table._ast, names, [preprocess_arg(val, table) for val in values], uuids
     )
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -621,7 +603,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
                     "`mutate`."
                 )
 
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -689,7 +671,7 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
         table._ast,
         [preprocess_arg(Order.from_col_expr(ord), table) for ord in order_by],
     )
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -727,7 +709,7 @@ def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, [preprocess_arg(col, table) for col in cols], add)
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -780,7 +762,7 @@ def ungroup(table: Table) -> Pipeable:
     """
     new = copy.copy(table)
     new._ast = Ungroup(table._ast)
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -881,7 +863,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     for root in new._ast.values:
         check_summarize_col_expr(root, False)
 
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -931,7 +913,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = SliceHead(table._ast, n, offset)
-    new._cache = copy.copy(table._cache).update(new._ast)
+    new._cache = table._cache.update(new._ast)
 
     return new
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 from uuid import UUID
 
@@ -30,54 +31,78 @@ class Cache:
                     node, right_cache=Cache.from_ast(node.right)
                 )
             else:
-                Cache.from_ast(node.child).update(node)
+                return Cache.from_ast(node.child).update(node)
 
         assert isinstance(node, TableImpl)
         return Cache(
-            {col.name: col._uuid for col in node.cols.values()},
-            {col._uuid: col.name for col in node.cols.values()},
-            [],
-            {node},
-            {col._uuid: col for col in node.cols.values()},
+            name_to_uuid={col.name: col._uuid for col in node.cols.values()},
+            uuid_to_name={col._uuid: col.name for col in node.cols.values()},
+            partition_by=[],
+            derived_from={node},
+            cols={col._uuid: col for col in node.cols.values()},
         )
 
-    def update(self, node: verbs.Verb, *, right_cache: Cache | None = None):
-        if isinstance(node, verbs.Select):
+    def update(self, node: verbs.Verb, *, right_cache: Cache | None = None) -> Cache:
+        """
+        Returns a new cache for `node`, assuming `self` is the cache of `node.child`.
+        Does not modify `self`.
+        """
+
+        res = copy.copy(self)
+
+        if isinstance(node, verbs.Alias):
+            if node.uuid_map is not None:
+                res.name_to_uuid = {
+                    name: node.uuid_map[uid] for name, uid in self.name_to_uuid.items()
+                }
+                res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
+                res.partition_by = [
+                    self.cols[node.uuid_map[col._uuid]] for col in self.partition_by
+                ]
+                res.cols = {
+                    node.uuid_map[uid]: Col(
+                        col.name, node, node.uuid_map[uid], col._dtype, col._ftype
+                    )
+                    for uid, col in self.cols.items()
+                }
+                res.derived_from = set()
+
+        elif isinstance(node, verbs.Select):
             selected_uuids = set(col._uuid for col in node.select)
-            self.uuid_to_name = {
+            res.uuid_to_name = {
                 uid: name
                 for uid, name in self.uuid_to_name.items()
                 if uid in selected_uuids
             }
-            self.name_to_uuid = {name: uid for uid, name in self.uuid_to_name.items()}
+            res.name_to_uuid = {name: uid for uid, name in res.uuid_to_name.items()}
 
         elif isinstance(node, verbs.Rename):
-            self.name_to_uuid = {
+            res.name_to_uuid = {
                 (new_name if (new_name := node.name_map.get(name)) else name): uid
                 for name, uid in self.name_to_uuid.items()
             }
-            self.uuid_to_name = {uid: name for name, uid in self.name_to_uuid.items()}
+            res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
         elif isinstance(node, verbs.Mutate):
-            self.cols = self.cols | {
+            res.cols = self.cols | {
                 uid: Col(name, node, uid, val.dtype(), val.ftype(agg_is_window=True))
                 for name, val, uid in zip(
                     node.names, node.values, node.uuids, strict=True
                 )
             }
-            self.name_to_uuid = self.name_to_uuid | {
+            res.name_to_uuid = self.name_to_uuid | {
                 name: uid for name, uid in zip(node.names, node.uuids, strict=True)
             }
-            self.uuid_to_name = {uid: name for name, uid in self.name_to_uuid.items()}
+            res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
         elif isinstance(node, verbs.GroupBy):
             if node.add:
-                self.partition_by = self.partition_by + node.group_by
+                res.partition_by = self.partition_by + node.group_by
             else:
-                self.partition_by = node.group_by
+                res.partition_by = node.group_by
 
         elif isinstance(node, verbs.Ungroup):
-            self.partition_by = []
+            res.partition_by = []
 
         elif isinstance(node, verbs.Summarize):
             overwritten = {
@@ -94,28 +119,28 @@ class Cache:
                 )
             }
 
-            self.cols = {col._uuid: col for _, col in cols.items()}
-            self.name_to_uuid = {name: col._uuid for name, col in cols.items()}
-            self.uuid_to_name = {uid: name for name, uid in self.name_to_uuid.items()}
-            self.partition_by = []
+            res.cols = {col._uuid: col for _, col in cols.items()}
+            res.name_to_uuid = {name: col._uuid for name, col in cols.items()}
+            res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
+            res.partition_by = []
 
         elif isinstance(node, verbs.Join):
             assert right_cache is not None
 
-            self.cols = self.cols | right_cache.cols
-            self.name_to_uuid = self.name_to_uuid | {
+            res.cols = self.cols | right_cache.cols
+            res.name_to_uuid = self.name_to_uuid | {
                 name + node.suffix: uid
                 for name, uid in right_cache.name_to_uuid.items()
             }
-            self.uuid_to_name = self.uuid_to_name | {
-                uid: name + node.suffix
-                for uid, name in right_cache.uuid_to_name.items()
-            }
-            self.derived_from = self.derived_from | right_cache.derived_from
+            res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
-        assert len(self.name_to_uuid) == len(self.uuid_to_name)
+            res.derived_from = self.derived_from | right_cache.derived_from
 
-        self.derived_from = self.derived_from | {node}
+        assert len(res.name_to_uuid) == len(res.uuid_to_name)
+
+        res.derived_from = res.derived_from | {node}
+
+        return res
 
     def get_selected_cols(self) -> list[Col]:
         return [self.cols[uid] for uid in self.uuid_to_name.keys()]

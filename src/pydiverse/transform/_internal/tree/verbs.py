@@ -60,6 +60,16 @@ class Verb(AstNode):
 class Alias(Verb):
     uuid_map: dict[UUID, UUID] | None
 
+    def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        cloned, nd_map, uuid_map = Verb._clone(self)
+        if self.uuid_map is not None:  # happens if and only if keep_col_refs=False
+            assert len(self.uuid_map) == len(uuid_map)
+            uuid_map = {
+                self.uuid_map[old_uid]: new_uid for old_uid, new_uid in uuid_map.items()
+            }
+            cloned.uuid_map = None
+        return cloned, nd_map, uuid_map
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Select(Verb):

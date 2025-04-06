@@ -123,7 +123,7 @@ class TableImpl(AstNode):
         nd: AstNode,
         target: Target,
         *,
-        schema_overrides: dict[Col, Any],
+        schema_overrides: dict[UUID, Any],
     ) -> Any: ...
 
     @classmethod

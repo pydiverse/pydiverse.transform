@@ -148,7 +148,7 @@ class SqlImpl(TableImpl):
         nd: AstNode,
         target: Target,
         *,
-        schema_overrides: dict[Col, Any],
+        schema_overrides: dict[UUID, Any],
     ) -> Any:
         final_select = Cache.from_ast(nd).get_selected_cols()
 
@@ -161,14 +161,18 @@ class SqlImpl(TableImpl):
                     sel.compile(engine, compile_kwargs={"literal_binds": True}),
                     connection=conn,
                     schema_overrides={
-                        sql_col.name: schema_overrides[col]
-                        if col in schema_overrides
-                        else col.dtype().to_polars()
+                        sql_col.name: schema_overrides[col._uuid]
                         for sql_col, col in zip(
                             sel.columns.values(), final_select, strict=True
                         )
-                        if col in schema_overrides
-                        or types.without_const(col.dtype()) == NullType()
+                        if col._uuid in schema_overrides
+                    }
+                    | {
+                        sql_col.name: NullType().to_polars()
+                        for sql_col, col in zip(
+                            sel.columns.values(), final_select, strict=True
+                        )
+                        if types.without_const(col.dtype()) == NullType()
                     },
                 )
                 df.name = nd.name
