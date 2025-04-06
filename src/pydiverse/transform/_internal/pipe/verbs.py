@@ -62,22 +62,28 @@ __all__ = [
 
 
 @overload
-def alias(new_name: str | None = None) -> Pipeable: ...
+def alias(new_name: str | None = None, *, keep_col_refs: bool = False) -> Pipeable: ...
 
 
+# TODO: can we just store the uuid map in the Alias obj and do the uuid reroll lazily
+# (handing an AST to the backend, uuids are rerolled anyway)
 @verb
-def alias(table: Table, new_name: str | None = None) -> Pipeable:
+def alias(
+    table: Table, new_name: str | None = None, *, keep_col_refs: bool = False
+) -> Pipeable:
     """
-    Changes the name of the current table and resets column references.
-
-    That column references are reset means that the resulting table is not
-    considered to be derived from the input table, i.e. one cannot use columns
-    from the input table in subsequent operations on the result table. However,
-    the reset of column references is necessary before performing a self-join.
+    Changes the name of the current table and allows subqueries in SQL.
 
     :param new_name:
         The new name assigned to the table. If this is ``None``, the table
         retains its previous name.
+
+    :param keep_col_refs:
+        Whether column references are reset. If ``keep_col_refs=False``, the resulting
+        table is not considered to be derived from the input table, i.e. one cannot use
+        columns from the input table in subsequent operations on the result table.
+        However, the reset of column references is necessary before performing a
+        self-join.
 
     Examples
     --------
@@ -116,10 +122,16 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
 
     if new_name is None:
         new_name = table._ast.name
+
     new = copy.copy(table)
+    if keep_col_refs:
+        new._ast = Alias(new._ast)
+        new._ast.name = new_name
+        return new
+
     new._ast, nd_map, uuid_map = table._ast._clone()
-    new._ast.name = new_name
     new._ast = Alias(new._ast)
+    new._ast.name = new_name
     new._cache = copy.copy(table._cache)
 
     new._cache.all_cols = {
@@ -152,7 +164,12 @@ def collect(target: Target | None = None) -> Pipeable: ...
 
 
 @verb
-def collect(table: Table, target: Target | None = None) -> Pipeable:
+def collect(
+    table: Table,
+    target: Target | None = None,
+    keep_hidden_cols: bool = False,
+    keep_col_refs: bool = True,
+) -> Pipeable:
     """
     Execute all accumulated operations and write the result to a new Table.
 
@@ -199,13 +216,14 @@ def collect(table: Table, target: Target | None = None) -> Pipeable:
     if target is None:
         target = Polars()
 
+    # TODO: keep_hidden_cols, keep_col_refs options
     new = Table(
         TableImpl.from_resource(
             df,
             target,
             name=table._ast.name,
             # preserve UUIDs and by this column references across collect()
-            uuids={name: uid for name, uid in table._cache.name_to_uuid.items()},
+            uuids={name: uid for uid, name in table._cache.uuid_to_name.items()},
         )
     )
     new._cache.derived_from = table._cache.derived_from | {new._ast}

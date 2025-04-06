@@ -23,6 +23,12 @@ class SubqueryError(Exception):
     """
 
 
+class ColumnNotFoundError(Exception):
+    """
+    Raised if a column does not exist in the current table.
+    """
+
+
 class NonStandardWarning(UserWarning):
     """
     Category for when a specific backend deviates from

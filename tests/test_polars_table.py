@@ -6,6 +6,7 @@ import polars as pl
 import pytest
 
 import pydiverse.transform as pdt
+from pydiverse.transform._internal.errors import ColumnNotFoundError
 from pydiverse.transform.extended import *
 from tests.util import assert_equal
 
@@ -374,7 +375,7 @@ class TestPolarsLazyImpl:
             ),
         )
 
-    def test_window_functions(self, tbl3):
+    def test_window_functions(self, tbl3, tbl4):
         # Everything else should stay the same
         assert_equal(
             tbl3 >> mutate(x=row_number(arrange=[-C.col4])) >> select(*tbl3),
@@ -404,6 +405,15 @@ class TestPolarsLazyImpl:
                 >> mutate(x=row_number(arrange=[-C.col4], partition_by=[C.col2]))
                 >> select(C.x)
             ),
+        )
+
+        assert_equal(
+            tbl3
+            >> mutate(x=tbl3.col1.shift(1, arrange=tbl3.col4))
+            >> inner_join(tbl4, on="col1"),
+            df3.sort(pl.col("col4"))
+            .with_columns(x=pl.col("col3").shift(1))
+            .join(df4, on="col1", suffix="_df4", coalesce=False),
         )
 
     def test_slice_head(self, tbl3):
@@ -632,6 +642,15 @@ class TestPolarsLazyImpl:
             tbl1 >> mutate(p=tbl1.col1.prefix_sum()),
             df1.with_columns(p=pl.col("col1").cum_sum()),
         )
+
+    def test_collect(self, tbl1):
+        assert_equal(
+            tbl1 >> collect() >> mutate(x=tbl1.col1),
+            tbl1 >> mutate(x=tbl1.col1),
+        )
+
+        with pytest.raises(ColumnNotFoundError):
+            tbl1 >> select() >> collect() >> mutate(x=tbl1.col1)
 
 
 class TestPrintAndRepr:

@@ -1,5 +1,15 @@
 from __future__ import annotations
 
-from ._internal.errors import FunctionTypeError, NotSupportedError, SubqueryError
+from ._internal.errors import (
+    ColumnNotFoundError,
+    FunctionTypeError,
+    NotSupportedError,
+    SubqueryError,
+)
 
-__all__ = ["SubqueryError", "FunctionTypeError", "NotSupportedError"]
+__all__ = [
+    "SubqueryError",
+    "FunctionTypeError",
+    "NotSupportedError",
+    "ColumnNotFoundError",
+]
