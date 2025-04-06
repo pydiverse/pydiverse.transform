@@ -12,7 +12,7 @@ from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
-from pydiverse.transform._internal.pipe.table import Table
+from pydiverse.transform._internal.pipe.table import Cache, Table
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
@@ -65,8 +65,6 @@ __all__ = [
 def alias(new_name: str | None = None, *, keep_col_refs: bool = False) -> Pipeable: ...
 
 
-# TODO: can we just store the uuid map in the Alias obj and do the uuid reroll lazily
-# (handing an AST to the backend, uuids are rerolled anyway)
 @verb
 def alias(
     table: Table, new_name: str | None = None, *, keep_col_refs: bool = False
@@ -125,30 +123,33 @@ def alias(
 
     new = copy.copy(table)
     if keep_col_refs:
-        new._ast = Alias(new._ast)
+        new._ast = Alias(new._ast, None)
         new._ast.name = new_name
         return new
 
-    new._ast, nd_map, uuid_map = table._ast._clone()
-    new._ast = Alias(new._ast)
+    new._ast = Alias(new._ast, {uid: uuid.uuid1() for uid in table._cache.cols.keys()})
     new._ast.name = new_name
-    new._cache = copy.copy(table._cache)
-
-    new._cache.cols = {
-        uuid_map[uid]: Col(
-            col.name, nd_map[col._ast], uuid_map[uid], col._dtype, col._ftype
-        )
-        for uid, col in table._cache.cols.items()
-    }
-    new._cache.partition_by = [
-        new._cache.cols[uuid_map[col._uuid]] for col in table._cache.partition_by
-    ]
-
-    new._cache.name_to_uuid = {
-        name: uuid_map[uid] for name, uid in table._cache.name_to_uuid.items()
-    }
-
-    new._cache.derived_from = set(new._ast.iter_subtree_postorder())
+    new._cache = Cache(
+        name_to_uuid={
+            name: new._ast.uuid_map[uid]
+            for name, uid in table._cache.name_to_uuid.items()
+        },
+        uuid_to_name={
+            new._ast.uuid_map[uid]: name
+            for uid, name in table._cache.uuid_to_name.items()
+        },
+        partition_by=[
+            table._cache.cols[new._ast.uuid_map[col._uuid]]
+            for col in table._cache.partition_by
+        ],
+        derived_from={new._ast},
+        cols={
+            new._ast.uuid_map[uid]: Col(
+                col.name, new._ast, new._ast.uuid_map[uid], col._dtype, col._ftype
+            )
+            for uid, col in table._cache.cols.items()
+        },
+    )
 
     return new
 
@@ -290,14 +291,12 @@ def export(
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
     SourceBackend: type[TableImpl] = get_backend(data._ast)
-    data = data >> alias()
     if schema_overrides is None:
         schema_overrides = {}
     return SourceBackend.export(
-        data._ast,
+        data._ast.clone(),
         target,
-        [data._cache.cols[uid] for uid in data._cache.name_to_uuid.values()],
-        schema_overrides,
+        schema_overrides=schema_overrides,
     )
 
 
@@ -387,18 +386,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = Select(table._ast, [preprocess_arg(col, table) for col in cols])
-    new._cache = copy.copy(table._cache)
-
-    selected_uuids = set(col._uuid for col in new._ast.select)
-    new._cache.uuid_to_name = {
-        uid: name
-        for uid, name in new._cache.uuid_to_name.items()
-        if uid in selected_uuids
-    }
-    new._cache.name_to_uuid = {
-        name: uid for uid, name in new._cache.uuid_to_name.items()
-    }
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     assert len(new) == len(cols)
     return new
@@ -527,12 +515,7 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = Rename(table._ast, name_map)
-    new._cache = copy.copy(table._cache)
-    new._cache.name_to_uuid = {
-        (new_name if (new_name := new._ast.name_map.get(name)) else name): uid
-        for name, uid in new._cache.name_to_uuid.items()
-    }
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -581,23 +564,7 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     new._ast = Mutate(
         table._ast, names, [preprocess_arg(val, table) for val in values], uuids
     )
-
-    new._cache = copy.copy(table._cache)
-    new._cache.cols.update(
-        {
-            uid: Col(name, new._ast, uid, val.dtype(), val.ftype(agg_is_window=True))
-            for name, val, uid in zip(
-                new._ast.names, new._ast.values, new._ast.uuids, strict=True
-            )
-        }
-    )
-    new._cache.name_to_uuid = new._cache.name_to_uuid | {
-        name: uid for name, uid in zip(new._ast.names, new._ast.uuids, strict=True)
-    }
-    new._cache.uuid_to_name = {
-        uid: name for name, uid in new._cache.name_to_uuid.items()
-    }
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -654,8 +621,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
                     "`mutate`."
                 )
 
-    new._cache = copy.copy(table._cache)
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -723,9 +689,7 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
         table._ast,
         [preprocess_arg(Order.from_col_expr(ord), table) for ord in order_by],
     )
-
-    new._cache = copy.copy(table._cache)
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -763,13 +727,7 @@ def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, [preprocess_arg(col, table) for col in cols], add)
-    new._cache = copy.copy(table._cache)
-    if add:
-        new._cache.partition_by = table._cache.partition_by + new._ast.group_by
-    else:
-        new._cache.partition_by = new._ast.group_by
-
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -822,9 +780,7 @@ def ungroup(table: Table) -> Pipeable:
     """
     new = copy.copy(table)
     new._ast = Ungroup(table._ast)
-    new._cache = copy.copy(table._cache)
-    new._cache.partition_by = []
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -925,29 +881,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     for root in new._ast.values:
         check_summarize_col_expr(root, False)
 
-    new._cache = copy.copy(table._cache)
-
-    overwritten = {
-        col_name for col_name in new._ast.names if col_name in new._cache.name_to_uuid
-    }
-    cols = {
-        new._cache.uuid_to_name[col._uuid]: col
-        for col in new._cache.partition_by
-        if new._cache.uuid_to_name[col._uuid] not in overwritten
-    } | {
-        name: Col(name, new._ast, uid, val.dtype(), val.ftype())
-        for name, val, uid in zip(
-            new._ast.names, new._ast.values, new._ast.uuids, strict=True
-        )
-    }
-
-    new._cache.cols = {col._uuid: col for _, col in cols.items()}
-    new._cache.name_to_uuid = {name: col._uuid for name, col in cols.items()}
-    new._cache.uuid_to_name = {
-        uid: name for name, uid in new._cache.name_to_uuid.items()
-    }
-    new._cache.partition_by = []
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -997,8 +931,7 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = SliceHead(table._ast, n, offset)
-    new._cache = copy.copy(table._cache)
-    new._cache.derived_from = new._cache.derived_from | {new._ast}
+    new._cache = copy.copy(table._cache).update(new._ast)
 
     return new
 
@@ -1167,19 +1100,7 @@ def join(
     new._ast.on = resolve_C_columns(
         resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
     )
-
-    new._cache = copy.copy(left._cache)
-    new._cache.cols = new._cache.cols | right._cache.cols
-    new._cache.name_to_uuid = new._cache.name_to_uuid | {
-        name + suffix: uid for name, uid in right._cache.name_to_uuid.items()
-    }
-
-    new._cache.uuid_to_name = new._cache.uuid_to_name | {
-        uid: name + suffix for uid, name in right._cache.uuid_to_name.items()
-    }
-    new._cache.derived_from = (
-        new._cache.derived_from | right._cache.derived_from | {new._ast}
-    )
+    new._cache = copy.copy(left._cache).update(new._ast, right_cache=right._cache)
 
     # TODO: error messages for right cols may use the left table name here
     new._ast.on = preprocess_arg(new._ast.on, new)

@@ -115,14 +115,14 @@ class TableImpl(AstNode):
         yield self
 
     @classmethod
-    def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None: ...
+    def build_query(cls, nd: AstNode) -> str | None: ...
 
     @classmethod
     def export(
         cls,
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
+        *,
         schema_overrides: dict[Col, Any],
     ) -> Any: ...
 

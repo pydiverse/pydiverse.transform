@@ -13,7 +13,6 @@ from pydiverse.transform._internal.backend.duckdb import DuckDbImpl
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Col
 
 
 # TODO: we should move the engine of SqlImpl in the subclasses and let this thing
@@ -42,18 +41,18 @@ class DuckDbPolarsImpl(TableImpl):
         )
 
     @staticmethod
-    def build_query(nd: AstNode, final_select: list[Col]) -> str | None:
-        return DuckDbImpl.build_query(nd, final_select, dialect=duckdb_engine.Dialect())
+    def build_query(nd: AstNode) -> str | None:
+        return DuckDbImpl.build_query(nd, dialect=duckdb_engine.Dialect())
 
     @staticmethod
     def export(
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
-        schema_overrides: dict[str, Any],
+        *,
+        schema_overrides: dict[str, Any],  # TODO: use this
     ) -> pl.DataFrame:
         if isinstance(target, Polars):
-            sel = DuckDbImpl.build_select(nd, final_select)
+            sel = DuckDbImpl.build_select(nd)
             query_str = str(
                 sel.compile(
                     dialect=duckdb_engine.Dialect(),

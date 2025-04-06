@@ -13,6 +13,7 @@ from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.pipe.table import Cache
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
@@ -44,18 +45,25 @@ class MsSqlImpl(SqlImpl):
         cls,
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
+        *,
         schema_overrides: dict[Col, Any],
     ) -> Any:
+        final_select = Cache.from_ast(nd).get_selected_cols()
+
         for col in final_select:
             if types.without_const(col.dtype()) == Bool():
                 if col not in schema_overrides:
                     schema_overrides[col] = col.dtype().to_polars()
 
-        return super().export(nd, target, final_select, schema_overrides)
+        return super().export(
+            nd, target, final_select=final_select, schema_overrides=schema_overrides
+        )
 
     @classmethod
-    def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
+    def build_select(cls, nd: AstNode, *, final_select: list[Col] | None = None) -> Any:
+        if final_select is None:
+            final_select = Cache.from_ast(nd).get_selected_cols()
+
         # boolean / bit conversion
         for desc in nd.iter_subtree_postorder():
             if isinstance(desc, verbs.Verb):

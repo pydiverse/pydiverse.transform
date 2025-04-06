@@ -47,14 +47,13 @@ class PolarsImpl(TableImpl):
         )
 
     @staticmethod
-    def build_query(nd: AstNode, final_select: list[Col]) -> None:
+    def build_query(nd: AstNode) -> None:
         return None
 
     @staticmethod
     def export(
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
         schema_overrides: dict,
     ) -> Any:
         lf, name_in_df, select, _ = compile_ast(nd)

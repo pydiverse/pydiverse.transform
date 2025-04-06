@@ -13,7 +13,7 @@ from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Cast, Col, LiteralCol
+from pydiverse.transform._internal.tree.col_expr import Cast, LiteralCol
 from pydiverse.transform._internal.tree.types import Int64
 
 
@@ -23,18 +23,17 @@ class DuckDbImpl(SqlImpl):
         cls,
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
         schema_overrides: dict[str, Any],
     ):
         if isinstance(target, Polars):
             engine = sql.get_engine(nd)
             with engine.connect() as conn:
                 return pl.read_database(
-                    DuckDbImpl.build_query(nd, final_select),
+                    DuckDbImpl.build_query(nd),
                     connection=conn,
                     schema_overrides=schema_overrides,
                 )
-        return SqlImpl.export(nd, target, final_select, schema_overrides)
+        return SqlImpl.export(nd, target, schema_overrides)
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:

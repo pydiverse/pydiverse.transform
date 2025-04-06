@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import dataclasses
 import inspect
 from collections.abc import Callable, Iterable
 from html import escape
-from uuid import UUID
 
 import pandas as pd
 import polars as pl
@@ -13,6 +11,7 @@ import sqlalchemy as sqa
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Target
+from pydiverse.transform._internal.pipe.cache import Cache
 from pydiverse.transform._internal.pipe.pipeable import Pipeable
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col, ColName
@@ -164,13 +163,7 @@ class Table:
         errors.check_arg_type(str | None, "Table.__init__", "name", name)
 
         self._ast: AstNode = TableImpl.from_resource(resource, backend, name=name)
-        self._cache = Cache(
-            {col.name: col._uuid for col in self._ast.cols.values()},
-            {col._uuid: col.name for col in self._ast.cols.values()},
-            [],
-            {self._ast},
-            {col._uuid: col for col in self._ast.cols.values()},
-        )
+        self._cache = Cache.from_ast(self._ast)
 
     def __getitem__(self, key: str) -> Col:
         errors.check_arg_type(str, "Table.__getitem__", "key", key)
@@ -192,7 +185,7 @@ class Table:
             setattr(self, slot, val)
 
     def __iter__(self) -> Iterable[Col]:
-        cols = [self[col] for col in self._cache.name_to_uuid]
+        cols = self._cache.get_selected_cols()
         yield from cols
 
     def __contains__(self, col: str | Col | ColName) -> bool:
@@ -271,16 +264,3 @@ class Table:
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
-
-
-# For a column to be usable in an expression, the table it comes from must be an
-# ancestor of the current table AND the column's UUID must be in `all_cols` of the
-# current table (the latter is necessary because not every column is usable after
-# `summarize``)
-@dataclasses.dataclass(slots=True)
-class Cache:
-    name_to_uuid: dict[str, UUID]  # the selected columns, in order
-    uuid_to_name: dict[UUID, str]  # again, only the selected columns + in order
-    partition_by: list[Col]
-    derived_from: set[AstNode]  # for detecting invalid columns and self-joins
-    cols: dict[UUID, Col]  # all columns in current scope (including hidden ones)

@@ -19,6 +19,7 @@ from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Ta
 from pydiverse.transform._internal.errors import SubqueryError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
+from pydiverse.transform._internal.pipe.table import Cache
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
@@ -132,7 +133,11 @@ class SqlImpl(TableImpl):
         return "POSIX"
 
     @classmethod
-    def build_select(cls, nd: AstNode, final_select: list[Col]) -> sqa.Select:
+    def build_select(
+        cls, nd: AstNode, *, final_select: list[Col] | None = None
+    ) -> sqa.Select:
+        if final_select is None:
+            final_select = Cache.from_ast(nd).get_selected_cols()
         create_aliases(nd, {})
         nd, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
         return cls.compile_query(nd, query)
@@ -142,11 +147,14 @@ class SqlImpl(TableImpl):
         cls,
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
+        *,
         schema_overrides: dict[Col, Any],
     ) -> Any:
-        sel = cls.build_select(nd, final_select)
+        final_select = Cache.from_ast(nd).get_selected_cols()
+
+        sel = cls.build_select(nd, final_select=final_select)
         engine = get_engine(nd)
+
         if isinstance(target, Polars):
             with engine.connect() as conn:
                 df = pl.read_database(
@@ -169,10 +177,8 @@ class SqlImpl(TableImpl):
         raise NotImplementedError
 
     @classmethod
-    def build_query(
-        cls, nd: AstNode, final_select: list[Col], dialect=None
-    ) -> str | None:
-        sel = cls.build_select(nd, final_select)
+    def build_query(cls, nd: AstNode, dialect=None) -> str | None:
+        sel = cls.build_select(nd)
         if dialect is None:
             dialect = get_engine(nd).dialect
         return str(sel.compile(dialect=dialect, compile_kwargs={"literal_binds": True}))

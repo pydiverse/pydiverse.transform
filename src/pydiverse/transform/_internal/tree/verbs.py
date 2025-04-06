@@ -57,7 +57,8 @@ class Verb(AstNode):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Alias(Verb): ...
+class Alias(Verb):
+    uuid_map: dict[UUID, UUID] | None
 
 
 @dataclasses.dataclass(eq=False, slots=True)
