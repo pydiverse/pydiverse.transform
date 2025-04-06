@@ -187,6 +187,50 @@ def test_join_summarize(df3, df4):
         ),
     )
 
+    assert_result_equal(
+        (df3, df4),
+        lambda t3, t4: t3
+        >> summarize(y=t3.col1.max(), z=t3.col4.mean())
+        >> left_join(t4, on=C.y == t4.col4),
+    )
+
+
+def test_join_window(df3, df4):
+    assert_result_equal(
+        (df3, df4),
+        lambda t3, t4: t3
+        >> mutate(y=t3.col1.dense_rank())
+        >> inner_join(t4, on=C.y == t4.col1),
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda s, t: s
+        >> mutate(y=s.col1.shift(1, arrange=s.col4))
+        >> inner_join(t, on="col2"),
+    )
+
+
+def test_join_where(df2, df3, df4):
+    assert_result_equal(
+        (df2, df3),
+        lambda t2, t3: t2 >> left_join(t3 >> filter(t3.col4 >= 2), on="col1"),
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda t3, t4: t3
+        >> filter(t3.col4 != -1729)
+        >> left_join(t4 >> filter(t4.col3 > 0), on=t3.col2 == t4.col2),
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda t3, t4: t3
+        >> filter(t3.col1 % 2 == 0)
+        >> full_join(t4 >> filter(t4.col1.is_not_null()), on=t3.col2 == t4.col2),
+    )
+
 
 def test_join_const_col(df3, df4):
     assert_result_equal(
