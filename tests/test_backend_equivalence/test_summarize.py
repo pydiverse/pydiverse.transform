@@ -50,7 +50,7 @@ def test_chained_summarized(df3):
         >> mutate(k=(C.col1 + C.col2) * C.col4)
         >> group_by(C.k)
         >> summarize(x=C.col4.mean())
-        >> alias()  # TODO: I think we could prevent a subquery here.
+        >> alias()
         >> summarize(y=C.k.mean()),
     )
 

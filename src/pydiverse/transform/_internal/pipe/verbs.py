@@ -124,7 +124,7 @@ def alias(
     new = copy.copy(table)
     new._ast = Alias(
         new._ast,
-        {uid: uuid.uuid1() for uid in table._cache.cols.keys()}
+        uuid_map={uid: uuid.uuid1() for uid in table._cache.cols.keys()}
         if not keep_col_refs
         else None,
     )

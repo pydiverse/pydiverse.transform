@@ -56,15 +56,15 @@ class Cache:
                     name: node.uuid_map[uid] for name, uid in self.name_to_uuid.items()
                 }
                 res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
-                res.partition_by = [
-                    self.cols[node.uuid_map[col._uuid]] for col in self.partition_by
-                ]
                 res.cols = {
                     node.uuid_map[uid]: Col(
                         col.name, node, node.uuid_map[uid], col._dtype, col._ftype
                     )
                     for uid, col in self.cols.items()
                 }
+                res.partition_by = [
+                    res.cols[node.uuid_map[col._uuid]] for col in self.partition_by
+                ]
                 res.derived_from = set()
 
         elif isinstance(node, verbs.Select):

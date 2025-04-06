@@ -412,7 +412,7 @@ class TestPolarsLazyImpl:
             >> mutate(x=tbl3.col1.shift(1, arrange=tbl3.col4))
             >> inner_join(tbl4, on="col1"),
             df3.sort(pl.col("col4"))
-            .with_columns(x=pl.col("col3").shift(1))
+            .with_columns(x=pl.col("col1").shift(1))
             .join(df4, on="col1", suffix="_df4", coalesce=False),
         )
 

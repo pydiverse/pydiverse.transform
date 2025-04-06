@@ -2042,16 +2042,11 @@ class Col(ColExpr):
 
     def __str__(self) -> str:
         try:
-            from pydiverse.transform._internal.backend.polars import PolarsImpl
-            from pydiverse.transform._internal.backend.targets import Polars
-
-            df = PolarsImpl.export(self._ast, Polars(lazy=False), [self], {})
-            return str(df.get_column(df.columns[0]))
+            return str(self.export(Polars(lazy=False)))
         except Exception as e:
             return (
-                repr(self)
-                + f"\ncould not evaluate {repr(self)} due to"
-                + f"{e.__class__.__name__}: {str(e)}"
+                f"could not evaluate {repr(self)} due to "
+                f"{e.__class__.__name__}: {str(e)}"
             )
 
     def __hash__(self) -> int:
@@ -2096,7 +2091,7 @@ class Col(ColExpr):
         from pydiverse.transform._internal.tree.verbs import Select
 
         ast = Select(self._ast, [self])
-        df = get_backend(self._ast).export(ast, target, [self], {})
+        df = get_backend(self._ast).export(ast, target, schema_overrides={})
         if isinstance(target, Polars):
             if isinstance(df, pl.LazyFrame):
                 df = df.collect()

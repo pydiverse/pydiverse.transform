@@ -63,9 +63,11 @@ class Alias(Verb):
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned, nd_map, uuid_map = Verb._clone(self)
         if self.uuid_map is not None:  # happens if and only if keep_col_refs=False
-            assert len(self.uuid_map) == len(uuid_map)
+            assert set(self.uuid_map.keys()).issubset(uuid_map.keys())
             uuid_map = {
-                self.uuid_map[old_uid]: new_uid for old_uid, new_uid in uuid_map.items()
+                self.uuid_map[old_uid]: new_uid
+                for old_uid, new_uid in uuid_map.items()
+                if old_uid in self.uuid_map
             }
             cloned.uuid_map = None
         return cloned, nd_map, uuid_map
