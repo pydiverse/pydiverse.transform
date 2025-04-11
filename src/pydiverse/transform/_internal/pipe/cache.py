@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.ops.op import Ftype
-from pydiverse.transform._internal.tree import verbs
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col, ColFn
 
@@ -203,7 +203,16 @@ class Cache:
                     )
                 )
             )
-            or (isinstance(node, verbs.Join) and self.group_by)
+            or (
+                isinstance(node, verbs.Join)
+                and (
+                    self.group_by
+                    or any(
+                        types.is_const(self.cols[uid].dtype())
+                        for uid in self.uuid_to_name.keys()
+                    )
+                )
+            )
         )
 
     def selected_cols(self) -> list[Col]:

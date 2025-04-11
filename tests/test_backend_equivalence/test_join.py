@@ -234,12 +234,16 @@ def test_join_where(df2, df3, df4):
 
 def test_join_const_col(df3, df4):
     assert_result_equal(
-        (df3, df4), lambda s, t: s >> left_join(t >> mutate(y=0), on="col1")
+        (df3, df4),
+        lambda s, t: s >> left_join(t >> mutate(y=0) >> alias(), on=s.col1 == C.y_df4),
     )
 
     assert_result_equal(
         (df3, df4),
-        lambda s, t: s >> mutate(z=2) >> full_join(t >> mutate(j=True), on="col2"),
+        lambda s, t: s
+        >> mutate(z=2)
+        >> alias()
+        >> full_join(t >> mutate(j=True) >> alias(), on="col2"),
     )
 
     assert_result_equal(
@@ -247,7 +251,8 @@ def test_join_const_col(df3, df4):
         lambda t: t
         >> mutate(x=4, y=5)
         >> mutate(z=C.x + C.y)
-        >> full_join(t_ := t >> alias(), on=t.col1 == t_.col2),
+        >> alias()
+        >> full_join(t_ := t >> alias(), on=C.col1 == t_.col2),
     )
 
 

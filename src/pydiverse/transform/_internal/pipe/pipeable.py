@@ -91,7 +91,7 @@ def modify_ast(fn):
         if isinstance(new._ast, verbs.Join) and _check_subquery(
             args[0]._cache, args[0]._ast
         ):
-            new._ast.child = verbs.SubqueryMarker(new._ast.child)
+            new._ast.right = verbs.SubqueryMarker(new._ast.right)
             # here limit and group_by are reset by Cache.update anyway
 
         return new
