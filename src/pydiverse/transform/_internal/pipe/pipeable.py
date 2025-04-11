@@ -63,21 +63,29 @@ def modify_ast(fn):
         new = fn(table, *args, **kwargs)
         assert new._ast != table._ast
 
-        if new._cache.requires_subquery(new._ast):
-            if not isinstance(new._ast, verbs.Verb) or not isinstance(
-                new._ast.child, verbs.Alias
-            ):
-                raise SubqueryError(
-                    f"Executing the `{new._ast.__class__.__name__.lower()}` verb on "
-                    f"the table `{new._ast.name}` requires a subquery, which is "
-                    "forbidden in transform by default.\n"
-                    "hint: If you are sure you want to do a subquery, put an "
-                    "`>> alias()` before this verb."
-                )
+        child_nodes = [new._ast.child] + (
+            [new._ast.right] if isinstance(new._ast, verbs.Join) else []
+        )
 
-            new._ast.child.subquery = True
+        for child in child_nodes:
+            if new._cache.requires_subquery(new._ast, child_node=child):
+                if not isinstance(new._ast, verbs.Verb) or not isinstance(
+                    child, verbs.Alias
+                ):
+                    raise SubqueryError(
+                        f"Executing the `{new._ast.__class__.__name__.lower()}` verb "
+                        f"on the table `{child.name}` requires a subquery, which is "
+                        "forbidden in transform by default.\n"
+                        "hint: If you are sure you want to do a subquery, put an "
+                        f"`>> alias()` on `{child.name}` before this verb."
+                    )
 
-        new._cache = table._cache.update(new._ast)
+                child.subquery = True
+
+        new._cache = table._cache.update(
+            new._ast,
+            right_cache=args[0]._cache if isinstance(new._ast, verbs.Join) else None,
+        )
         return new
 
     return _fn

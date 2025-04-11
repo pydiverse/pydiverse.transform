@@ -161,7 +161,7 @@ class Cache:
                     | verbs.GroupBy
                     | verbs.Join,
                 )
-                and self.limit is not None
+                and self.limit != 0
             )
             or (
                 isinstance(node, verbs.Mutate)

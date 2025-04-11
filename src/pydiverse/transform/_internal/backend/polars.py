@@ -307,7 +307,8 @@ def compile_ast(
         )
 
     elif isinstance(nd, verbs.Filter):
-        df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.predicates])
+        if nd.predicates:
+            df = df.filter(compile_col_expr(fil, name_in_df) for fil in nd.predicates)
 
     elif isinstance(nd, verbs.Arrange):
         order_by, descending, nulls_last = zip(

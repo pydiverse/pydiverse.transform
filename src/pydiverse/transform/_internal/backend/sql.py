@@ -516,9 +516,6 @@ class SqlImpl(TableImpl):
             right_table, right_query, right_sqa_col = cls.compile_ast(
                 nd.right, needed_cols
             )
-            right_table, right_query, right_sqa_col = cls.check_for_subquery(
-                nd, right_table, right_sqa_col, right_query, needed_cols, child=nd.right
-            )
             sqa_col.update(
                 {
                     uid: sqa.label(lb.name + nd.suffix, lb)

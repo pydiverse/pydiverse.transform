@@ -815,9 +815,9 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
         uuids,
     )
 
-    partition_by_uuids = {col._uuid for col in table._cache.partition_by}
+    partition_by = set(table._cache.partition_by)
 
-    if len(kwargs) == 0 and len(partition_by_uuids) == 0:
+    if len(kwargs) == 0 and len(partition_by) == 0:
         raise ValueError(
             "summarize without preceding group_by needs at least one column to "
             "summarize"
@@ -827,7 +827,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
         # TODO: does not catch everything (test_alias_window)
         if (
             isinstance(expr, Col)
-            and expr._uuid not in partition_by_uuids
+            and expr._uuid not in partition_by
             and not agg_fn_above
         ):
             raise FunctionTypeError(
@@ -1066,7 +1066,6 @@ def join(
     new._ast.on = resolve_C_columns(
         resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
     )
-    new._cache = copy.copy(left._cache).update(new._ast, right_cache=right._cache)
 
     # TODO: error messages for right cols may use the left table name here
     new._ast.on = preprocess_arg(new._ast.on, new)
@@ -1234,6 +1233,8 @@ def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) 
                 and "partition_by" not in expr.context_kwargs
                 and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
             ):
-                expr.context_kwargs["partition_by"] = table._cache.partition_by
+                expr.context_kwargs["partition_by"] = [
+                    table._cache.cols[uid] for uid in table._cache.partition_by
+                ]
 
         return resolve_C_columns(arg, table)
