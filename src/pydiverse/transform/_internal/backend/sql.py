@@ -16,7 +16,6 @@ import sqlalchemy as sqa
 from pydiverse.common import String
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
-from pydiverse.transform._internal.errors import SubqueryError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.table import Cache
@@ -137,7 +136,7 @@ class SqlImpl(TableImpl):
         cls, nd: AstNode, *, final_select: list[Col] | None = None
     ) -> sqa.Select:
         if final_select is None:
-            final_select = Cache.from_ast(nd).get_selected_cols()
+            final_select = Cache.from_ast(nd).selected_cols()
         create_aliases(nd, {})
         nd, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
         return cls.compile_query(nd, query)
@@ -150,7 +149,7 @@ class SqlImpl(TableImpl):
         *,
         schema_overrides: dict[UUID, Any],
     ) -> Any:
-        final_select = Cache.from_ast(nd).get_selected_cols()
+        final_select = Cache.from_ast(nd).selected_cols()
 
         sel = cls.build_select(nd, final_select=final_select)
         engine = get_engine(nd)
@@ -372,14 +371,62 @@ class SqlImpl(TableImpl):
                         needed_cols[node._uuid] = cnt + 1
 
             table, query, sqa_col = cls.compile_ast(nd.child, needed_cols)
-            table, query, sqa_col = cls.check_for_subquery(
-                nd, table, sqa_col, query, needed_cols
-            )
 
         if isinstance(nd, verbs.Mutate | verbs.Summarize):
             query.select = [lb for lb in query.select if lb.name not in set(nd.names)]
 
-        if isinstance(nd, verbs.Select):
+        if isinstance(nd, verbs.Alias) and nd.subquery:
+            if needed_cols.keys().isdisjoint(sqa_col.keys()):
+                # We cannot select zero columns from a subquery. This happens when the
+                # user only 0-ary functions after the subquery, e.g. `count`.
+                needed_cols[next(iter(sqa_col.keys()))] = 1
+
+            # We only want to select those columns that (1) the user uses in some
+            # expression later or (2) are present in the final selection.
+
+            orig_select = query.select
+            query.select = []
+            cnt = dict()
+            name_in_subquery = dict()
+
+            # resolve potential column name collisions in the subquery
+            for uid in needed_cols.keys():
+                if uid in sqa_col:
+                    name = sqa_col[uid].name
+                    if c := cnt.get(name):
+                        name_in_subquery[uid] = f"{name}_{c}"
+                        cnt[name] = c + 1
+                    else:
+                        name_in_subquery[uid] = name
+                        cnt[name] = 1
+                    query.select.append(sqa.Label(name_in_subquery[uid], sqa_col[uid]))
+
+            table = cls.compile_query(table, query).subquery()
+            sqa_col.update(
+                {
+                    uid: sqa.label(
+                        sqa_col[uid].name, table.columns.get(name_in_subquery[uid])
+                    )
+                    for uid in needed_cols.keys()
+                    if uid in sqa_col
+                }
+            )
+
+            # rewire col refs to the subquery
+            query = Query(
+                select=[
+                    sqa.Label(lb.name, col)
+                    for lb in orig_select
+                    if (col := table.columns.get(lb.name)) is not None
+                ],
+                partition_by=[
+                    sqa.Label(lb.name, col)
+                    for lb in query.partition_by
+                    if (col := table.columns.get(lb.name)) is not None
+                ],
+            )
+
+        elif isinstance(nd, verbs.Select):
             query.select = [sqa_col[col._uuid] for col in nd.select]
 
         elif isinstance(nd, verbs.Rename):
@@ -528,135 +575,6 @@ class SqlImpl(TableImpl):
                         del needed_cols[node._uuid]
                     else:
                         needed_cols[node._uuid] = cnt - 1
-
-        return table, query, sqa_col
-
-    @classmethod
-    def check_for_subquery(
-        cls,
-        nd: verbs.Verb,
-        table: sqa.Table,
-        sqa_col: dict[UUID, sqa.Label],
-        query: Query,
-        needed_cols: dict[UUID, int],
-        *,
-        child: verbs.Verb | None = None,
-    ) -> tuple[sqa.Table, Query, dict[UUID, sqa.Label]]:
-        if child is None:
-            child = nd.child
-
-        if (
-            (
-                isinstance(
-                    nd,
-                    verbs.Filter
-                    | verbs.Summarize
-                    | verbs.Arrange
-                    | verbs.GroupBy
-                    | verbs.Join,
-                )
-                and query.limit is not None
-            )
-            or (
-                isinstance(nd, verbs.Mutate)
-                and any(
-                    any(
-                        col.ftype(agg_is_window=True) in (Ftype.WINDOW, Ftype.AGGREGATE)
-                        for col in fn.iter_subtree()
-                        if isinstance(col, Col)
-                    )
-                    for fn in nd.iter_col_nodes()
-                    if (
-                        isinstance(fn, ColFn)
-                        and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
-                    )
-                )
-            )
-            or (
-                isinstance(nd, verbs.Filter)
-                and any(
-                    col.ftype(agg_is_window=True) == Ftype.WINDOW
-                    for col in nd.iter_col_nodes()
-                    if isinstance(col, Col)
-                )
-            )
-            or (
-                isinstance(nd, verbs.Summarize)
-                and (
-                    (
-                        bool(query.group_by)
-                        and set(query.group_by) != set(query.partition_by)
-                    )
-                    or any(
-                        (
-                            node.ftype(agg_is_window=False)
-                            in (Ftype.WINDOW, Ftype.AGGREGATE)
-                        )
-                        for node in nd.iter_col_nodes()
-                        if isinstance(node, Col)
-                    )
-                )
-            )
-            or (isinstance(nd, verbs.Join) and query.group_by)
-        ):
-            if not isinstance(child, verbs.Alias):
-                raise SubqueryError(
-                    f"forbidden subquery required during compilation of `{repr(nd)}`\n"
-                    "hint: If you are sure you want to do a subquery, put an "
-                    "`>> alias()` before this verb. On the other hand, if you want to "
-                    "write out the table of the subquery, put `>> materialize()` "
-                    "before this verb."
-                )
-
-            if needed_cols.keys().isdisjoint(sqa_col.keys()):
-                # We cannot select zero columns from a subquery. This happens when the
-                # user only 0-ary functions after the subquery, e.g. `count`.
-                needed_cols[next(iter(sqa_col.keys()))] = 1
-
-            # We only want to select those columns that (1) the user uses in some
-            # expression later or (2) are present in the final selection.
-
-            orig_select = query.select
-            query.select = []
-            cnt = dict()
-            name_in_subquery = dict()
-
-            # resolve potential column name collisions in the subquery
-            for uid in needed_cols.keys():
-                if uid in sqa_col:
-                    name = sqa_col[uid].name
-                    if c := cnt.get(name):
-                        name_in_subquery[uid] = f"{name}_{c}"
-                        cnt[name] = c + 1
-                    else:
-                        name_in_subquery[uid] = name
-                        cnt[name] = 1
-                    query.select.append(sqa.Label(name_in_subquery[uid], sqa_col[uid]))
-
-            table = cls.compile_query(table, query).subquery()
-            sqa_col.update(
-                {
-                    uid: sqa.label(
-                        sqa_col[uid].name, table.columns.get(name_in_subquery[uid])
-                    )
-                    for uid in needed_cols.keys()
-                    if uid in sqa_col
-                }
-            )
-
-            # rewire col refs to the subquery
-            query = Query(
-                select=[
-                    sqa.Label(lb.name, col)
-                    for lb in orig_select
-                    if (col := table.columns.get(lb.name)) is not None
-                ],
-                partition_by=[
-                    sqa.Label(lb.name, col)
-                    for lb in query.partition_by
-                    if (col := table.columns.get(lb.name)) is not None
-                ],
-            )
 
         return table, query, sqa_col
 

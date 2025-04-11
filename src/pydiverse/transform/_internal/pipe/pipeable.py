@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from functools import partial, wraps
 
+from pydiverse.transform._internal.errors import SubqueryError
+from pydiverse.transform._internal.tree import verbs
+
 
 class Pipeable:
     def __init__(self, f=None, calls=None):
@@ -52,3 +55,29 @@ def verb(fn):
         return Pipeable(inverse_partial(fn, *args, **kwargs))
 
     return wrapper
+
+
+def modify_ast(fn):
+    @wraps(fn)
+    def _fn(table, *args, **kwargs):
+        new = fn(table, *args, **kwargs)
+        assert new._ast != table._ast
+
+        if new._cache.requires_subquery(new._ast):
+            if not isinstance(new._ast, verbs.Verb) or not isinstance(
+                new._ast.child, verbs.Alias
+            ):
+                raise SubqueryError(
+                    f"Executing the `{new._ast.__class__.__name__.lower()}` verb on "
+                    f"the table `{new._ast.name}` requires a subquery, which is "
+                    "forbidden in transform by default.\n"
+                    "hint: If you are sure you want to do a subquery, put an "
+                    "`>> alias()` before this verb."
+                )
+
+            new._ast.child.subquery = True
+
+        new._cache = table._cache.update(new._ast)
+        return new
+
+    return _fn

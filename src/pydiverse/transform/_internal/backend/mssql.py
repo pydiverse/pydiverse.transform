@@ -49,7 +49,7 @@ class MsSqlImpl(SqlImpl):
         *,
         schema_overrides: dict[UUID, Any],
     ) -> Any:
-        final_select = Cache.from_ast(nd).get_selected_cols()
+        final_select = Cache.from_ast(nd).selected_cols()
 
         for col in final_select:
             if types.without_const(col.dtype()) == Bool():
@@ -61,7 +61,7 @@ class MsSqlImpl(SqlImpl):
     @classmethod
     def build_select(cls, nd: AstNode, *, final_select: list[Col] | None = None) -> Any:
         if final_select is None:
-            final_select = Cache.from_ast(nd).get_selected_cols()
+            final_select = Cache.from_ast(nd).selected_cols()
 
         # boolean / bit conversion
         for desc in nd.iter_subtree_postorder():

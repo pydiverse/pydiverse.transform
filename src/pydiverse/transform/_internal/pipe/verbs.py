@@ -11,7 +11,7 @@ from pydiverse.transform._internal.backend.table_impl import TableImpl, get_back
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
 from pydiverse.transform._internal.ops.op import Ftype
-from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
+from pydiverse.transform._internal.pipe.pipeable import Pipeable, modify_ast, verb
 from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
@@ -66,6 +66,7 @@ def alias(new_name: str | None = None, *, keep_col_refs: bool = False) -> Pipeab
 
 
 @verb
+@modify_ast
 def alias(
     table: Table, new_name: str | None = None, *, keep_col_refs: bool = False
 ) -> Pipeable:
@@ -129,7 +130,6 @@ def alias(
         else None,
     )
     new._ast.name = new_name
-    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -326,6 +326,7 @@ def select(*cols: Col | ColName | str) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     """
     Selects a subset of columns.
@@ -368,9 +369,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = Select(table._ast, [preprocess_arg(col, table) for col in cols])
-    new._cache = table._cache.update(new._ast)
 
-    assert len(new) == len(cols)
     return new
 
 
@@ -420,6 +419,7 @@ def rename(name_map: dict[str, str]) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     """
     Renames columns.
@@ -497,7 +497,6 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = Rename(table._ast, name_map)
-    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -507,6 +506,7 @@ def mutate(**kwargs: ColExpr) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     """
     Adds new columns to the table.
@@ -536,17 +536,12 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     └─────┴────────┴─────────┘
     """
 
-    if len(kwargs) == 0:
-        return table
-
     names, values = list(kwargs.keys()), list(kwargs.values())
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
-
     new._ast = Mutate(
         table._ast, names, [preprocess_arg(val, table) for val in values], uuids
     )
-    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -556,6 +551,7 @@ def filter(*predicates: ColExpr[Bool]) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     """
     Selects a subset of rows based on some condition.
@@ -578,9 +574,6 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     │ 2   ┆ g   │
     └─────┴─────┘
     """
-    if len(predicates) == 0:
-        return table
-
     new = copy.copy(table)
     new._ast = Filter(table._ast, [preprocess_arg(pred, table) for pred in predicates])
 
@@ -603,8 +596,6 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
                     "`mutate`."
                 )
 
-    new._cache = table._cache.update(new._ast)
-
     return new
 
 
@@ -613,7 +604,8 @@ def arrange(*order_by: ColExpr) -> Pipeable: ...
 
 
 @verb
-def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
+@modify_ast
+def arrange(table: Table, by: ColExpr, *more_by: ColExpr) -> Pipeable:
     """
     Sorts the rows of the table.
 
@@ -661,17 +653,13 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     │ 3    ┆ a   ┆ null  │
     └──────┴─────┴───────┘
     """
-    if len(order_by) == 0:
-        return table
 
-    order_by = [ColName(col) if isinstance(col, str) else col for col in order_by]
-
+    order_by = [ColName(col) if isinstance(col, str) else col for col in (by, *more_by)]
     new = copy.copy(table)
     new._ast = Arrange(
         table._ast,
         [preprocess_arg(Order.from_col_expr(ord), table) for ord in order_by],
     )
-    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -681,6 +669,7 @@ def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable: .
 
 
 @verb
+@modify_ast
 def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
     """
     Add a grouping state to the table.
@@ -700,16 +689,12 @@ def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
     :doc:`ungroup <pydiverse.transform.ungroup>`
     verb can be used to clear the grouping state.
     """
-    if len(cols) == 0:
-        return table
-
     errors.check_vararg_type(Col | ColName | str, "group_by", *cols)
     errors.check_arg_type(bool, "group_by", "add", add)
     cols = [ColName(col) if isinstance(col, str) else col for col in cols]
 
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, [preprocess_arg(col, table) for col in cols], add)
-    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -719,6 +704,7 @@ def ungroup() -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def ungroup(table: Table) -> Pipeable:
     """
     Clear the grouping state of the table.
@@ -762,7 +748,6 @@ def ungroup(table: Table) -> Pipeable:
     """
     new = copy.copy(table)
     new._ast = Ungroup(table._ast)
-    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -772,6 +757,7 @@ def summarize(**kwargs: ColExpr) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     """
     Computes aggregates over groups of rows.
@@ -863,8 +849,6 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     for root in new._ast.values:
         check_summarize_col_expr(root, False)
 
-    new._cache = table._cache.update(new._ast)
-
     return new
 
 
@@ -873,6 +857,7 @@ def slice_head(n: int, *, offset: int = 0) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
     """
     Selects a subset of rows based on their index.
@@ -904,7 +889,6 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
     │ -55 ┆ --- │
     └─────┴─────┘
     """
-
     errors.check_arg_type(int, "slice_head", "n", n)
     errors.check_arg_type(int, "slice_head", "offset", offset)
 
@@ -913,7 +897,6 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = SliceHead(table._ast, n, offset)
-    new._cache = table._cache.update(new._ast)
 
     return new
 
@@ -930,6 +913,7 @@ def join(
 
 
 @verb
+@modify_ast
 def join(
     left: Table,
     right: Table,

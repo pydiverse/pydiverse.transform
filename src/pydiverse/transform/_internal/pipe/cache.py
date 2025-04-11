@@ -5,18 +5,23 @@ import dataclasses
 from uuid import UUID
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
+from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import verbs
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.col_expr import Col
+from pydiverse.transform._internal.tree.col_expr import Col, ColFn
 
 
 @dataclasses.dataclass(slots=True)
 class Cache:
     name_to_uuid: dict[str, UUID]  # the selected columns, in order
     uuid_to_name: dict[UUID, str]  # again, only the selected columns + in order
-    partition_by: list[Col]
+    partition_by: list[UUID]
     derived_from: set[AstNode]  # for detecting invalid columns and self-joins
     cols: dict[UUID, Col]  # all columns in current scope (including hidden ones)
+
+    # the following are only necessary for subquery detection
+    limit: int
+    group_by: set[UUID]
 
     # For a column to be usable in an expression, the table it comes from must be an
     # ancestor of the current table AND the column's UUID must be in `all_cols` of the
@@ -40,6 +45,8 @@ class Cache:
             partition_by=[],
             derived_from={node},
             cols={col._uuid: col for col in node.cols.values()},
+            limit=0,
+            group_by=[],
         )
 
     def update(self, node: verbs.Verb, *, right_cache: Cache | None = None) -> Cache:
@@ -62,9 +69,7 @@ class Cache:
                     )
                     for uid, col in self.cols.items()
                 }
-                res.partition_by = [
-                    res.cols[node.uuid_map[col._uuid]] for col in self.partition_by
-                ]
+                res.partition_by = [node.uuid_map[uid] for uid in self.partition_by]
                 res.derived_from = set()
 
         elif isinstance(node, verbs.Select):
@@ -96,10 +101,9 @@ class Cache:
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
         elif isinstance(node, verbs.GroupBy):
+            res.partition_by = [col._uuid for col in node.group_by]
             if node.add:
-                res.partition_by = self.partition_by + node.group_by
-            else:
-                res.partition_by = node.group_by
+                res.partition_by = self.partition_by + res.partition_by
 
         elif isinstance(node, verbs.Ungroup):
             res.partition_by = []
@@ -109,9 +113,9 @@ class Cache:
                 col_name for col_name in node.names if col_name in self.name_to_uuid
             }
             cols = {
-                self.uuid_to_name[col._uuid]: col
-                for col in self.partition_by
-                if self.uuid_to_name[col._uuid] not in overwritten
+                self.uuid_to_name[uid]: self.cols[uid]
+                for uid in self.partition_by
+                if self.uuid_to_name[uid] not in overwritten
             } | {
                 name: Col(name, node, uid, val.dtype(), val.ftype())
                 for name, val, uid in zip(
@@ -137,10 +141,67 @@ class Cache:
             res.derived_from = self.derived_from | right_cache.derived_from
 
         assert len(res.name_to_uuid) == len(res.uuid_to_name)
-
         res.derived_from = res.derived_from | {node}
 
         return res
 
-    def get_selected_cols(self) -> list[Col]:
+    def requires_subquery(
+        self, node: verbs.Verb, *, child_node: verbs.Verb | None = None
+    ) -> bool:
+        if child_node is None:
+            child_node = node.child
+
+        return (
+            (
+                isinstance(
+                    node,
+                    verbs.Filter
+                    | verbs.Summarize
+                    | verbs.Arrange
+                    | verbs.GroupBy
+                    | verbs.Join,
+                )
+                and self.limit is not None
+            )
+            or (
+                isinstance(node, verbs.Mutate)
+                and any(
+                    any(
+                        col.ftype(agg_is_window=True) in (Ftype.WINDOW, Ftype.AGGREGATE)
+                        for col in fn.iter_subtree()
+                        if isinstance(col, Col)
+                    )
+                    for fn in node.iter_col_nodes()
+                    if (
+                        isinstance(fn, ColFn)
+                        and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
+                    )
+                )
+            )
+            or (
+                isinstance(node, verbs.Filter)
+                and any(
+                    col.ftype(agg_is_window=True) == Ftype.WINDOW
+                    for col in node.iter_col_nodes()
+                    if isinstance(col, Col)
+                )
+            )
+            or (
+                isinstance(node, verbs.Summarize)
+                and (
+                    (self.group_by and self.group_by != set(self.partition_by))
+                    or any(
+                        (
+                            node.ftype(agg_is_window=False)
+                            in (Ftype.WINDOW, Ftype.AGGREGATE)
+                        )
+                        for node in node.iter_col_nodes()
+                        if isinstance(node, Col)
+                    )
+                )
+            )
+            or (isinstance(node, verbs.Join) and self.group_by)
+        )
+
+    def selected_cols(self) -> list[Col]:
         return [self.cols[uid] for uid in self.uuid_to_name.keys()]

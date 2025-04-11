@@ -185,7 +185,7 @@ class Table:
             setattr(self, slot, val)
 
     def __iter__(self) -> Iterable[Col]:
-        cols = self._cache.get_selected_cols()
+        cols = self._cache.selected_cols()
         yield from cols
 
     def __contains__(self, col: str | Col | ColName) -> bool:
