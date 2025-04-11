@@ -135,14 +135,16 @@ def alias(
 
 
 @overload
-def collect(target: Target | None = None) -> Pipeable: ...
+def collect(
+    target: Target | None = None, *, keep_col_refs: bool = True
+) -> Pipeable: ...
 
 
 @verb
 def collect(
     table: Table,
     target: Target | None = None,
-    keep_hidden_cols: bool = False,
+    *,
     keep_col_refs: bool = True,
 ) -> Pipeable:
     """
@@ -187,24 +189,31 @@ def collect(
     """
     errors.check_arg_type(Target | None, "collect", "target", target)
 
-    df = table >> select(*table._cache.cols.values()) >> export(Polars(lazy=False))
+    df = table >> export(Polars(lazy=False))
     if target is None:
         target = Polars()
 
-    # TODO: keep_hidden_cols, keep_col_refs options
+    if not keep_col_refs:
+        return Table(df)
+
+    # TODO: keep_hidden_cols option
+
+    assert len(table) == len(table._cache.name_to_uuid)
+
     new = Table(
         TableImpl.from_resource(
             df,
             target,
             name=table._ast.name,
-            # preserve UUIDs and by this column references across collect()
-            uuids={name: uid for uid, name in table._cache.uuid_to_name.items()},
+            # preserve UUIDs -> this keeps column references across collect()
+            uuids={name: uid for name, uid in table._cache.name_to_uuid.items()},
         )
     )
     new._cache.derived_from = table._cache.derived_from | {new._ast}
     new._cache.partition_by = [
         preprocess_arg(col, new) for col in table._cache.partition_by
     ]
+
     return new
 
 
@@ -1218,11 +1227,9 @@ def preprocess_arg(
     assert isinstance(arg, ColExpr | Order)
 
     def _preprocess_expr(expr: ColExpr):
-        if isinstance(expr, Col) and expr._ast not in table._cache.derived_from:
-            raise ValueError(
-                f"column `{repr(expr)}` does not exist in table `{table._ast.name}`. "
-                f"The source table `{expr._ast.name}` of the column is not an ancestor "
-                "of the current table."
+        if isinstance(expr, Col) and expr._uuid not in table._cache.cols:
+            raise ColumnNotFoundError(
+                f"column `{repr(expr)}` does not exist in table `{table._ast.name}`"
             )
 
         if (

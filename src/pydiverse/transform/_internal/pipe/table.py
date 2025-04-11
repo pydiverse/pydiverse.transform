@@ -11,6 +11,7 @@ import sqlalchemy as sqa
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Target
+from pydiverse.transform._internal.errors import ColumnNotFoundError
 from pydiverse.transform._internal.pipe.cache import Cache
 from pydiverse.transform._internal.pipe.pipeable import Pipeable
 from pydiverse.transform._internal.tree.ast import AstNode
@@ -174,7 +175,7 @@ class Table:
             # for hasattr to work correctly on dunder methods
             raise AttributeError
         if name not in self._cache.name_to_uuid:
-            raise ValueError(
+            raise ColumnNotFoundError(
                 f"column `{name}` does not exist in table `{self._ast.name}`"
             )
         col = self._cache.cols[self._cache.name_to_uuid[name]]

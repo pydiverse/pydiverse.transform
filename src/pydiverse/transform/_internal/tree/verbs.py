@@ -25,7 +25,13 @@ class Verb(AstNode):
 
         cloned.map_col_nodes(
             lambda col: Col(
-                col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+                col.name,
+                # If the current ast is not in nd_map (happens after collect with
+                # keep_col_refs=True), the node wasn't really present anyway.
+                nd_map.get(col._ast, col._ast),
+                uuid_map[col._uuid],
+                col._dtype,
+                col._ftype,
             )
             if isinstance(col, Col)
             else copy.copy(col)
@@ -205,7 +211,11 @@ class Join(Verb):
         cloned.right = right_child
         cloned.on = self.on.map_subtree(
             lambda col: Col(
-                col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+                col.name,
+                nd_map.get(col._ast, col._ast),
+                uuid_map[col._uuid],
+                col._dtype,
+                col._ftype,
             )
             if isinstance(col, Col)
             else copy.copy(col)
