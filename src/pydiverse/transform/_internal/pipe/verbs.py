@@ -1060,15 +1060,39 @@ def join(
     else:
         suffix = ""
 
-    new = copy.copy(left)
-    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
-    # The join condition must be preprocessed with respect to both tables
-    new._ast.on = resolve_C_columns(
-        resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
-    )
+    # Lambda column resolution and checks for existence of columns are done manually
+    # here since we need to incorporate columns from the right.
+    def _preprocess_on(expr: ColExpr):
+        if isinstance(expr, ColName):
+            if expr in left:
+                return left[expr.name]
+            old_right_name = expr.name[: len(expr.name) - len(suffix)]
+            if old_right_name not in right:
+                raise ValueError(
+                    f"no column with name `{expr.name}` found"
+                    "\nhint: To reference a column of the right table in the `on` "
+                    "clause using `C`, you must append the suffix to the column name."
+                )
+            return right[old_right_name]
 
-    # TODO: error messages for right cols may use the left table name here
-    new._ast.on = preprocess_arg(new._ast.on, new)
+        if (
+            isinstance(expr, Col)
+            and expr._ast not in left._cache.derived_from
+            and expr._ast not in right._cache.derived_from
+        ):
+            raise ValueError(
+                f"column `{repr(expr)}` used in `on` neither exists in the table "
+                f"`{left._ast.name}` nor in the table `{right._ast.name}`. "
+                f"The source table `{expr._ast.name}` of the column must be an "
+                "ancestor of one of the two input tables."
+            )
+
+        return expr
+
+    new = copy.copy(left)
+    new._ast = Join(
+        left._ast, right._ast, on.map_subtree(_preprocess_on), how, validate, suffix
+    )
 
     return new
 
@@ -1189,52 +1213,33 @@ def show(table: Table) -> Pipeable:
     return table
 
 
-def resolve_C_columns(expr: ColExpr, table: Table, *, strict=True, suffix=""):
-    def resolve_C(col: ColName):
-        if strict or col in table:
-            return table[col.name[: len(col.name) - len(suffix)]]
-        return col
+def preprocess_arg(
+    arg: ColExpr, table: Table, *, update_partition_by: bool = True
+) -> Any:
+    arg = wrap_literal(arg)
+    assert isinstance(arg, ColExpr | Order)
 
-    return expr.map_subtree(
-        lambda col: resolve_C(col)
-        if isinstance(col, ColName)
-        else (
-            table._cache.cols[col._uuid]
-            if isinstance(col, Col) and col._uuid in table._cache.cols
-            else col
-        )
-    )
+    def _preprocess_expr(expr: ColExpr):
+        if isinstance(expr, Col) and expr._ast not in table._cache.derived_from:
+            raise ValueError(
+                f"column `{repr(expr)}` does not exist in table `{table._ast.name}`. "
+                f"The source table `{expr._ast.name}` of the column is not an ancestor "
+                "of the current table."
+            )
 
+        if (
+            update_partition_by
+            and isinstance(expr, ColFn)
+            and "partition_by" not in expr.context_kwargs
+            and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
+        ):
+            expr.context_kwargs["partition_by"] = [
+                table._cache.cols[uid] for uid in table._cache.partition_by
+            ]
 
-def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:
-    if isinstance(arg, Order):
-        return Order(
-            preprocess_arg(
-                arg.order_by, table, update_partition_by=update_partition_by
-            ),
-            arg.descending,
-            arg.nulls_last,
-        )
+        if isinstance(expr, ColName):
+            return table[expr.name]
 
-    else:
-        arg = wrap_literal(arg)
-        assert isinstance(arg, ColExpr)
+        return expr
 
-        for expr in arg.iter_subtree():
-            if isinstance(expr, Col) and expr._ast not in table._cache.derived_from:
-                raise ValueError(
-                    f"table `{expr._ast.name}` used to reference the column "
-                    f"`{repr(expr)}` cannot be used at this point. The current table "
-                    "is not derived from it."
-                )
-            if (
-                update_partition_by
-                and isinstance(expr, ColFn)
-                and "partition_by" not in expr.context_kwargs
-                and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
-            ):
-                expr.context_kwargs["partition_by"] = [
-                    table._cache.cols[uid] for uid in table._cache.partition_by
-                ]
-
-        return resolve_C_columns(arg, table)
+    return arg.map_subtree(_preprocess_expr)

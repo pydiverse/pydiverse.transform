@@ -85,6 +85,19 @@ class ColExpr(Generic[T]):
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
+    def iter_children(self) -> Iterable[ColExpr]:
+        return iter(())
+
+    # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
+    # and `Order` expressions are not yielded.
+    def iter_subtree(self) -> Iterable[ColExpr]:
+        for node in self.iter_children():
+            yield from node.iter_subtree()
+        yield self
+
+    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+        return g(self)
+
     def dtype(self) -> Dtype:
         """
         Returns the data type of the expression.
@@ -239,19 +252,6 @@ class ColExpr(Generic[T]):
                 "instance or subclass of pdt.Dtype"
             )
         return Cast(self, target_type)
-
-    def iter_children(self) -> Iterable[ColExpr]:
-        return iter(())
-
-    # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
-    # and `Order` expressions are not yielded.
-    def iter_subtree(self) -> Iterable[ColExpr]:
-        for node in self.iter_children():
-            yield from node.iter_subtree()
-        yield self
-
-    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        return g(self)
 
     def __rshift__(self, rhs):
         from pydiverse.transform._internal.pipe.pipeable import Pipeable
