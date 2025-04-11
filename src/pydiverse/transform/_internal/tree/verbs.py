@@ -59,7 +59,6 @@ class Verb(AstNode):
 @dataclasses.dataclass(eq=False, slots=True)
 class Alias(Verb):
     uuid_map: dict[UUID, UUID] | None
-    subquery: bool = False
 
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned, nd_map, uuid_map = Verb._clone(self)
@@ -231,3 +230,6 @@ class Join(Verb):
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.on = g(self.on)
+
+
+class SubqueryMarker(Verb): ...

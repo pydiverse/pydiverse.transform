@@ -482,8 +482,6 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     └─────┴───────┴─────┴───────┘
     """
     errors.check_arg_type(dict, "rename", "name_map", name_map)
-    if len(name_map) == 0:
-        return table
 
     if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(

@@ -46,7 +46,7 @@ class Cache:
             derived_from={node},
             cols={col._uuid: col for col in node.cols.values()},
             limit=0,
-            group_by=[],
+            group_by=set(),
         )
 
     def update(self, node: verbs.Verb, *, right_cache: Cache | None = None) -> Cache:
@@ -126,7 +126,11 @@ class Cache:
             res.cols = {col._uuid: col for _, col in cols.items()}
             res.name_to_uuid = {name: col._uuid for name, col in cols.items()}
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
+            res.group_by = res.group_by | set(res.partition_by)
             res.partition_by = []
+
+        elif isinstance(node, verbs.SliceHead):
+            res.limit = node.n
 
         elif isinstance(node, verbs.Join):
             assert right_cache is not None
@@ -139,18 +143,17 @@ class Cache:
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
             res.derived_from = self.derived_from | right_cache.derived_from
+            res.limit = 0
+            res.group_by = set()
 
         assert len(res.name_to_uuid) == len(res.uuid_to_name)
         res.derived_from = res.derived_from | {node}
 
         return res
 
-    def requires_subquery(
-        self, node: verbs.Verb, *, child_node: verbs.Verb | None = None
-    ) -> bool:
-        if child_node is None:
-            child_node = node.child
-
+    # Returns whether applying `node` to this table would require it to be wrapped in a
+    # subquery. (so `self` is the old cache and `node` the new AST)
+    def requires_subquery(self, node: verbs.Verb) -> bool:
         return (
             (
                 isinstance(
@@ -192,11 +195,11 @@ class Cache:
                     (self.group_by and self.group_by != set(self.partition_by))
                     or any(
                         (
-                            node.ftype(agg_is_window=False)
+                            col.ftype(agg_is_window=False)
                             in (Ftype.WINDOW, Ftype.AGGREGATE)
                         )
-                        for node in node.iter_col_nodes()
-                        if isinstance(node, Col)
+                        for col in node.iter_col_nodes()
+                        if isinstance(col, Col)
                     )
                 )
             )

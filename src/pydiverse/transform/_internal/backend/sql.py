@@ -375,7 +375,7 @@ class SqlImpl(TableImpl):
         if isinstance(nd, verbs.Mutate | verbs.Summarize):
             query.select = [lb for lb in query.select if lb.name not in set(nd.names)]
 
-        if isinstance(nd, verbs.Alias) and nd.subquery:
+        if isinstance(nd, verbs.SubqueryMarker):
             if needed_cols.keys().isdisjoint(sqa_col.keys()):
                 # We cannot select zero columns from a subquery. This happens when the
                 # user only 0-ary functions after the subquery, e.g. `count`.

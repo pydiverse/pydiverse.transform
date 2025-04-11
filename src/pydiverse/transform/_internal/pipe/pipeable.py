@@ -63,29 +63,37 @@ def modify_ast(fn):
         new = fn(table, *args, **kwargs)
         assert new._ast != table._ast
 
-        child_nodes = [new._ast.child] + (
-            [new._ast.right] if isinstance(new._ast, verbs.Join) else []
-        )
-
-        for child in child_nodes:
-            if new._cache.requires_subquery(new._ast, child_node=child):
-                if not isinstance(new._ast, verbs.Verb) or not isinstance(
-                    child, verbs.Alias
-                ):
+        def _check_subquery(cache, ast_node):
+            if cache.requires_subquery(new._ast):
+                if not isinstance(ast_node, verbs.Alias):
                     raise SubqueryError(
                         f"Executing the `{new._ast.__class__.__name__.lower()}` verb "
-                        f"on the table `{child.name}` requires a subquery, which is "
-                        "forbidden in transform by default.\n"
+                        f"on the table `{ast_node.name}` requires a subquery, which "
+                        "is forbidden in transform by default.\n"
                         "hint: If you are sure you want to do a subquery, put an "
-                        f"`>> alias()` on `{child.name}` before this verb."
+                        f"`>> alias()` on `{ast_node.name}` before this verb."
                     )
-
-                child.subquery = True
+                return True
+            return False
 
         new._cache = table._cache.update(
             new._ast,
             right_cache=args[0]._cache if isinstance(new._ast, verbs.Join) else None,
         )
+
+        # If a subquery is required, we put a marker in between
+        assert new._ast.child == table._ast
+        if _check_subquery(table._cache, table._ast):
+            new._ast.child = verbs.SubqueryMarker(new._ast.child)
+            new._cache.limit = 0
+            new._cache.group_by = set()
+
+        if isinstance(new._ast, verbs.Join) and _check_subquery(
+            args[0]._cache, args[0]._ast
+        ):
+            new._ast.child = verbs.SubqueryMarker(new._ast.child)
+            # here limit and group_by are reset by Cache.update anyway
+
         return new
 
     return _fn
