@@ -104,3 +104,12 @@ def test_group_by_scalar(df3):
     assert_result_equal(
         df3, lambda t: t >> mutate(x=0) >> group_by(C.x) >> summarize(y=t.col1.sum())
     )
+
+    assert_result_equal(
+        df3,
+        lambda t: t
+        >> mutate(x=0)
+        >> mutate(y=C.x.sum(partition_by=t.col2))
+        >> group_by(C.y)
+        >> summarize(z=t.col1.min()),
+    )

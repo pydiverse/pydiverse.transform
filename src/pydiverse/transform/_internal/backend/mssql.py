@@ -89,8 +89,10 @@ class MsSqlImpl(SqlImpl):
                         node.context_kwargs["arrange"] = convert_order_list(arrange)
 
         sql.create_aliases(nd, {})
-        table, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
-        return cls.compile_query(table, query)
+        table, query, sqa_expr = cls.compile_ast(
+            nd, {col._uuid: 1 for col in final_select}
+        )
+        return cls.compile_query(table, query, sqa_expr)
 
     @classmethod
     def compile_ordered_aggregation(

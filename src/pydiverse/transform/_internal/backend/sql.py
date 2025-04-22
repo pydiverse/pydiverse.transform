@@ -138,8 +138,10 @@ class SqlImpl(TableImpl):
         if final_select is None:
             final_select = Cache.from_ast(nd).selected_cols()
         create_aliases(nd, {})
-        nd, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
-        return cls.compile_query(nd, query)
+        nd, query, sqa_expr = cls.compile_ast(
+            nd, {col._uuid: 1 for col in final_select}
+        )
+        return cls.compile_query(nd, query, sqa_expr)
 
     @classmethod
     def export(
@@ -198,9 +200,9 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_order(
-        cls, order: Order, sqa_col: dict[str, sqa.Label]
+        cls, order: Order, sqa_expr: dict[str, sqa.Label]
     ) -> sqa.UnaryExpression:
-        order_expr = cls.compile_col_expr(order.order_by, sqa_col)
+        order_expr = cls.compile_col_expr(order.order_by, sqa_expr)
         if types.without_const(order.order_by.dtype()) == String():
             order_expr = order_expr.collate(cls.default_collation())
         order_expr = order_expr.desc() if order.descending else order_expr.asc()
@@ -213,8 +215,8 @@ class SqlImpl(TableImpl):
         return order_expr
 
     @classmethod
-    def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
-        return cls.compile_col_expr(cast.val, sqa_col).cast(
+    def compile_cast(cls, cast: Cast, sqa_expr: dict[str, sqa.Label]) -> sqa.Cast:
+        return cls.compile_col_expr(cast.val, sqa_expr).cast(
             cls.sqa_type(cast.target_type)
         )
 
@@ -232,15 +234,15 @@ class SqlImpl(TableImpl):
 
     @classmethod
     def compile_col_expr(
-        cls, expr: ColExpr, sqa_col: dict[str, sqa.Label], *, compile_literals=True
+        cls, expr: ColExpr, sqa_expr: dict[str, sqa.Label], *, compile_literals=True
     ) -> sqa.ColumnElement:
         if isinstance(expr, Col):
-            return sqa_col[expr._uuid]
+            return sqa_expr[expr._uuid]
 
         elif isinstance(expr, ColFn):
             args: list[sqa.ColumnElement] = [
                 cls.compile_col_expr(
-                    arg, sqa_col, compile_literals=not types.is_const(param)
+                    arg, sqa_expr, compile_literals=not types.is_const(param)
                 )
                 for arg, param in zip(
                     expr.args,
@@ -255,13 +257,13 @@ class SqlImpl(TableImpl):
             if partition_by:
                 assert expr.ftype() == Ftype.WINDOW
                 partition_by = sqa.sql.expression.ClauseList(
-                    *(cls.compile_col_expr(col, sqa_col) for col in partition_by)
+                    *(cls.compile_col_expr(col, sqa_expr) for col in partition_by)
                 )
 
             arrange = expr.context_kwargs.get("arrange")
             if arrange:
                 order_by = dedup_order_by(
-                    cls.compile_order(order, sqa_col) for order in arrange
+                    cls.compile_order(order, sqa_expr) for order in arrange
                 )
             else:
                 order_by = None
@@ -299,13 +301,13 @@ class SqlImpl(TableImpl):
             res = sqa.case(
                 *(
                     (
-                        cls.compile_col_expr(cond, sqa_col),
-                        cls.compile_col_expr(val, sqa_col),
+                        cls.compile_col_expr(cond, sqa_expr),
+                        cls.compile_col_expr(val, sqa_expr),
                     )
                     for cond, val in expr.cases
                 ),
                 else_=(
-                    cls.compile_col_expr(expr.default_val, sqa_col)
+                    cls.compile_col_expr(expr.default_val, sqa_expr)
                     if expr.default_val is not None
                     else None
                 ),
@@ -328,30 +330,42 @@ class SqlImpl(TableImpl):
             return cls.compile_lit(expr) if compile_literals else expr.val
 
         elif isinstance(expr, Cast):
-            return cls.compile_cast(expr, sqa_col)
+            return cls.compile_cast(expr, sqa_expr)
 
         raise AssertionError
 
     @classmethod
-    def compile_query(cls, table: sqa.Table, query: Query) -> sqa.sql.Select:
+    def compile_query(
+        cls, table: sqa.Table, query: Query, sqa_expr: dict[UUID, sqa.ColumnElement]
+    ) -> sqa.sql.Select:
         sel = table.select().select_from(table)
 
         if query.where:
-            sel = sel.where(*query.where)
+            sel = sel.where(
+                cls.compile_col_expr(pred, sqa_expr) for pred in query.where
+            )
 
         if query.group_by:
-            sel = sel.group_by(*query.group_by)
+            sel = sel.group_by(*(sqa_expr[uid] for uid in query.group_by.values()))
 
         if query.having:
-            sel = sel.having(*query.having)
+            sel = sel.having(
+                cls.compile_col_expr(pred, sqa_expr) for pred in query.having
+            )
 
         if query.limit is not None:
             sel = sel.limit(query.limit).offset(query.offset)
 
         if query.order_by:
-            sel = sel.order_by(*query.order_by)
+            sel = sel.order_by(
+                *dedup_order_by(
+                    cls.compile_order(ord, sqa_expr) for ord in query.order_by
+                )
+            )
 
-        sel = sel.with_only_columns(*query.select)
+        sel = sel.with_only_columns(
+            *(sqa.Label(name, sqa_expr[uid]) for name, uid in query.select.items())
+        )
 
         return sel
 
@@ -370,116 +384,101 @@ class SqlImpl(TableImpl):
                     else:
                         needed_cols[node._uuid] = cnt + 1
 
-            table, query, sqa_col = cls.compile_ast(nd.child, needed_cols)
+            table, query, sqa_expr = cls.compile_ast(nd.child, needed_cols)
 
         if isinstance(nd, verbs.Mutate | verbs.Summarize):
-            query.select = [lb for lb in query.select if lb.name not in set(nd.names)]
+            query.select = {
+                name: uid
+                for name, uid in query.select.items()
+                if name not in set(nd.names)
+            }
 
         if isinstance(nd, verbs.SubqueryMarker):
-            if needed_cols.keys().isdisjoint(sqa_col.keys()):
+            if needed_cols.keys().isdisjoint(sqa_expr.keys()):
                 # We cannot select zero columns from a subquery. This happens when the
                 # user only 0-ary functions after the subquery, e.g. `count`.
-                needed_cols[next(iter(sqa_col.keys()))] = 1
+                needed_cols[next(iter(sqa_expr.keys()))] = 1
 
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
 
-            orig_select = query.select
-            query.select = []
+            query.select = dict()
             cnt = dict()
             name_in_subquery = dict()
 
             # resolve potential column name collisions in the subquery
             for uid in needed_cols.keys():
-                if uid in sqa_col:
-                    name = sqa_col[uid].name
+                if uid in sqa_expr:
+                    name = sqa_expr[uid].name
                     if c := cnt.get(name):
                         name_in_subquery[uid] = f"{name}_{c}"
                         cnt[name] = c + 1
                     else:
                         name_in_subquery[uid] = name
                         cnt[name] = 1
-                    query.select.append(sqa.Label(name_in_subquery[uid], sqa_col[uid]))
+                    query.select[name_in_subquery[uid]] = uid
 
-            table = cls.compile_query(table, query).subquery()
-            sqa_col.update(
+            table = cls.compile_query(table, query, sqa_expr).subquery()
+            sqa_expr.update(
                 {
-                    uid: sqa.label(
-                        sqa_col[uid].name, table.columns.get(name_in_subquery[uid])
-                    )
+                    uid: table.columns.get(name_in_subquery[uid])
                     for uid in needed_cols.keys()
-                    if uid in sqa_col
+                    if uid in sqa_expr
                 }
             )
 
-            # rewire col refs to the subquery
-            query = Query(
-                select=[
-                    sqa.Label(lb.name, col)
-                    for lb in orig_select
-                    if (col := table.columns.get(lb.name)) is not None
-                ],
-                partition_by=[
-                    sqa.Label(lb.name, col)
-                    for lb in query.partition_by
-                    if (col := table.columns.get(lb.name)) is not None
-                ],
-            )
-
         elif isinstance(nd, verbs.Select):
-            query.select = [sqa_col[col._uuid] for col in nd.select]
-
-        elif isinstance(nd, verbs.Rename):
-            sqa_col = {
-                uid: (
-                    sqa.label(nd.name_map[lb.name], lb)
-                    if lb.name in nd.name_map
-                    else lb
-                )
-                for uid, lb in sqa_col.items()
+            selected_uuids = set(col._uuid for col in nd.select)
+            query.select = {
+                name: uid for name, uid in query.select.items() if uid in selected_uuids
             }
 
+        elif isinstance(nd, verbs.Rename):
             query.select, query.partition_by, query.group_by = (
-                [
-                    sqa.label(nd.name_map[lb.name], lb)
-                    if lb.name in nd.name_map
-                    else lb
-                    for lb in label_arr
-                ]
-                for label_arr in (query.select, query.partition_by, query.group_by)
+                {
+                    (nd.name_map[name] if name in nd.name_map else name): val
+                    for name, val in cols.items()
+                }
+                for cols in (query.select, query.partition_by, query.group_by)
             )
 
         elif isinstance(nd, verbs.Mutate):
-            for name, val, uid in zip(nd.names, nd.values, nd.uuids, strict=True):
-                sqa_col[uid] = sqa.label(name, cls.compile_col_expr(val, sqa_col))
-                query.select.append(sqa_col[uid])
+            sqa_expr |= {
+                uid: cls.compile_col_expr(val, sqa_expr)
+                for uid, val in zip(nd.uuids, nd.values, strict=True)
+            }
+            query.select |= {
+                name: uid for name, uid in zip(nd.names, nd.uuids, strict=True)
+            }
 
         elif isinstance(nd, verbs.Filter):
             if query.group_by:
-                query.having.extend(
-                    cls.compile_col_expr(fil, sqa_col) for fil in nd.predicates
-                )
+                query.having.extend(nd.predicates)
             else:
-                query.where.extend(
-                    cls.compile_col_expr(fil, sqa_col) for fil in nd.predicates
-                )
+                query.where.extend(nd.predicates)
 
         elif isinstance(nd, verbs.Arrange):
             query.order_by = dedup_order_by(
                 itertools.chain(
-                    (cls.compile_order(ord, sqa_col) for ord in nd.order_by),
+                    (cls.compile_order(ord, sqa_expr) for ord in nd.order_by),
                     query.order_by,
                 )
             )
 
         elif isinstance(nd, verbs.Summarize):
-            query.group_by.extend(query.partition_by)
-
-            for name, val, uid in zip(nd.names, nd.values, nd.uuids, strict=True):
-                sqa_col[uid] = sqa.Label(name, cls.compile_col_expr(val, sqa_col))
-
-            query.select = query.partition_by + [sqa_col[uid] for uid in nd.uuids]
-            query.partition_by = []
+            sqa_expr |= {
+                uid: cls.compile_col_expr(val, sqa_expr)
+                for uid, val in zip(nd.uuids, nd.values, strict=True)
+            }
+            query.group_by |= {
+                name: col._uuid
+                for name, col in query.partition_by.items()
+                if not types.is_const(col.dtype())
+            }
+            query.select = {
+                name: col._uuid for name, col in query.partition_by.items()
+            } | {name: uid for name, uid in zip(nd.names, nd.uuids, strict=True)}
+            query.partition_by = dict()
             query.order_by.clear()
 
         elif isinstance(nd, verbs.SliceHead):
@@ -491,28 +490,28 @@ class SqlImpl(TableImpl):
                 query.offset += nd.offset
 
         elif isinstance(nd, verbs.GroupBy):
-            compiled_group_by = (sqa_col[col._uuid] for col in nd.group_by)
+            uuid_to_col = {col._uuid: col for col in nd.group_by}
+            group_cols = {
+                name: uuid_to_col[uid]
+                for name, uid in query.select.items()
+                if uid in uuid_to_col
+            }
             if nd.add:
-                query.partition_by.extend(compiled_group_by)
+                query.partition_by |= group_cols
             else:
-                query.partition_by = list(compiled_group_by)
+                query.partition_by = group_cols
 
         elif isinstance(nd, verbs.Ungroup):
             assert not (query.partition_by and query.group_by)
             query.partition_by.clear()
 
         elif isinstance(nd, verbs.Join):
-            right_table, right_query, right_sqa_col = cls.compile_ast(
+            right_table, right_query, right_sqa_expr = cls.compile_ast(
                 nd.right, needed_cols
             )
-            sqa_col.update(
-                {
-                    uid: sqa.label(lb.name + nd.suffix, lb)
-                    for uid, lb in right_sqa_col.items()
-                }
-            )
+            sqa_expr.update(right_sqa_expr)
 
-            compiled_on = cls.compile_col_expr(nd.on, sqa_col)
+            compiled_on = cls.compile_col_expr(nd.on, sqa_expr)
 
             if nd.how == "inner":
                 query.where.extend(right_query.where)
@@ -530,25 +529,21 @@ class SqlImpl(TableImpl):
                 full=nd.how == "full",
             )
 
-            query.select += [
-                sqa.Label(lb.name + nd.suffix, lb) for lb in right_query.select
-            ]
+            query.select |= {
+                name + nd.suffix: col for name, col in right_query.select.items()
+            }
 
             assert not right_query.partition_by
             assert not right_query.group_by
 
         elif isinstance(nd, TableImpl):
             table = nd.table
-            cols = [
-                sqa.type_coerce(col, cls.sqa_type(nd.cols[col.name].dtype())).label(
-                    col.name
+            query = Query(select={name: col._uuid for name, col in nd.cols.items()})
+            sqa_expr = {
+                nd.cols[col.name]._uuid: sqa.type_coerce(
+                    col, cls.sqa_type(nd.cols[col.name].dtype())
                 )
-                for col in nd.table.columns
-            ]
-            query = Query(cols)
-            sqa_col = {
-                nd.cols[table_col.name]._uuid: col
-                for table_col, col in zip(nd.table.columns, cols, strict=True)
+                for col in table.columns
             }
 
         if isinstance(nd, verbs.Verb):
@@ -561,7 +556,7 @@ class SqlImpl(TableImpl):
                     else:
                         needed_cols[node._uuid] = cnt - 1
 
-        return table, query, sqa_col
+        return table, query, sqa_expr
 
     # TODO: we shouldn't need these
     @classmethod
@@ -575,12 +570,12 @@ class SqlImpl(TableImpl):
 
 @dataclasses.dataclass(slots=True)
 class Query:
-    select: list[sqa.Label]
-    partition_by: list[sqa.Label] = dataclasses.field(default_factory=list)
-    group_by: list[sqa.Label] = dataclasses.field(default_factory=list)
-    where: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
-    having: list[sqa.ColumnElement] = dataclasses.field(default_factory=list)
-    order_by: list[sqa.UnaryExpression] = dataclasses.field(default_factory=list)
+    select: dict[str, UUID]
+    partition_by: dict[str, Col] = dataclasses.field(default_factory=dict)
+    group_by: dict[str, UUID] = dataclasses.field(default_factory=dict)
+    where: list[ColExpr] = dataclasses.field(default_factory=list)
+    having: list[ColExpr] = dataclasses.field(default_factory=list)
+    order_by: list[Order] = dataclasses.field(default_factory=list)
     limit: int | None = None
     offset: int | None = None
 

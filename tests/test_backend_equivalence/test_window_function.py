@@ -379,3 +379,9 @@ def test_op_dense_rank(df3):
             ),
         ),
     )
+
+
+def test_partition_by_const_col(df3):
+    assert_result_equal(
+        df3, lambda t: t >> mutate(x=0) >> mutate(y=t.col3.sum(partition_by=C.x))
+    )
