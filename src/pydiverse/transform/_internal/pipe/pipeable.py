@@ -70,8 +70,9 @@ def modify_ast(fn):
                         f"Executing the `{new._ast.__class__.__name__.lower()}` verb "
                         f"on the table `{ast_node.name}` requires a subquery, which "
                         "is forbidden in transform by default.\n"
-                        "hint: If you are sure you want to do a subquery, put an "
-                        f"`>> alias()` on `{ast_node.name}` before this verb."
+                        f"hint: Materialize the table `{ast_node.name}` before this "
+                        "verb. If you are sure you want to do a subquery, put an "
+                        "`>> alias()` before this verb. "
                     )
                 return True
             return False

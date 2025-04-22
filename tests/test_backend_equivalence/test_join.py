@@ -238,7 +238,11 @@ def test_join_where(df2, df3, df4):
         (df3, df4),
         lambda t3, t4: t3
         >> filter(t3.col1 % 2 == 0)
-        >> full_join(t4 >> filter(t4.col1.is_not_null()), on=t3.col2 == t4.col2),
+        >> alias()
+        >> full_join(
+            t4_filtered := t4 >> filter(t4.col1.is_not_null()) >> alias(),
+            on=C.col2 == t4_filtered.col2,
+        ),
     )
 
 

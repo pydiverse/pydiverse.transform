@@ -23,6 +23,7 @@ class Cache:
     # the following are only necessary for subquery detection
     limit: int
     group_by: set[UUID]
+    is_filtered: bool
 
     backend: Literal["polars", "sqlite", "postgres", "duckdb", "mssql"]
 
@@ -50,6 +51,7 @@ class Cache:
             cols={col._uuid: col for col in node.cols.values()},
             limit=0,
             group_by=set(),
+            is_filtered=False,
             backend=node.backend_name,
         )
 
@@ -103,6 +105,9 @@ class Cache:
                 name: uid for name, uid in zip(node.names, node.uuids, strict=True)
             }
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
+
+        elif isinstance(node, verbs.Filter):
+            res.is_filtered = True
 
         elif isinstance(node, verbs.GroupBy):
             res.partition_by = [col._uuid for col in node.group_by]
@@ -163,6 +168,7 @@ class Cache:
             }
             res.limit = 0
             res.group_by = set()
+            res.is_filtered = False
 
         assert len(res.name_to_uuid) == len(res.uuid_to_name)
         res.derived_from = res.derived_from | {node}
@@ -247,6 +253,7 @@ class Cache:
                         for col in node.on.iter_subtree()
                         if isinstance(col, Col)
                     )
+                    or (self.is_filtered and node.how == "full")
                 )
             )
         )

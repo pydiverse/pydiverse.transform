@@ -521,8 +521,7 @@ class SqlImpl(TableImpl):
                     operator.and_, (compiled_on, *right_query.where)
                 )
             elif nd.how == "full":
-                if query.where or right_query.where:
-                    raise ValueError("invalid filter before full join")
+                assert not (query.where or right_query.where)
 
             table = table.join(
                 right_table,
