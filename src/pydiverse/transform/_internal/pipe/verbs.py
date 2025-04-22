@@ -1011,6 +1011,9 @@ def join(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
 
+    if left._cache.backend != right._cache.backend:
+        raise TypeError("cannot join two tables with different backends")
+
     if left._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
     elif right._cache.partition_by:

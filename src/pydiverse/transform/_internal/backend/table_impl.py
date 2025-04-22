@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
 
 class TableImpl(AstNode):
+    backend_name: str
     impl_store = ImplStore()
 
     def __init__(self, name: str, schema: dict[str, Dtype]):

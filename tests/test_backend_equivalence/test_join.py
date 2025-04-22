@@ -192,6 +192,7 @@ def test_join_summarize(df3, df4):
         (df3, df4),
         lambda t3, t4: t3
         >> summarize(y=t3.col1.max(), z=t3.col4.mean())
+        >> alias()
         >> left_join(t4, on=C.y == t4.col4),
     )
 

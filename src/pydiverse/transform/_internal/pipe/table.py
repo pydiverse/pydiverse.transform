@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable, Iterable
 from html import escape
+from typing import Literal
 
 import pandas as pd
 import polars as pl
@@ -265,3 +266,11 @@ class Table:
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+
+def backend(table: Table) -> Literal["polars", "sqlite", "postgres", "duckdb", "mssql"]:
+    return table._cache.backend
+
+
+def is_sql_backed(table: Table) -> bool:
+    return table._cache.backend != "polars"

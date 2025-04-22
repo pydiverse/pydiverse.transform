@@ -30,6 +30,8 @@ from pydiverse.transform._internal.tree.col_expr import (
 
 
 class PolarsImpl(TableImpl):
+    backend_name = "polars"
+
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
         self.df = self.df.cast(

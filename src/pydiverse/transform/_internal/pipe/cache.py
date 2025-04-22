@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+from typing import Literal
 from uuid import UUID
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
@@ -22,6 +23,8 @@ class Cache:
     # the following are only necessary for subquery detection
     limit: int
     group_by: set[UUID]
+
+    backend: Literal["polars", "sqlite", "postgres", "duckdb", "mssql"]
 
     # For a column to be usable in an expression, the table it comes from must be an
     # ancestor of the current table AND the column's UUID must be in `all_cols` of the
@@ -47,6 +50,7 @@ class Cache:
             cols={col._uuid: col for col in node.cols.values()},
             limit=0,
             group_by=set(),
+            backend=node.backend_name,
         )
 
     def update(self, node: verbs.Verb, *, right_cache: Cache | None = None) -> Cache:
@@ -168,6 +172,9 @@ class Cache:
     # Returns whether applying `node` to this table would require it to be wrapped in a
     # subquery. (so `self` is the old cache and `node` the new AST)
     def requires_subquery(self, node: verbs.Verb) -> bool:
+        if self.backend == "polars":
+            return False
+
         return (
             (
                 isinstance(

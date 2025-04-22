@@ -19,6 +19,8 @@ from pydiverse.transform._internal.tree.types import Int64
 
 
 class DuckDbImpl(SqlImpl):
+    backend_name = "duckdb"
+
     @classmethod
     def export(
         cls,

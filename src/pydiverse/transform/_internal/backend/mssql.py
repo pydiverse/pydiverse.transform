@@ -29,6 +29,8 @@ from pydiverse.transform._internal.tree.col_expr import (
 
 
 class MsSqlImpl(SqlImpl):
+    backend_name = "mssql"
+
     @classmethod
     def inf(cls):
         raise NotSupportedError("SQL Server does not support `inf`")

@@ -11,6 +11,8 @@ from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
 
 
 class PostgresImpl(SqlImpl):
+    backend_name = "postgres"
+
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)

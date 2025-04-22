@@ -17,6 +17,8 @@ from pydiverse.transform._internal.util.warnings import warn_non_standard
 
 
 class SqliteImpl(SqlImpl):
+    backend_name = "sqlite"
+
     @classmethod
     def inf(cls):
         return sqa.type_coerce(sqa.literal("1e314"), sqa.Double)

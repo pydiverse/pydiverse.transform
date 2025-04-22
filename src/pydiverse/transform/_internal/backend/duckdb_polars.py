@@ -20,6 +20,8 @@ from pydiverse.transform._internal.tree.ast import AstNode
 # Currently it works only since this class also has a table object, but it should be
 # enforced by inheritance.
 class DuckDbPolarsImpl(TableImpl):
+    backend_name = "polars"
+
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
 
