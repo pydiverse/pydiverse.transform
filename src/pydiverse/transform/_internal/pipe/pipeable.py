@@ -76,23 +76,23 @@ def modify_ast(fn):
                 return True
             return False
 
-        new._cache = table._cache.update(
-            new._ast,
-            right_cache=args[0]._cache if isinstance(new._ast, verbs.Join) else None,
-        )
-
         # If a subquery is required, we put a marker in between
         assert new._ast.child == table._ast
         if _check_subquery(table._cache, table._ast):
             new._ast.child = verbs.SubqueryMarker(new._ast.child)
-            new._cache.limit = 0
-            new._cache.group_by = set()
+            new._cache = new._cache.update(new._ast.child)
 
-        if isinstance(new._ast, verbs.Join) and _check_subquery(
-            args[0]._cache, args[0]._ast
-        ):
-            new._ast.right = verbs.SubqueryMarker(new._ast.right)
-            # here limit and group_by are reset by Cache.update anyway
+        if isinstance(new._ast, verbs.Join):
+            if _check_subquery(args[0]._cache, args[0]._ast):
+                new._ast.right = verbs.SubqueryMarker(new._ast.right)
+                right_cache = args[0]._cache.update(new._ast.right)
+            else:
+                right_cache = args[0]._cache
+
+        new._cache = new._cache.update(
+            new._ast,
+            right_cache=right_cache if isinstance(new._ast, verbs.Join) else None,
+        )
 
         return new
 

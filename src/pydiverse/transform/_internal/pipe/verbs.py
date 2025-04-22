@@ -1011,19 +1011,6 @@ def join(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
 
-    if isinstance(on, str):
-        on = [on]
-    ignore_right = set()
-    if isinstance(on, list):
-        on = functools.reduce(
-            operator.and_,
-            (
-                left[expr] == right[expr] if isinstance(expr, str) else expr
-                for expr in on
-            ),
-            LiteralCol(True),  # initial value
-        )
-
     if left._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
     elif right._cache.partition_by:
@@ -1054,9 +1041,9 @@ def join(
                     "hint: Specify a different suffix to prevent name collisions or "
                     "none at all for automatic name collision resolution."
                 )
-    elif (right_names - ignore_right) & left_names:
+    elif right_names & left_names:
         cnt = 0
-        for name in right_names - ignore_right:
+        for name in right_names:
             suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
             while suffixed in left_names:
                 cnt += 1
@@ -1066,6 +1053,10 @@ def join(
             suffix += f"_{cnt}"
     else:
         suffix = ""
+
+    if not isinstance(on, list):
+        on = [on]
+    on = [left[expr] == right[expr] if isinstance(expr, str) else expr for expr in on]
 
     # Lambda column resolution and checks for existence of columns are done manually
     # here since we need to incorporate columns from the right.
@@ -1096,10 +1087,26 @@ def join(
 
         return expr
 
+    on = [pred.map_subtree(_preprocess_on) for pred in on]
+    for pred in on:
+        if types.without_const(pred.dtype()) != Bool():
+            raise TypeError(
+                "predicates in `on` must have boolean type, found "
+                f"`{pred.dtype()}` instead"
+            )
+    on = functools.reduce(operator.and_, on, LiteralCol(True))
+    for fn in on.iter_subtree():
+        if isinstance(fn, ColFn) and fn.op.ftype != Ftype.ELEMENT_WISE:
+            raise FunctionTypeError(
+                f"window function `{fn.op.name}` not allowed in `on`\n"
+                "hint: First add the result of the window function to the table using "
+                "`mutate`."
+            )
+
+    on.ftype(agg_is_window=False)
+
     new = copy.copy(left)
-    new._ast = Join(
-        left._ast, right._ast, on.map_subtree(_preprocess_on), how, validate, suffix
-    )
+    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
 
     return new
 

@@ -146,6 +146,20 @@ class Cache:
             res.limit = 0
             res.group_by = set()
 
+        elif isinstance(node, verbs.SubqueryMarker):
+            res.cols = {
+                uid: Col(
+                    col.name,
+                    node.child,
+                    uid,
+                    types.without_const(col._dtype),
+                    Ftype.ELEMENT_WISE,
+                )
+                for uid, col in self.cols.items()
+            }
+            res.limit = 0
+            res.group_by = set()
+
         assert len(res.name_to_uuid) == len(res.uuid_to_name)
         res.derived_from = res.derived_from | {node}
 
@@ -207,9 +221,24 @@ class Cache:
                 isinstance(node, verbs.Join)
                 and (
                     self.group_by
+                    or (
+                        (
+                            node.how == "full"
+                            or (node.right in self.derived_from and node.how == "left")
+                        )
+                        and any(
+                            types.is_const(self.cols[uid].dtype())
+                            for uid in self.uuid_to_name.keys()
+                        )
+                    )
                     or any(
-                        types.is_const(self.cols[uid].dtype())
+                        self.cols[uid].ftype() == Ftype.WINDOW
                         for uid in self.uuid_to_name.keys()
+                    )
+                    or any(
+                        col.ftype() != Ftype.ELEMENT_WISE and col._uuid in self.cols
+                        for col in node.on.iter_subtree()
+                        if isinstance(col, Col)
                     )
                 )
             )

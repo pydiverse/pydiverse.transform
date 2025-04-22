@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 
 import pydiverse.transform as pdt
+from pydiverse.transform.errors import FunctionTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
@@ -200,14 +201,22 @@ def test_join_window(df3, df4):
         (df3, df4),
         lambda t3, t4: t3
         >> mutate(y=t3.col1.dense_rank())
+        >> alias()
         >> inner_join(t4, on=C.y == t4.col1),
     )
 
     assert_result_equal(
         (df3, df4),
         lambda s, t: s
-        >> mutate(y=s.col1.shift(1, arrange=s.col4))
+        >> mutate(y=s.col1.shift(1, arrange=s.col4.nulls_first()))
+        >> alias()
         >> inner_join(t, on="col2"),
+    )
+
+    assert_result_equal(
+        (df3, df4),
+        lambda t3, t4: t3 >> inner_join(t4, on=t3.col1.dense_rank() == t4.col1),
+        exception=FunctionTypeError,
     )
 
 
