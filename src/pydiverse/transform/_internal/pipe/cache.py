@@ -228,6 +228,10 @@ class Cache:
                         for col in node.iter_col_nodes()
                         if isinstance(col, Col)
                     )
+                    or any(
+                        self.cols[uid].ftype() == Ftype.WINDOW
+                        for uid in self.partition_by
+                    )
                 )
             )
             or (

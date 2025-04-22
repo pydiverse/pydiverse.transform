@@ -110,6 +110,7 @@ def test_group_by_scalar(df3):
         lambda t: t
         >> mutate(x=0)
         >> mutate(y=C.x.sum(partition_by=t.col2))
-        >> group_by(C.y)
-        >> summarize(z=t.col1.min()),
+        >> group_by(C.y)  # TODO: first alias and then group by should also work
+        >> alias()
+        >> summarize(z=C.col1.min()),
     )

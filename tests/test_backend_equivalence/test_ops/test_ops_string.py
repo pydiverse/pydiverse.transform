@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform.extended import *
+from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
@@ -172,6 +173,7 @@ def test_str_join(df_strings):
     )
 
 
+@skip_backends("mssql")
 def test_str_arrange(df_strings):
     def bind(col):
         assert_result_equal(

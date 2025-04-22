@@ -446,13 +446,10 @@ def compile_ast(
                 )
 
         else:
-            if nd.how in ("left", "full"):
+            assert nd.how != "full"
+            if nd.how == "left":
                 df = df.with_columns(
-                    __LEFT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
-                )
-            if nd.how in ("full"):
-                right_df = right_df.with_columns(
-                    __RIGHT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+                    __INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
                 )
 
             joined = df.join_where(
@@ -465,14 +462,8 @@ def compile_ast(
                 if isinstance(left_col, Col) and isinstance(right_col, Col)
             )
 
-            if nd.how in ("left", "full"):
-                joined = df.join(joined, on="__LEFT_INDEX__", how="left").drop(
-                    "__LEFT_INDEX__"
-                )
-            if nd.how in ("full"):
-                joined = joined.join(right_df, on="__RIGHT_INDEX__", how="right").drop(
-                    "__RIGHT_INDEX__"
-                )
+            if nd.how == "left":
+                joined = df.join(joined, on="__INDEX__", how="left").drop("__INDEX__")
 
             df = joined
 

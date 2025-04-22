@@ -7,9 +7,14 @@ import uuid
 from typing import Any, Literal, overload
 
 from pydiverse.transform._internal import errors
-from pydiverse.transform._internal.backend.table_impl import TableImpl, get_backend
+from pydiverse.transform._internal.backend.table_impl import (
+    TableImpl,
+    get_backend,
+    split_join_cond,
+)
 from pydiverse.transform._internal.backend.targets import Polars, Target
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
+from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, modify_ast, verb
 from pydiverse.transform._internal.pipe.table import Table
@@ -1098,6 +1103,10 @@ def join(
                 f"`{pred.dtype()}` instead"
             )
     on = functools.reduce(operator.and_, on, LiteralCol(True))
+
+    if how == "full" and not all(pred.op == ops.equal for pred in split_join_cond(on)):
+        raise ValueError("in a `full` join, only equality predicates can be used")
+
     for fn in on.iter_subtree():
         if isinstance(fn, ColFn) and fn.op.ftype != Ftype.ELEMENT_WISE:
             raise FunctionTypeError(

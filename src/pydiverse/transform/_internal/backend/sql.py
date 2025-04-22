@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
-import itertools
 import math
 import operator
 from collections.abc import Iterable
@@ -342,15 +341,15 @@ class SqlImpl(TableImpl):
 
         if query.where:
             sel = sel.where(
-                cls.compile_col_expr(pred, sqa_expr) for pred in query.where
+                *(cls.compile_col_expr(pred, sqa_expr) for pred in query.where)
             )
 
         if query.group_by:
-            sel = sel.group_by(*(sqa_expr[uid] for uid in query.group_by.values()))
+            sel = sel.group_by(*(sqa_expr[uid] for uid in query.group_by))
 
         if query.having:
             sel = sel.having(
-                cls.compile_col_expr(pred, sqa_expr) for pred in query.having
+                *(cls.compile_col_expr(pred, sqa_expr) for pred in query.having)
             )
 
         if query.limit is not None:
@@ -363,9 +362,7 @@ class SqlImpl(TableImpl):
                 )
             )
 
-        sel = sel.with_only_columns(
-            *(sqa.Label(name, sqa_expr[uid]) for name, uid in query.select.items())
-        )
+        sel = sel.with_only_columns(*(sqa_expr[uid] for uid in query.select))
 
         return sel
 
@@ -387,11 +384,9 @@ class SqlImpl(TableImpl):
             table, query, sqa_expr = cls.compile_ast(nd.child, needed_cols)
 
         if isinstance(nd, verbs.Mutate | verbs.Summarize):
-            query.select = {
-                name: uid
-                for name, uid in query.select.items()
-                if name not in set(nd.names)
-            }
+            query.select = [
+                uid for uid in query.select if sqa_expr[uid].name not in set(nd.names)
+            ]
 
         if isinstance(nd, verbs.SubqueryMarker):
             if needed_cols.keys().isdisjoint(sqa_expr.keys()):
@@ -402,7 +397,8 @@ class SqlImpl(TableImpl):
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
 
-            query.select = dict()
+            original_select = query.select
+            query.select = []
             cnt = dict()
             name_in_subquery = dict()
 
@@ -416,40 +412,42 @@ class SqlImpl(TableImpl):
                     else:
                         name_in_subquery[uid] = name
                         cnt[name] = 1
-                    query.select[name_in_subquery[uid]] = uid
+                    sqa_expr[uid] = sqa.label(name_in_subquery[uid], sqa_expr[uid])
+                    query.select.append(uid)
 
             table = cls.compile_query(table, query, sqa_expr).subquery()
-            sqa_expr.update(
-                {
-                    uid: table.columns.get(name_in_subquery[uid])
-                    for uid in needed_cols.keys()
-                    if uid in sqa_expr
-                }
+            sqa_expr = {
+                uid: sqa.label(
+                    name_in_subquery[uid], table.columns.get(name_in_subquery[uid])
+                )
+                for uid in needed_cols.keys()
+                if uid in sqa_expr
+            }
+
+            query = Query(
+                [uid for uid in original_select if uid in sqa_expr],
+                partition_by=query.partition_by,
             )
 
         elif isinstance(nd, verbs.Select):
-            selected_uuids = set(col._uuid for col in nd.select)
-            query.select = {
-                name: uid for name, uid in query.select.items() if uid in selected_uuids
-            }
+            query.select = [col._uuid for col in nd.select]
 
         elif isinstance(nd, verbs.Rename):
-            query.select, query.partition_by, query.group_by = (
-                {
-                    (nd.name_map[name] if name in nd.name_map else name): val
-                    for name, val in cols.items()
-                }
-                for cols in (query.select, query.partition_by, query.group_by)
-            )
+            sqa_expr = {
+                uid: (
+                    sqa.label(nd.name_map[lb.name], lb)
+                    if lb.name in nd.name_map
+                    else lb
+                )
+                for uid, lb in sqa_expr.items()
+            }
 
         elif isinstance(nd, verbs.Mutate):
             sqa_expr |= {
-                uid: cls.compile_col_expr(val, sqa_expr)
-                for uid, val in zip(nd.uuids, nd.values, strict=True)
+                uid: sqa.label(name, cls.compile_col_expr(val, sqa_expr))
+                for name, uid, val in zip(nd.names, nd.uuids, nd.values, strict=True)
             }
-            query.select |= {
-                name: uid for name, uid in zip(nd.names, nd.uuids, strict=True)
-            }
+            query.select += nd.uuids
 
         elif isinstance(nd, verbs.Filter):
             if query.group_by:
@@ -458,27 +456,20 @@ class SqlImpl(TableImpl):
                 query.where.extend(nd.predicates)
 
         elif isinstance(nd, verbs.Arrange):
-            query.order_by = dedup_order_by(
-                itertools.chain(
-                    (cls.compile_order(ord, sqa_expr) for ord in nd.order_by),
-                    query.order_by,
-                )
-            )
+            query.order_by = nd.order_by + query.order_by
 
         elif isinstance(nd, verbs.Summarize):
             sqa_expr |= {
-                uid: cls.compile_col_expr(val, sqa_expr)
-                for uid, val in zip(nd.uuids, nd.values, strict=True)
+                uid: sqa.label(name, cls.compile_col_expr(val, sqa_expr))
+                for name, uid, val in zip(nd.names, nd.uuids, nd.values, strict=True)
             }
-            query.group_by |= {
-                name: col._uuid
-                for name, col in query.partition_by.items()
+            query.group_by.extend(
+                col._uuid
+                for col in query.partition_by
                 if not types.is_const(col.dtype())
-            }
-            query.select = {
-                name: col._uuid for name, col in query.partition_by.items()
-            } | {name: uid for name, uid in zip(nd.names, nd.uuids, strict=True)}
-            query.partition_by = dict()
+            )
+            query.select = [col._uuid for col in query.partition_by] + nd.uuids
+            query.partition_by = []
             query.order_by.clear()
 
         elif isinstance(nd, verbs.SliceHead):
@@ -490,16 +481,10 @@ class SqlImpl(TableImpl):
                 query.offset += nd.offset
 
         elif isinstance(nd, verbs.GroupBy):
-            uuid_to_col = {col._uuid: col for col in nd.group_by}
-            group_cols = {
-                name: uuid_to_col[uid]
-                for name, uid in query.select.items()
-                if uid in uuid_to_col
-            }
             if nd.add:
-                query.partition_by |= group_cols
+                query.partition_by += nd.group_by
             else:
-                query.partition_by = group_cols
+                query.partition_by = nd.group_by
 
         elif isinstance(nd, verbs.Ungroup):
             assert not (query.partition_by and query.group_by)
@@ -509,7 +494,12 @@ class SqlImpl(TableImpl):
             right_table, right_query, right_sqa_expr = cls.compile_ast(
                 nd.right, needed_cols
             )
-            sqa_expr.update(right_sqa_expr)
+            sqa_expr.update(
+                {
+                    uid: sqa.label(lb.name + nd.suffix, lb)
+                    for uid, lb in right_sqa_expr.items()
+                }
+            )
 
             compiled_on = cls.compile_col_expr(nd.on, sqa_expr)
 
@@ -517,7 +507,14 @@ class SqlImpl(TableImpl):
                 query.where.extend(right_query.where)
             elif nd.how == "left":
                 compiled_on = functools.reduce(
-                    operator.and_, (compiled_on, *right_query.where)
+                    operator.and_,
+                    (
+                        compiled_on,
+                        *(
+                            cls.compile_col_expr(pred, right_sqa_expr)
+                            for pred in right_query.where
+                        ),
+                    ),
                 )
             elif nd.how == "full":
                 assert not (query.where or right_query.where)
@@ -529,19 +526,18 @@ class SqlImpl(TableImpl):
                 full=nd.how == "full",
             )
 
-            query.select |= {
-                name + nd.suffix: col for name, col in right_query.select.items()
-            }
+            query.select += right_query.select
 
             assert not right_query.partition_by
             assert not right_query.group_by
 
         elif isinstance(nd, TableImpl):
             table = nd.table
-            query = Query(select={name: col._uuid for name, col in nd.cols.items()})
+            query = Query(select=[col._uuid for col in nd.cols.values()])
             sqa_expr = {
-                nd.cols[col.name]._uuid: sqa.type_coerce(
-                    col, cls.sqa_type(nd.cols[col.name].dtype())
+                nd.cols[col.name]._uuid: sqa.label(
+                    col.name,
+                    sqa.type_coerce(col, cls.sqa_type(nd.cols[col.name].dtype())),
                 )
                 for col in table.columns
             }
@@ -570,9 +566,9 @@ class SqlImpl(TableImpl):
 
 @dataclasses.dataclass(slots=True)
 class Query:
-    select: dict[str, UUID]
-    partition_by: dict[str, Col] = dataclasses.field(default_factory=dict)
-    group_by: dict[str, UUID] = dataclasses.field(default_factory=dict)
+    select: list[UUID]
+    partition_by: list[Col] = dataclasses.field(default_factory=list)
+    group_by: list[UUID] = dataclasses.field(default_factory=list)
     where: list[ColExpr] = dataclasses.field(default_factory=list)
     having: list[ColExpr] = dataclasses.field(default_factory=list)
     order_by: list[Order] = dataclasses.field(default_factory=list)
