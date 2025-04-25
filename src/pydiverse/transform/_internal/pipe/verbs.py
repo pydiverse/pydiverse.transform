@@ -6,13 +6,15 @@ import operator
 import uuid
 from typing import Any, Literal, overload
 
+import polars as pl
+
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import (
     TableImpl,
     get_backend,
     split_join_cond,
 )
-from pydiverse.transform._internal.backend.targets import Polars, Target
+from pydiverse.transform._internal.backend.targets import Polars, Scalar, Target
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
@@ -286,6 +288,20 @@ def export(
     │ 9   ┆ 0.0    ┆ -22       │
     └─────┴────────┴───────────┘
     """
+
+    if target is Scalar or isinstance(target, Scalar):
+        if len(table) != 1:
+            raise TypeError(
+                "cannot export a table with more than one column to `Scalar`, "
+                f"but found {len(table)} columns"
+            )
+        df: pl.DataFrame = table >> export(Polars())
+        if df.height != 1:
+            raise TypeError(
+                "cannot export a table with more than one row to `Scalar`, "
+                f"but found {df.height} rows"
+            )
+        return df.item()
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns

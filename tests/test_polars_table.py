@@ -652,6 +652,9 @@ class TestPolarsLazyImpl:
         with pytest.raises(ColumnNotFoundError):
             tbl1 >> select() >> collect() >> mutate(x=tbl1.col1)
 
+    def test_scalar_export(self):
+        assert (pdt.Table({"a": 1}) >> export(pdt.Scalar)) == 1
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
