@@ -288,4 +288,5 @@ COMPARABLE = (
     String(),
     Datetime(),
     Date(),
+    Bool(),
 )

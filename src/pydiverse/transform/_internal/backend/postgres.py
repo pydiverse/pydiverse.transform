@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 
-from pydiverse.common import Dtype, String
+from pydiverse.common import Bool, Dtype, Int64, String
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
@@ -29,6 +29,12 @@ class PostgresImpl(SqlImpl):
                     (compiled == "-Infinity", "-inf"),
                     else_=compiled,
                 )
+
+        if (
+            types.without_const(cast.val.dtype()) == Bool()
+            and cast.target_type == Int64()
+        ):
+            return sqa.cast(compiled_val, sqa.Integer)
 
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
@@ -109,10 +115,12 @@ with PostgresImpl.impl_store.impl_manager as impl:
         return sqa.func.LEAST(*(sqa.collate(e, "POSIX") for e in x))
 
     @impl(ops.any)
+    @impl(ops.max, Bool())
     def _any(x):
         return sqa.func.BOOL_OR(x, type_=sqa.Boolean())
 
     @impl(ops.all)
+    @impl(ops.min, Bool())
     def _all(x):
         return sqa.func.BOOL_AND(x, type_=sqa.Boolean())
 

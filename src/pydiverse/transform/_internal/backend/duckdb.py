@@ -8,6 +8,7 @@ import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
+from pydiverse.common import Int64
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
@@ -15,7 +16,6 @@ from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Cast, LiteralCol
-from pydiverse.transform._internal.tree.types import Int64
 
 
 class DuckDbImpl(SqlImpl):

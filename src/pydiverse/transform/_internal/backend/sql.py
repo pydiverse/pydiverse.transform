@@ -12,7 +12,15 @@ from uuid import UUID
 import polars as pl
 import sqlalchemy as sqa
 
-from pydiverse.common import String
+from pydiverse.common import (
+    Dtype,
+    Float,
+    Float64,
+    Int,
+    Int64,
+    NullType,
+    String,
+)
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.backend.targets import Polars, SqlAlchemy, Target
 from pydiverse.transform._internal.ops import ops
@@ -28,14 +36,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColFn,
     LiteralCol,
     Order,
-)
-from pydiverse.transform._internal.tree.types import (
-    Dtype,
-    Float,
-    Float64,
-    Int,
-    Int64,
-    NullType,
 )
 
 

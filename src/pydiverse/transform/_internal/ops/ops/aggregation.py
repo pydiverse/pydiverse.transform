@@ -65,6 +65,7 @@ mean = Aggregation(
 sum = Aggregation(
     "sum",
     *(Signature(dtype, return_type=dtype) for dtype in NUMERIC),
+    Signature(Bool(), return_type=Int()),
     doc="Computes the sum of values in each group.",
 )
 

@@ -35,7 +35,11 @@ from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.ops.markers import Marker
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.types import FLOAT_SUBTYPES, INT_SUBTYPES, Const
+from pydiverse.transform._internal.tree.types import (
+    FLOAT_SUBTYPES,
+    INT_SUBTYPES,
+    Const,
+)
 
 T = TypeVar("T")
 
@@ -311,6 +315,9 @@ class ColExpr(Generic[T]):
     def __add__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
 
     @overload
+    def __add__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Int]: ...
+
+    @overload
     def __add__(
         self: ColExpr[Duration], rhs: ColExpr[Duration]
     ) -> ColExpr[Duration]: ...
@@ -341,6 +348,9 @@ class ColExpr(Generic[T]):
 
     @overload
     def __radd__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
+
+    @overload
+    def __radd__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Int]: ...
 
     @overload
     def __radd__(
@@ -771,6 +781,9 @@ class ColExpr(Generic[T]):
     @overload
     def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
+    @overload
+    def __ge__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
     def __ge__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Greater than or equal to comparison >="""
 
@@ -793,6 +806,9 @@ class ColExpr(Generic[T]):
 
     @overload
     def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __gt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Greater than comparison >"""
@@ -868,6 +884,9 @@ class ColExpr(Generic[T]):
     @overload
     def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
+    @overload
+    def __le__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
     def __le__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Less than or equal to comparison <="""
 
@@ -890,6 +909,9 @@ class ColExpr(Generic[T]):
 
     @overload
     def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __lt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Less than comparison <"""
@@ -948,6 +970,14 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Date]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Bool]: ...
 
     def max(
         self: ColExpr,
@@ -1040,6 +1070,14 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Date]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Bool]: ...
 
     def min(
         self: ColExpr,
@@ -1445,6 +1483,14 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Decimal]: ...
+
+    @overload
+    def sum(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Int]: ...
 
     def sum(
         self: ColExpr,
@@ -2469,6 +2515,7 @@ class Cast(ColExpr):
                         ),
                     )
                 ),
+                *((Bool(), t) for t in itertools.chain(FLOAT_SUBTYPES, INT_SUBTYPES)),
             }
 
             if (
@@ -2553,6 +2600,9 @@ class Order:
 
     def dtype(self) -> Dtype:
         return self.order_by.dtype()
+
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
+        return self.order_by.ftype(agg_is_window=agg_is_window)
 
     def iter_subtree(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_subtree()

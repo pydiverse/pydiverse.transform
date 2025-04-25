@@ -197,6 +197,10 @@ def max(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: 
 def max(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
+@overload
+def max(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+
 def max(arg: ColExpr, *args: ColExpr) -> ColExpr:
     """
     The maximum of the given columns.
@@ -252,6 +256,10 @@ def min(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: 
 
 @overload
 def min(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
+
+
+@overload
+def min(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
 
 def min(arg: ColExpr, *args: ColExpr) -> ColExpr:

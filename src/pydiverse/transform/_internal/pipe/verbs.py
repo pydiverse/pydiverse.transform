@@ -8,6 +8,7 @@ from typing import Any, Literal, overload
 
 import polars as pl
 
+from pydiverse.common import Bool, Int64
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import (
     TableImpl,
@@ -30,7 +31,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     Order,
     wrap_literal,
 )
-from pydiverse.transform._internal.tree.types import Bool
 from pydiverse.transform._internal.tree.verbs import (
     Alias,
     Arrange,
@@ -839,7 +839,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     new._ast = Summarize(
         table._ast,
         names,
-        [preprocess_arg(val, table, update_partition_by=False) for val in values],
+        [preprocess_arg(val, table, agg_is_window=False) for val in values],
         uuids,
     )
 
@@ -1255,9 +1255,7 @@ def show(table: Table) -> Pipeable:
     return table
 
 
-def preprocess_arg(
-    arg: ColExpr, table: Table, *, update_partition_by: bool = True
-) -> Any:
+def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) -> Any:
     arg = wrap_literal(arg)
     assert isinstance(arg, ColExpr | Order)
 
@@ -1268,7 +1266,7 @@ def preprocess_arg(
             )
 
         if (
-            update_partition_by
+            agg_is_window
             and isinstance(expr, ColFn)
             and "partition_by" not in expr.context_kwargs
             and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
@@ -1277,9 +1275,23 @@ def preprocess_arg(
                 table._cache.cols[uid] for uid in table._cache.partition_by
             ]
 
+        # add casts for boolean add / sum
+        # If we have more operations like these, which we want to map to other
+        # operations on the AST, consider streamlining this in some special function
+        if (
+            isinstance(expr, ColFn)
+            and len(expr.args) > 0
+            and types.without_const(expr.args[0].dtype()) == Bool()
+            and expr.op in (ops.add, ops.sum)
+        ):
+            expr.args = [arg.cast(Int64) for arg in expr.args]
+
         if isinstance(expr, ColName):
             return table[expr.name]
 
         return expr
 
-    return arg.map_subtree(_preprocess_expr)
+    res = arg.map_subtree(_preprocess_expr)
+    res.dtype()
+    res.ftype(agg_is_window=agg_is_window)
+    return res
