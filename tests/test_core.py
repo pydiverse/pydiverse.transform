@@ -5,6 +5,7 @@ import pytest
 from polars.testing import assert_series_equal
 
 import pydiverse.transform as pdt
+from pydiverse.transform._internal.errors import ColumnNotFoundError
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, inverse_partial
 from pydiverse.transform.common import *
 
@@ -24,7 +25,7 @@ class TestTable:
         assert tbl1.col1.name == "col1"
         assert tbl1.col2._ast == tbl1._ast
 
-        with pytest.raises(ValueError, match="colXXX"):
+        with pytest.raises(ColumnNotFoundError, match="colXXX"):
             _ = tbl1.colXXX
 
     def test_getitem(self, tbl1):

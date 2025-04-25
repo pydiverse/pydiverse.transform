@@ -2,21 +2,23 @@ from __future__ import annotations
 
 import sqlalchemy as sqa
 
-from pydiverse.transform._internal.backend.sql import SqlImpl
-from pydiverse.transform._internal.errors import NotSupportedError
-from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
-from pydiverse.transform._internal.tree.types import (
+from pydiverse.common import (
     Date,
     Datetime,
     Decimal,
-    Float,
     String,
 )
+from pydiverse.transform._internal.backend.sql import SqlImpl
+from pydiverse.transform._internal.errors import NotSupportedError
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.tree import types
+from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
 from pydiverse.transform._internal.util.warnings import warn_non_standard
 
 
 class SqliteImpl(SqlImpl):
+    backend_name = "sqlite"
+
     @classmethod
     def inf(cls):
         return sqa.type_coerce(sqa.literal("1e314"), sqa.Double)
@@ -26,10 +28,15 @@ class SqliteImpl(SqlImpl):
         raise NotSupportedError("SQLite does not have `nan`, use `null` instead.")
 
     @classmethod
+    def default_collation(cls):
+        return "BINARY"
+
+    @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> sqa.Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
+        val_type = types.without_const(cast.val.dtype())
 
-        if cast.val.dtype() <= String() and cast.target_type <= Float():
+        if val_type == String() and cast.target_type.is_float():
             return sqa.case(
                 (compiled_val == "inf", cls.inf()),
                 (compiled_val == "-inf", -cls.inf()),
@@ -39,12 +46,12 @@ class SqliteImpl(SqlImpl):
                 ),
             )
 
-        elif cast.val.dtype() <= Datetime() and cast.target_type == Date():
+        elif val_type == Datetime() and cast.target_type == Date():
             return sqa.type_coerce(sqa.func.date(compiled_val), sqa.Date())
-        elif cast.val.dtype() <= Date() and cast.target_type == Datetime():
+        elif val_type == Date() and cast.target_type == Datetime():
             return sqa.type_coerce(sqa.func.datetime(compiled_val), sqa.DateTime())
 
-        elif cast.val.dtype() <= Float() and cast.target_type == String():
+        elif val_type.is_float() and cast.target_type == String():
             return sqa.case(
                 (compiled_val == cls.inf(), "inf"),
                 (compiled_val == -cls.inf(), "-inf"),
@@ -54,16 +61,37 @@ class SqliteImpl(SqlImpl):
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
     @classmethod
-    def past_over_clause(
+    def fix_fn_types(
         cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
     ) -> sqa.ColumnElement:
         if (
             fn.op
             in (ops.horizontal_min, ops.horizontal_max, ops.mean, ops.min, ops.max)
-            and fn.dtype() <= Float()
+            and fn.dtype().is_float()
         ):
             return sqa.cast(val, sqa.Double)
         return val
+
+    @classmethod
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
+    ):
+        from sqlalchemy.dialects import postgresql
+        from sqlalchemy.dialects.postgresql import aggregate_order_by
+
+        # TODO: this is hacky but there is currently no other way except writing raw
+        # SQL.
+        return impl(
+            *args[:-1],
+            sqa.text(
+                str(
+                    aggregate_order_by(args[-1], *order_by).compile(
+                        dialect=postgresql.psycopg2.PGDialect_psycopg2(),
+                        compile_kwargs={"literal_binds": True},
+                    )
+                )
+            ),
+        )
 
 
 with SqliteImpl.impl_store.impl_manager as impl:

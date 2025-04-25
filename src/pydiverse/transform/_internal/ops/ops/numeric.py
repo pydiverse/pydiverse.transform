@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import NUMERIC, Bool, Decimal, Float, Int
+from pydiverse.transform._internal.tree.types import (
+    NUMERIC,
+    Bool,
+    Const,
+    Decimal,
+    Float,
+    Int,
+)
 
 pow = Operator(
     "__pow__",
@@ -39,7 +46,7 @@ abs = Operator(
 
 round = Operator(
     "round",
-    *(Signature(t, Int(const=True), return_type=t) for t in NUMERIC),
+    *(Signature(t, Const(Int()), return_type=t) for t in NUMERIC),
     param_names=["self", "decimals"],
     default_values=[..., 0],
     doc="""

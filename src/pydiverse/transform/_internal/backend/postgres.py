@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import sqlalchemy as sqa
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 
+from pydiverse.common import Bool, Dtype, Int64, String
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import Cast, ColFn
-from pydiverse.transform._internal.tree.types import Float, Int, String
 
 
 class PostgresImpl(SqlImpl):
+    backend_name = "postgres"
+
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         compiled_val = cls.compile_col_expr(cast.val, sqa_col)
 
-        if cast.val.dtype() <= Float():
-            if cast.target_type <= Int():
+        if types.without_const(cast.val.dtype()).is_float():
+            if cast.target_type.is_int():
                 return sqa.func.trunc(compiled_val).cast(sqa.BigInteger())
 
             if cast.target_type == String():
@@ -26,10 +30,23 @@ class PostgresImpl(SqlImpl):
                     else_=compiled,
                 )
 
+        if (
+            types.without_const(cast.val.dtype()) == Bool()
+            and cast.target_type == Int64()
+        ):
+            return sqa.cast(compiled_val, sqa.Integer)
+
         return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
 
     @classmethod
-    def past_over_clause(
+    def sqa_type(cls, pdt_type: Dtype):
+        if isinstance(pdt_type, types.List):
+            return sqa.types.ARRAY(item_type=cls.sqa_type())
+
+        return super().sqa_type(pdt_type)
+
+    @classmethod
+    def fix_fn_types(
         cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
     ) -> sqa.ColumnElement:
         if isinstance(fn.op, ops.DatetimeExtract | ops.DateExtract):
@@ -38,6 +55,12 @@ class PostgresImpl(SqlImpl):
             # postgres sometimes switches types for `sum`
             return sqa.cast(val, args[0].type)
         return val
+
+    @classmethod
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
+    ) -> sqa.ColumnElement:
+        return impl(*args[:-1], aggregate_order_by(args[-1], *order_by))
 
 
 with PostgresImpl.impl_store.impl_manager as impl:
@@ -92,10 +115,12 @@ with PostgresImpl.impl_store.impl_manager as impl:
         return sqa.func.LEAST(*(sqa.collate(e, "POSIX") for e in x))
 
     @impl(ops.any)
+    @impl(ops.max, Bool())
     def _any(x):
         return sqa.func.BOOL_OR(x, type_=sqa.Boolean())
 
     @impl(ops.all)
+    @impl(ops.min, Bool())
     def _all(x):
         return sqa.func.BOOL_AND(x, type_=sqa.Boolean())
 
@@ -106,3 +131,11 @@ with PostgresImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return x != PostgresImpl.nan()
+
+    @impl(ops.dur_days)
+    def _dur_days(x):
+        sqa.func.extract("DAYS", x)
+
+    @impl(ops.list_agg)
+    def _list_agg(x):
+        return sqa.func.array_agg(x)

@@ -6,6 +6,7 @@ from pydiverse.transform._internal.pipe.verbs import (
     mutate,
     select,
 )
+from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
@@ -33,10 +34,16 @@ def test_reorder(df2):
 
 def test_literals(df1):
     assert_result_equal(df1, lambda t: t >> mutate(x=1))
-    assert_result_equal(df1, lambda t: t >> mutate(x=1.1))
     assert_result_equal(df1, lambda t: t >> mutate(x=True))
     assert_result_equal(df1, lambda t: t >> mutate(x="test"))
     assert_result_equal(df1, lambda t: t >> mutate(u=pdt.lit(None)))
+
+
+# probably something wrong with pl.read_database (it goes via pandas). Maybe this
+# works once polars has a native solution.
+@skip_backends("mssql")
+def test_float_lit(df1):
+    assert_result_equal(df1, lambda t: t >> mutate(x=1.1))
 
 
 def test_empty(df1):

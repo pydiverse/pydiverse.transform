@@ -7,6 +7,11 @@ from uuid import UUID
 
 import polars as pl
 
+from pydiverse.common import (
+    Dtype,
+    Int,
+    String,
+)
 from pydiverse.transform._internal.backend.table_impl import TableImpl, split_join_cond
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
@@ -22,32 +27,11 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import (
-    Bool,
-    Date,
-    Datetime,
-    Decimal,
-    Dtype,
-    Duration,
-    Float,
-    Float32,
-    Float64,
-    Int,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    List,
-    NullType,
-    String,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-)
 
 
 class PolarsImpl(TableImpl):
+    backend_name = "polars"
+
     def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
         self.df = self.df.cast(
@@ -58,22 +42,26 @@ class PolarsImpl(TableImpl):
         )
         super().__init__(
             name,
-            {name: pdt_type(dtype) for name, dtype in df.collect_schema().items()},
+            {
+                name: Dtype.from_polars(pl_type)
+                for name, pl_type in df.collect_schema().items()
+            },
         )
 
     @staticmethod
-    def build_query(nd: AstNode, final_select: list[Col]) -> None:
+    def build_query(nd: AstNode) -> None:
         return None
 
     @staticmethod
     def export(
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
-        schema_overrides: dict,
+        *,
+        schema_overrides: dict[UUID, Any],  # TODO: use this
     ) -> Any:
-        lf, _, select, _ = compile_ast(nd)
-        lf = lf.select(*select)
+        lf, name_in_df, select, _ = compile_ast(nd)
+        lf = lf.select(*(name_in_df[uid] for uid in select))
+
         if isinstance(target, Polars):
             if not target.lazy and isinstance(lf, pl.LazyFrame):
                 lf = lf.collect()
@@ -165,7 +153,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
 
-        value: pl.Expr = impl(*args, _pdt_args=expr.args)
+        value: pl.Expr = impl(*args, _partition_by=partition_by)
 
         # TODO: currently, count and list_agg are the only aggregation function where we
         # don't want to return null for cols containing only null values. If this
@@ -179,7 +167,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             # default value (e.g. 0, False) for empty columns, but we want to put
             # Null in this case to let the user decide about the default value via
             # `fill_null` if he likes to set one.
-            assert all(arg.dtype().const for arg in expr.args[1:])
+            assert all(types.is_const(arg.dtype()) for arg in expr.args[1:])
             value = pl.when(args[0].count() == 0).then(None).otherwise(value)
 
         if partition_by:
@@ -193,7 +181,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
                 order_by = None
             value = value.over(partition_by, order_by=order_by)
 
-        elif arrange:
+        elif arrange and expr.op.ftype == Ftype.WINDOW:
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
@@ -219,18 +207,26 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         return compiled
 
     elif isinstance(expr, LiteralCol):
-        return pl.lit(expr.val, dtype=polars_type(expr.dtype()))
+        return pl.lit(
+            expr.val,
+            # only give the type explicitly if we can still be sure about it
+            # in nested lists with ints / floats mixed we do not give guarantees
+            dtype=expr.dtype().to_polars() if types.is_subtype(expr.dtype()) else None,
+        )
 
     elif isinstance(expr, Cast):
         if (
-            expr.target_type <= Int() or expr.target_type <= Float()
-        ) and expr.val.dtype() <= String():
+            expr.target_type.is_int() or expr.target_type.is_float()
+        ) and types.without_const(expr.val.dtype()) == String():
             expr.val = expr.val.str.strip()
         compiled = compile_col_expr(expr.val, name_in_df).cast(
-            polars_type(expr.target_type)
+            expr.target_type.to_polars()
         )
 
-        if expr.val.dtype() <= Float() and expr.target_type == String():
+        if (
+            types.without_const(expr.val.dtype()).is_float()
+            and expr.target_type == String()
+        ):
             compiled = compiled.replace("NaN", "nan")
 
         return compiled
@@ -244,7 +240,7 @@ def rename_overwritten_cols(
     df: pl.LazyFrame,
     name_in_df: dict[UUID, str],
     *,
-    names_to_consider: set[str] | None = None,
+    names_to_consider: set[UUID] | None = None,
 ) -> tuple[pl.LazyFrame, dict[UUID, str]]:
     if names_to_consider is None:
         names_to_consider = set(name_in_df.values())
@@ -265,13 +261,21 @@ def rename_overwritten_cols(
 
 def compile_ast(
     nd: AstNode,
-) -> tuple[pl.LazyFrame, dict[UUID, str], list[str], list[UUID]]:
+) -> tuple[pl.LazyFrame, dict[UUID, str], list[UUID], list[UUID]]:
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
     if isinstance(nd, verbs.Mutate | verbs.Summarize):
+        nd_names_set = set(nd.names)
+        # we need to do this before name_in_df is changed
+        select = [
+            uid
+            for uid in (select if isinstance(nd, verbs.Mutate) else partition_by)
+            if name_in_df[uid] not in nd_names_set
+        ] + nd.uuids
+
         names_to_consider = (
-            set(partition_by)
+            set(name_in_df[uid] for uid in partition_by)
             if isinstance(nd, verbs.Summarize)
             else set(name_in_df.values())
         )
@@ -283,7 +287,7 @@ def compile_ast(
         )
 
     if isinstance(nd, verbs.Select):
-        select = [name_in_df[col._uuid] for col in nd.select]
+        select = [col._uuid for col in nd.select]
 
     elif isinstance(nd, verbs.Rename):
         df = df.rename(nd.name_map)
@@ -291,10 +295,6 @@ def compile_ast(
             uid: (nd.name_map[name] if name in nd.name_map else name)
             for uid, name in name_in_df.items()
         }
-        select = [
-            nd.name_map[col_name] if col_name in nd.name_map else col_name
-            for col_name in select
-        ]
 
     elif isinstance(nd, verbs.Mutate):
         df = df.with_columns(
@@ -307,10 +307,10 @@ def compile_ast(
         name_in_df.update(
             {uid: name for uid, name in zip(nd.uuids, nd.names, strict=True)}
         )
-        select = [name for name in select if name not in nd.names] + nd.names
 
     elif isinstance(nd, verbs.Filter):
-        df = df.filter([compile_col_expr(fil, name_in_df) for fil in nd.predicates])
+        if nd.predicates:
+            df = df.filter(compile_col_expr(fil, name_in_df) for fil in nd.predicates)
 
     elif isinstance(nd, verbs.Arrange):
         order_by, descending, nulls_last = zip(
@@ -342,22 +342,21 @@ def compile_ast(
                 compiled = compiled.first()
             aggregations[name] = compiled
 
-        if partition_by:
-            df = df.group_by(*(name_in_df[uid] for uid in partition_by)).agg(
-                **aggregations
-            )
-        else:
-            df = df.select(**aggregations)
+        group_by = [name_in_df[uid] for uid in partition_by]
+        # polars complains about an empty group_by, so we insert a dummy constant
+        # (which will get deselected later)
+        df = df.group_by(*(group_by or [pl.lit(0).alias(str(uuid.uuid1()))])).agg(
+            **aggregations
+        )
 
-        # remove columns dropped by summarize after they might have been used in
-        # expressions
+        # we have to remove the columns here for the join hidden column rename to work
+        # correctly (otherwise it would try to rename hidden columns that do not exist)
         name_in_df = {
             name: uuid for name, uuid in name_in_df.items() if name in partition_by
         }
         name_in_df.update(
             {uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)}
         )
-        select = [*(name_in_df[uid] for uid in partition_by), *nd.names]
         partition_by = []
 
     elif isinstance(nd, verbs.SliceHead):
@@ -384,39 +383,24 @@ def compile_ast(
         # to bother the user to provide a suffix only to prevent name collisions of
         # hidden columns)
 
-        coalesce_join_cols = set()
-        if nd.coalesce:
-            assert all(
-                type(pred.args[0]) is Col and type(pred.args[1]) is Col
-                for pred in predicates
-            )
-            coalesce_join_cols = {name_in_df[pred.args[0]._uuid] for pred in predicates}
-
-        suffix_name_map = {
-            name: (name + nd.suffix if name not in coalesce_join_cols else name)
-            for name in right_name_in_df.values()
-        }
-        right_select = [suffix_name_map[name] for name in right_select]
         right_name_in_df = {
-            uid: suffix_name_map[name] for uid, name in right_name_in_df.items()
+            uid: name + nd.suffix for uid, name in right_name_in_df.items()
         }
         right_df = right_df.rename(
-            {name: suffix_name_map[name] for name in right_df.collect_schema().names()}
+            {name: name + nd.suffix for name in right_df.collect_schema().names()}
         )
 
         # visible columns
         right_df, right_name_in_df = rename_overwritten_cols(
-            set(select).difference(coalesce_join_cols),
-            right_df,
-            right_name_in_df,
+            set(name_in_df[uid] for uid in select), right_df, right_name_in_df
         )
         df, name_in_df = rename_overwritten_cols(
-            set(right_select).difference(coalesce_join_cols), df, name_in_df
+            set(right_name_in_df[uid] for uid in right_select), df, name_in_df
         )
 
         # hidden columns
         right_df, right_name_in_df = rename_overwritten_cols(
-            set(name_in_df.values()).difference(coalesce_join_cols),
+            set(name_in_df.values()),
             right_df,
             right_name_in_df,
         )
@@ -424,159 +408,74 @@ def compile_ast(
         assert not set(right_name_in_df.keys()) & set(name_in_df.keys())
         name_in_df.update(right_name_in_df)
 
-        # Do equality predicates separately because polars coalesces on them.
         eq_predicates = [pred for pred in predicates if pred.op == ops.equal]
-        other_predicates = [pred for pred in predicates if pred.op != ops.equal]
+        left_on = []
+        right_on = []
+        for pred in eq_predicates:
+            left_on.append(pred.args[0])
+            right_on.append(pred.args[1])
 
-        if eq_predicates:
-            left_on = []
-            right_on = []
-            for pred in eq_predicates:
-                left_on.append(pred.args[0])
-                right_on.append(pred.args[1])
+            must_swap_cols = None
+            for e in pred.args[0].iter_subtree():
+                if isinstance(e, Col):
+                    must_swap_cols = e._uuid in right_name_in_df
+                    assert e._uuid in name_in_df
+                    break
+            # TODO: find a good place to throw an error if one side of an equality
+            # predicate is constant. or do not consider such predicates as equality
+            # predicates and put them in join_where
+            assert must_swap_cols is not None
 
-                left_is_left = None
-                for e in pred.args[0].iter_subtree():
-                    if isinstance(e, Col):
-                        left_is_left = e._uuid not in right_name_in_df
-                        assert e._uuid in name_in_df
-                        break
-                assert left_is_left is not None
+            if must_swap_cols:
+                left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
 
-                if not left_is_left:
-                    left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
+        # If there are only equality predicates, use normal join. Else use join_where
+        if len(eq_predicates) == len(predicates):
+            if len(predicates) == 0:
+                # cross join, polars does not like an empty join condition
+                df = df.join(right_df, how="cross")
 
-            df = df.join(
-                right_df,
-                left_on=[compile_col_expr(col, name_in_df) for col in left_on],
-                right_on=[compile_col_expr(col, name_in_df) for col in right_on],
-                how=nd.how,
-                validate=nd.validate,
-                coalesce=nd.coalesce,
-            )
-        else:
-            if nd.how in ("left", "full"):
-                df = df.with_columns(
-                    __LEFT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+            else:
+                df = df.join(
+                    right_df,
+                    left_on=[compile_col_expr(col, name_in_df) for col in left_on],
+                    right_on=[compile_col_expr(col, name_in_df) for col in right_on],
+                    how=nd.how,
+                    validate=nd.validate,
+                    coalesce=False,
                 )
-            if nd.how in ("full"):
-                right_df = right_df.with_columns(
-                    __RIGHT_INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
+
+        else:
+            assert nd.how != "full"
+            if nd.how == "left":
+                df = df.with_columns(
+                    __INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
                 )
 
             joined = df.join_where(
                 right_df,
-                *(compile_col_expr(pred, name_in_df) for pred in other_predicates),
+                *(compile_col_expr(pred, name_in_df) for pred in predicates),
+            ).with_columns(
+                # polars deletes the right column in equality predicates...
+                pl.col(name_in_df[left_col._uuid]).alias(name_in_df[right_col._uuid])
+                for left_col, right_col in zip(left_on, right_on, strict=True)
+                if isinstance(left_col, Col) and isinstance(right_col, Col)
             )
 
-            if nd.how in ("left", "full"):
-                joined = df.join(joined, on="__LEFT_INDEX__", how="left").drop(
-                    "__LEFT_INDEX__"
-                )
-            if nd.how in ("full"):
-                joined = joined.join(right_df, on="__RIGHT_INDEX__", how="right").drop(
-                    "__RIGHT_INDEX__"
-                )
+            if nd.how == "left":
+                joined = df.join(joined, on="__INDEX__", how="left").drop("__INDEX__")
 
             df = joined
 
-        select += [name for name in right_select if name not in coalesce_join_cols]
+        select += right_select
 
     elif isinstance(nd, PolarsImpl):
-        df = nd.df.collect()
+        df = nd.df
         name_in_df = {col._uuid: col.name for col in nd.cols.values()}
-        select = list(nd.cols.keys())
+        select = list(name_in_df.keys())
         partition_by = []
 
     return df, name_in_df, select, partition_by
-
-
-def pdt_type(pl_type: pl.DataType) -> Dtype:
-    if pl_type == pl.Float64():
-        return Float64()
-    elif pl_type == pl.Float32():
-        return Float32()
-
-    elif pl_type == pl.Int64():
-        return Int64()
-    elif pl_type == pl.Int32():
-        return Int32()
-    elif pl_type == pl.Int16():
-        return Int16()
-    elif pl_type == pl.Int8():
-        return Int8()
-
-    elif pl_type == pl.UInt64():
-        return Uint64()
-    elif pl_type == pl.UInt32():
-        return Uint32()
-    elif pl_type == pl.UInt16():
-        return Uint16()
-    elif pl_type == pl.UInt8():
-        return Uint8()
-
-    elif pl_type.is_decimal():
-        return Decimal()
-    elif isinstance(pl_type, pl.Boolean):
-        return Bool()
-    elif isinstance(pl_type, pl.String):
-        return String()
-    elif isinstance(pl_type, pl.Datetime):
-        return Datetime()
-    elif isinstance(pl_type, pl.Date):
-        return Date()
-    elif isinstance(pl_type, pl.Duration):
-        return Duration()
-    elif isinstance(pl_type, pl.List):
-        return List()
-    elif isinstance(pl_type, pl.Null):
-        return NullType()
-
-    raise TypeError(f"polars type {pl_type} is not supported by pydiverse.transform")
-
-
-def polars_type(pdt_type: Dtype) -> pl.DataType:
-    assert types.is_subtype(pdt_type)
-
-    if pdt_type <= Float64():
-        return pl.Float64()
-    elif pdt_type <= Float32():
-        return pl.Float32()
-
-    elif pdt_type <= Int64():
-        return pl.Int64()
-    elif pdt_type <= Int32():
-        return pl.Int32()
-    elif pdt_type <= Int16():
-        return pl.Int16()
-    elif pdt_type <= Int8():
-        return pl.Int8()
-
-    elif pdt_type <= Uint64():
-        return pl.UInt64()
-    elif pdt_type <= Uint32():
-        return pl.UInt32()
-    elif pdt_type <= Uint16():
-        return pl.UInt16()
-    elif pdt_type <= Uint8():
-        return pl.UInt8()
-
-    elif pdt_type <= Bool():
-        return pl.Boolean()
-    elif pdt_type <= String():
-        return pl.String()
-    elif pdt_type <= Datetime():
-        return pl.Datetime()
-    elif pdt_type <= Date():
-        return pl.Date()
-    elif pdt_type <= Duration():
-        return pl.Duration()
-    elif pdt_type <= List():
-        return pl.List
-    elif pdt_type <= NullType():
-        return pl.Null()
-
-    raise AssertionError
 
 
 with PolarsImpl.impl_store.impl_manager as impl:

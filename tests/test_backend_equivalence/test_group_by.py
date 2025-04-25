@@ -98,3 +98,19 @@ def test_group_by_bool_col(df4):
         >> group_by(C.x)
         >> mutate(y=C.col4.mean()),
     )
+
+
+def test_group_by_scalar(df3):
+    assert_result_equal(
+        df3, lambda t: t >> mutate(x=0) >> group_by(C.x) >> summarize(y=t.col1.sum())
+    )
+
+    assert_result_equal(
+        df3,
+        lambda t: t
+        >> mutate(x=0)
+        >> mutate(y=C.x.sum(partition_by=t.col2))
+        >> group_by(C.y)  # TODO: first alias and then group by should also work
+        >> alias()
+        >> summarize(z=C.col1.min()),
+    )

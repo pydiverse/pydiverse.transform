@@ -25,7 +25,13 @@ class Verb(AstNode):
 
         cloned.map_col_nodes(
             lambda col: Col(
-                col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+                col.name,
+                # If the current ast is not in nd_map (happens after collect with
+                # keep_col_refs=True), the node wasn't really present anyway.
+                nd_map.get(col._ast, col._ast),
+                uuid_map[col._uuid],
+                col._dtype,
+                col._ftype,
             )
             if isinstance(col, Col)
             else copy.copy(col)
@@ -57,7 +63,20 @@ class Verb(AstNode):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Alias(Verb): ...
+class Alias(Verb):
+    uuid_map: dict[UUID, UUID] | None
+
+    def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
+        cloned, nd_map, uuid_map = Verb._clone(self)
+        if self.uuid_map is not None:  # happens if and only if keep_col_refs=False
+            assert set(self.uuid_map.keys()).issubset(uuid_map.keys())
+            uuid_map = {
+                self.uuid_map[old_uid]: new_uid
+                for old_uid, new_uid in uuid_map.items()
+                if old_uid in self.uuid_map
+            }
+            cloned.uuid_map = None
+        return cloned, nd_map, uuid_map
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -180,7 +199,6 @@ class Join(Verb):
     how: Literal["inner", "left", "full"]
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
     suffix: str
-    coalesce: bool
 
     def _clone(self) -> tuple[Join, dict[AstNode, AstNode], dict[UUID, UUID]]:
         child, nd_map, uuid_map = self.child._clone()
@@ -193,7 +211,11 @@ class Join(Verb):
         cloned.right = right_child
         cloned.on = self.on.map_subtree(
             lambda col: Col(
-                col.name, nd_map[col._ast], uuid_map[col._uuid], col._dtype, col._ftype
+                col.name,
+                nd_map.get(col._ast, col._ast),
+                uuid_map[col._uuid],
+                col._dtype,
+                col._ftype,
             )
             if isinstance(col, Col)
             else copy.copy(col)
@@ -218,3 +240,6 @@ class Join(Verb):
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.on = g(self.on)
+
+
+class SubqueryMarker(Verb): ...

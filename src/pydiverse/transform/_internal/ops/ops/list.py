@@ -3,11 +3,11 @@ from __future__ import annotations
 from pydiverse.transform._internal.ops.op import ContextKwarg
 from pydiverse.transform._internal.ops.ops.aggregation import Aggregation
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import D, List
+from pydiverse.transform._internal.tree.types import List, S
 
 list_agg = Aggregation(
     "list.agg",
-    Signature(D, return_type=List()),
+    Signature(S, return_type=List(S)),
     context_kwargs=[
         ContextKwarg("partition_by"),
         ContextKwarg("arrange"),

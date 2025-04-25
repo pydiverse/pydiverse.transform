@@ -4,6 +4,7 @@ from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import (
     NUMERIC,
+    Bool,
     Date,
     Datetime,
     Decimal,
@@ -17,6 +18,7 @@ add = Operator(
     "__add__",
     *(Signature(dtype, dtype, return_type=dtype) for dtype in NUMERIC),
     Signature(String(), String(), return_type=String()),
+    Signature(Bool(), Bool(), return_type=Int()),
     Signature(Duration(), Duration(), return_type=Duration()),
     Signature(Datetime(), Duration(), return_type=Datetime()),
     Signature(Duration(), Datetime(), return_type=Datetime()),

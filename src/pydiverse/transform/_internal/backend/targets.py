@@ -25,3 +25,6 @@ class SqlAlchemy(Target):
     def __init__(self, engine: sqa.Engine, *, schema: str | None = None):
         self.engine = engine
         self.schema = schema
+
+
+class Scalar(Target): ...

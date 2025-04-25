@@ -6,13 +6,22 @@ import operator
 import uuid
 from typing import Any, Literal, overload
 
+import polars as pl
+
+from pydiverse.common import Bool, Int64
 from pydiverse.transform._internal import errors
-from pydiverse.transform._internal.backend.table_impl import TableImpl, get_backend
-from pydiverse.transform._internal.backend.targets import Polars, Target
-from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.backend.table_impl import (
+    TableImpl,
+    get_backend,
+    split_join_cond,
+)
+from pydiverse.transform._internal.backend.targets import Polars, Scalar, Target
+from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
+from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
-from pydiverse.transform._internal.pipe.pipeable import Pipeable, verb
+from pydiverse.transform._internal.pipe.pipeable import Pipeable, modify_ast, verb
 from pydiverse.transform._internal.pipe.table import Table
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
@@ -22,7 +31,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     Order,
     wrap_literal,
 )
-from pydiverse.transform._internal.tree.types import Bool
 from pydiverse.transform._internal.tree.verbs import (
     Alias,
     Arrange,
@@ -61,22 +69,27 @@ __all__ = [
 
 
 @overload
-def alias(new_name: str | None = None) -> Pipeable: ...
+def alias(new_name: str | None = None, *, keep_col_refs: bool = False) -> Pipeable: ...
 
 
 @verb
-def alias(table: Table, new_name: str | None = None) -> Pipeable:
+@modify_ast
+def alias(
+    table: Table, new_name: str | None = None, *, keep_col_refs: bool = False
+) -> Pipeable:
     """
-    Changes the name of the current table and resets column references.
-
-    That column references are reset means that the resulting table is not
-    considered to be derived from the input table, i.e. one cannot use columns
-    from the input table in subsequent operations on the result table. However,
-    the reset of column references is necessary before performing a self-join.
+    Changes the name of the current table and allows subqueries in SQL.
 
     :param new_name:
         The new name assigned to the table. If this is ``None``, the table
         retains its previous name.
+
+    :param keep_col_refs:
+        Whether column references are reset. If ``keep_col_refs=False``, the resulting
+        table is not considered to be derived from the input table, i.e. one cannot use
+        columns from the input table in subsequent operations on the result table.
+        However, the reset of column references is necessary before performing a
+        self-join.
 
     Examples
     --------
@@ -115,43 +128,32 @@ def alias(table: Table, new_name: str | None = None) -> Pipeable:
 
     if new_name is None:
         new_name = table._ast.name
+
     new = copy.copy(table)
-    new._ast, nd_map, uuid_map = table._ast._clone()
+    new._ast = Alias(
+        new._ast,
+        uuid_map={uid: uuid.uuid1() for uid in table._cache.cols.keys()}
+        if not keep_col_refs
+        else None,
+    )
     new._ast.name = new_name
-    new._ast = Alias(new._ast)
-    new._cache = copy.copy(table._cache)
-
-    new._cache.all_cols = {
-        uuid_map[uid]: Col(
-            col.name, nd_map[col._ast], uuid_map[uid], col._dtype, col._ftype
-        )
-        for uid, col in table._cache.all_cols.items()
-    }
-    new._cache.partition_by = [
-        new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.partition_by
-    ]
-
-    new._cache.select = [
-        new._cache.all_cols[uuid_map[col._uuid]] for col in table._cache.select
-    ]
-    new._cache.name_to_uuid = {
-        name: uuid_map[uid] for name, uid in table._cache.name_to_uuid.items()
-    }
-    new._cache.uuid_to_name = {
-        uuid_map[uid]: name for uid, name in table._cache.uuid_to_name.items()
-    }
-
-    new._cache.derived_from = set(new._ast.iter_subtree_postorder())
 
     return new
 
 
 @overload
-def collect(target: Target | None = None) -> Pipeable: ...
+def collect(
+    target: Target | None = None, *, keep_col_refs: bool = True
+) -> Pipeable: ...
 
 
 @verb
-def collect(table: Table, target: Target | None = None) -> Pipeable:
+def collect(
+    table: Table,
+    target: Target | None = None,
+    *,
+    keep_col_refs: bool = True,
+) -> Pipeable:
     """
     Execute all accumulated operations and write the result to a new Table.
 
@@ -194,34 +196,46 @@ def collect(table: Table, target: Target | None = None) -> Pipeable:
     """
     errors.check_arg_type(Target | None, "collect", "target", target)
 
-    df = table >> select(*table._cache.all_cols.values()) >> export(Polars(lazy=False))
+    df = table >> export(Polars(lazy=False))
     if target is None:
         target = Polars()
+
+    if not keep_col_refs:
+        return Table(df)
+
+    # TODO: keep_hidden_cols option
+
+    assert len(table) == len(table._cache.name_to_uuid)
 
     new = Table(
         TableImpl.from_resource(
             df,
             target,
             name=table._ast.name,
-            # preserve UUIDs and by this column references across collect()
+            # preserve UUIDs -> this keeps column references across collect()
             uuids={name: uid for name, uid in table._cache.name_to_uuid.items()},
         )
     )
     new._cache.derived_from = table._cache.derived_from | {new._ast}
-    new._cache.select = [preprocess_arg(col, new) for col in table._cache.select]
     new._cache.partition_by = [
         preprocess_arg(col, new) for col in table._cache.partition_by
     ]
+
     return new
 
 
 @overload
-def export(target: Target, *, schema_overrides: dict | None = None) -> Pipeable: ...
+def export(
+    target: Target, *, schema_overrides: dict[str, Any] | None = None
+) -> Pipeable: ...
 
 
 @verb
 def export(
-    data: Table, target: Target, *, schema_overrides: dict[Col, Any] | None = None
+    table: Table,
+    target: Target,
+    *,
+    schema_overrides: dict[str, Any] | None = None,
 ) -> Pipeable:
     """Convert a pydiverse.transform Table to a data frame.
 
@@ -233,8 +247,8 @@ def export(
         the LazyFrame.
 
     :param schema_overrides:
-        A dictionary of columns to backend-specific data types. This controls which data
-        types are used when writing to the backend. Because the data types are not
+        A dictionary of column names to backend-specific data types. This controls which
+        data types are used when writing to the backend. Because the data types are not
         constrained by pydiverse.transform's type system, this may sometimes be
         preferred over a cast.
 
@@ -275,13 +289,32 @@ def export(
     └─────┴────────┴───────────┘
     """
 
+    if target is Scalar or isinstance(target, Scalar):
+        if len(table) != 1:
+            raise TypeError(
+                "cannot export a table with more than one column to `Scalar`, "
+                f"but found {len(table)} columns"
+            )
+        df: pl.DataFrame = table >> export(Polars())
+        if df.height != 1:
+            raise TypeError(
+                "cannot export a table with more than one row to `Scalar`, "
+                f"but found {df.height} rows"
+            )
+        return df.item()
+
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
-    SourceBackend: type[TableImpl] = get_backend(data._ast)
-    data = data >> alias()
+    SourceBackend: type[TableImpl] = get_backend(table._ast)
     if schema_overrides is None:
-        schema_overrides = {}
-    return SourceBackend.export(data._ast, target, data._cache.select, schema_overrides)
+        schema_overrides = dict()
+    return SourceBackend.export(
+        table._ast.clone(),
+        target,
+        schema_overrides={
+            table[col_name]._uuid: dtype for col_name, dtype in schema_overrides.items()
+        },
+    )
 
 
 @overload
@@ -297,9 +330,7 @@ def build_query(table: Table) -> Pipeable:
         The SQL query as a string.
     """
 
-    table = table >> alias()
-    SourceBackend: type[TableImpl] = get_backend(table._ast)
-    return SourceBackend.build_query(table._ast, table._cache.select)
+    return get_backend(table._ast).build_query(table._ast.clone())
 
 
 @overload
@@ -325,6 +356,7 @@ def select(*cols: Col | ColName | str) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     """
     Selects a subset of columns.
@@ -350,15 +382,24 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     """
 
     errors.check_vararg_type(Col | ColName | str, "select", *cols)
+
+    for col in cols:
+        if isinstance(col, ColName | str) and col not in table:
+            raise ColumnNotFoundError(
+                f"column `{col}` does not exist in table `{table._ast.name}`"
+            )
+        elif col not in table and col._uuid in table._cache.cols:
+            raise ColumnNotFoundError(
+                f"cannot select hidden column `{col}` again\n"
+                "hint: A column becomes hidden if you deselected it before or "
+                "overwrite it in `mutate` or `summarize`."
+            )
+
     cols = [ColName(col) if isinstance(col, str) else col for col in cols]
 
     new = copy.copy(table)
     new._ast = Select(table._ast, [preprocess_arg(col, table) for col in cols])
-    new._cache = copy.copy(table._cache)
-    new._cache.update(new._ast)
-    # TODO: prevent selection of overwritten columns
 
-    assert len(new) == len(cols)
     return new
 
 
@@ -395,7 +436,11 @@ def drop(table: Table, *cols: Col | ColName | str) -> Pipeable:
 
     dropped_uuids = {preprocess_arg(col, table)._uuid for col in cols}
     return table >> select(
-        *(col for col in table._cache.select if col._uuid not in dropped_uuids),
+        *(
+            name
+            for name, uid in table._cache.name_to_uuid.items()
+            if uid not in dropped_uuids
+        ),
     )
 
 
@@ -404,6 +449,7 @@ def rename(name_map: dict[str, str]) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     """
     Renames columns.
@@ -466,12 +512,6 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     └─────┴───────┴─────┴───────┘
     """
     errors.check_arg_type(dict, "rename", "name_map", name_map)
-    if len(name_map) == 0:
-        return table
-
-    new = copy.copy(table)
-    new._ast = Rename(table._ast, name_map)
-    new._cache = copy.copy(table._cache)
 
     if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(
@@ -483,7 +523,9 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     ):
         raise ValueError(f"duplicate column name `{next(iter(d))}`")
 
-    new._cache.update(new._ast)
+    new = copy.copy(table)
+    new._ast = Rename(table._ast, name_map)
+
     return new
 
 
@@ -492,6 +534,7 @@ def mutate(**kwargs: ColExpr) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     """
     Adds new columns to the table.
@@ -521,22 +564,12 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     └─────┴────────┴─────────┘
     """
 
-    if len(kwargs) == 0:
-        return table
-
     names, values = list(kwargs.keys()), list(kwargs.values())
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
-
     new._ast = Mutate(
-        table._ast,
-        names,
-        [preprocess_arg(val, table) for val in values],
-        uuids,
+        table._ast, names, [preprocess_arg(val, table) for val in values], uuids
     )
-
-    new._cache = copy.copy(table._cache)
-    new._cache.update(new._ast)
 
     return new
 
@@ -546,6 +579,7 @@ def filter(*predicates: ColExpr[Bool]) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     """
     Selects a subset of rows based on some condition.
@@ -568,14 +602,11 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     │ 2   ┆ g   │
     └─────┴─────┘
     """
-    if len(predicates) == 0:
-        return table
-
     new = copy.copy(table)
     new._ast = Filter(table._ast, [preprocess_arg(pred, table) for pred in predicates])
 
     for cond in new._ast.predicates:
-        if not cond.dtype() <= Bool():
+        if not types.without_const(cond.dtype()) == Bool():
             raise TypeError(
                 "predicates given to `filter` must be of boolean type.\n"
                 f"hint: {cond} is of type {cond.dtype()} instead."
@@ -593,9 +624,6 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
                     "`mutate`."
                 )
 
-    new._cache = copy.copy(table._cache)
-    new._cache.update(new._ast)
-
     return new
 
 
@@ -604,7 +632,8 @@ def arrange(*order_by: ColExpr) -> Pipeable: ...
 
 
 @verb
-def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
+@modify_ast
+def arrange(table: Table, by: ColExpr, *more_by: ColExpr) -> Pipeable:
     """
     Sorts the rows of the table.
 
@@ -652,19 +681,13 @@ def arrange(table: Table, *order_by: ColExpr) -> Pipeable:
     │ 3    ┆ a   ┆ null  │
     └──────┴─────┴───────┘
     """
-    if len(order_by) == 0:
-        return table
 
-    order_by = [ColName(col) if isinstance(col, str) else col for col in order_by]
-
+    order_by = [ColName(col) if isinstance(col, str) else col for col in (by, *more_by)]
     new = copy.copy(table)
     new._ast = Arrange(
         table._ast,
         [preprocess_arg(Order.from_col_expr(ord), table) for ord in order_by],
     )
-
-    new._cache = copy.copy(table._cache)
-    new._cache.update(new._ast)
 
     return new
 
@@ -674,6 +697,7 @@ def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable: .
 
 
 @verb
+@modify_ast
 def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
     """
     Add a grouping state to the table.
@@ -693,22 +717,12 @@ def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
     :doc:`ungroup <pydiverse.transform.ungroup>`
     verb can be used to clear the grouping state.
     """
-    if len(cols) == 0:
-        return table
-
     errors.check_vararg_type(Col | ColName | str, "group_by", *cols)
     errors.check_arg_type(bool, "group_by", "add", add)
     cols = [ColName(col) if isinstance(col, str) else col for col in cols]
 
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, [preprocess_arg(col, table) for col in cols], add)
-    new._cache = copy.copy(table._cache)
-    if add:
-        new._cache.partition_by = table._cache.partition_by + new._ast.group_by
-    else:
-        new._cache.partition_by = new._ast.group_by
-
-    new._cache.derived_from = table._cache.derived_from | {new._ast}
 
     return new
 
@@ -718,6 +732,7 @@ def ungroup() -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def ungroup(table: Table) -> Pipeable:
     """
     Clear the grouping state of the table.
@@ -761,8 +776,7 @@ def ungroup(table: Table) -> Pipeable:
     """
     new = copy.copy(table)
     new._ast = Ungroup(table._ast)
-    new._cache = copy.copy(table._cache)
-    new._cache.partition_by = []
+
     return new
 
 
@@ -771,6 +785,7 @@ def summarize(**kwargs: ColExpr) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     """
     Computes aggregates over groups of rows.
@@ -824,13 +839,13 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     new._ast = Summarize(
         table._ast,
         names,
-        [preprocess_arg(val, table, update_partition_by=False) for val in values],
+        [preprocess_arg(val, table, agg_is_window=False) for val in values],
         uuids,
     )
 
-    partition_by_uuids = {col._uuid for col in table._cache.partition_by}
+    partition_by = set(table._cache.partition_by)
 
-    if len(kwargs) == 0 and len(partition_by_uuids) == 0:
+    if len(kwargs) == 0 and len(partition_by) == 0:
         raise ValueError(
             "summarize without preceding group_by needs at least one column to "
             "summarize"
@@ -840,7 +855,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
         # TODO: does not catch everything (test_alias_window)
         if (
             isinstance(expr, Col)
-            and expr._uuid not in partition_by_uuids
+            and expr._uuid not in partition_by
             and not agg_fn_above
         ):
             raise FunctionTypeError(
@@ -862,9 +877,6 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     for root in new._ast.values:
         check_summarize_col_expr(root, False)
 
-    new._cache = copy.copy(table._cache)
-    new._cache.update(new._ast)
-
     return new
 
 
@@ -873,6 +885,7 @@ def slice_head(n: int, *, offset: int = 0) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
     """
     Selects a subset of rows based on their index.
@@ -904,7 +917,6 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
     │ -55 ┆ --- │
     └─────┴─────┘
     """
-
     errors.check_arg_type(int, "slice_head", "n", n)
     errors.check_arg_type(int, "slice_head", "offset", offset)
 
@@ -913,8 +925,6 @@ def slice_head(table: Table, n: int, *, offset: int = 0) -> Pipeable:
 
     new = copy.copy(table)
     new._ast = SliceHead(table._ast, n, offset)
-    new._cache = copy.copy(table._cache)
-    new._cache.update(new._ast)
 
     return new
 
@@ -927,11 +937,11 @@ def join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce=False,
 ) -> Pipeable: ...
 
 
 @verb
+@modify_ast
 def join(
     left: Table,
     right: Table,
@@ -940,7 +950,6 @@ def join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce=False,
 ) -> Pipeable:
     """
     Joins two tables on a boolean expression.
@@ -973,12 +982,6 @@ def join(
         appended to all columns of the right table. If this still does not resolve all
         name collisions, additionally an integer is appended to the column names of the
         right table.
-
-    :param coalesce:
-        If `on` is a list of strings and `coalesce=True`, the join columns are merged.
-        If there are no column name collisions apart from the join columns, no suffix is
-        appended to columns of the right table.
-
 
     Note
     ----
@@ -1028,26 +1031,9 @@ def join(
     errors.check_literal_type(
         ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
     )
-    errors.check_arg_type(bool, "join", "coalesce", coalesce)
 
-    if isinstance(on, str):
-        on = [on]
-    ignore_right = set()
-    if isinstance(on, list):
-        if not all(type(cond) is str for cond in on) and coalesce:
-            raise ValueError(
-                "`coalesce` can only be set to True if `on` is a list of strings"
-            )
-        elif coalesce:
-            ignore_right = set(on)
-        on = functools.reduce(
-            operator.and_,
-            (
-                left[expr] == right[expr] if isinstance(expr, str) else expr
-                for expr in on
-            ),
-            LiteralCol(True),  # initial value
-        )
+    if left._cache.backend != right._cache.backend:
+        raise TypeError("cannot join two tables with different backends")
 
     if left._cache.partition_by:
         raise ValueError(f"cannot join grouped table `{left._ast.name}`")
@@ -1079,9 +1065,9 @@ def join(
                     "hint: Specify a different suffix to prevent name collisions or "
                     "none at all for automatic name collision resolution."
                 )
-    elif (right_names - ignore_right) & left_names:
+    elif right_names & left_names:
         cnt = 0
-        for name in right_names - ignore_right:
+        for name in right_names:
             suffixed = name + suffix + (f"_{cnt}" if cnt > 0 else "")
             while suffixed in left_names:
                 cnt += 1
@@ -1092,22 +1078,63 @@ def join(
     else:
         suffix = ""
 
-    new = copy.copy(left)
-    new._ast = Join(left._ast, right._ast, on, how, validate, suffix, coalesce)
-    # The join condition must be preprocessed with respect to both tables
-    new._ast.on = resolve_C_columns(
-        resolve_C_columns(new._ast.on, left, strict=False), right, suffix=suffix
-    )
+    if not isinstance(on, list):
+        on = [on]
+    on = [left[expr] == right[expr] if isinstance(expr, str) else expr for expr in on]
 
-    new._cache = copy.copy(left._cache)
-    new._cache.update(new._ast, rcache=right._cache)
-    # TODO: make sure that error messages (e.g. for non-existent columns) use the
-    # correct table name.
-    new._ast.on = preprocess_arg(new._ast.on, new)
-    ignore_uuids = set(right[col]._uuid for col in ignore_right)
-    new._cache.select = left._cache.select + [
-        col for col in right._cache.select if col._uuid not in ignore_uuids
-    ]
+    # Lambda column resolution and checks for existence of columns are done manually
+    # here since we need to incorporate columns from the right.
+    def _preprocess_on(expr: ColExpr):
+        if isinstance(expr, ColName):
+            if expr in left:
+                return left[expr.name]
+            old_right_name = expr.name[: len(expr.name) - len(suffix)]
+            if old_right_name not in right:
+                raise ValueError(
+                    f"no column with name `{expr.name}` found"
+                    "\nhint: To reference a column of the right table in the `on` "
+                    "clause using `C`, you must append the suffix to the column name."
+                )
+            return right[old_right_name]
+
+        if (
+            isinstance(expr, Col)
+            and expr._ast not in left._cache.derived_from
+            and expr._ast not in right._cache.derived_from
+        ):
+            raise ValueError(
+                f"column `{repr(expr)}` used in `on` neither exists in the table "
+                f"`{left._ast.name}` nor in the table `{right._ast.name}`. "
+                f"The source table `{expr._ast.name}` of the column must be an "
+                "ancestor of one of the two input tables."
+            )
+
+        return expr
+
+    on = [pred.map_subtree(_preprocess_on) for pred in on]
+    for pred in on:
+        if types.without_const(pred.dtype()) != Bool():
+            raise TypeError(
+                "predicates in `on` must have boolean type, found "
+                f"`{pred.dtype()}` instead"
+            )
+    on = functools.reduce(operator.and_, on, LiteralCol(True))
+
+    if how == "full" and not all(pred.op == ops.equal for pred in split_join_cond(on)):
+        raise ValueError("in a `full` join, only equality predicates can be used")
+
+    for fn in on.iter_subtree():
+        if isinstance(fn, ColFn) and fn.op.ftype != Ftype.ELEMENT_WISE:
+            raise FunctionTypeError(
+                f"window function `{fn.op.name}` not allowed in `on`\n"
+                "hint: First add the result of the window function to the table using "
+                "`mutate`."
+            )
+
+    on.ftype(agg_is_window=False)
+
+    new = copy.copy(left)
+    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
 
     return new
 
@@ -1122,7 +1149,6 @@ def inner_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1134,15 +1160,12 @@ def inner_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="inner"``.
     """
 
-    return left >> join(
-        right, on, "inner", validate=validate, suffix=suffix, coalesce=coalesce
-    )
+    return left >> join(right, on, "inner", validate=validate, suffix=suffix)
 
 
 @overload
@@ -1152,7 +1175,6 @@ def left_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1164,15 +1186,12 @@ def left_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="left"``.
     """
 
-    return left >> join(
-        right, on, "left", validate=validate, suffix=suffix, coalesce=coalesce
-    )
+    return left >> join(right, on, "left", validate=validate, suffix=suffix)
 
 
 @overload
@@ -1182,7 +1201,6 @@ def full_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable: ...
 
 
@@ -1194,15 +1212,20 @@ def full_join(
     *,
     validate: Literal["1:1", "1:m", "m:1", "m:m"] = "m:m",
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
     Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
     """
 
-    return left >> join(
-        right, on, "full", validate=validate, suffix=suffix, coalesce=coalesce
-    )
+    return left >> join(right, on, "full", validate=validate, suffix=suffix)
+
+
+@overload
+def cross_join(
+    right: Table,
+    *,
+    suffix: str | None = None,
+) -> Pipeable: ...
 
 
 @verb
@@ -1211,13 +1234,12 @@ def cross_join(
     right: Table,
     *,
     suffix: str | None = None,
-    coalesce: bool = False,
 ) -> Pipeable:
     """
-    Alias for the :doc:`pydiverse.transform.join` verb with ``how="full"``.
+    Alias for the :doc:`pydiverse.transform.join` verb with an empty ``on`` clause.
     """
 
-    return left >> full_join(right, on=[], suffix=suffix, coalesce=coalesce)
+    return left >> join(right, how="inner", on=[], suffix=suffix)
 
 
 @overload
@@ -1233,50 +1255,43 @@ def show(table: Table) -> Pipeable:
     return table
 
 
-def resolve_C_columns(expr: ColExpr, table: Table, *, strict=True, suffix=""):
-    def resolve_C(col: ColName):
-        if strict or col in table:
-            return table[col.name[: len(col.name) - len(suffix)]]
-        return col
+def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) -> Any:
+    arg = wrap_literal(arg)
+    assert isinstance(arg, ColExpr | Order)
 
-    return expr.map_subtree(
-        lambda col: resolve_C(col)
-        if isinstance(col, ColName)
-        else (
-            table._cache.all_cols[col._uuid]
-            if isinstance(col, Col) and col._uuid in table._cache.all_cols
-            else col
-        )
-    )
+    def _preprocess_expr(expr: ColExpr):
+        if isinstance(expr, Col) and expr._uuid not in table._cache.cols:
+            raise ColumnNotFoundError(
+                f"column `{repr(expr)}` does not exist in table `{table._ast.name}`"
+            )
 
+        if (
+            agg_is_window
+            and isinstance(expr, ColFn)
+            and "partition_by" not in expr.context_kwargs
+            and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
+        ):
+            expr.context_kwargs["partition_by"] = [
+                table._cache.cols[uid] for uid in table._cache.partition_by
+            ]
 
-def preprocess_arg(arg: Any, table: Table, *, update_partition_by: bool = True) -> Any:
-    if isinstance(arg, Order):
-        return Order(
-            preprocess_arg(
-                arg.order_by, table, update_partition_by=update_partition_by
-            ),
-            arg.descending,
-            arg.nulls_last,
-        )
+        # add casts for boolean add / sum
+        # If we have more operations like these, which we want to map to other
+        # operations on the AST, consider streamlining this in some special function
+        if (
+            isinstance(expr, ColFn)
+            and len(expr.args) > 0
+            and types.without_const(expr.args[0].dtype()) == Bool()
+            and expr.op in (ops.add, ops.sum)
+        ):
+            expr.args = [arg.cast(Int64) for arg in expr.args]
 
-    else:
-        arg = wrap_literal(arg)
-        assert isinstance(arg, ColExpr)
+        if isinstance(expr, ColName):
+            return table[expr.name]
 
-        for expr in arg.iter_subtree():
-            if isinstance(expr, Col) and expr._ast not in table._cache.derived_from:
-                raise ValueError(
-                    f"table `{expr._ast.name}` used to reference the column "
-                    f"`{repr(expr)}` cannot be used at this point. The current table "
-                    "is not derived from it."
-                )
-            if (
-                update_partition_by
-                and isinstance(expr, ColFn)
-                and "partition_by" not in expr.context_kwargs
-                and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
-            ):
-                expr.context_kwargs["partition_by"] = table._cache.partition_by
+        return expr
 
-        return resolve_C_columns(arg, table)
+    res = arg.map_subtree(_preprocess_expr)
+    res.dtype()
+    res.ftype(agg_is_window=agg_is_window)
+    return res

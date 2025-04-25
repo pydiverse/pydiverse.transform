@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pydiverse.transform.extended import *
+from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
@@ -158,5 +159,28 @@ def test_slice(df_strings):
 
 def test_str_join(df_strings):
     assert_result_equal(
-        df_strings, lambda t: t >> group_by(t.e) >> summarize(con=t.c.str.join(", "))
+        df_strings,
+        lambda t: t
+        >> group_by(t.e)
+        >> summarize(
+            con=t.c.str.join(", ", arrange=[t.d.nulls_first(), t.c.nulls_last()])
+        ),
     )
+
+    assert_result_equal(
+        df_strings,
+        lambda t: t >> group_by(t.gb) >> summarize(y=t.col1.str.join(arrange=t.col2)),
+    )
+
+
+@skip_backends("mssql")
+def test_str_arrange(df_strings):
+    def bind(col):
+        assert_result_equal(
+            df_strings,
+            lambda t: t >> arrange(t[col].nulls_last(), t.c.nulls_last()),
+            check_row_order=True,
+        )
+
+    for col in ["col1", "col2", "c", "d", "e", "gb"]:
+        bind(col)

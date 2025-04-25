@@ -31,7 +31,10 @@ from pydiverse.transform._internal.tree.types import (
 
 def when(condition: ColExpr) -> WhenClause:
     condition = wrap_literal(condition)
-    if condition.dtype() is not None and not condition.dtype() <= Bool():
+    if (
+        condition.dtype() is not None
+        and not types.without_const(condition.dtype()) == Bool()
+    ):
         raise TypeError(
             "argument for `when` must be of boolean type, but has type "
             f"`{condition.dtype()}`"
@@ -194,6 +197,10 @@ def max(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: 
 def max(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
+@overload
+def max(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
+
 def max(arg: ColExpr, *args: ColExpr) -> ColExpr:
     """
     The maximum of the given columns.
@@ -249,6 +256,10 @@ def min(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: 
 
 @overload
 def min(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
+
+
+@overload
+def min(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
 
 def min(arg: ColExpr, *args: ColExpr) -> ColExpr:

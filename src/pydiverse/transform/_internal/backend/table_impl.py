@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
 
 class TableImpl(AstNode):
+    backend_name: str
     impl_store = ImplStore()
 
     def __init__(self, name: str, schema: dict[str, Dtype]):
@@ -89,10 +90,15 @@ class TableImpl(AstNode):
                 res = DuckDbPolarsImpl(name, resource)
 
         elif isinstance(resource, str | sqa.Table):
-            if isinstance(backend, SqlAlchemy):
-                from pydiverse.transform._internal.backend.sql import SqlImpl
+            if not isinstance(backend, SqlAlchemy):
+                raise TypeError(
+                    "If `resource` is a string or a SQLAlchemy table, `backend` must "
+                    "have type `SqlALchemy` and contain an engine."
+                )
 
-                res = SqlImpl(resource, backend, name)
+            from pydiverse.transform._internal.backend.sql import SqlImpl
+
+            res = SqlImpl(resource, backend, name)
 
         else:
             raise AssertionError
@@ -110,15 +116,15 @@ class TableImpl(AstNode):
         yield self
 
     @classmethod
-    def build_query(cls, nd: AstNode, final_select: list[Col]) -> str | None: ...
+    def build_query(cls, nd: AstNode) -> str | None: ...
 
     @classmethod
     def export(
         cls,
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
-        schema_overrides: dict[Col, Any],
+        *,
+        schema_overrides: dict[UUID, Any],
     ) -> Any: ...
 
     @classmethod

@@ -6,8 +6,8 @@ from pydiverse.transform._internal.tree.types import (
     COMPARABLE,
     NUMERIC,
     Bool,
-    D,
     Duration,
+    S,
     String,
 )
 
@@ -91,7 +91,7 @@ shape: (6, 4)
 
 coalesce = Horizontal(
     "coalesce",
-    Signature(D, D, ..., return_type=D),
+    Signature(S, S, ..., return_type=S),
     doc="""
 Returns the first non-null value among the given.
 

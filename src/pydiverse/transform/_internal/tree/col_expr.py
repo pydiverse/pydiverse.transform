@@ -15,19 +15,7 @@ from uuid import UUID
 import pandas as pd
 import polars as pl
 
-from pydiverse.transform._internal import errors
-from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
-from pydiverse.transform._internal.errors import FunctionTypeError
-from pydiverse.transform._internal.ops import ops, signature
-from pydiverse.transform._internal.ops.op import Ftype, Operator
-from pydiverse.transform._internal.ops.ops.markers import Marker
-from pydiverse.transform._internal.pipe.pipeable import Pipeable
-from pydiverse.transform._internal.tree import types
-from pydiverse.transform._internal.tree.ast import AstNode
-from pydiverse.transform._internal.tree.types import (
-    FLOAT_SUBTYPES,
-    IMPLICIT_CONVS,
-    INT_SUBTYPES,
+from pydiverse.common import (
     Bool,
     Date,
     Datetime,
@@ -38,7 +26,19 @@ from pydiverse.transform._internal.tree.types import (
     Int,
     List,
     String,
-    python_type_to_pdt,
+)
+from pydiverse.transform._internal import errors
+from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
+from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.ops import ops
+from pydiverse.transform._internal.ops.op import Ftype, Operator
+from pydiverse.transform._internal.ops.ops.markers import Marker
+from pydiverse.transform._internal.tree import types
+from pydiverse.transform._internal.tree.ast import AstNode
+from pydiverse.transform._internal.tree.types import (
+    FLOAT_SUBTYPES,
+    INT_SUBTYPES,
+    Const,
 )
 
 T = TypeVar("T")
@@ -89,13 +89,26 @@ class ColExpr(Generic[T]):
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
+    def iter_children(self) -> Iterable[ColExpr]:
+        return iter(())
+
+    # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
+    # and `Order` expressions are not yielded.
+    def iter_subtree(self) -> Iterable[ColExpr]:
+        for node in self.iter_children():
+            yield from node.iter_subtree()
+        yield self
+
+    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
+        return g(self)
+
     def dtype(self) -> Dtype:
         """
         Returns the data type of the expression.
         """
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool) -> Ftype:
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self._ftype
 
     def map(
@@ -244,25 +257,15 @@ class ColExpr(Generic[T]):
             )
         return Cast(self, target_type)
 
-    def iter_children(self) -> Iterable[ColExpr]:
-        return iter(())
-
-    # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
-    # and `Order` expressions are not yielded.
-    def iter_subtree(self) -> Iterable[ColExpr]:
-        for node in self.iter_children():
-            yield from node.iter_subtree()
-        yield self
-
-    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        return g(self)
-
     def __rshift__(self, rhs):
+        from pydiverse.transform._internal.pipe.pipeable import Pipeable
+
         if not isinstance(rhs, Pipeable):
             raise TypeError(
                 "the right shift operator `>>` can only be applied to a column "
                 "expression if a verb is on the right"
             )
+
         return rhs(self)
 
     def rank(
@@ -312,6 +315,9 @@ class ColExpr(Generic[T]):
     def __add__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
 
     @overload
+    def __add__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Int]: ...
+
+    @overload
     def __add__(
         self: ColExpr[Duration], rhs: ColExpr[Duration]
     ) -> ColExpr[Duration]: ...
@@ -342,6 +348,9 @@ class ColExpr(Generic[T]):
 
     @overload
     def __radd__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
+
+    @overload
+    def __radd__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Int]: ...
 
     @overload
     def __radd__(
@@ -772,6 +781,9 @@ class ColExpr(Generic[T]):
     @overload
     def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
+    @overload
+    def __ge__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
     def __ge__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Greater than or equal to comparison >="""
 
@@ -794,6 +806,9 @@ class ColExpr(Generic[T]):
 
     @overload
     def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __gt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Greater than comparison >"""
@@ -869,6 +884,9 @@ class ColExpr(Generic[T]):
     @overload
     def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
+    @overload
+    def __le__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
+
     def __le__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Less than or equal to comparison <="""
 
@@ -891,6 +909,9 @@ class ColExpr(Generic[T]):
 
     @overload
     def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __lt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Less than comparison <"""
@@ -949,6 +970,14 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Date]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Bool]: ...
 
     def max(
         self: ColExpr,
@@ -1041,6 +1070,14 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Date]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Bool]: ...
 
     def min(
         self: ColExpr,
@@ -1446,6 +1483,14 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Decimal]: ...
+
+    @overload
+    def sum(
+        self: ColExpr[Bool],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Int]: ...
 
     def sum(
         self: ColExpr,
@@ -2045,16 +2090,11 @@ class Col(ColExpr):
 
     def __str__(self) -> str:
         try:
-            from pydiverse.transform._internal.backend.polars import PolarsImpl
-            from pydiverse.transform._internal.backend.targets import Polars
-
-            df = PolarsImpl.export(self._ast, Polars(lazy=False), [self], {})
-            return str(df.get_column(df.columns[0]))
+            return str(self.export(Polars(lazy=False)))
         except Exception as e:
             return (
-                repr(self)
-                + f"\ncould not evaluate {repr(self)} due to"
-                + f"{e.__class__.__name__}: {str(e)}"
+                f"could not evaluate {repr(self)} due to "
+                f"{e.__class__.__name__}: {str(e)}"
             )
 
     def __hash__(self) -> int:
@@ -2099,7 +2139,7 @@ class Col(ColExpr):
         from pydiverse.transform._internal.tree.verbs import Select
 
         ast = Select(self._ast, [self])
-        df = get_backend(self._ast).export(ast, target, [self], {})
+        df = get_backend(self._ast).export(ast, target, schema_overrides={})
         if isinstance(target, Polars):
             if isinstance(df, pl.LazyFrame):
                 df = df.collect()
@@ -2122,11 +2162,18 @@ class ColName(ColExpr):
 
 
 class LiteralCol(ColExpr):
-    def __init__(self, val: Any, dtype: types.Dtype | None = None):
+    def __init__(self, val: Any, dtype: Dtype | None = None):
         self.val = val
         if dtype is None:
-            dtype = python_type_to_pdt(type(val))
-        dtype.const = True
+            try:
+                dtype = types.from_python(val)
+            except KeyError as ke:
+                raise TypeError(
+                    f"invalid type `{type(val).__name__}` found in column expression. "
+                    "Objects used in a column expression must have type `ColExpr` or a "
+                    "suitable python builtin type"
+                ) from ke
+        dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
     def __repr__(self):
@@ -2142,6 +2189,8 @@ class ColFn(ColExpr):
         ]
         self.context_kwargs = clean_kwargs(**kwargs)
 
+        # TODO: probably it is faster and produces nicer SQL code if we put this in
+        # WITHIN GROUP for aggregation functions. On polars use col.filter().
         if filters := self.context_kwargs.get("filter"):
             if len(self.args) == 0:
                 assert self.op == ops.count_star
@@ -2184,15 +2233,25 @@ class ColFn(ColExpr):
             return self._dtype
 
         arg_dtypes = [arg.dtype() for arg in self.args]
-        if None in arg_dtypes:
+        context_kwarg_dtypes = [
+            elem.dtype() for elem in itertools.chain(*self.context_kwargs.values())
+        ]
+
+        # we don't need the context_kwargs' types but we need to make sure type checks
+        # are run on them
+        if None in arg_dtypes or None in context_kwarg_dtypes:
             return None
 
         self._dtype = self.op.return_type(arg_dtypes)
-        self._dtype.const = all(argt.const for argt in arg_dtypes)
+        if self.op.ftype == Ftype.ELEMENT_WISE and all(
+            types.is_const(argt)
+            for argt in itertools.chain(arg_dtypes, context_kwarg_dtypes)
+        ):
+            self._dtype = Const(self._dtype)
 
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool):
+    def ftype(self, *, agg_is_window: bool | None = None):
         """
         Determine the ftype based on the arguments.
 
@@ -2204,10 +2263,10 @@ class ColFn(ColExpr):
         an Exception.
         """
 
-        # TODO: This causes wrong results if ftype is called once with
-        # agg_is_window=True and then with agg_is_window=False.
         if self._ftype is not None:
             return self._ftype
+        if self.op.ftype == Ftype.AGGREGATE and agg_is_window is None:
+            return None
 
         ftypes = [arg.ftype(agg_is_window=agg_is_window) for arg in self.args]
         if None in ftypes:
@@ -2315,7 +2374,10 @@ class CaseExpr(ColExpr):
             return self._dtype
 
         for cond, _ in self.cases:
-            if cond.dtype() is not None and not cond.dtype() <= types.Bool():
+            if (
+                cond.dtype() is not None
+                and not types.without_const(cond.dtype()) == types.Bool()
+            ):
                 raise TypeError(
                     f"argument `{cond}` for `when` must be of boolean type, but has "
                     f"type `{cond.dtype()}`"
@@ -2326,52 +2388,41 @@ class CaseExpr(ColExpr):
             val_types.append(self.default_val.dtype())
         if None in val_types:
             return None
-        val_types = [t.without_const() for t in val_types]
-
-        if not (
-            common_ancestors := functools.reduce(
-                operator.and_,
-                (set(IMPLICIT_CONVS[t].keys()) for t in val_types[1:]),
-                IMPLICIT_CONVS[val_types[0]].keys(),
-            )
-        ):
-            raise TypeError(
-                f'incompatible types `{", ".join(val_types)}` in case expression.'
-            )
+        val_types = [types.without_const(t) for t in val_types]
 
         if any(cond.dtype() is None for cond, _ in self.cases):
             return None
 
-        common_ancestors: list[Dtype] = list(common_ancestors)
-        self._dtype = copy.copy(
-            common_ancestors[
-                signature.best_signature_match(
-                    val_types,
-                    [[ancestor] * len(val_types) for ancestor in common_ancestors],
-                )
-            ]
-        )
-        self._dtype.const = all(
+        self._dtype = types.lca_type(val_types)
+
+        if all(
             (
-                *(cond.dtype().const and val.dtype().const for cond, val in self.cases),
-                self.default_val is None or self.default_val.dtype().const,
+                *(
+                    types.is_const(cond.dtype()) and types.is_const(val.dtype())
+                    for cond, val in self.cases
+                ),
+                self.default_val is None or types.is_const(self.default_val.dtype()),
             )
-        )
+        ):
+            self._dtype = types.with_const(self._dtype)
 
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool):
+    def ftype(self, *, agg_is_window: bool | None = None):
         if self._ftype is not None:
             return self._ftype
 
         val_ftypes = set()
         # TODO: does it actually matter if we add stuff that is const? it should be
         # elemwise anyway...
-        if self.default_val is not None and not self.default_val.dtype().const:
+        if self.default_val is not None and not types.is_const(
+            self.default_val.dtype()
+        ):
             val_ftypes.add(self.default_val.ftype(agg_is_window=agg_is_window))
 
-        for _, val in self.cases:
-            if val.dtype() is not None and not val.dtype().const:
+        for cond, val in self.cases:
+            cond.ftype(agg_is_window=agg_is_window)
+            if val.dtype() is not None and not types.is_const(val.dtype()):
                 val_ftypes.add(val.ftype(agg_is_window=agg_is_window))
 
         if None in val_ftypes:
@@ -2417,7 +2468,7 @@ class Cast(ColExpr):
     def __init__(self, val: ColExpr, target_type: Dtype):
         if type(target_type) is type:
             target_type = target_type()
-        if target_type.const:
+        if types.is_const(target_type):
             raise TypeError("cannot cast to `const` type")
 
         self.val = val
@@ -2431,9 +2482,9 @@ class Cast(ColExpr):
         if self.val.dtype() is None:
             return None
 
-        assert not self.target_type.const
+        assert not types.is_const(self.target_type)
 
-        if not self.val.dtype().converts_to(self.target_type):
+        if not types.converts_to(self.val.dtype(), self.target_type):
             valid_casts = {
                 *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
                 *(
@@ -2464,14 +2515,17 @@ class Cast(ColExpr):
                         ),
                     )
                 ),
+                *((Bool(), t) for t in itertools.chain(FLOAT_SUBTYPES, INT_SUBTYPES)),
             }
 
             if (
-                self.val.dtype().without_const(),
+                types.without_const(self.val.dtype()),
                 self.target_type,
             ) not in valid_casts:
                 hint = ""
-                if self.val.dtype() <= String() and self.target_type in (
+                if types.without_const(
+                    self.val.dtype()
+                ) == String() and self.target_type in (
                     Datetime(),
                     Date(),
                 ):
@@ -2486,10 +2540,11 @@ class Cast(ColExpr):
                     f"{hint}"
                 )
 
-        self._dtype.const = self.val.dtype().const
+        if types.is_const(self.val.dtype()):
+            self._dtype = types.with_const(self._dtype)
         return self._dtype
 
-    def ftype(self, *, agg_is_window: bool) -> Ftype:
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self.val.ftype(agg_is_window=agg_is_window)
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -2510,6 +2565,12 @@ class Order:
     # translated normally.
     @staticmethod
     def from_col_expr(expr: ColExpr) -> Order:
+        if not isinstance(expr, ColExpr):
+            raise TypeError(
+                f"argument to `arrange` must be a `ColExpr`, found `{type(expr)}` "
+                "instead.\n"
+                "hint: maybe you forgot to close parentheses `()`?"
+            )
         descending = None
         nulls_last = None
         while isinstance(expr, ColFn):
@@ -2536,6 +2597,12 @@ class Order:
             descending = False
 
         return Order(expr, descending, nulls_last)
+
+    def dtype(self) -> Dtype:
+        return self.order_by.dtype()
+
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
+        return self.order_by.ftype(agg_is_window=agg_is_window)
 
     def iter_subtree(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_subtree()

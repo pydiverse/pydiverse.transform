@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import copy
 import functools
-from typing import Any
+from typing import Any, Literal
+from uuid import UUID
 
 import sqlalchemy as sqa
-from sqlalchemy.dialects.mssql import DATETIME2
+from sqlalchemy.dialects.mssql import BIT, DATETIME2, TINYINT
 
+from pydiverse.common import Bool, Int, String
 from pydiverse.transform._internal.backend import sql
-from pydiverse.transform._internal.backend.polars import polars_type
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Target
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
-from pydiverse.transform._internal.tree import verbs
+from pydiverse.transform._internal.pipe.table import Cache
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
     CaseExpr,
@@ -24,44 +26,54 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
-from pydiverse.transform._internal.tree.types import Bool, Datetime, Dtype, Int, String
 
 
 class MsSqlImpl(SqlImpl):
+    backend_name = "mssql"
+
     @classmethod
-    def inf():
+    def inf(cls):
         raise NotSupportedError("SQL Server does not support `inf`")
 
     @classmethod
-    def nan():
+    def nan(cls):
         raise NotSupportedError("SQL Server does not support `nan`")
+
+    @classmethod
+    def default_collation(cls):
+        return "Latin1_General_bin"
 
     @classmethod
     def export(
         cls,
         nd: AstNode,
         target: Target,
-        final_select: list[Col],
-        schema_overrides: dict[Col, Any],
+        *,
+        schema_overrides: dict[UUID, Any],
     ) -> Any:
-        for col in final_select:
-            if col.dtype() <= Bool():
-                if col not in schema_overrides:
-                    schema_overrides[col] = polars_type(col.dtype())
+        final_select = Cache.from_ast(nd).selected_cols()
 
-        return super().export(nd, target, final_select, schema_overrides)
+        for col in final_select:
+            if types.without_const(col.dtype()) == Bool():
+                if col._uuid not in schema_overrides:
+                    schema_overrides[col._uuid] = col.dtype().to_polars()
+
+        return super().export(nd, target, schema_overrides=schema_overrides)
 
     @classmethod
-    def build_select(cls, nd: AstNode, final_select: list[Col]) -> Any:
+    def build_select(cls, nd: AstNode, *, final_select: list[Col] | None = None) -> Any:
+        if final_select is None:
+            final_select = Cache.from_ast(nd).selected_cols()
+
         # boolean / bit conversion
         for desc in nd.iter_subtree_postorder():
             if isinstance(desc, verbs.Verb):
                 desc.map_col_roots(
                     functools.partial(
                         convert_bool_bit,
-                        wants_bool_as_bit=not isinstance(
-                            desc, verbs.Filter | verbs.Join
-                        ),
+                        desired_return_type="bool"
+                        if isinstance(desc, verbs.Filter | verbs.Join)
+                        else "bit",
                     )
                 )
 
@@ -77,15 +89,28 @@ class MsSqlImpl(SqlImpl):
                         node.context_kwargs["arrange"] = convert_order_list(arrange)
 
         sql.create_aliases(nd, {})
-        table, query, _ = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
-        return cls.compile_query(table, query)
+        table, query, sqa_expr = cls.compile_ast(
+            nd, {col._uuid: 1 for col in final_select}
+        )
+        return cls.compile_query(table, query, sqa_expr)
 
     @classmethod
-    def sqa_type(cls, pdt_type: Dtype):
-        if pdt_type <= Datetime():
-            return DATETIME2
+    def compile_ordered_aggregation(
+        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
+    ):
+        return impl(*args).within_group(*order_by)
 
-        return super().sqa_type(pdt_type)
+    @classmethod
+    def fix_fn_types(
+        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
+    ) -> sqa.ColumnElement:
+        if (
+            fn.op in (ops.any, ops.all, ops.min, ops.max)
+            and types.without_const(fn.dtype()) == Bool()
+        ):
+            return val.cast(BIT)
+
+        return val
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
@@ -93,17 +118,13 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
     for ord in order_list:
         # is True / is False are important here since we don't want to do this costly
         # workaround if nulls_last is None (i.e. the user doesn't care)
-        if ord.nulls_last is True and not ord.descending:
+        if ord.nulls_last is not None and (ord.nulls_last ^ ord.descending):
             new_list.append(
                 Order(
-                    CaseExpr([(ord.order_by.is_null(), LiteralCol(1))], LiteralCol(0)),
-                )
-            )
-
-        elif ord.nulls_last is False and ord.descending:
-            new_list.append(
-                Order(
-                    CaseExpr([(ord.order_by.is_null(), LiteralCol(0))], LiteralCol(1)),
+                    CaseExpr(
+                        [(ord.order_by.is_null(), LiteralCol(int(ord.nulls_last)))],
+                        LiteralCol(int(not ord.nulls_last)),
+                    )
                 )
             )
 
@@ -115,77 +136,106 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
 # MSSQL doesn't have a boolean type. This means that expressions that return a boolean
 # (e.g. ==, !=, >) can't be used in other expressions without casting to the BIT type.
 # Conversely, after casting to BIT, we sometimes may need to convert back to booleans.
+# For any / all, we need to use max / min, which can't be applied to BIT either. Thus we
+# convert to int in this case.
 
 
-def convert_bool_bit(expr: ColExpr | Order, wants_bool_as_bit: bool) -> ColExpr | Order:
+def convert_bool_bit(
+    expr: ColExpr | Order,
+    desired_return_type: Literal["bool", "bit"],
+) -> ColExpr | Order:
     if isinstance(expr, Order):
         return Order(
-            convert_bool_bit(expr.order_by, wants_bool_as_bit),
+            convert_bool_bit(expr.order_by, "bit"),
             expr.descending,
             expr.nulls_last,
         )
 
-    elif isinstance(expr, Col):
-        if not wants_bool_as_bit and expr.dtype() <= Bool():
-            return ColFn(ops.equal, expr, LiteralCol(True))
-        return expr
+    result = expr
+
+    if isinstance(expr, Col):
+        return_type = "bit"
 
     elif isinstance(expr, ColFn):
-        wants_args_bool_as_bit = expr.op not in (
-            ops.bool_and,
-            ops.bool_or,
-            ops.bool_invert,
+        desired_arg_type = (
+            "bool"
+            if expr.op
+            in (
+                ops.bool_and,
+                ops.bool_or,
+                ops.bool_invert,
+                ops.horizontal_all,
+                ops.horizontal_any,
+            )
+            else "bit"
         )
 
-        converted = copy.copy(expr)
-        converted.args = [
-            convert_bool_bit(arg, wants_args_bool_as_bit) for arg in expr.args
-        ]
-        converted.context_kwargs = {
-            key: [convert_bool_bit(val, wants_bool_as_bit) for val in arr]
+        result = copy.copy(expr)
+        result.args = list(convert_bool_bit(arg, desired_arg_type) for arg in expr.args)
+        result.context_kwargs = {
+            key: [convert_bool_bit(val, "bit") for val in arr]
             for key, arr in expr.context_kwargs.items()
         }
 
-        if expr.op.return_type(tuple(arg.dtype() for arg in expr.args)) <= Bool():
-            # most operations return bits, except for `any`, `all`
-            returns_bool_as_bit = isinstance(expr.op, ops.Aggregation | ops.Window)
-
-            if wants_bool_as_bit and not returns_bool_as_bit:
-                return CaseExpr(
-                    [(converted, LiteralCol(True)), (~converted, LiteralCol(False))],
-                    None,
-                )
-            elif not wants_bool_as_bit and returns_bool_as_bit:
-                return ColFn(ops.equal, converted, LiteralCol(True))
-
-        return converted
-
-    elif isinstance(expr, CaseExpr):
-        converted = copy.copy(expr)
-        converted.cases = [
-            (convert_bool_bit(cond, False), convert_bool_bit(val, True))
-            for cond, val in expr.cases
-        ]
-        converted.default_val = (
-            None
-            if expr.default_val is None
-            else convert_bool_bit(expr.default_val, wants_bool_as_bit)
+        return_type = (
+            "bool"
+            if expr.op
+            in (
+                ops.bool_and,
+                ops.bool_or,
+                ops.bool_xor,
+                ops.bool_invert,
+                ops.equal,
+                ops.not_equal,
+                ops.greater_equal,
+                ops.greater_than,
+                ops.less_equal,
+                ops.less_than,
+                ops.is_null,
+                ops.is_not_null,
+                ops.is_in,
+                ops.str_starts_with,
+                ops.str_ends_with,
+                ops.str_contains,
+                ops.horizontal_any,
+                ops.horizontal_all,
+            )
+            else "bit"
         )
 
-        return converted
+    elif isinstance(expr, CaseExpr):
+        return_type = "bit"
+        result = copy.copy(expr)
+        result.cases = [
+            (convert_bool_bit(cond, "bool"), convert_bool_bit(val, "bit"))
+            for cond, val in expr.cases
+        ]
+        result.default_val = (
+            None
+            if expr.default_val is None
+            else convert_bool_bit(expr.default_val, "bit")
+        )
 
     elif isinstance(expr, LiteralCol):
-        return expr
+        return_type = "bit"
 
     elif isinstance(expr, Cast):
-        # TODO: does this really work for casting onto / from booleans? we probably have
-        # to use wants_bool_as_bit in some way when casting to bool
         return Cast(
-            convert_bool_bit(expr.val, wants_bool_as_bit=wants_bool_as_bit),
+            convert_bool_bit(expr.val, "bit"),
             expr.target_type,
         )
 
-    raise AssertionError
+    if types.without_const(expr.dtype()) == Bool():
+        if desired_return_type == "bool" and return_type == "bit":
+            return ColFn(ops.equal, result, LiteralCol(True))
+
+        if return_type == "bool" and desired_return_type == "bit":
+            return CaseExpr(
+                [(result, LiteralCol(True)), (~result, LiteralCol(False))],
+                None,
+            )
+
+    return result
 
 
 with MsSqlImpl.impl_store.impl_manager as impl:
@@ -312,3 +362,13 @@ with MsSqlImpl.impl_store.impl_manager as impl:
     @impl(ops.pow, Int(), Int())
     def _pow_int(x, y):
         return sqa.func.POWER(sqa.cast(x, type_=sqa.Double()), y)
+
+    @impl(ops.all)
+    @impl(ops.min, Bool())
+    def _all(x):
+        return sqa.func.min(sqa.cast(x, TINYINT))
+
+    @impl(ops.any)
+    @impl(ops.max, Bool())
+    def _all(x):
+        return sqa.func.max(sqa.cast(x, TINYINT))

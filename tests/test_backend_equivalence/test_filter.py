@@ -5,9 +5,7 @@ from tests.util import assert_result_equal
 
 
 def test_noop(df2):
-    assert_result_equal(
-        df2, lambda t: t >> filter(), may_throw=True, exception=TypeError
-    )
+    assert_result_equal(df2, lambda t: t >> filter())
     assert_result_equal(df2, lambda t: t >> filter(t.col1 == t.col1))
 
 

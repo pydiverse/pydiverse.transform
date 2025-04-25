@@ -6,7 +6,7 @@ from types import EllipsisType
 from typing import Any
 
 from pydiverse.transform._internal.tree import types
-from pydiverse.transform._internal.tree.types import IMPLICIT_CONVS, Dtype, Tvar
+from pydiverse.transform._internal.tree.types import Dtype, Tyvar
 
 
 @dataclasses.dataclass(slots=True, init=False)
@@ -60,45 +60,51 @@ class SignatureTrie:
             )
 
         def all_matches(
-            self, sig: Sequence[Dtype], tvars: dict[str, Dtype]
+            self, sig: Sequence[Dtype], tyvars: dict[str, Dtype]
         ) -> list[tuple[list[Dtype], Any]]:
             if len(sig) == 0:
                 return [
                     (
                         [],
                         self.data
-                        if not isinstance(self.data, Tvar)
-                        else tvars[self.data.name],
+                        if not isinstance(self.data, Tyvar)
+                        else tyvars[self.data.name],
                     )
                 ]
 
             matches: list[tuple[list[Dtype], Any]] = []
-            tvar = None
+            tyvar = None
             for dtype, child in self.children.items():
+                base_type = types.without_const(dtype)
                 match_dtype = (
-                    tvars[dtype.name]
-                    if isinstance(dtype, Tvar) and dtype.name in tvars
+                    tyvars[base_type.name]
+                    if isinstance(base_type, Tyvar) and base_type.name in tyvars
                     else dtype
                 )
-                if isinstance(match_dtype, Tvar):
-                    assert tvar is None
-                    tvar = dtype
-                elif sig[0].converts_to(match_dtype):
+                if isinstance(types.without_const(match_dtype), Tyvar):
+                    assert tyvar is None
+                    tyvar = dtype
+                elif types.converts_to(sig[0], match_dtype):
                     matches.extend(
                         ([match_dtype] + match_sig, data)
-                        for match_sig, data in child.all_matches(sig[1:], tvars)
+                        for match_sig, data in child.all_matches(sig[1:], tyvars)
                     )
 
             # When the current node is a type var, try every type we can convert to.
-            if tvar is not None:
-                already_matched = {m[0][0].without_const() for m in matches}
-                for dtype, _ in IMPLICIT_CONVS[sig[0].without_const()].items():
-                    match_dtype = dtype.with_const() if tvar.const else dtype
-                    if dtype not in already_matched and sig[0].converts_to(match_dtype):
+            if tyvar is not None:
+                already_matched = {types.without_const(m[0][0]) for m in matches}
+                for dtype in types.implicit_conversions(types.without_const(sig[0])):
+                    match_dtype = (
+                        types.with_const(dtype) if types.is_const(tyvar) else dtype
+                    )
+                    if dtype not in already_matched and types.converts_to(
+                        sig[0], match_dtype
+                    ):
                         matches.extend(
                             ([match_dtype] + match_sig, data)
-                            for match_sig, data in self.children[tvar].all_matches(
-                                sig[1:], tvars | {tvar.name: match_dtype}
+                            for match_sig, data in self.children[tyvar].all_matches(
+                                sig[1:],
+                                tyvars | {types.without_const(tyvar).name: match_dtype},
                             )
                         )
 

@@ -11,6 +11,7 @@ def test_ungrouped(df3):
         df3,
         lambda t: t >> summarize(mean3=t.col3.mean(), mean4=t.col4.mean()),
     )
+    assert_result_equal(df3, lambda t: t >> group_by() >> summarize(y=t.col1.sum()))
 
 
 def test_empty_ungrouped_fail(df3):
@@ -49,7 +50,7 @@ def test_chained_summarized(df3):
         >> mutate(k=(C.col1 + C.col2) * C.col4)
         >> group_by(C.k)
         >> summarize(x=C.col4.mean())
-        >> alias()  # TODO: I think we could prevent a subquery here.
+        >> alias()
         >> summarize(y=C.k.mean()),
     )
 
@@ -108,16 +109,16 @@ def test_filter_argument(df3):
         >> summarize(u=t.col4.sum(filter=(t.col1 != 0))),
     )
 
-    # assert_result_equal(
-    #     df3,
-    #     lambda t: t
-    #     >> group_by(t.col4, t.col1)
-    #     >> summarize(
-    #         u=(t.col3 * t.col4 - t.col2).sum(
-    #             filter=(t.col5.is_in("a", "e", "i", "o", "u"))
-    #         )
-    #     ),
-    # )
+    assert_result_equal(
+        df3,
+        lambda t: t
+        >> group_by(t.col4, t.col1)
+        >> summarize(
+            u=(t.col3 * t.col4 - t.col2).sum(
+                filter=(t.col5.is_in("a", "e", "i", "o", "u"))
+            )
+        ),
+    )
 
 
 def test_arrange(df3):
@@ -147,12 +148,6 @@ def test_not_summarising(df4):
 
 def test_none(df4):
     assert_result_equal(df4, lambda t: t >> summarize(x=None))
-
-
-# TODO: Implement more test cases for summarize verb
-
-
-# Test specific operations
 
 
 def test_op_min(df4):

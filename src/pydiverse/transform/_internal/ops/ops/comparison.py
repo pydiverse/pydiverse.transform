@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import COMPARABLE, Bool, D
+from pydiverse.transform._internal.tree.types import COMPARABLE, Bool, S
 
 equal = Operator(
-    "__eq__", Signature(D, D, return_type=Bool()), doc="Equality comparison =="
+    "__eq__", Signature(S, S, return_type=Bool()), doc="Equality comparison =="
 )
 
 not_equal = Operator(
-    "__ne__", Signature(D, D, return_type=Bool()), doc="Non-equality comparison !="
+    "__ne__", Signature(S, S, return_type=Bool()), doc="Non-equality comparison !="
 )
 
 
@@ -39,25 +39,25 @@ greater_equal = Operator(
 
 is_null = Operator(
     "is_null",
-    Signature(D, return_type=Bool()),
+    Signature(S, return_type=Bool()),
     doc="Indicates whether the value is null.",
 )
 
 is_not_null = Operator(
     "is_not_null",
-    Signature(D, return_type=Bool()),
+    Signature(S, return_type=Bool()),
     doc="Indicates whether the value is not null.",
 )
 
 fill_null = Operator(
     "fill_null",
-    Signature(D, D, return_type=D),
+    Signature(S, S, return_type=S),
     doc="Replaces every null by the given value.",
 )
 
 is_in = Operator(
     "is_in",
-    Signature(D, D, ..., return_type=Bool()),
+    Signature(S, S, ..., return_type=Bool()),
     doc="""
 Whether the value equals one of the given.
 

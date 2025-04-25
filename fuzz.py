@@ -16,7 +16,7 @@ from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.ops.markers import Marker
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.col_expr import ColFn
-from pydiverse.transform._internal.tree.types import Tvar
+from pydiverse.transform._internal.tree.types import Tyvar
 from pydiverse.transform.common import *  # noqa: F403
 from tests.util.backend import BACKEND_TABLES
 
@@ -65,20 +65,22 @@ for op in ops.__dict__.values():
     ):
         continue
     for sig in op.signatures:
-        if not all(t in (*ALL_TYPES, Tvar("T")) for t in (*sig.types, sig.return_type)):
+        if not all(
+            t in (*ALL_TYPES, Tyvar("T")) for t in (*sig.types, sig.return_type)
+        ):
             continue
 
-        if isinstance(sig.return_type, Tvar) or any(
-            isinstance(param, Tvar) for param in sig.types
+        if isinstance(sig.return_type, Tyvar) or any(
+            isinstance(param, Tyvar) for param in sig.types
         ):
             for ty in ALL_TYPES:
-                rtype = ty if isinstance(sig.return_type, Tvar) else sig.return_type
+                rtype = ty if isinstance(sig.return_type, Tyvar) else sig.return_type
                 ops_with_return_type[rtype].append(
                     (
                         op,
                         Signature(
                             *(
-                                ty if isinstance(param, Tvar) else param
+                                ty if isinstance(param, Tyvar) else param
                                 for param in sig.types
                             ),
                             return_type=rtype,
