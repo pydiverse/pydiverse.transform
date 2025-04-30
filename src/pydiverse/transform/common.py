@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from ._internal.backend.targets import Dict, DuckDb, Pandas, Polars, Scalar, SqlAlchemy
+from ._internal.backend.targets import (
+    Dict,
+    DictOfLists,
+    DuckDb,
+    ListOfDicts,
+    Pandas,
+    Polars,
+    Scalar,
+    SqlAlchemy,
+)
 from ._internal.pipe.pipeable import verb
 from ._internal.pipe.verbs import (
     arrange,
@@ -43,4 +52,6 @@ __all__ = __base + [
     "Pandas",
     "Scalar",
     "Dict",
+    "DictOfLists",
+    "ListOfDicts",
 ]

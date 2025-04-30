@@ -665,6 +665,18 @@ class TestPolarsLazyImpl:
         with pytest.raises(TypeError):
             pdt.Table({"a": [1, 2]}) >> export(pdt.Dict)
 
+    def test_dict_of_lists_export(self):
+        assert (pdt.Table({"a": 1}) >> export(pdt.DictOfLists)) == {"a": [1]}
+        assert (
+            pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.DictOfLists)
+        ) == {"a": [1, 2], "b": [True, False]}
+
+    def test_list_of_dicts_export(self):
+        assert (pdt.Table({"a": 1}) >> export(pdt.ListOfDicts)) == [{"a": 1}]
+        assert (
+            pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.ListOfDicts)
+        ) == [{"a": 1, "b": True}, {"a": 2, "b": False}]
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

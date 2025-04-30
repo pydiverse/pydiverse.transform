@@ -15,7 +15,14 @@ from pydiverse.transform._internal.backend.table_impl import (
     get_backend,
     split_join_cond,
 )
-from pydiverse.transform._internal.backend.targets import Dict, Polars, Scalar, Target
+from pydiverse.transform._internal.backend.targets import (
+    Dict,
+    DictOfLists,
+    ListOfDicts,
+    Polars,
+    Scalar,
+    Target,
+)
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
@@ -311,6 +318,12 @@ def export(
                 f"found {df.height} rows"
             )
         return df.to_dicts()[0]
+
+    elif target is DictOfLists or isinstance(target, DictOfLists):
+        return (table >> export(Polars())).to_dict(as_series=False)
+
+    elif target is ListOfDicts or isinstance(target, ListOfDicts):
+        return (table >> export(Polars())).to_dicts()
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns
