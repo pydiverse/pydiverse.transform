@@ -15,7 +15,7 @@ from pydiverse.transform._internal.backend.table_impl import (
     get_backend,
     split_join_cond,
 )
-from pydiverse.transform._internal.backend.targets import Polars, Scalar, Target
+from pydiverse.transform._internal.backend.targets import Dict, Polars, Scalar, Target
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
@@ -293,15 +293,24 @@ def export(
         if len(table) != 1:
             raise TypeError(
                 "cannot export a table with more than one column to `Scalar`, "
-                f"but found {len(table)} columns"
+                f"found {len(table)} columns"
             )
         df: pl.DataFrame = table >> export(Polars())
         if df.height != 1:
             raise TypeError(
                 "cannot export a table with more than one row to `Scalar`, "
-                f"but found {df.height} rows"
+                f"found {df.height} rows"
             )
         return df.item()
+
+    elif target is Dict or isinstance(target, Dict):
+        df: pl.DataFrame = table >> export(Polars())
+        if df.height != 1:
+            raise TypeError(
+                "cannot export a table with more than one row to `Dict`, "
+                f"found {df.height} rows"
+            )
+        return df.to_dicts()[0]
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
     # to columns

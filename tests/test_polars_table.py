@@ -655,6 +655,16 @@ class TestPolarsLazyImpl:
     def test_scalar_export(self):
         assert (pdt.Table({"a": 1}) >> export(pdt.Scalar)) == 1
 
+    def test_dict_export(self):
+        assert (pdt.Table({"a": 1}) >> export(pdt.Dict)) == {"a": 1}
+        assert (pdt.Table({"a": 1, "b": True}) >> export(pdt.Dict)) == {
+            "a": 1,
+            "b": True,
+        }
+
+        with pytest.raises(TypeError):
+            pdt.Table({"a": [1, 2]}) >> export(pdt.Dict)
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

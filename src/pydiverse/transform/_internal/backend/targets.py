@@ -28,3 +28,6 @@ class SqlAlchemy(Target):
 
 
 class Scalar(Target): ...
+
+
+class Dict(Target): ...
