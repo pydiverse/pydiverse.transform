@@ -677,6 +677,12 @@ class TestPolarsLazyImpl:
             pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.ListOfDicts)
         ) == [{"a": 1, "b": True}, {"a": 2, "b": False}]
 
+    def test_uses_table(self, tbl2, tbl3):
+        assert tbl2.col1.uses_table(tbl2)
+        assert not tbl2.col1.uses_table(tbl3)
+        assert (tbl2.col1 == tbl3.col1).uses_table(tbl3)
+        assert not tbl2.col1.uses_table(tbl2 >> mutate(x=0))
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

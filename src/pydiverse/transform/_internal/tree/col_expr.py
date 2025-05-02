@@ -12,7 +12,6 @@ from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
-import pandas as pd
 import polars as pl
 
 from pydiverse.common import (
@@ -101,6 +100,16 @@ class ColExpr(Generic[T]):
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
+
+    def uses_table(self, table) -> bool:
+        from pydiverse.transform._internal.pipe.table import Table
+
+        errors.check_arg_type(Table, "ColExpr.uses_table", "table", table)
+        return any(
+            any(node == table._ast for node in col._ast.iter_subtree())
+            for col in self.iter_subtree()
+            if isinstance(col, Col)
+        )
 
     def dtype(self) -> Dtype:
         """
@@ -2146,6 +2155,8 @@ class Col(ColExpr):
             return df.get_column(self.name)
         else:
             assert isinstance(target, Pandas)
+            import pandas as pd
+
             return pd.Series(df[self.name])
 
 

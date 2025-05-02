@@ -66,7 +66,7 @@ class MsSqlImpl(SqlImpl):
             final_select = Cache.from_ast(nd).selected_cols()
 
         # boolean / bit conversion
-        for desc in nd.iter_subtree_postorder():
+        for desc in nd.iter_subtree():
             if isinstance(desc, verbs.Verb):
                 desc.map_col_roots(
                     functools.partial(
@@ -78,7 +78,7 @@ class MsSqlImpl(SqlImpl):
                 )
 
         # workaround for correct nulls_first / nulls_last behaviour on MSSQL
-        for desc in nd.iter_subtree_postorder():
+        for desc in nd.iter_subtree():
             if isinstance(desc, verbs.Arrange):
                 desc.order_by = convert_order_list(desc.order_by)
             if isinstance(desc, verbs.Verb):

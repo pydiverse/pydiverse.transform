@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import uuid
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Iterable
 from typing import Literal
 from uuid import UUID
 
@@ -40,14 +40,9 @@ class Verb(AstNode):
 
         return cloned, nd_map, uuid_map
 
-    def iter_subtree_postorder(self) -> Iterable[AstNode]:
-        yield from self.child.iter_subtree_postorder()
+    def iter_subtree(self) -> Iterable[AstNode]:
+        yield from self.child.iter_subtree()
         yield self
-
-    def iter_subtree_preorder(self) -> Generator[AstNode, bool | None, None]:
-        if (yield self):
-            return
-        yield from self.child.iter_subtree_preorder()
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
@@ -224,16 +219,10 @@ class Join(Verb):
         nd_map[self] = cloned
         return cloned, nd_map, uuid_map
 
-    def iter_subtree_postorder(self) -> Iterable[AstNode]:
-        yield from self.child.iter_subtree_postorder()
-        yield from self.right.iter_subtree_postorder()
+    def iter_subtree(self) -> Iterable[AstNode]:
+        yield from self.child.iter_subtree()
+        yield from self.right.iter_subtree()
         yield self
-
-    def iter_subtree_preorder(self) -> Generator[AstNode, bool | None, None]:
-        if (yield self):
-            return
-        yield from self.child.iter_subtree_preorder()
-        yield from self.right.iter_subtree_preorder()
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield self.on

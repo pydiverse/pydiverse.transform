@@ -64,7 +64,7 @@ class DuckDbPolarsImpl(TableImpl):
 
             # tell duckdb which table names in the SQL query correspond to which
             # data frames
-            for desc in nd.iter_subtree_postorder():
+            for desc in nd.iter_subtree():
                 if isinstance(desc, DuckDbPolarsImpl):
                     duckdb.register(desc.table.name, desc.df)
 
