@@ -2224,7 +2224,7 @@ class ColFn(ColExpr):
         args = [repr(e) for e in self.args] + [
             f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
         ]
-        return f'{self.op.name}({", ".join(args)})'
+        return f"{self.op.name}({', '.join(args)})"
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -2447,7 +2447,7 @@ class CaseExpr(ColExpr):
             self._ftype = Ftype.WINDOW
         else:
             raise FunctionTypeError(
-                "incompatible function types found in case statement: " ", ".join(
+                "incompatible function types found in case statement: , ".join(
                     val_ftypes
                 )
             )
@@ -2547,8 +2547,7 @@ class Cast(ColExpr):
                     )
 
                 raise TypeError(
-                    f"cannot cast type {self.val.dtype()} to {self.target_type}."
-                    f"{hint}"
+                    f"cannot cast type {self.val.dtype()} to {self.target_type}.{hint}"
                 )
 
         if types.is_const(self.val.dtype()):
