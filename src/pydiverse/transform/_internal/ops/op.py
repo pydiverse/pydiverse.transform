@@ -101,6 +101,6 @@ class Operator:
         if match is None:
             raise TypeError(
                 f"operator `{self.name}` cannot be called with arguments of type "
-                f'{", ".join(str(t) for t in signature)}'
+                f"{', '.join(str(t) for t in signature)}"
             )
         return match[1]

@@ -183,7 +183,7 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
             IMPLICIT_CONVS[dtypes[0]].keys(),
         )
     ):
-        raise TypeError(f'incompatible types `{", ".join(dtypes)}`')
+        raise TypeError(f"incompatible types `{', '.join(dtypes)}`")
 
     common_ancestors: list[Dtype] = list(common_ancestors)
     return copy.copy(

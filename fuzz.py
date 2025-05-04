@@ -45,7 +45,7 @@ def gen_table(rows: int, types: dict[pdt.Dtype, int]) -> pl.DataFrame:
         if ty in types:
             d = d.with_columns(
                 **{
-                    f"{ty.__class__.__name__.lower()} #{i+1}": pl.lit(fn(rows))
+                    f"{ty.__class__.__name__.lower()} #{i + 1}": pl.lit(fn(rows))
                     for i in range(types[ty])
                 }
             )
