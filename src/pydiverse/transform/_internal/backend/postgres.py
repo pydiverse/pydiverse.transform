@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 
-from pydiverse.common import Bool, Dtype, Int64, String
+from pydiverse.common import Bool, Dtype, Float, Int, Int64, String
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
@@ -139,3 +139,12 @@ with PostgresImpl.impl_store.impl_manager as impl:
     @impl(ops.list_agg)
     def _list_agg(x):
         return sqa.func.array_agg(x)
+
+    @impl(ops.truediv, Int(), Int())
+    @impl(ops.truediv, Float(), Float())
+    def _truediv(x, y):
+        if not isinstance(x.type, Float):
+            x = sqa.cast(x, sqa.Double)
+        if not isinstance(y.type, Float):
+            y = sqa.cast(y, sqa.Double)
+        return x / y

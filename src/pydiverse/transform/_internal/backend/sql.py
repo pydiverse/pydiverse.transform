@@ -772,12 +772,13 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _horizontal_min(*x):
         return sqa.func.LEAST(*x)
 
+    @impl(ops.mean, Int())
+    def _mean(x):
+        return sqa.func.AVG(x, type_=sqa.Double)
+
     @impl(ops.mean)
     def _mean(x):
-        type_ = sqa.Numeric()
-        if isinstance(x.type, sqa.Float):
-            type_ = sqa.Double()
-        return sqa.func.AVG(x, type_=type_)
+        return sqa.func.AVG(x, type_=x.type)
 
     @impl(ops.min)
     def _min(x):

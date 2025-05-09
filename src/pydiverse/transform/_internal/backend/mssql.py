@@ -8,7 +8,7 @@ from uuid import UUID
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import BIT, DATETIME2, TINYINT
 
-from pydiverse.common import Bool, Int, String
+from pydiverse.common import Bool, Float, Int, String
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Target
@@ -372,3 +372,12 @@ with MsSqlImpl.impl_store.impl_manager as impl:
     @impl(ops.max, Bool())
     def _all(x):
         return sqa.func.max(sqa.cast(x, TINYINT))
+
+    @impl(ops.truediv, Int(), Int())
+    @impl(ops.truediv, Float(), Float())
+    def _truediv(x, y):
+        if not isinstance(x.type, Float):
+            x = sqa.cast(x, sqa.Double)
+        if not isinstance(y.type, Float):
+            y = sqa.cast(y, sqa.Double)
+        return x / y
