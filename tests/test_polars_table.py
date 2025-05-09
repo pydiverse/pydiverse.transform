@@ -655,6 +655,34 @@ class TestPolarsLazyImpl:
     def test_scalar_export(self):
         assert (pdt.Table({"a": 1}) >> export(pdt.Scalar)) == 1
 
+    def test_dict_export(self):
+        assert (pdt.Table({"a": 1}) >> export(pdt.Dict)) == {"a": 1}
+        assert (pdt.Table({"a": 1, "b": True}) >> export(pdt.Dict)) == {
+            "a": 1,
+            "b": True,
+        }
+
+        with pytest.raises(TypeError):
+            pdt.Table({"a": [1, 2]}) >> export(pdt.Dict)
+
+    def test_dict_of_lists_export(self):
+        assert (pdt.Table({"a": 1}) >> export(pdt.DictOfLists)) == {"a": [1]}
+        assert (
+            pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.DictOfLists)
+        ) == {"a": [1, 2], "b": [True, False]}
+
+    def test_list_of_dicts_export(self):
+        assert (pdt.Table({"a": 1}) >> export(pdt.ListOfDicts)) == [{"a": 1}]
+        assert (
+            pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.ListOfDicts)
+        ) == [{"a": 1, "b": True}, {"a": 2, "b": False}]
+
+    def test_uses_table(self, tbl2, tbl3):
+        assert tbl2.col1.uses_table(tbl2)
+        assert not tbl2.col1.uses_table(tbl3)
+        assert (tbl2.col1 == tbl3.col1).uses_table(tbl3)
+        assert not tbl2.col1.uses_table(tbl2 >> mutate(x=0))
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

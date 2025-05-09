@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import uuid
-from collections.abc import Generator, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -109,10 +109,7 @@ class TableImpl(AstNode):
 
         return res
 
-    def iter_subtree_postorder(self) -> Iterable[AstNode]:
-        yield self
-
-    def iter_subtree_preorder(self) -> Generator[AstNode, bool | None, None]:
+    def iter_subtree(self) -> Iterable[AstNode]:
         yield self
 
     @classmethod

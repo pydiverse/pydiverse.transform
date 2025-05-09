@@ -37,14 +37,14 @@ def test_min(df4):
         df4,
         lambda t: t
         >> mutate(
-            # int1=pdt.min(C.col1 + 2, C.col2, 9),
-            # int2=pdt.min(C.col1 * C.col2, 0),
-            # int3=pdt.min(C.col1 * C.col2, C.col2 * C.col3, 2 - C.col3),
+            int1=pdt.min(C.col1 + 2, C.col2, 9),
+            int2=pdt.min(C.col1 * C.col2, 0),
+            int3=pdt.min(C.col1 * C.col2, C.col2 * C.col3, 2 - C.col3),
             int4=pdt.min(C.col1),
-            # float1=pdt.min(C.col1, 1.5),
-            # float2=pdt.min(1, C.col1 + 1.5, C.col2, 2.2),
-            # str1=pdt.min(C.col5, "c"),
-            # str2=pdt.min(C.col5, "C"),
+            float1=pdt.min(C.col1, 1.5),
+            float2=pdt.min(1, C.col1 + 1.5, C.col2, 2.2),
+            str1=pdt.min(C.col5, "c"),
+            str2=pdt.min(C.col5, "C"),
         ),
     )
 

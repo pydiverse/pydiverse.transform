@@ -77,7 +77,13 @@ class ImplContextManager:
         is_vararg = len(sig) > 1 and sig[-1] is Ellipsis
         if is_vararg:
             sig = sig[:-1]
-        assert all(isinstance(dtype, Dtype) for dtype in sig)
+
+        if not all(isinstance(dtype, Dtype) for dtype in sig):
+            raise TypeError(
+                "The argument types must have type `Dtype`.\n"
+                "hint: Maybe you forgot the parentheses and passed in the class "
+                "instead of an instance? (E.g. it must be `Int()` instead of `Int`.)"
+            )
 
         def f(g):
             self.impl_store.add_impl(op, None if len(sig) == 0 else sig, is_vararg, g)

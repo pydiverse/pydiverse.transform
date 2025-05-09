@@ -195,7 +195,14 @@ class SqlImpl(TableImpl):
                 return cls.nan()
             elif math.isinf(lit.val):
                 return cls.inf() if lit.val > 0 else -cls.inf()
-        return sqa.literal(lit.val, cls.sqa_type(lit.dtype()))
+
+            # Often, floats are incorrectly converted to decimals
+            # TODO: ensure in tests that the dtype not only match after export to
+            # polars, but also really in the backend
+            return sqa.cast(
+                sqa.literal(lit.val, literal_execute=True), cls.sqa_type(lit.dtype())
+            )
+        return sqa.literal(lit.val, cls.sqa_type(lit.dtype()), literal_execute=True)
 
     @classmethod
     def compile_order(
@@ -554,7 +561,6 @@ class SqlImpl(TableImpl):
 
         return table, query, sqa_expr
 
-    # TODO: we shouldn't need these
     @classmethod
     def sqa_type(cls, pdt_type: Dtype) -> type[sqa.types.TypeEngine]:
         return pdt_type.to_sql()
@@ -766,12 +772,13 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _horizontal_min(*x):
         return sqa.func.LEAST(*x)
 
+    @impl(ops.mean, Int())
+    def _mean(x):
+        return sqa.func.AVG(x, type_=sqa.Double)
+
     @impl(ops.mean)
     def _mean(x):
-        type_ = sqa.Numeric()
-        if isinstance(x.type, sqa.Float):
-            type_ = sqa.Double()
-        return sqa.func.AVG(x, type_=type_)
+        return sqa.func.AVG(x, type_=x.type)
 
     @impl(ops.min)
     def _min(x):
