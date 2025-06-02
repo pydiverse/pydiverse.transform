@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3 (2025-06-2)
+
+- fix error messages
+- fix polars count()
+
 ## 0.3.2 (2025-06-02)
 - add Dict, DictOfLists, ListOfDicts as export types
 - add ColExpr.uses_table to check whether a table occurs in a column expression
