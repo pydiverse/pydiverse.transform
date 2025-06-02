@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.2 (2025-06-02)
+- add Dict, DictOfLists, ListOfDicts as export types
+- add ColExpr.uses_table to check whether a table occurs in a column expression
+- fixes around float in SQL and integer truediv
+
+## 0.3.1 (2025-04-27)
+- fix conda feedstock build
+
+## 0.3.0 (2025-04-25)
+- moved DType code to pydiverse.common package
+- various fixes
+- make `list.agg` work on polars/postgres/duckdb
+- add Scalar as export type
+
+## 0.2.3 (2025-02-04)
+- always set alias in query generation
+- various fixes
+- documentation improvements
+
+## 0.2.2 (2025-10-09)
+- require pandas/SQLAlchemy >= 2.0.0
+- be more strict about iterables in column expressions
+
 ## 0.2.1 (2024-10-07)
 
 - added some functions like exp / log
