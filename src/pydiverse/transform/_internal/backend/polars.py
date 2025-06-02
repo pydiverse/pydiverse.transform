@@ -117,16 +117,25 @@ def compile_order(
     )
 
 
-def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
+def compile_col_expr(
+    expr: ColExpr,
+    name_in_df: dict[UUID, str],
+    op_kwargs: dict[str, Any] | None = None,
+) -> pl.Expr:
     if isinstance(expr, Col):
         return pl.col(name_in_df[expr._uuid])
 
     elif isinstance(expr, ColFn):
         impl = PolarsImpl.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
-        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df) for arg in expr.args]
+        args: list[pl.Expr] = [
+            compile_col_expr(arg, name_in_df, op_kwargs=op_kwargs) for arg in expr.args
+        ]
 
         if (partition_by := expr.context_kwargs.get("partition_by")) is not None:
-            partition_by = [compile_col_expr(pb, name_in_df) for pb in partition_by]
+            partition_by = [
+                compile_col_expr(pb, name_in_df, op_kwargs=op_kwargs)
+                for pb in partition_by
+            ]
 
         arrange = expr.context_kwargs.get("arrange")
         if arrange:
@@ -153,7 +162,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             args = [pl.struct(merge_desc_nulls_last(order_by, descending, nulls_last))]
             arrange = None
 
-        value: pl.Expr = impl(*args, _partition_by=partition_by)
+        value: pl.Expr = impl(*args, _partition_by=partition_by, **(op_kwargs or {}))
 
         # TODO: currently, count and list_agg are the only aggregation function where we
         # don't want to return null for cols containing only null values. If this
@@ -197,12 +206,12 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
         assert len(expr.cases) >= 1
         compiled = pl  # to initialize the when/then-chain
         for cond, val in expr.cases:
-            compiled = compiled.when(compile_col_expr(cond, name_in_df)).then(
-                compile_col_expr(val, name_in_df)
-            )
+            compiled = compiled.when(
+                compile_col_expr(cond, name_in_df, op_kwargs=op_kwargs)
+            ).then(compile_col_expr(val, name_in_df, op_kwargs=op_kwargs))
         if expr.default_val is not None:
             compiled = compiled.otherwise(
-                compile_col_expr(expr.default_val, name_in_df)
+                compile_col_expr(expr.default_val, name_in_df, op_kwargs=op_kwargs)
             )
         return compiled
 
@@ -219,7 +228,7 @@ def compile_col_expr(expr: ColExpr, name_in_df: dict[UUID, str]) -> pl.Expr:
             expr.target_type.is_int() or expr.target_type.is_float()
         ) and types.without_const(expr.val.dtype()) == String():
             expr.val = expr.val.str.strip()
-        compiled = compile_col_expr(expr.val, name_in_df).cast(
+        compiled = compile_col_expr(expr.val, name_in_df, op_kwargs=op_kwargs).cast(
             expr.target_type.to_polars()
         )
 
@@ -337,7 +346,11 @@ def compile_ast(
 
         aggregations = {}
         for name, val in zip(nd.names, nd.values, strict=True):
-            compiled = compile_col_expr(val, name_in_df)
+            # For some aggregations, a different polars function must be used if there
+            # is not grouping. (In this case, `df.select` is called.)
+            compiled = compile_col_expr(
+                val, name_in_df, op_kwargs={"_empty_group_by": len(partition_by) == 0}
+            )
             if has_path_to_leaf_without_agg(val):
                 compiled = compiled.first()
             aggregations[name] = compiled
@@ -719,5 +732,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
         return x.cum_sum()
 
     @impl(ops.list_agg)
-    def _list_agg(x):
+    def _list_agg(x, *, _empty_group_by: bool):
+        if _empty_group_by:
+            return x.implode()
         return x
