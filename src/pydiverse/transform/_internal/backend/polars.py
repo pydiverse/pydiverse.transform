@@ -343,11 +343,11 @@ def compile_ast(
             aggregations[name] = compiled
 
         group_by = [name_in_df[uid] for uid in partition_by]
-        # polars complains about an empty group_by, so we insert a dummy constant
-        # (which will get deselected later)
-        df = df.group_by(*(group_by or [pl.lit(0).alias(str(uuid.uuid1()))])).agg(
-            **aggregations
-        )
+        # polars complains about an empty group_by
+        if group_by:
+            df = df.group_by(*group_by).agg(**aggregations)
+        else:
+            df = df.select(**aggregations)
 
         # we have to remove the columns here for the join hidden column rename to work
         # correctly (otherwise it would try to rename hidden columns that do not exist)

@@ -240,7 +240,7 @@ def export(
 @verb
 def export(
     table: Table,
-    target: Target,
+    target: Target | type[Target],
     *,
     schema_overrides: dict[str, Any] | None = None,
 ) -> Pipeable:
@@ -296,21 +296,27 @@ def export(
     └─────┴────────┴───────────┘
     """
 
-    if target is Scalar or isinstance(target, Scalar):
+    errors.check_arg_type(Target | type(Target), "export", "target", target)
+
+    if not isinstance(target, Target):
+        assert issubclass(target, Target)
+        target = target()
+
+    if isinstance(target, Scalar):
         if len(table) != 1:
             raise TypeError(
-                "cannot export a table with more than one column to `Scalar`, "
+                "to export a table to a scalar, it must have exactly one column, but "
                 f"found {len(table)} columns"
             )
         df: pl.DataFrame = table >> export(Polars())
         if df.height != 1:
             raise TypeError(
-                "cannot export a table with more than one row to `Scalar`, "
+                "to export a table to a scalar, it must have exactly one row, but "
                 f"found {df.height} rows"
             )
         return df.item()
 
-    elif target is Dict or isinstance(target, Dict):
+    elif isinstance(target, Dict):
         df: pl.DataFrame = table >> export(Polars())
         if df.height != 1:
             raise TypeError(
@@ -319,10 +325,10 @@ def export(
             )
         return df.to_dicts()[0]
 
-    elif target is DictOfLists or isinstance(target, DictOfLists):
+    elif isinstance(target, DictOfLists):
         return (table >> export(Polars())).to_dict(as_series=False)
 
-    elif target is ListOfDicts or isinstance(target, ListOfDicts):
+    elif isinstance(target, ListOfDicts):
         return (table >> export(Polars())).to_dicts()
 
     # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
