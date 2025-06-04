@@ -187,7 +187,7 @@ class Table:
             setattr(self, slot, val)
 
     def __iter__(self) -> Iterable[Col]:
-        cols = self._cache.selected_cols()
+        cols = [self.__getattr__(name) for name in self._cache.name_to_uuid.keys()]
         yield from cols
 
     def __contains__(self, col: str | Col | ColName) -> bool:
