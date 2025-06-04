@@ -58,6 +58,8 @@ class MsSqlImpl(SqlImpl):
                 if col._uuid not in schema_overrides:
                     schema_overrides[col._uuid] = col.dtype().to_polars()
 
+        # TODO: make sure the dtypes are preserved as in the database on export to
+        # polars. Currently all ints become int64 and all floats float64
         return super().export(nd, target, schema_overrides=schema_overrides)
 
     @classmethod
@@ -226,7 +228,9 @@ def convert_bool_bit(
         return_type = "bit"
 
     elif isinstance(expr, Cast):
-        return Cast(convert_bool_bit(expr.val, "bit"), expr.target_type)
+        return Cast(
+            convert_bool_bit(expr.val, "bit"), expr.target_type, strict=expr.strict
+        )
 
     if types.without_const(expr.dtype()) == Bool():
         if desired_return_type == "bool" and return_type == "bit":

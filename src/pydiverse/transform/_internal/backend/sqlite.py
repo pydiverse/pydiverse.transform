@@ -59,6 +59,7 @@ class SqliteImpl(SqlImpl):
 
     @classmethod
     def cast_compiled(cls, cast: Cast, compiled_expr: sqa.ColumnElement):
+        # For SQLite, we ignore the `strict` parameter to `cast`.
         return sqa.cast(compiled_expr, cls.sqa_type(cast.target_type))
 
     @classmethod
