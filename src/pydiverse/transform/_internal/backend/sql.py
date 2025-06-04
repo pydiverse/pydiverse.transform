@@ -221,10 +221,19 @@ class SqlImpl(TableImpl):
         return order_expr
 
     @classmethod
-    def compile_cast(cls, cast: Cast, sqa_expr: dict[str, sqa.Label]) -> sqa.Cast:
-        return cls.compile_col_expr(cast.val, sqa_expr).cast(
-            cls.sqa_type(cast.target_type)
-        )
+    def compile_cast(
+        cls, cast: Cast, sqa_expr: dict[str, sqa.Label]
+    ) -> sqa.Cas | sqa.TryCast:
+        return cls.cast_compiled(cast, cls.compile_col_expr(cast.val, sqa_expr))
+
+    @classmethod
+    def cast_compiled(
+        cls, cast: Cast, compiled_expr: sqa.ColumnElement
+    ) -> sqa.Cast | sqa.TryCast:
+        if cast.strict:
+            return sqa.cast(compiled_expr, cls.sqa_type(cast.target_type))
+        else:
+            return sqa.try_cast(compiled_expr, cls.sqa_type(cast.target_type))
 
     @classmethod
     def fix_fn_types(

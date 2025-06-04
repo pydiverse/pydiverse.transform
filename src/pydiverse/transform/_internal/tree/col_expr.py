@@ -182,7 +182,7 @@ class ColExpr(Generic[T]):
             wrap_literal(default) if default is not None else self,
         )
 
-    def cast(self, target_type: Dtype | type) -> Cast:
+    def cast(self, target_type: Dtype | type, *, strict: bool = True) -> Cast:
         """
         Cast to a different data type.
 
@@ -259,12 +259,13 @@ class ColExpr(Generic[T]):
         """
 
         errors.check_arg_type(Dtype | type, "ColExpr.cast", "target_type", target_type)
+        errors.check_arg_type(bool, "ColExpr.cast", "strict", strict)
         if type(target_type) is type and not issubclass(target_type, Dtype):
             TypeError(
                 "argument for parameter `target_type` of `ColExpr.cast` must be an"
                 "instance or subclass of pdt.Dtype"
             )
-        return Cast(self, target_type)
+        return Cast(self, target_type, strict=strict)
 
     def __rshift__(self, rhs):
         from pydiverse.transform._internal.pipe.pipeable import Pipeable
@@ -2476,7 +2477,7 @@ class CaseExpr(ColExpr):
 
 
 class Cast(ColExpr):
-    def __init__(self, val: ColExpr, target_type: Dtype):
+    def __init__(self, val: ColExpr, target_type: Dtype, *, strict: bool = True):
         if type(target_type) is type:
             target_type = target_type()
         if types.is_const(target_type):
@@ -2484,6 +2485,7 @@ class Cast(ColExpr):
 
         self.val = val
         self.target_type = copy.copy(target_type)
+        self.strict = strict
         super().__init__(copy.copy(target_type))
         self.dtype()
 
@@ -2561,7 +2563,7 @@ class Cast(ColExpr):
         yield self.val
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        return g(Cast(self.val.map_subtree(g), self.target_type))
+        return g(Cast(self.val.map_subtree(g), self.target_type, strict=self.strict))
 
 
 @dataclasses.dataclass(slots=True)

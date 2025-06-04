@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 
-from pydiverse.common import Bool, Dtype, Float, Int, Int64, String
+from pydiverse.common import Bool, Dtype, Float, Int, Int32, Int64, String
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
@@ -15,14 +15,14 @@ class PostgresImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        compiled_val = cls.compile_col_expr(cast.val, sqa_col)
-
         if types.without_const(cast.val.dtype()).is_float():
             if cast.target_type.is_int():
-                return sqa.func.trunc(compiled_val).cast(sqa.BigInteger())
+                return cls.cast_compiled(
+                    cast, sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col))
+                )
 
             if cast.target_type == String():
-                compiled = sqa.cast(compiled_val, sqa.String)
+                compiled = super().compile_cast(cast, sqa_col)
                 return sqa.case(
                     (compiled == "NaN", "nan"),
                     (compiled == "Infinity", "inf"),
@@ -34,9 +34,10 @@ class PostgresImpl(SqlImpl):
             types.without_const(cast.val.dtype()) == Bool()
             and cast.target_type == Int64()
         ):
-            return sqa.cast(compiled_val, sqa.Integer)
+            # postgres does not like casts bool -> bigint, so we go via int
+            return cls.compile_cast(Cast(cast.val, Int32()).cast(Int64()), sqa_col)
 
-        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
+        return super().compile_cast(cast, sqa_col)
 
     @classmethod
     def sqa_type(cls, pdt_type: Dtype):

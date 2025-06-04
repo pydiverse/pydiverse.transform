@@ -8,7 +8,7 @@ from uuid import UUID
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import BIT, DATETIME2, TINYINT
 
-from pydiverse.common import Bool, Float, Int, String
+from pydiverse.common import Bool, Float, Int, String, Uint8
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Target
@@ -111,6 +111,12 @@ class MsSqlImpl(SqlImpl):
             return val.cast(BIT)
 
         return val
+
+    @classmethod
+    def sqa_type(cls, pdt_type):
+        if isinstance(pdt_type, Uint8):
+            return TINYINT
+        return super().sqa_type(pdt_type)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
@@ -220,10 +226,7 @@ def convert_bool_bit(
         return_type = "bit"
 
     elif isinstance(expr, Cast):
-        return Cast(
-            convert_bool_bit(expr.val, "bit"),
-            expr.target_type,
-        )
+        return Cast(convert_bool_bit(expr.val, "bit"), expr.target_type)
 
     if types.without_const(expr.dtype()) == Bool():
         if desired_return_type == "bool" and return_type == "bit":

@@ -228,9 +228,9 @@ def compile_col_expr(
             expr.target_type.is_int() or expr.target_type.is_float()
         ) and types.without_const(expr.val.dtype()) == String():
             expr.val = expr.val.str.strip()
-        compiled = compile_col_expr(expr.val, name_in_df, op_kwargs=op_kwargs).cast(
-            expr.target_type.to_polars()
-        )
+
+        compiled = compile_col_expr(expr.val, name_in_df, op_kwargs=op_kwargs)
+        compiled = compiled.cast(expr.target_type.to_polars(), strict=expr.strict)
 
         if (
             types.without_const(expr.val.dtype()).is_float()

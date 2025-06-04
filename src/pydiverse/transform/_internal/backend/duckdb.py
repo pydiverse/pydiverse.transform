@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+import duckdb_engine.datatypes as duckdb_types
 import polars as pl
 import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
-from pydiverse.common import Int64
+from pydiverse.common import Dtype, Int8, Int64, Uint8, Uint16, Uint32, Uint64
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
@@ -42,9 +43,10 @@ class DuckDbImpl(SqlImpl):
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         if cast.val.dtype().is_float() and cast.target_type.is_int():
-            return sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)).cast(
-                cls.sqa_type(cast.target_type)
+            return cls.cast_compiled(
+                cast, sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col))
             )
+
         return super().compile_cast(cast, sqa_col)
 
     @classmethod
@@ -66,6 +68,21 @@ class DuckDbImpl(SqlImpl):
         cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
     ) -> sqa.ColumnElement:
         return impl(*args[:-1], aggregate_order_by(args[-1], *order_by))
+
+    @classmethod
+    def sqa_type(cls, pdt_type: Dtype):
+        if isinstance(pdt_type, Int8):
+            return duckdb_types.TinyInteger()
+        if isinstance(pdt_type, Uint8):
+            return duckdb_types.UTinyInteger()
+        if isinstance(pdt_type, Uint16):
+            return duckdb_types.UInt16()
+        if isinstance(pdt_type, Uint32):
+            return duckdb_types.UInt32()
+        if isinstance(pdt_type, Uint64):
+            return duckdb_types.UInt64()
+
+        return super().sqa_type(pdt_type)
 
 
 with DuckDbImpl.impl_store.impl_manager as impl:

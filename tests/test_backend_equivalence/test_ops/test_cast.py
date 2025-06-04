@@ -3,6 +3,8 @@ from __future__ import annotations
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.pipe.c import C
 from pydiverse.transform._internal.pipe.verbs import mutate
+from pydiverse.transform._internal.tree import types
+from tests.fixtures.backend import skip_backends
 from tests.util.assertion import assert_result_equal
 
 
@@ -88,5 +90,20 @@ def test_date_to_string(df_datetime):
             x=t.col1.cast(pdt.Date()).cast(pdt.String()),
             y=t.col2.cast(pdt.Date()).cast(pdt.String()),
             z=t.cdate.cast(pdt.String()),
+        ),
+    )
+
+
+@skip_backends("postgres")
+def test_non_strict_cast(df_strings):
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> mutate(
+            **{
+                f"{col.name}_{dtype}": col.cast(dtype, strict=False)
+                for col in t
+                for dtype in (*types.INT_SUBTYPES, *types.FLOAT_SUBTYPES)
+            }
         ),
     )
