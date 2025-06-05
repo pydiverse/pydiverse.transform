@@ -61,9 +61,10 @@ class PolarsImpl(TableImpl):
     ) -> Any:
         lf, name_in_df, select, _ = compile_ast(nd)
         lf = lf.select(*(name_in_df[uid] for uid in select))
+        assert isinstance(lf, pl.LazyFrame)
 
         if isinstance(target, Polars):
-            if not target.lazy and isinstance(lf, pl.LazyFrame):
+            if not target.lazy:
                 lf = lf.collect()
             lf.name = nd.name
             return lf

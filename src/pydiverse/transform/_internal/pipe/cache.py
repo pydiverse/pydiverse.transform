@@ -215,9 +215,9 @@ class Cache:
         ):
             return "window function in `filter`"
 
-        if isinstance(node, verbs.Summarize) and (
-            self.group_by and self.group_by != set(self.partition_by)
-        ):
+        if isinstance(node, verbs.Summarize):
+            if self.group_by and self.group_by != set(self.partition_by):
+                return "nested summarize"
             if any(
                 (col.ftype(agg_is_window=False) in (Ftype.WINDOW, Ftype.AGGREGATE))
                 for col in node.iter_col_nodes()

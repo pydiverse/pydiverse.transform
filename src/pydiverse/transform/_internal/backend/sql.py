@@ -408,7 +408,7 @@ class SqlImpl(TableImpl):
             if needed_cols.keys().isdisjoint(sqa_expr.keys()):
                 # We cannot select zero columns from a subquery. This happens when the
                 # user only 0-ary functions after the subquery, e.g. `count`.
-                needed_cols[next(iter(sqa_expr.keys()))] = 1
+                needed_cols[query.select[0]] = 1
 
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
