@@ -216,6 +216,7 @@ SIMPLE_TYPES = (
     String(),
     Date(),
     Datetime(),
+    Time(),
     Bool(),
     NullType(),
     Duration(),
@@ -251,6 +252,7 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
     String(): {String(): (0, 0)},
     Decimal(): {Decimal(): (0, 0)},
     Datetime(): {Datetime(): (0, 0)},
+    Time(): {Time(): (0, 0)},
     Date(): {Date(): (0, 0)},
     Bool(): {Bool(): (0, 0)},
     NullType(): {
@@ -287,6 +289,8 @@ COMPARABLE = (
     Decimal(),
     String(),
     Datetime(),
+    Time(),
+    Duration(),
     Date(),
     Bool(),
 )

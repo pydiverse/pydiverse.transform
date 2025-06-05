@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import operator
 import uuid
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any
@@ -156,6 +157,10 @@ def split_join_cond(expr: ColFn) -> list[ColFn]:
         return []
     elif expr.op == ops.bool_and:
         return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
+    elif expr.op == ops.horizontal_all:
+        return functools.reduce(
+            operator.add, (split_join_cond(arg) for arg in expr.args)
+        )
     else:
         return [expr]
 

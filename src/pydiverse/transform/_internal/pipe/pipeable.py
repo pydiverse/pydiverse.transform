@@ -65,6 +65,8 @@ def modify_ast(fn):
 
         def _check_subquery(cache, ast_node):
             if (reason := cache.requires_subquery(new._ast)) is not None:
+                # TODO: we should also search for aliases in the subtree and see if we
+                # can make it work by inserting a subquery at one of those.
                 if not isinstance(ast_node, verbs.Alias):
                     raise SubqueryError(
                         f"Executing the `{new._ast.__class__.__name__.lower()}` verb "

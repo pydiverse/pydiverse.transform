@@ -25,6 +25,7 @@ from pydiverse.common import (
     Int,
     List,
     String,
+    Time,
 )
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
@@ -789,6 +790,12 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
+    def __ge__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
+
+    @overload
     def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
@@ -813,6 +820,12 @@ class ColExpr(Generic[T]):
 
     @overload
     def __gt__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
 
     @overload
     def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -892,6 +905,12 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
 
     @overload
+    def __le__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
+
+    @overload
     def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
 
     @overload
@@ -916,6 +935,12 @@ class ColExpr(Generic[T]):
 
     @overload
     def __lt__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
 
     @overload
     def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -972,6 +997,22 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Time],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Time]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Duration],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Duration]: ...
 
     @overload
     def max(
@@ -1072,6 +1113,22 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Time],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Time]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Duration],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Duration]: ...
 
     @overload
     def min(

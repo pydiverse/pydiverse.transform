@@ -5,6 +5,20 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, overload
 
+from pydiverse.common import (
+    Bool,
+    Date,
+    Datetime,
+    Decimal,
+    Dtype,
+    Duration,
+    Float,
+    Int,
+    List,
+    String,
+    Time,
+)
+from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
@@ -15,17 +29,6 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     WhenClause,
     wrap_literal,
-)
-from pydiverse.transform._internal.tree.types import (
-    Bool,
-    Date,
-    Datetime,
-    Decimal,
-    Dtype,
-    Duration,
-    Float,
-    Int,
-    String,
 )
 
 
@@ -43,7 +46,7 @@ def when(condition: ColExpr) -> WhenClause:
     return WhenClause([], wrap_literal(condition))
 
 
-def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
+def lit(val: Any, dtype: Dtype | type[Dtype] | None = None) -> LiteralCol:
     """
     Creates a pydiverse.transform expression from a python builtin type.
 
@@ -52,6 +55,15 @@ def lit(val: Any, dtype: Dtype | None = None) -> LiteralCol:
     ``lit`` allows to set the exact pydiverse.transform type, which may be useful
     sometimes.
     """
+    errors.check_arg_type(Dtype | type | None, "lit", "dtype", dtype)
+    if dtype is not None and not isinstance(dtype, Dtype):
+        if not issubclass(dtype, Dtype) or dtype is List:
+            raise TypeError(
+                "argument for parameter `dtype` of `lit` must be an"
+                "instance or subclass of `Dtype` (and for `List`, you have to"
+                "specify the inner type)"
+            )
+        dtype = dtype()
     if dtype is not None and types.is_subtype(dtype):
         return LiteralCol(val, dtype).cast(dtype)
     return LiteralCol(val, dtype)
@@ -194,6 +206,14 @@ def max(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: 
 
 
 @overload
+def max(arg: ColExpr[Time], *args: ColExpr[Time]) -> ColExpr[Time]: ...
+
+
+@overload
+def max(arg: ColExpr[Duration], *args: ColExpr[Duration]) -> ColExpr[Duration]: ...
+
+
+@overload
 def max(arg: ColExpr[Date], *args: ColExpr[Date]) -> ColExpr[Date]: ...
 
 
@@ -252,6 +272,14 @@ def min(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
 
 @overload
 def min(arg: ColExpr[Datetime], *args: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
+
+
+@overload
+def min(arg: ColExpr[Time], *args: ColExpr[Time]) -> ColExpr[Time]: ...
+
+
+@overload
+def min(arg: ColExpr[Duration], *args: ColExpr[Duration]) -> ColExpr[Duration]: ...
 
 
 @overload
