@@ -64,12 +64,13 @@ def modify_ast(fn):
         assert new._ast != table._ast
 
         def _check_subquery(cache, ast_node):
-            if cache.requires_subquery(new._ast):
+            if (reason := cache.requires_subquery(new._ast)) is not None:
                 if not isinstance(ast_node, verbs.Alias):
                     raise SubqueryError(
                         f"Executing the `{new._ast.__class__.__name__.lower()}` verb "
                         f"on the table `{ast_node.name}` requires a subquery, which "
                         "is forbidden in transform by default.\n"
+                        f"reason for the subquery: {reason}\n"
                         f"hint: Materialize the table `{ast_node.name}` before this "
                         "verb. If you are sure you want to do a subquery, put an "
                         "`>> alias()` before this verb. "
