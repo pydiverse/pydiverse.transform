@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.3 (2025-06-2)
+## 0.3.3 (2025-06-02)
 
 - fix error messages
 - fix polars count()
