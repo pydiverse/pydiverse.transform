@@ -7,7 +7,6 @@ from pydiverse.transform._internal.tree.types import (
     Bool,
     Date,
     Datetime,
-    Decimal,
     Duration,
     Float,
     Int,
@@ -43,7 +42,6 @@ truediv = Operator(
     "__truediv__",
     Signature(Int(), Int(), return_type=Float()),
     Signature(Float(), Float(), return_type=Float()),
-    Signature(Decimal(), Decimal(), return_type=Decimal()),
     doc="True division /",
 )
 

@@ -9,7 +9,6 @@ from pydiverse.common import (
     Bool,
     Date,
     Datetime,
-    Decimal,
     Dtype,
     Duration,
     Float,
@@ -194,10 +193,6 @@ def max(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
 
 
 @overload
-def max(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-
-@overload
 def max(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
 
 
@@ -263,10 +258,6 @@ def min(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
 
 
 @overload
-def min(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-
-@overload
 def min(arg: ColExpr[String], *args: ColExpr[String]) -> ColExpr[String]: ...
 
 
@@ -329,10 +320,6 @@ def sum(arg: ColExpr[Int], *args: ColExpr[Int]) -> ColExpr[Int]: ...
 
 @overload
 def sum(arg: ColExpr[Float], *args: ColExpr[Float]) -> ColExpr[Float]: ...
-
-
-@overload
-def sum(arg: ColExpr[Decimal], *args: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
 
 @overload

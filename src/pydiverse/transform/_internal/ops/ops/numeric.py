@@ -6,7 +6,6 @@ from pydiverse.transform._internal.tree.types import (
     NUMERIC,
     Bool,
     Const,
-    Decimal,
     Float,
     Int,
 )
@@ -15,7 +14,6 @@ pow = Operator(
     "__pow__",
     Signature(Int(), Int(), return_type=Float()),
     Signature(Float(), Float(), return_type=Float()),
-    Signature(Decimal(), Decimal(), return_type=Decimal()),
     doc="""
 Computes the power x ** y.
 
@@ -60,14 +58,12 @@ Rounds to a given number of decimals.
 floor = Operator(
     "floor",
     Signature(Float(), return_type=Float()),
-    Signature(Decimal(), return_type=Decimal()),
     doc="Returns the largest integer less than or equal to the input.",
 )
 
 ceil = Operator(
     "ceil",
     Signature(Float(), return_type=Float()),
-    Signature(Decimal(), return_type=Decimal()),
     doc="Returns the smallest integer greater than or equal to the input.",
 )
 

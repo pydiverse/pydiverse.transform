@@ -18,7 +18,6 @@ from pydiverse.common import (
     Bool,
     Date,
     Datetime,
-    Decimal,
     Dtype,
     Duration,
     Float,
@@ -305,9 +304,6 @@ class ColExpr(Generic[T]):
     @overload
     def abs(self: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def abs(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def abs(self: ColExpr) -> ColExpr:
         """Computes the absolute value."""
 
@@ -318,9 +314,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __add__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __add__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     @overload
     def __add__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
@@ -353,9 +346,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __radd__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __radd__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     @overload
     def __radd__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
@@ -637,13 +627,7 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.bool_xor, rhs, self)
 
-    @overload
-    def ceil(self: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def ceil(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-    def ceil(self: ColExpr) -> ColExpr:
+    def ceil(self: ColExpr[Float]) -> ColExpr[Float]:
         """Returns the smallest integer greater than or equal to the input."""
 
         return ColFn(ops.ceil, self)
@@ -685,13 +669,7 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.fill_null, self, rhs)
 
-    @overload
-    def floor(self: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def floor(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-    def floor(self: ColExpr) -> ColExpr:
+    def floor(self: ColExpr[Float]) -> ColExpr[Float]:
         """Returns the largest integer less than or equal to the input."""
 
         return ColFn(ops.floor, self)
@@ -781,9 +759,6 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
-
-    @overload
     def __ge__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
@@ -811,9 +786,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __gt__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
-
-    @overload
-    def __gt__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
 
     @overload
     def __gt__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
@@ -896,9 +868,6 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
-
-    @overload
     def __le__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
@@ -926,9 +895,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __lt__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
-
-    @overload
-    def __lt__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
 
     @overload
     def __lt__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
@@ -973,14 +939,6 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Float]: ...
-
-    @overload
-    def max(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
 
     @overload
     def max(
@@ -1050,14 +1008,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def mean(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
-    @overload
-    def mean(
         self: ColExpr[Int],
         *,
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
@@ -1089,14 +1039,6 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Float]: ...
-
-    @overload
-    def min(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
 
     @overload
     def min(
@@ -1242,9 +1184,6 @@ class ColExpr(Generic[T]):
     @overload
     def __mul__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __mul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def __mul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Multiplication *"""
 
@@ -1256,9 +1195,6 @@ class ColExpr(Generic[T]):
     @overload
     def __rmul__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __rmul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def __rmul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Multiplication *"""
 
@@ -1269,9 +1205,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __neg__(self: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __neg__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __neg__(self: ColExpr) -> ColExpr:
         """The unary - (negation) operator (__neg__)"""
@@ -1323,9 +1256,6 @@ class ColExpr(Generic[T]):
     @overload
     def __pos__(self: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __pos__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def __pos__(self: ColExpr) -> ColExpr:
         """The unary + operator (__pos__)"""
 
@@ -1336,9 +1266,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __pow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __pow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __pow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """
@@ -1357,9 +1284,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rpow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __rpow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __rpow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """
@@ -1389,14 +1313,6 @@ class ColExpr(Generic[T]):
         arrange: ColExpr | Iterable[ColExpr] | None = None,
     ) -> ColExpr[Float]: ...
 
-    @overload
-    def prefix_sum(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
     def prefix_sum(
         self: ColExpr,
         *,
@@ -1414,9 +1330,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def round(self: ColExpr[Float], decimals: int = 0) -> ColExpr[Float]: ...
-
-    @overload
-    def round(self: ColExpr[Decimal], decimals: int = 0) -> ColExpr[Decimal]: ...
 
     def round(self: ColExpr, decimals: int = 0) -> ColExpr:
         """
@@ -1490,9 +1403,6 @@ class ColExpr(Generic[T]):
     def __sub__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     @overload
-    def __sub__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-    @overload
     def __sub__(
         self: ColExpr[Datetime], rhs: ColExpr[Datetime]
     ) -> ColExpr[Duration]: ...
@@ -1510,9 +1420,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rsub__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __rsub__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     @overload
     def __rsub__(
@@ -1545,14 +1452,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def sum(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
-    @overload
-    def sum(
         self: ColExpr[Bool],
         *,
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
@@ -1575,11 +1474,6 @@ class ColExpr(Generic[T]):
     @overload
     def __truediv__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __truediv__(
-        self: ColExpr[Decimal], rhs: ColExpr[Decimal]
-    ) -> ColExpr[Decimal]: ...
-
     def __truediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """True division /"""
 
@@ -1590,11 +1484,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rtruediv__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __rtruediv__(
-        self: ColExpr[Decimal], rhs: ColExpr[Decimal]
-    ) -> ColExpr[Decimal]: ...
 
     def __rtruediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """True division /"""

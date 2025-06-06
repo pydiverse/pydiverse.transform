@@ -206,7 +206,7 @@ INT_SUBTYPES = (
     Int32(),
     Int64(),
 )
-FLOAT_SUBTYPES = (Float32(), Float64())
+FLOAT_SUBTYPES = (Float32(), Float64(), Decimal())
 SIMPLE_TYPES = (
     *INT_SUBTYPES,
     *FLOAT_SUBTYPES,
@@ -250,7 +250,7 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
     },
     Float(): {Float(): (0, 0)},
     String(): {String(): (0, 0)},
-    Decimal(): {Decimal(): (0, 0)},
+    Decimal(): {Decimal(): (0, 0), Float(): (0, 1)},
     Datetime(): {Datetime(): (0, 0)},
     Time(): {Time(): (0, 0)},
     Date(): {Date(): (0, 0)},
@@ -282,11 +282,10 @@ def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
     return IMPLICIT_CONVS[without_const(dtype)][without_const(target)]
 
 
-NUMERIC = (Int(), Float(), Decimal())
+NUMERIC = (Int(), Float())
 COMPARABLE = (
     Int(),
     Float(),
-    Decimal(),
     String(),
     Datetime(),
     Time(),

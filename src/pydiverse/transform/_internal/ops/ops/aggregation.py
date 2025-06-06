@@ -7,7 +7,6 @@ from pydiverse.transform._internal.tree.types import (
     NUMERIC,
     Bool,
     Const,
-    Decimal,
     Float,
     Int,
     S,
@@ -57,7 +56,7 @@ max = Aggregation(
 
 mean = Aggregation(
     "mean",
-    *(Signature(dtype, return_type=dtype) for dtype in (Float(), Decimal())),
+    Signature(Float(), return_type=Float()),
     Signature(Int(), return_type=Float()),
     doc="Computes the average value in each group.",
 )
