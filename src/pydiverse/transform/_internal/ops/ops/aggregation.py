@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 from pydiverse.transform._internal.ops.op import ContextKwarg, Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
@@ -7,7 +8,6 @@ from pydiverse.transform._internal.tree.types import (
     NUMERIC,
     Bool,
     Const,
-    Decimal,
     Float,
     Int,
     S,
@@ -57,7 +57,7 @@ max = Aggregation(
 
 mean = Aggregation(
     "mean",
-    *(Signature(dtype, return_type=dtype) for dtype in (Float(), Decimal())),
+    Signature(Float(), return_type=Float()),
     Signature(Int(), return_type=Float()),
     doc="Computes the average value in each group.",
 )

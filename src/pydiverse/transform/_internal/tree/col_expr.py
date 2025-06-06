@@ -1,5 +1,7 @@
-# ruff: noqa: A002
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
+# ruff: noqa: A002
 from __future__ import annotations
 
 import copy
@@ -18,13 +20,13 @@ from pydiverse.common import (
     Bool,
     Date,
     Datetime,
-    Decimal,
     Dtype,
     Duration,
     Float,
     Int,
     List,
     String,
+    Time,
 )
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
@@ -182,7 +184,7 @@ class ColExpr(Generic[T]):
             wrap_literal(default) if default is not None else self,
         )
 
-    def cast(self, target_type: Dtype | type) -> Cast:
+    def cast(self, target_type: Dtype | type, *, strict: bool = True) -> Cast:
         """
         Cast to a different data type.
 
@@ -259,12 +261,13 @@ class ColExpr(Generic[T]):
         """
 
         errors.check_arg_type(Dtype | type, "ColExpr.cast", "target_type", target_type)
+        errors.check_arg_type(bool, "ColExpr.cast", "strict", strict)
         if type(target_type) is type and not issubclass(target_type, Dtype):
             TypeError(
                 "argument for parameter `target_type` of `ColExpr.cast` must be an"
                 "instance or subclass of pdt.Dtype"
             )
-        return Cast(self, target_type)
+        return Cast(self, target_type, strict=strict)
 
     def __rshift__(self, rhs):
         from pydiverse.transform._internal.pipe.pipeable import Pipeable
@@ -303,9 +306,6 @@ class ColExpr(Generic[T]):
     @overload
     def abs(self: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def abs(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def abs(self: ColExpr) -> ColExpr:
         """Computes the absolute value."""
 
@@ -316,9 +316,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __add__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __add__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     @overload
     def __add__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
@@ -351,9 +348,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __radd__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __radd__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     @overload
     def __radd__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[String]: ...
@@ -635,13 +629,7 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.bool_xor, rhs, self)
 
-    @overload
-    def ceil(self: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def ceil(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-    def ceil(self: ColExpr) -> ColExpr:
+    def ceil(self: ColExpr[Float]) -> ColExpr[Float]:
         """Returns the smallest integer greater than or equal to the input."""
 
         return ColFn(ops.ceil, self)
@@ -683,13 +671,7 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.fill_null, self, rhs)
 
-    @overload
-    def floor(self: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def floor(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-    def floor(self: ColExpr) -> ColExpr:
+    def floor(self: ColExpr[Float]) -> ColExpr[Float]:
         """Returns the largest integer less than or equal to the input."""
 
         return ColFn(ops.floor, self)
@@ -779,13 +761,16 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __ge__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
-
-    @overload
     def __ge__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
     def __ge__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __ge__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
 
     @overload
     def __ge__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -805,13 +790,16 @@ class ColExpr(Generic[T]):
     def __gt__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __gt__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
-
-    @overload
     def __gt__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
     def __gt__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __gt__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
 
     @overload
     def __gt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -882,13 +870,16 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __le__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
-
-    @overload
     def __le__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
     def __le__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __le__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
 
     @overload
     def __le__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -908,13 +899,16 @@ class ColExpr(Generic[T]):
     def __lt__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Bool]: ...
 
     @overload
-    def __lt__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Bool]: ...
-
-    @overload
     def __lt__(self: ColExpr[String], rhs: ColExpr[String]) -> ColExpr[Bool]: ...
 
     @overload
     def __lt__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Time], rhs: ColExpr[Time]) -> ColExpr[Bool]: ...
+
+    @overload
+    def __lt__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Bool]: ...
 
     @overload
     def __lt__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Bool]: ...
@@ -950,14 +944,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def max(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
-    @overload
-    def max(
         self: ColExpr[String],
         *,
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
@@ -971,6 +957,22 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Time],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Time]: ...
+
+    @overload
+    def max(
+        self: ColExpr[Duration],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Duration]: ...
 
     @overload
     def max(
@@ -1008,14 +1010,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def mean(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
-    @overload
-    def mean(
         self: ColExpr[Int],
         *,
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
@@ -1050,14 +1044,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def min(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
-    @overload
-    def min(
         self: ColExpr[String],
         *,
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
@@ -1071,6 +1057,22 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Time],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Time]: ...
+
+    @overload
+    def min(
+        self: ColExpr[Duration],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
+    ) -> ColExpr[Duration]: ...
 
     @overload
     def min(
@@ -1184,9 +1186,6 @@ class ColExpr(Generic[T]):
     @overload
     def __mul__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __mul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def __mul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Multiplication *"""
 
@@ -1198,9 +1197,6 @@ class ColExpr(Generic[T]):
     @overload
     def __rmul__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __rmul__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def __rmul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """Multiplication *"""
 
@@ -1211,9 +1207,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __neg__(self: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __neg__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __neg__(self: ColExpr) -> ColExpr:
         """The unary - (negation) operator (__neg__)"""
@@ -1265,9 +1258,6 @@ class ColExpr(Generic[T]):
     @overload
     def __pos__(self: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __pos__(self: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
     def __pos__(self: ColExpr) -> ColExpr:
         """The unary + operator (__pos__)"""
 
@@ -1278,9 +1268,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __pow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __pow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __pow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """
@@ -1299,9 +1286,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rpow__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __rpow__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     def __rpow__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """
@@ -1331,14 +1315,6 @@ class ColExpr(Generic[T]):
         arrange: ColExpr | Iterable[ColExpr] | None = None,
     ) -> ColExpr[Float]: ...
 
-    @overload
-    def prefix_sum(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
     def prefix_sum(
         self: ColExpr,
         *,
@@ -1356,9 +1332,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def round(self: ColExpr[Float], decimals: int = 0) -> ColExpr[Float]: ...
-
-    @overload
-    def round(self: ColExpr[Decimal], decimals: int = 0) -> ColExpr[Decimal]: ...
 
     def round(self: ColExpr, decimals: int = 0) -> ColExpr:
         """
@@ -1432,9 +1405,6 @@ class ColExpr(Generic[T]):
     def __sub__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     @overload
-    def __sub__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
-
-    @overload
     def __sub__(
         self: ColExpr[Datetime], rhs: ColExpr[Datetime]
     ) -> ColExpr[Duration]: ...
@@ -1452,9 +1422,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rsub__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __rsub__(self: ColExpr[Decimal], rhs: ColExpr[Decimal]) -> ColExpr[Decimal]: ...
 
     @overload
     def __rsub__(
@@ -1487,14 +1454,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def sum(
-        self: ColExpr[Decimal],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
-    ) -> ColExpr[Decimal]: ...
-
-    @overload
-    def sum(
         self: ColExpr[Bool],
         *,
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
@@ -1517,11 +1476,6 @@ class ColExpr(Generic[T]):
     @overload
     def __truediv__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
-    @overload
-    def __truediv__(
-        self: ColExpr[Decimal], rhs: ColExpr[Decimal]
-    ) -> ColExpr[Decimal]: ...
-
     def __truediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """True division /"""
 
@@ -1532,11 +1486,6 @@ class ColExpr(Generic[T]):
 
     @overload
     def __rtruediv__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
-
-    @overload
-    def __rtruediv__(
-        self: ColExpr[Decimal], rhs: ColExpr[Decimal]
-    ) -> ColExpr[Decimal]: ...
 
     def __rtruediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """True division /"""
@@ -2476,7 +2425,7 @@ class CaseExpr(ColExpr):
 
 
 class Cast(ColExpr):
-    def __init__(self, val: ColExpr, target_type: Dtype):
+    def __init__(self, val: ColExpr, target_type: Dtype, *, strict: bool = True):
         if type(target_type) is type:
             target_type = target_type()
         if types.is_const(target_type):
@@ -2484,6 +2433,7 @@ class Cast(ColExpr):
 
         self.val = val
         self.target_type = copy.copy(target_type)
+        self.strict = strict
         super().__init__(copy.copy(target_type))
         self.dtype()
 
@@ -2561,7 +2511,7 @@ class Cast(ColExpr):
         yield self.val
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        return g(Cast(self.val.map_subtree(g), self.target_type))
+        return g(Cast(self.val.map_subtree(g), self.target_type, strict=self.strict))
 
 
 @dataclasses.dataclass(slots=True)

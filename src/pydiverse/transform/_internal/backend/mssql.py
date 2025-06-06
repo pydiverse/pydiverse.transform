@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import copy
 import functools
@@ -8,7 +9,7 @@ from uuid import UUID
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import BIT, DATETIME2, TINYINT
 
-from pydiverse.common import Bool, Float, Int, String
+from pydiverse.common import Bool, Decimal, Float, Int, String, Uint8
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Target
@@ -58,6 +59,8 @@ class MsSqlImpl(SqlImpl):
                 if col._uuid not in schema_overrides:
                     schema_overrides[col._uuid] = col.dtype().to_polars()
 
+        # TODO: make sure the dtypes are preserved as in the database on export to
+        # polars. Currently all ints become int64 and all floats float64
         return super().export(nd, target, schema_overrides=schema_overrides)
 
     @classmethod
@@ -111,6 +114,14 @@ class MsSqlImpl(SqlImpl):
             return val.cast(BIT)
 
         return val
+
+    @classmethod
+    def sqa_type(cls, pdt_type):
+        if isinstance(pdt_type, Uint8):
+            return TINYINT
+        if isinstance(pdt_type, Decimal):
+            return sqa.DECIMAL(15, 6)
+        return super().sqa_type(pdt_type)
 
 
 def convert_order_list(order_list: list[Order]) -> list[Order]:
@@ -221,8 +232,7 @@ def convert_bool_bit(
 
     elif isinstance(expr, Cast):
         return Cast(
-            convert_bool_bit(expr.val, "bit"),
-            expr.target_type,
+            convert_bool_bit(expr.val, "bit"), expr.target_type, strict=expr.strict
         )
 
     if types.without_const(expr.dtype()) == Bool():

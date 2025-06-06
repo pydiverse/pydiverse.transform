@@ -1,8 +1,11 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
-from pydiverse.transform._internal.pipe.c import C
-from pydiverse.transform._internal.pipe.verbs import mutate, summarize
+import pydiverse.transform as pdt
+from pydiverse.transform import C, mutate, summarize
 from tests.util.assertion import assert_result_equal
+
+_ = pdt
 
 
 def test_add(df_int):

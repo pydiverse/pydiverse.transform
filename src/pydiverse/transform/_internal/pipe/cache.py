@@ -1,8 +1,9 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import copy
 import dataclasses
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
@@ -33,7 +34,7 @@ class Cache:
     # `summarize``)
 
     @staticmethod
-    def from_ast(node: AstNode) -> Cache:
+    def from_ast(node: AstNode) -> "Cache":
         if isinstance(node, verbs.Verb):
             if isinstance(node, verbs.Join):
                 return Cache.from_ast(node.child).update(
@@ -55,7 +56,9 @@ class Cache:
             backend=node.backend_name,
         )
 
-    def update(self, node: verbs.Verb, *, right_cache: Cache | None = None) -> Cache:
+    def update(
+        self, node: verbs.Verb, *, right_cache: Optional["Cache"] = None
+    ) -> "Cache":
         """
         Returns a new cache for `node`, assuming `self` is the cache of `node.child`.
         Does not modify `self`.
@@ -176,91 +179,87 @@ class Cache:
         return res
 
     # Returns whether applying `node` to this table would require it to be wrapped in a
-    # subquery. (so `self` is the old cache and `node` the new AST)
-    def requires_subquery(self, node: verbs.Verb) -> bool:
+    # subquery. (so `self` is the old cache and `node` the new AST).
+    # Either returns a reason for the subquery or None.
+    def requires_subquery(self, node: verbs.Verb) -> str | None:
         if self.backend == "polars":
-            return False
+            return None
 
-        return (
-            (
-                isinstance(
-                    node,
-                    verbs.Filter
-                    | verbs.Summarize
-                    | verbs.Arrange
-                    | verbs.GroupBy
-                    | verbs.Join,
-                )
-                and self.limit != 0
+        if (
+            isinstance(
+                node,
+                verbs.Filter
+                | verbs.Summarize
+                | verbs.Arrange
+                | verbs.GroupBy
+                | verbs.Join,
             )
-            or (
-                isinstance(node, verbs.Mutate)
-                and any(
-                    any(
-                        col.ftype(agg_is_window=True) in (Ftype.WINDOW, Ftype.AGGREGATE)
-                        for col in fn.iter_subtree()
-                        if isinstance(col, Col)
-                    )
-                    for fn in node.iter_col_nodes()
-                    if (
-                        isinstance(fn, ColFn)
-                        and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
-                    )
-                )
+            and self.limit != 0
+        ):
+            return f"`{node.__class__.__name__.lower()}` after `slice_head`"
+
+        if isinstance(node, verbs.Mutate) and any(
+            any(
+                col.ftype(agg_is_window=True) in (Ftype.WINDOW, Ftype.AGGREGATE)
+                for col in fn.iter_subtree()
+                if isinstance(col, Col)
             )
-            or (
-                isinstance(node, verbs.Filter)
-                and any(
-                    col.ftype(agg_is_window=True) == Ftype.WINDOW
-                    for col in node.iter_col_nodes()
-                    if isinstance(col, Col)
-                )
+            for fn in node.iter_col_nodes()
+            if (
+                isinstance(fn, ColFn) and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
             )
-            or (
-                isinstance(node, verbs.Summarize)
-                and (
-                    (self.group_by and self.group_by != set(self.partition_by))
-                    or any(
-                        (
-                            col.ftype(agg_is_window=False)
-                            in (Ftype.WINDOW, Ftype.AGGREGATE)
-                        )
-                        for col in node.iter_col_nodes()
-                        if isinstance(col, Col)
-                    )
-                    or any(
-                        self.cols[uid].ftype() == Ftype.WINDOW
-                        for uid in self.partition_by
-                    )
-                )
-            )
-            or (
-                isinstance(node, verbs.Join)
-                and (
-                    self.group_by
-                    or (
-                        (
-                            node.how == "full"
-                            or (node.right in self.derived_from and node.how == "left")
-                        )
-                        and any(
-                            types.is_const(self.cols[uid].dtype())
-                            for uid in self.uuid_to_name.keys()
-                        )
-                    )
-                    or any(
-                        self.cols[uid].ftype() == Ftype.WINDOW
-                        for uid in self.uuid_to_name.keys()
-                    )
-                    or any(
-                        col.ftype() != Ftype.ELEMENT_WISE and col._uuid in self.cols
-                        for col in node.on.iter_subtree()
-                        if isinstance(col, Col)
-                    )
-                    or (self.is_filtered and node.how == "full")
-                )
-            )
-        )
+        ):
+            return "nested window / aggregation functions in `mutate`"
+
+        if isinstance(node, verbs.Filter) and any(
+            col.ftype(agg_is_window=True) == Ftype.WINDOW
+            for col in node.iter_col_nodes()
+            if isinstance(col, Col)
+        ):
+            return "window function in `filter`"
+
+        if isinstance(node, verbs.Summarize):
+            if self.group_by and self.group_by != set(self.partition_by):
+                return "nested summarize"
+            if any(
+                (col.ftype(agg_is_window=False) in (Ftype.WINDOW, Ftype.AGGREGATE))
+                for col in node.iter_col_nodes()
+                if isinstance(col, Col)
+            ):
+                return "nested window / aggregation functions in `summarize`"
+            if any(self.cols[uid].ftype() == Ftype.WINDOW for uid in self.partition_by):
+                return "window function among grouping columns"
+
+        if isinstance(node, verbs.Join):
+            if self.group_by:
+                return "join with a grouped table"
+
+            if (
+                node.how == "full"
+                or (node.right in self.derived_from and node.how == "left")
+            ) and any(
+                types.is_const(self.cols[uid].dtype())
+                for uid in self.uuid_to_name.keys()
+            ):
+                return "left / full join with a table containing a constant column"
+
+            if any(
+                self.cols[uid].ftype() == Ftype.WINDOW
+                for uid in self.uuid_to_name.keys()
+            ):
+                return "join with a table containing window function expression"
+
+            if any(
+                col.ftype() != Ftype.ELEMENT_WISE and col._uuid in self.cols
+                for col in node.on.iter_subtree()
+                if isinstance(col, Col)
+            ):
+                return "window / aggregation functions in join condition"
+
+            if self.is_filtered and node.how == "full":
+                return "full join with a filtered table"
+
+        return None
 
     def selected_cols(self) -> list[Col]:
         return [self.cols[uid] for uid in self.uuid_to_name.keys()]

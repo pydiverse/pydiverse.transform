@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import uuid
 from collections.abc import Iterable
@@ -61,9 +62,10 @@ class PolarsImpl(TableImpl):
     ) -> Any:
         lf, name_in_df, select, _ = compile_ast(nd)
         lf = lf.select(*(name_in_df[uid] for uid in select))
+        assert isinstance(lf, pl.LazyFrame)
 
         if isinstance(target, Polars):
-            if not target.lazy and isinstance(lf, pl.LazyFrame):
+            if not target.lazy:
                 lf = lf.collect()
             lf.name = nd.name
             return lf
@@ -73,7 +75,7 @@ class PolarsImpl(TableImpl):
 
         raise AssertionError
 
-    def _clone(self) -> tuple[PolarsImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
+    def _clone(self) -> tuple["PolarsImpl", dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned = PolarsImpl(self.name, self.df.clone())
         return (
             cloned,
@@ -228,9 +230,9 @@ def compile_col_expr(
             expr.target_type.is_int() or expr.target_type.is_float()
         ) and types.without_const(expr.val.dtype()) == String():
             expr.val = expr.val.str.strip()
-        compiled = compile_col_expr(expr.val, name_in_df, op_kwargs=op_kwargs).cast(
-            expr.target_type.to_polars()
-        )
+
+        compiled = compile_col_expr(expr.val, name_in_df, op_kwargs=op_kwargs)
+        compiled = compiled.cast(expr.target_type.to_polars(), strict=expr.strict)
 
         if (
             types.without_const(expr.val.dtype()).is_float()

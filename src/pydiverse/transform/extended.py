@@ -1,6 +1,7 @@
-# ruff: noqa: A004
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
-from __future__ import annotations
+# ruff: noqa: A004
 
 from ._internal.pipe.functions import (
     all,

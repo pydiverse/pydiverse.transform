@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import sqlalchemy as sqa
 
@@ -40,10 +41,7 @@ class SqliteImpl(SqlImpl):
             return sqa.case(
                 (compiled_val == "inf", cls.inf()),
                 (compiled_val == "-inf", -cls.inf()),
-                else_=sqa.cast(
-                    compiled_val,
-                    cls.sqa_type(cast.target_type),
-                ),
+                else_=cls.cast_compiled(cast, compiled_val),
             )
 
         elif val_type == Datetime() and cast.target_type == Date():
@@ -55,10 +53,15 @@ class SqliteImpl(SqlImpl):
             return sqa.case(
                 (compiled_val == cls.inf(), "inf"),
                 (compiled_val == -cls.inf(), "-inf"),
-                else_=sqa.cast(compiled_val, sqa.String),
+                else_=cls.cast_compiled(cast, compiled_val),
             )
 
-        return sqa.cast(compiled_val, cls.sqa_type(cast.target_type))
+        return cls.cast_compiled(cast, compiled_val)
+
+    @classmethod
+    def cast_compiled(cls, cast: Cast, compiled_expr: sqa.ColumnElement):
+        # For SQLite, we ignore the `strict` parameter to `cast`.
+        return sqa.cast(compiled_expr, cls.sqa_type(cast.target_type))
 
     @classmethod
     def fix_fn_types(

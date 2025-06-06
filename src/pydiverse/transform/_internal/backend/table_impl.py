@@ -1,6 +1,8 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import functools
+import operator
 import uuid
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any
@@ -48,7 +50,7 @@ class TableImpl(AstNode):
         *,
         name: str | None = None,
         uuids: dict[str, UUID] | None = None,
-    ) -> TableImpl:
+    ) -> "TableImpl":
         from pydiverse.transform._internal.backend.targets import (
             DuckDb,
             Polars,
@@ -125,7 +127,7 @@ class TableImpl(AstNode):
     ) -> Any: ...
 
     @classmethod
-    def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:
+    def get_impl(cls, op: "Operator", sig: Sequence[Dtype]) -> Any:
         if (impl := cls.impl_store.get_impl(op, sig)) is not None:
             return impl
 
@@ -156,6 +158,10 @@ def split_join_cond(expr: ColFn) -> list[ColFn]:
         return []
     elif expr.op == ops.bool_and:
         return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
+    elif expr.op == ops.horizontal_all:
+        return functools.reduce(
+            operator.add, (split_join_cond(arg) for arg in expr.args)
+        )
     else:
         return [expr]
 

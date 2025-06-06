@@ -1,8 +1,10 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.pipe.c import C
 from pydiverse.transform._internal.pipe.verbs import mutate, select
+from pydiverse.transform.common import *
 from tests.fixtures.backend import skip_backends
 from tests.util.assertion import assert_result_equal
 
@@ -81,8 +83,12 @@ def test_div(df_num):
 
 
 def test_decimal(df_num):
-    # TODO: test the decimal here
-    assert_result_equal(df_num, lambda t: t >> mutate(u=t.f + t.g, z=t.f * t.g))
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(f=t.f.cast(pdt.Decimal), g=t.g.cast(pdt.Decimal))
+        >> mutate(u=C.f + C.g, z=C.f * C.g),
+    )
 
 
 def test_floor(df_num):

@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
@@ -6,7 +7,6 @@ from pydiverse.transform._internal.tree.types import (
     NUMERIC,
     Bool,
     Const,
-    Decimal,
     Float,
     Int,
 )
@@ -15,7 +15,6 @@ pow = Operator(
     "__pow__",
     Signature(Int(), Int(), return_type=Float()),
     Signature(Float(), Float(), return_type=Float()),
-    Signature(Decimal(), Decimal(), return_type=Decimal()),
     doc="""
 Computes the power x ** y.
 
@@ -60,14 +59,12 @@ Rounds to a given number of decimals.
 floor = Operator(
     "floor",
     Signature(Float(), return_type=Float()),
-    Signature(Decimal(), return_type=Decimal()),
     doc="Returns the largest integer less than or equal to the input.",
 )
 
 ceil = Operator(
     "ceil",
     Signature(Float(), return_type=Float()),
-    Signature(Decimal(), return_type=Decimal()),
     doc="Returns the smallest integer greater than or equal to the input.",
 )
 

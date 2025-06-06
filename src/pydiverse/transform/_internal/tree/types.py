@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import copy
 import datetime
@@ -206,7 +207,7 @@ INT_SUBTYPES = (
     Int32(),
     Int64(),
 )
-FLOAT_SUBTYPES = (Float32(), Float64())
+FLOAT_SUBTYPES = (Float32(), Float64(), Decimal())
 SIMPLE_TYPES = (
     *INT_SUBTYPES,
     *FLOAT_SUBTYPES,
@@ -216,6 +217,7 @@ SIMPLE_TYPES = (
     String(),
     Date(),
     Datetime(),
+    Time(),
     Bool(),
     NullType(),
     Duration(),
@@ -249,8 +251,9 @@ IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
     },
     Float(): {Float(): (0, 0)},
     String(): {String(): (0, 0)},
-    Decimal(): {Decimal(): (0, 0)},
+    Decimal(): {Decimal(): (0, 0), Float(): (0, 1)},
     Datetime(): {Datetime(): (0, 0)},
+    Time(): {Time(): (0, 0)},
     Date(): {Date(): (0, 0)},
     Bool(): {Bool(): (0, 0)},
     NullType(): {
@@ -280,13 +283,14 @@ def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
     return IMPLICIT_CONVS[without_const(dtype)][without_const(target)]
 
 
-NUMERIC = (Int(), Float(), Decimal())
+NUMERIC = (Int(), Float())
 COMPARABLE = (
     Int(),
     Float(),
-    Decimal(),
     String(),
     Datetime(),
+    Time(),
+    Duration(),
     Date(),
     Bool(),
 )

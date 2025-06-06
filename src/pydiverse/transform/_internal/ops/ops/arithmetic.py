@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
@@ -7,7 +8,6 @@ from pydiverse.transform._internal.tree.types import (
     Bool,
     Date,
     Datetime,
-    Decimal,
     Duration,
     Float,
     Int,
@@ -43,7 +43,6 @@ truediv = Operator(
     "__truediv__",
     Signature(Int(), Int(), return_type=Float()),
     Signature(Float(), Float(), return_type=Float()),
-    Signature(Decimal(), Decimal(), return_type=Decimal()),
     doc="True division /",
 )
 

@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import inspect
 from collections.abc import Callable, Iterable
@@ -187,7 +188,7 @@ class Table:
             setattr(self, slot, val)
 
     def __iter__(self) -> Iterable[Col]:
-        cols = self._cache.selected_cols()
+        cols = [self.__getattr__(name) for name in self._cache.name_to_uuid.keys()]
         yield from cols
 
     def __contains__(self, col: str | Col | ColName) -> bool:
@@ -200,7 +201,7 @@ class Table:
     def __len__(self) -> int:
         return len(self._cache.name_to_uuid)
 
-    def __rshift__(self, rhs) -> Table:
+    def __rshift__(self, rhs) -> "Table":
         """
         The pipe operator for chaining verbs.
         """

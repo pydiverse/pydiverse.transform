@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import dataclasses
 import functools
@@ -39,8 +40,20 @@ from pydiverse.transform._internal.tree.col_expr import (
 )
 
 
+@dataclasses.dataclass(slots=True)
+class Query:
+    select: list[UUID]
+    partition_by: list[Col] = dataclasses.field(default_factory=list)
+    group_by: list[UUID] = dataclasses.field(default_factory=list)
+    where: list[ColExpr] = dataclasses.field(default_factory=list)
+    having: list[ColExpr] = dataclasses.field(default_factory=list)
+    order_by: list[Order] = dataclasses.field(default_factory=list)
+    limit: int | None = None
+    offset: int | None = None
+
+
 class SqlImpl(TableImpl):
-    def __new__(cls, *args, **kwargs) -> SqlImpl:
+    def __new__(cls, *args, **kwargs) -> "SqlImpl":
         engine: str | sqa.Engine = (
             inspect.signature(cls.__init__)
             .bind(None, *args, **kwargs)
@@ -107,7 +120,7 @@ class SqlImpl(TableImpl):
     def schema(self) -> dict[str, Dtype]:
         return {col.name: self.pdt_type(col.type) for col in self.table.columns}
 
-    def _clone(self) -> tuple[SqlImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
+    def _clone(self) -> tuple["SqlImpl", dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned = self.__class__(self.table, SqlAlchemy(self.engine), self.name)
         return (
             cloned,
@@ -221,10 +234,19 @@ class SqlImpl(TableImpl):
         return order_expr
 
     @classmethod
-    def compile_cast(cls, cast: Cast, sqa_expr: dict[str, sqa.Label]) -> sqa.Cast:
-        return cls.compile_col_expr(cast.val, sqa_expr).cast(
-            cls.sqa_type(cast.target_type)
-        )
+    def compile_cast(
+        cls, cast: Cast, sqa_expr: dict[str, sqa.Label]
+    ) -> sqa.Case | sqa.TryCast:
+        return cls.cast_compiled(cast, cls.compile_col_expr(cast.val, sqa_expr))
+
+    @classmethod
+    def cast_compiled(
+        cls, cast: Cast, compiled_expr: sqa.ColumnElement
+    ) -> sqa.Cast | sqa.TryCast:
+        if cast.strict:
+            return sqa.cast(compiled_expr, cls.sqa_type(cast.target_type))
+        else:
+            return sqa.try_cast(compiled_expr, cls.sqa_type(cast.target_type))
 
     @classmethod
     def fix_fn_types(
@@ -399,7 +421,7 @@ class SqlImpl(TableImpl):
             if needed_cols.keys().isdisjoint(sqa_expr.keys()):
                 # We cannot select zero columns from a subquery. This happens when the
                 # user only 0-ary functions after the subquery, e.g. `count`.
-                needed_cols[next(iter(sqa_expr.keys()))] = 1
+                needed_cols[query.select[0]] = 1
 
             # We only want to select those columns that (1) the user uses in some
             # expression later or (2) are present in the final selection.
@@ -568,18 +590,6 @@ class SqlImpl(TableImpl):
     @classmethod
     def pdt_type(cls, sqa_type: sqa.types.TypeEngine) -> Dtype:
         return Dtype.from_sql(sqa_type)
-
-
-@dataclasses.dataclass(slots=True)
-class Query:
-    select: list[UUID]
-    partition_by: list[Col] = dataclasses.field(default_factory=list)
-    group_by: list[UUID] = dataclasses.field(default_factory=list)
-    where: list[ColExpr] = dataclasses.field(default_factory=list)
-    having: list[ColExpr] = dataclasses.field(default_factory=list)
-    order_by: list[Order] = dataclasses.field(default_factory=list)
-    limit: int | None = None
-    offset: int | None = None
 
 
 # MSSQL complains about duplicates in ORDER BY.

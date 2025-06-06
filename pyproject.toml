@@ -1,6 +1,6 @@
 [project]
 name = "pydiverse-transform"
-version = "0.3.3"
+version = "0.4.0"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
   { name = "QuantCo, Inc." },
@@ -16,19 +16,6 @@ classifiers = [
   "Programming Language :: SQL",
   "Topic :: Database",
 ]
-requires-python = ">=3.10"
-dependencies = [
-  "pandas>=2.0.0",
-  "polars>=1.6.0",
-  "SQLAlchemy>=2.0.0",
-  "pyarrow>=11.0.0",
-  "pydiverse-common>=0.1.0",
-]
-
-[project.optional-dependencies]
-duckdb = ["duckdb>=0.8.1", "duckdb_engine>=0.9.1"]
-postgres = ["psycopg2>=2.9.3"]
-mssql = ["pyodbc>=4.0.35"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pydiverse"]
@@ -54,7 +41,6 @@ ignore-init-module-imports = true
 
 [tool.ruff.lint.isort]
 known-first-party = ["pydiverse"]
-required-imports = ["from __future__ import annotations"]
 
 [build-system]
 requires = ["hatchling"]
