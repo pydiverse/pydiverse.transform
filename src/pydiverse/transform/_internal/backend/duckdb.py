@@ -9,7 +9,7 @@ import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
-from pydiverse.common import Dtype, Int8, Int64, Uint8, Uint16, Uint32, Uint64
+from pydiverse.common import Decimal, Dtype, Int8, Int64, Uint8, Uint16, Uint32, Uint64
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
@@ -81,6 +81,8 @@ class DuckDbImpl(SqlImpl):
             return duckdb_types.UInt32()
         if isinstance(pdt_type, Uint64):
             return duckdb_types.UInt64()
+        if isinstance(pdt_type, Decimal):
+            return sqa.DECIMAL(35, 10)
 
         return super().sqa_type(pdt_type)
 

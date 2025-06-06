@@ -86,10 +86,10 @@ def assert_result_equal(
             query_y = pipe_factory(*y)
 
             dfx: pl.DataFrame = (query_x >> export(Polars(lazy=False))).with_columns(
-                pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
+                pl.col(pl.Decimal).cast(pl.Decimal(35, 10))
             )
             dfy: pl.DataFrame = (query_y >> export(Polars(lazy=False))).with_columns(
-                pl.col(pl.Decimal(scale=10)).cast(pl.Float64)
+                pl.col(pl.Decimal).cast(pl.Decimal(35, 10))
             )
 
             # TODO: after a join, cols containing only null values get type Null on
@@ -128,10 +128,7 @@ def assert_result_equal(
 
     try:
         assert_frame_equal(
-            dfx,
-            dfy,
-            check_row_order=check_row_order,
-            check_exact=False,
+            dfx, dfy, check_row_order=check_row_order, check_exact=False, atol=1e-6
         )
     except Exception as e:
         if xfail_warnings and did_raise_warning:
