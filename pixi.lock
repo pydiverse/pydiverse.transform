@@ -124,7 +124,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-20.0.0-py312h7900ff3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-20.0.0-py312h01725c0_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyodbc-5.2.0-py312h2ec8cdc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -281,7 +281,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-20.0.0-py312h8025657_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-core-20.0.0-py312h66f7834_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyodbc-5.2.0-py312h6f74592_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -429,7 +429,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-20.0.0-py312hb401068_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-core-20.0.0-py312h5157fe3_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyodbc-5.2.0-py312hae40c12_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -576,7 +576,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-20.0.0-py312h1f38498_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-core-20.0.0-py312hc40f475_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyodbc-5.2.0-py312hf02c72a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -704,7 +704,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-20.0.0-py312h2e8e312_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-core-20.0.0-py312h6a9c419_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyodbc-5.2.0-py312h275cf98_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -867,7 +867,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-20.0.0-py313h78bf25f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-20.0.0-py313he5f92c8_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/python-3.13.3-hf636f53_101_cp313.conda
@@ -1028,7 +1028,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-20.0.0-py313h1258fbd_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-core-20.0.0-py313h656e22b_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/python-3.13.3-h525b0ce_101_cp313.conda
@@ -1183,7 +1183,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-20.0.0-py313habf4b1d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-core-20.0.0-py313hc71e1e6_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/python-3.13.3-h534c281_101_cp313.conda
@@ -1336,7 +1336,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-20.0.0-py313h39782a4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-core-20.0.0-py313hf9431ad_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/python-3.13.3-h81fe080_101_cp313.conda
@@ -1473,7 +1473,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-20.0.0-py313hfa70ccb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-core-20.0.0-py313he812468_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pysocks-1.7.1-pyh09c184e_7.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/python-3.13.3-h261c0b1_101_cp313.conda
@@ -2108,7 +2108,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-20.0.0-py310hff52083_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-20.0.0-py310hac404ae_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyodbc-5.2.0-py310hf71b8c6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -2265,7 +2265,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-20.0.0-py310hbbe02a8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-core-20.0.0-py310h636e2c8_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyodbc-5.2.0-py310he30c3ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -2413,7 +2413,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-20.0.0-py310h2ec42d9_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-core-20.0.0-py310h86202ae_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyodbc-5.2.0-py310h2e7bc63_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -2560,7 +2560,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-20.0.0-py310hb6292c7_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-core-20.0.0-py310hc17921c_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyodbc-5.2.0-py310hdde5576_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -2688,7 +2688,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-20.0.0-py310h5588dad_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-core-20.0.0-py310h399dd74_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyodbc-5.2.0-py310h9e98ed7_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -2851,7 +2851,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-20.0.0-py311h38be061_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-20.0.0-py311h4854187_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyodbc-5.2.0-py311hfdbb021_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -3008,7 +3008,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-20.0.0-py311hfecb2dc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-core-20.0.0-py311ha6d2531_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyodbc-5.2.0-py311h89d996e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -3156,7 +3156,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-20.0.0-py311h6eed73b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-core-20.0.0-py311he02522f_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyodbc-5.2.0-py311ha701b48_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -3303,7 +3303,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-20.0.0-py311ha1ab1f8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-core-20.0.0-py311he04fa90_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyodbc-5.2.0-py311h6885ffc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -3431,7 +3431,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-20.0.0-py311h1ea47a8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-core-20.0.0-py311hdea38fa_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyodbc-5.2.0-py311hda3d55a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -3594,7 +3594,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-20.0.0-py312h7900ff3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-20.0.0-py312h01725c0_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyodbc-5.2.0-py312h2ec8cdc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -3751,7 +3751,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-20.0.0-py312h8025657_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-core-20.0.0-py312h66f7834_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyodbc-5.2.0-py312h6f74592_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -3899,7 +3899,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-20.0.0-py312hb401068_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-core-20.0.0-py312h5157fe3_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyodbc-5.2.0-py312hae40c12_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -4046,7 +4046,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-20.0.0-py312h1f38498_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-core-20.0.0-py312hc40f475_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyodbc-5.2.0-py312hf02c72a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -4174,7 +4174,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-20.0.0-py312h2e8e312_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-core-20.0.0-py312h6a9c419_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyodbc-5.2.0-py312h275cf98_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -4341,7 +4341,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-20.0.0-py312h7900ff3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-20.0.0-py312h01725c0_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyodbc-5.2.0-py312h2ec8cdc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -4490,7 +4490,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-20.0.0-py312hb401068_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-core-20.0.0-py312h5157fe3_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyodbc-5.2.0-py312hae40c12_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -4621,7 +4621,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-20.0.0-py312h2e8e312_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-core-20.0.0-py312h6a9c419_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyodbc-5.2.0-py312h275cf98_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.3.5-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-xdist-3.7.0-pyhd8ed1ab_0.conda
@@ -4783,7 +4783,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-20.0.0-py313h78bf25f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-20.0.0-py313he5f92c8_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyodbc-5.2.0-py313h46c70d0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.4.0-pyhd8ed1ab_0.conda
@@ -4939,7 +4939,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-20.0.0-py313h1258fbd_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-core-20.0.0-py313h656e22b_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyodbc-5.2.0-py313hb6a6212_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.4.0-pyhd8ed1ab_0.conda
@@ -5088,7 +5088,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-20.0.0-py313habf4b1d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyarrow-core-20.0.0-py313hc71e1e6_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyodbc-5.2.0-py313hc1eae12_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.4.0-pyhd8ed1ab_0.conda
@@ -5236,7 +5236,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-20.0.0-py313h39782a4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-core-20.0.0-py313hf9431ad_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyodbc-5.2.0-py313h4e5f155_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.4.0-pyhd8ed1ab_0.conda
@@ -5365,7 +5365,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-20.0.0-py313hfa70ccb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyarrow-core-20.0.0-py313he812468_0_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyodbc-5.2.0-py313h5813708_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-8.4.0-pyhd8ed1ab_0.conda
@@ -5960,8 +5960,6 @@ packages:
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-sdkutils >=0.2.4,<0.2.5.0a0
   - libgcc >=13
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: Apache
   size: 110968
@@ -5990,8 +5988,6 @@ packages:
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-sdkutils >=0.2.4,<0.2.5.0a0
   - libgcc >=13
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: Apache
   size: 115267
@@ -6021,8 +6017,6 @@ packages:
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-sdkutils >=0.2.4,<0.2.5.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: Apache
   size: 97717
@@ -6037,8 +6031,6 @@ packages:
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-sdkutils >=0.2.4,<0.2.5.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: Apache
   size: 94931
@@ -6069,8 +6061,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: Apache
   size: 105856
@@ -6113,8 +6103,6 @@ packages:
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - libgcc >=13
   - openssl >=3.5.0,<4.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: Apache
   size: 51039
@@ -6137,8 +6125,6 @@ packages:
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - libgcc >=13
   - openssl >=3.5.0,<4.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: Apache
   size: 54087
@@ -6160,8 +6146,6 @@ packages:
   depends:
   - __osx >=10.13
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: Apache
   size: 41080
@@ -6182,8 +6166,6 @@ packages:
   depends:
   - __osx >=11.0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: Apache
   size: 41549
@@ -6209,8 +6191,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: Apache
   size: 48875
@@ -6410,8 +6390,6 @@ packages:
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-compression >=0.3.1,<0.3.2.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 222984
@@ -6453,8 +6431,6 @@ packages:
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-compression >=0.3.1,<0.3.2.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 209993
@@ -6468,8 +6444,6 @@ packages:
   - aws-c-compression >=0.3.1,<0.3.2.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 190679
@@ -6497,8 +6471,6 @@ packages:
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-compression >=0.3.1,<0.3.2.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 169409
@@ -6530,8 +6502,6 @@ packages:
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 202795
@@ -6578,8 +6548,6 @@ packages:
   - s2n >=1.5.21,<1.5.22.0a0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 179227
@@ -6604,8 +6572,6 @@ packages:
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - s2n >=1.5.21,<1.5.22.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 183276
@@ -6629,8 +6595,6 @@ packages:
   - __osx >=10.15
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 181496
@@ -6653,8 +6617,6 @@ packages:
   - __osx >=11.0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 175481
@@ -6688,8 +6650,6 @@ packages:
   - ucrt >=10.0.20348.0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 177785
@@ -6717,8 +6677,6 @@ packages:
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 215778
@@ -6743,8 +6701,6 @@ packages:
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 189424
@@ -6770,8 +6726,6 @@ packages:
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 187203
@@ -6796,8 +6750,6 @@ packages:
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 149844
@@ -6833,8 +6785,6 @@ packages:
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 203403
@@ -6870,8 +6820,6 @@ packages:
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-auth >=0.9.0,<0.9.1.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 133755
@@ -6904,8 +6852,6 @@ packages:
   - aws-c-auth >=0.9.0,<0.9.1.0a0
   - openssl >=3.5.0,<4.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 138037
@@ -6921,8 +6867,6 @@ packages:
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-auth >=0.9.0,<0.9.1.0a0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 119969
@@ -6969,8 +6913,6 @@ packages:
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-auth >=0.9.0,<0.9.1.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 116458
@@ -6991,8 +6933,6 @@ packages:
   - aws-c-io >=0.19.1,<0.19.2.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-cal >=0.9.2,<0.9.3.0a0
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 125913
@@ -7173,8 +7113,6 @@ packages:
   - aws-c-cal >=0.9.2,<0.9.3.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-io >=0.19.1,<0.19.2.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 395115
@@ -7214,8 +7152,6 @@ packages:
   - aws-c-sdkutils >=0.2.4,<0.2.5.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-s3 >=0.8.0,<0.8.1.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 315617
@@ -7255,8 +7191,6 @@ packages:
   - aws-c-mqtt >=0.13.1,<0.13.2.0a0
   - aws-c-sdkutils >=0.2.4,<0.2.5.0a0
   - aws-c-event-stream >=0.5.4,<0.5.5.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 338186
@@ -7295,8 +7229,6 @@ packages:
   - aws-c-mqtt >=0.13.1,<0.13.2.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-c-s3 >=0.8.0,<0.8.1.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 262574
@@ -7344,8 +7276,6 @@ packages:
   - aws-c-s3 >=0.8.0,<0.8.1.0a0
   - aws-c-http >=0.10.1,<0.10.2.0a0
   - aws-c-mqtt >=0.13.1,<0.13.2.0a0
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 290879
@@ -7363,8 +7293,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - aws-crt-cpp >=0.32.8,<0.32.9.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 3401506
@@ -7415,8 +7343,6 @@ packages:
   - aws-crt-cpp >=0.32.8,<0.32.9.0a0
   - aws-c-event-stream >=0.5.4,<0.5.5.0a0
   - libzlib >=1.3.1,<2.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 3279089
@@ -7432,8 +7358,6 @@ packages:
   - aws-c-event-stream >=0.5.4,<0.5.5.0a0
   - aws-c-common >=0.12.3,<0.12.4.0a0
   - aws-crt-cpp >=0.32.8,<0.32.9.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 3255276
@@ -7480,8 +7404,6 @@ packages:
   - libcurl >=8.14.0,<9.0a0
   - aws-crt-cpp >=0.32.8,<0.32.9.0a0
   - libzlib >=1.3.1,<2.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 3066219
@@ -7500,8 +7422,6 @@ packages:
   - aws-c-event-stream >=0.5.4,<0.5.5.0a0
   - aws-crt-cpp >=0.32.8,<0.32.9.0a0
   - libzlib >=1.3.1,<2.0a0
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 3222678
@@ -8084,8 +8004,6 @@ packages:
   - pycparser
   - python >=3.13.0rc1,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 295514
@@ -8138,8 +8056,6 @@ packages:
   - pycparser
   - python >=3.13.0rc1,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 314846
@@ -8194,8 +8110,6 @@ packages:
   - pycparser
   - python >=3.13.0rc1,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 284540
@@ -8252,8 +8166,6 @@ packages:
   - python >=3.13.0rc1,<3.14.0a0
   - python >=3.13.0rc1,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 282115
@@ -8312,8 +8224,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 291828
@@ -8453,8 +8363,6 @@ packages:
   - openssl >=3.5.0,<4.0a0
   constrains:
   - __glibc >=2.17
-  arch: x86_64
-  platform: linux
   license: BSD-3-Clause
   license_family: BSD
   size: 2859276
@@ -8467,8 +8375,6 @@ packages:
   - openssl >=3.5.0,<4.0a0
   constrains:
   - __glibc >=2.17
-  arch: aarch64
-  platform: linux
   license: BSD-3-Clause
   license_family: BSD
   size: 2776968
@@ -8481,8 +8387,6 @@ packages:
   - openssl >=3.5.0,<4.0a0
   constrains:
   - __osx >=10.13
-  arch: x86_64
-  platform: osx
   license: BSD-3-Clause
   license_family: BSD
   size: 2247866
@@ -8495,8 +8399,6 @@ packages:
   - openssl >=3.5.0,<4.0a0
   constrains:
   - __osx >=11.0
-  arch: arm64
-  platform: osx
   license: BSD-3-Clause
   license_family: BSD
   size: 2132179
@@ -8511,8 +8413,6 @@ packages:
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
   - ucrt >=10.0.20348.0
-  arch: x86_64
-  platform: win
   license: BSD-3-Clause
   license_family: BSD
   size: 2233768
@@ -8948,8 +8848,6 @@ packages:
   - libstdcxx >=13
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 236945
@@ -9015,8 +8913,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 239398
@@ -9079,8 +8975,6 @@ packages:
   - libcxx >=18
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 231451
@@ -9146,8 +9040,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 232766
@@ -9215,8 +9107,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 221521
@@ -9941,8 +9831,6 @@ packages:
   - apache-arrow-proc =*=cpu
   - arrow-cpp <0.0a0
   - parquet-cpp <0.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 9205546
@@ -10060,8 +9948,6 @@ packages:
   - arrow-cpp <0.0a0
   - apache-arrow-proc =*=cpu
   - parquet-cpp <0.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 8391191
@@ -10140,8 +10026,6 @@ packages:
   - arrow-cpp <0.0a0
   - apache-arrow-proc =*=cpu
   - parquet-cpp <0.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 6425869
@@ -10219,8 +10103,6 @@ packages:
   - arrow-cpp <0.0a0
   - parquet-cpp <0.0a0
   - apache-arrow-proc =*=cpu
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 5709475
@@ -10294,8 +10176,6 @@ packages:
   - arrow-cpp <0.0a0
   - parquet-cpp <0.0a0
   - apache-arrow-proc =*=cpu
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 5392882
@@ -10322,8 +10202,6 @@ packages:
   - libarrow 20.0.0 h314c690_6_cpu
   - libgcc >=13
   - libstdcxx >=13
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 641644
@@ -10347,8 +10225,6 @@ packages:
   - libarrow 20.0.0 hf907350_6_cpu
   - libgcc >=13
   - libstdcxx >=13
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 605054
@@ -10373,8 +10249,6 @@ packages:
   - __osx >=10.14
   - libarrow 20.0.0 hd0d6b81_6_cpu
   - libcxx >=18
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 550247
@@ -10398,8 +10272,6 @@ packages:
   - __osx >=11.0
   - libarrow 20.0.0 h76b72fb_6_cpu
   - libcxx >=18
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 503204
@@ -10427,8 +10299,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.3,<15
   - vc14_runtime >=14.42.34438
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 461163
@@ -10459,8 +10329,6 @@ packages:
   - libgcc >=13
   - libparquet 20.0.0 h081d1f1_6_cpu
   - libstdcxx >=13
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 607827
@@ -10488,8 +10356,6 @@ packages:
   - libgcc >=13
   - libparquet 20.0.0 hfc78867_6_cpu
   - libstdcxx >=13
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 583327
@@ -10518,8 +10384,6 @@ packages:
   - libarrow-acero 20.0.0 hdc53af8_6_cpu
   - libcxx >=18
   - libparquet 20.0.0 h283e888_6_cpu
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 530357
@@ -10547,8 +10411,6 @@ packages:
   - libarrow-acero 20.0.0 hf07054f_6_cpu
   - libcxx >=18
   - libparquet 20.0.0 h636d7b7_6_cpu
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 503418
@@ -10580,8 +10442,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.3,<15
   - vc14_runtime >=14.42.34438
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 440842
@@ -10618,8 +10478,6 @@ packages:
   - libgcc >=13
   - libprotobuf >=5.29.3,<5.29.4.0a0
   - libstdcxx >=13
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 523328
@@ -10653,8 +10511,6 @@ packages:
   - libgcc >=13
   - libprotobuf >=5.29.3,<5.29.4.0a0
   - libstdcxx >=13
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 512627
@@ -10689,8 +10545,6 @@ packages:
   - libarrow-dataset 20.0.0 hdc53af8_6_cpu
   - libcxx >=18
   - libprotobuf >=5.29.3,<5.29.4.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 465141
@@ -10724,8 +10578,6 @@ packages:
   - libarrow-dataset 20.0.0 hf07054f_6_cpu
   - libcxx >=18
   - libprotobuf >=5.29.3,<5.29.4.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 451088
@@ -10763,8 +10615,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.3,<15
   - vc14_runtime >=14.42.34438
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 367092
@@ -11171,8 +11021,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.5.0,<4.0a0
   - zstd >=1.5.7,<1.6.0a0
-  arch: x86_64
-  platform: linux
   license: curl
   license_family: MIT
   size: 449910
@@ -11203,8 +11051,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.5.0,<4.0a0
   - zstd >=1.5.7,<1.6.0a0
-  arch: aarch64
-  platform: linux
   license: curl
   license_family: MIT
   size: 469143
@@ -11236,8 +11082,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.5.0,<4.0a0
   - zstd >=1.5.7,<1.6.0a0
-  arch: x86_64
-  platform: osx
   license: curl
   license_family: MIT
   size: 424040
@@ -11268,8 +11112,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.5.0,<4.0a0
   - zstd >=1.5.7,<1.6.0a0
-  arch: arm64
-  platform: osx
   license: curl
   license_family: MIT
   size: 403456
@@ -11299,8 +11141,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: curl
   license_family: MIT
   size: 368346
@@ -11662,8 +11502,6 @@ packages:
   md5: 044a210bc1d5b8367857755665157413
   depends:
   - libgfortran5 14.2.0 h6c33f7e_103
-  arch: arm64
-  platform: osx
   license: GPL-3.0-only WITH GCC-exception-3.1
   license_family: GPL
   size: 156291
@@ -11722,8 +11560,6 @@ packages:
   - llvm-openmp >=8.0.0
   constrains:
   - libgfortran 5.0.0 14_2_0_*_103
-  arch: arm64
-  platform: osx
   license: GPL-3.0-only WITH GCC-exception-3.1
   license_family: GPL
   size: 806566
@@ -12257,8 +12093,6 @@ packages:
   depends:
   - __glibc >=2.17,<3.0.a0
   - libgcc >=13
-  arch: x86_64
-  platform: linux
   license: BSD-2-Clause
   license_family: BSD
   size: 91183
@@ -12268,8 +12102,6 @@ packages:
   md5: 78cfed3f76d6f3f279736789d319af76
   depends:
   - libgcc >=13
-  arch: aarch64
-  platform: linux
   license: BSD-2-Clause
   license_family: BSD
   size: 114064
@@ -12279,8 +12111,6 @@ packages:
   md5: 18b81186a6adb43f000ad19ed7b70381
   depends:
   - __osx >=10.13
-  arch: x86_64
-  platform: osx
   license: BSD-2-Clause
   license_family: BSD
   size: 77667
@@ -12290,8 +12120,6 @@ packages:
   md5: 85ccccb47823dd9f7a99d2c7f530342f
   depends:
   - __osx >=11.0
-  arch: arm64
-  platform: osx
   license: BSD-2-Clause
   license_family: BSD
   size: 71829
@@ -12303,8 +12131,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: BSD-2-Clause
   license_family: BSD
   size: 88657
@@ -12617,8 +12443,6 @@ packages:
   - libstdcxx >=13
   - libthrift >=0.21.0,<0.21.1.0a0
   - openssl >=3.5.0,<4.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 1243790
@@ -12646,8 +12470,6 @@ packages:
   - libstdcxx >=13
   - libthrift >=0.21.0,<0.21.1.0a0
   - openssl >=3.5.0,<4.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 1154631
@@ -12676,8 +12498,6 @@ packages:
   - libcxx >=18
   - libthrift >=0.21.0,<0.21.1.0a0
   - openssl >=3.5.0,<4.0a0
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 966558
@@ -12705,8 +12525,6 @@ packages:
   - libcxx >=18
   - libthrift >=0.21.0,<0.21.1.0a0
   - openssl >=3.5.0,<4.0a0
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 895920
@@ -12738,8 +12556,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.3,<15
   - vc14_runtime >=14.42.34438
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 823138
@@ -13249,8 +13065,6 @@ packages:
   depends:
   - __glibc >=2.17,<3.0.a0
   - libgcc >=13
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 890145
@@ -13260,8 +13074,6 @@ packages:
   md5: bd76e353d6a09ae834fc9056343f2f73
   depends:
   - libgcc >=13
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 645133
@@ -13271,8 +13083,6 @@ packages:
   md5: 8afd5432c2e6776d145d94f4ea4d4db5
   depends:
   - __osx >=11.0
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 420355
@@ -13282,8 +13092,6 @@ packages:
   md5: 230a885fe67a3e945a4586b944b6020a
   depends:
   - __osx >=11.0
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 420654
@@ -13573,8 +13381,6 @@ packages:
   - python_abi 3.12.* *_cp312
   constrains:
   - jinja2 >=3.0.0
-  arch: x86_64
-  platform: linux
   license: BSD-3-Clause
   license_family: BSD
   size: 24604
@@ -13615,8 +13421,6 @@ packages:
   - python_abi 3.12.* *_cp312
   constrains:
   - jinja2 >=3.0.0
-  arch: x86_64
-  platform: osx
   license: BSD-3-Clause
   license_family: BSD
   size: 23888
@@ -13905,8 +13709,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.4.1,<4.0a0
   - zlib
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 21691794
@@ -13923,8 +13725,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.4.0,<4.0a0
   - zlib
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 22156450
@@ -13940,8 +13740,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.4.0,<4.0a0
   - zlib
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 12333957
@@ -13957,8 +13755,6 @@ packages:
   - libzlib >=1.3.1,<2.0a0
   - openssl >=3.4.0,<4.0a0
   - zlib
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 11751871
@@ -13966,8 +13762,6 @@ packages:
 - conda: https://conda.anaconda.org/conda-forge/win-64/nodejs-20.18.1-hfeaa22a_0.conda
   sha256: dd4b69a2e5ebf3fc12365e40fb9df94adc7de9fe3742d03baf408165c5d21a67
   md5: c3be6dc0ed995c7b4786e46abc43dc8b
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 22652518
@@ -14042,8 +13836,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - numpy-base <0a0
-  arch: x86_64
-  platform: linux
   license: BSD-3-Clause
   license_family: BSD
   size: 8517250
@@ -14116,8 +13908,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - numpy-base <0a0
-  arch: aarch64
-  platform: linux
   license: BSD-3-Clause
   license_family: BSD
   size: 7151540
@@ -14188,8 +13978,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - numpy-base <0a0
-  arch: x86_64
-  platform: osx
   license: BSD-3-Clause
   license_family: BSD
   size: 7596354
@@ -14262,8 +14050,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - numpy-base <0a0
-  arch: arm64
-  platform: osx
   license: BSD-3-Clause
   license_family: BSD
   size: 6532195
@@ -14338,8 +14124,6 @@ packages:
   - vc14_runtime >=14.29.30139
   constrains:
   - numpy-base <0a0
-  arch: x86_64
-  platform: win
   license: BSD-3-Clause
   license_family: BSD
   size: 7097859
@@ -15912,8 +15696,6 @@ packages:
   - nodejs
   - __glibc >=2.17,<3.0.a0
   - nodejs >=22.13.0,<23.0a0
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 1007349
@@ -15924,8 +15706,6 @@ packages:
   depends:
   - nodejs
   - nodejs >=22.13.0,<23.0a0
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 1008406
@@ -15937,8 +15717,6 @@ packages:
   - nodejs
   - __osx >=10.13
   - nodejs >=20.18.1,<21.0a0
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 1006276
@@ -15950,8 +15728,6 @@ packages:
   - nodejs
   - __osx >=11.0
   - nodejs >=20.18.1,<21.0a0
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 1006917
@@ -15965,8 +15741,6 @@ packages:
   - vc14_runtime >=14.42.34438
   - ucrt >=10.0.20348.0
   - nodejs >=20.18.1,<21.0a0
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 1009451
@@ -16076,8 +15850,6 @@ packages:
   - libpq >=17.5,<18.0a0
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: linux
   license: LGPL-3.0-or-later
   license_family: LGPL
   size: 190911
@@ -16126,8 +15898,6 @@ packages:
   - libpq >=17.5,<18.0a0
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: LGPL-3.0-or-later
   license_family: LGPL
   size: 192257
@@ -16182,8 +15952,6 @@ packages:
   - openssl >=3.5.0,<4.0a0
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: osx
   license: LGPL-3.0-or-later
   license_family: LGPL
   size: 170085
@@ -16240,8 +16008,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: LGPL-3.0-or-later
   license_family: LGPL
   size: 169872
@@ -16304,8 +16070,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: LGPL-3.0-or-later
   license_family: LGPL
   size: 173203
@@ -16731,8 +16495,6 @@ packages:
   constrains:
   - apache-arrow-proc * cpu
   - numpy >=1.21,<3
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 5216780
@@ -16805,8 +16567,6 @@ packages:
   constrains:
   - numpy >=1.21,<3
   - apache-arrow-proc * cpu
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: APACHE
   size: 4516436
@@ -16877,8 +16637,6 @@ packages:
   constrains:
   - apache-arrow-proc * cpu
   - numpy >=1.21,<3
-  arch: x86_64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 4473243
@@ -16951,8 +16709,6 @@ packages:
   constrains:
   - numpy >=1.21,<3
   - apache-arrow-proc * cpu
-  arch: arm64
-  platform: osx
   license: Apache-2.0
   license_family: APACHE
   size: 4706499
@@ -17027,8 +16783,6 @@ packages:
   constrains:
   - apache-arrow-proc * cpu
   - numpy >=1.21,<3
-  arch: x86_64
-  platform: win
   license: Apache-2.0
   license_family: APACHE
   size: 3461040
@@ -17044,18 +16798,17 @@ packages:
   purls: []
   size: 110100
   timestamp: 1733195786147
-- conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.1.0-pyh29332c3_0.conda
-  sha256: 62520ce1a38348d678b228a4ea4f10f3aa2982b74a8097caaccd54832796e592
-  md5: 18e14d5630610d418e96040f2e953727
+- conda: https://conda.anaconda.org/conda-forge/noarch/pydiverse-common-0.2.0-pyhcf101f3_0.conda
+  sha256: ebf6a8e80c3264e869adb29d5e597ea7713a334d4e70189ae1177f4d34c3cd2a
+  md5: 184420c55e51e12eeafc87b06381d171
   depends:
-  - python >=3.9
+  - python >=3.10
   - python
   license: BSD-3-Clause
-  license_family: BSD
   purls:
   - pkg:pypi/pydiverse-common?source=hash-mapping
-  size: 13406
-  timestamp: 1744279711481
+  size: 21411
+  timestamp: 1749227122247
 - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.19.1-pyhd8ed1ab_0.conda
   sha256: 28a3e3161390a9d23bc02b4419448f8d27679d9e2c250e29849e37749c8de86b
   md5: 232fb4577b6687b2d503ef8e254270c9
@@ -17119,8 +16872,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
   - unixodbc >=2.3.12,<2.4.0a0
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 79294
@@ -17177,8 +16928,6 @@ packages:
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
   - unixodbc >=2.3.12,<2.4.0a0
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 80779
@@ -17233,8 +16982,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
   - unixodbc >=2.3.12,<2.4.0a0
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 72457
@@ -17291,8 +17038,6 @@ packages:
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
   - unixodbc >=2.3.12,<2.4.0a0
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 72932
@@ -17347,8 +17092,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 69666
@@ -17993,8 +17736,6 @@ packages:
   - libstdcxx >=13
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 24061645
@@ -18047,8 +17788,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 22929342
@@ -18099,8 +17838,6 @@ packages:
   - libcxx >=18
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 21630677
@@ -18153,8 +17890,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 19933899
@@ -18209,8 +17944,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 17614431
@@ -18333,8 +18066,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: PSF-2.0
   license_family: PSF
   size: 6060096
@@ -18399,8 +18130,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
   - yaml >=0.2.5,<0.3.0a0
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 205919
@@ -18453,8 +18182,6 @@ packages:
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
   - yaml >=0.2.5,<0.3.0a0
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 198985
@@ -18505,8 +18232,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
   - yaml >=0.2.5,<0.3.0a0
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 196573
@@ -18559,8 +18284,6 @@ packages:
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
   - yaml >=0.2.5,<0.3.0a0
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 194243
@@ -18619,8 +18342,6 @@ packages:
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
   - yaml >=0.2.5,<0.3.0a0
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 182783
@@ -18635,8 +18356,6 @@ packages:
   - numpy
   - python >=3.12,<3.13.0a0
   - python_abi 3.12.* *_cp312
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 2160147
@@ -18651,8 +18370,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 1037106
@@ -18666,8 +18383,6 @@ packages:
   - numpy
   - python >=3.12,<3.13.0a0
   - python_abi 3.12.* *_cp312
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 1011747
@@ -18682,8 +18397,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 763734
@@ -18698,8 +18411,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 1063443
@@ -18826,8 +18537,6 @@ packages:
   - libgcc >=13
   - python >=3.12,<3.13.0a0
   - python_abi 3.12.* *_cp312
-  arch: x86_64
-  platform: linux
   license: Python-2.0
   license_family: PSF
   size: 402821
@@ -18840,8 +18549,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: Python-2.0
   license_family: PSF
   size: 400022
@@ -18853,8 +18560,6 @@ packages:
   - __osx >=10.13
   - python >=3.12,<3.13.0a0
   - python_abi 3.12.* *_cp312
-  arch: x86_64
-  platform: osx
   license: Python-2.0
   license_family: PSF
   size: 370482
@@ -18867,8 +18572,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: Python-2.0
   license_family: PSF
   size: 369054
@@ -18882,8 +18585,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: Python-2.0
   license_family: PSF
   size: 364831
@@ -18953,8 +18654,6 @@ packages:
   - python_abi 3.12.* *_cp312
   constrains:
   - __glibc >=2.17
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 391950
@@ -18968,8 +18667,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - __glibc >=2.17
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 393881
@@ -18983,8 +18680,6 @@ packages:
   - python_abi 3.12.* *_cp312
   constrains:
   - __osx >=10.13
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 370933
@@ -18999,8 +18694,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - __osx >=11.0
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 360004
@@ -19017,8 +18710,6 @@ packages:
   - vc14_runtime >=14.29.30139
   - ucrt >=10.0.20348.0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 252641
@@ -19073,8 +18764,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
   - ruamel.yaml.clib >=0.1.2
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 271899
@@ -19127,8 +18816,6 @@ packages:
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
   - ruamel.yaml.clib >=0.1.2
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 270538
@@ -19179,8 +18866,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
   - ruamel.yaml.clib >=0.1.2
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 272036
@@ -19233,8 +18918,6 @@ packages:
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
   - ruamel.yaml.clib >=0.1.2
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 271235
@@ -19293,8 +18976,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 271532
@@ -19345,8 +19026,6 @@ packages:
   - libgcc >=13
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 144267
@@ -19395,8 +19074,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 137024
@@ -19443,8 +19120,6 @@ packages:
   - __osx >=10.13
   - python >=3.13,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 121594
@@ -19493,8 +19168,6 @@ packages:
   - python >=3.13,<3.14.0a0
   - python >=3.13,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 115973
@@ -19549,8 +19222,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 108488
@@ -19613,8 +19284,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - __glibc >=2.17
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 8205456
@@ -19675,8 +19344,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - __glibc >=2.17
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 7574195
@@ -19735,8 +19402,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - __osx >=10.13
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 7840944
@@ -19797,8 +19462,6 @@ packages:
   - python_abi 3.13.* *_cp313
   constrains:
   - __osx >=11.0
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 7389768
@@ -19853,8 +19516,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 8215905
@@ -19878,8 +19539,6 @@ packages:
   - __glibc >=2.17,<3.0.a0
   - libgcc >=13
   - openssl >=3.5.0,<4.0a0
-  arch: x86_64
-  platform: linux
   license: Apache-2.0
   license_family: Apache
   size: 358164
@@ -19900,8 +19559,6 @@ packages:
   depends:
   - libgcc >=13
   - openssl >=3.5.0,<4.0a0
-  arch: aarch64
-  platform: linux
   license: Apache-2.0
   license_family: Apache
   size: 350372
@@ -20808,8 +20465,6 @@ packages:
   - libgcc >=13
   constrains:
   - __glibc >=2.17
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 3461640
@@ -20832,8 +20487,6 @@ packages:
   - libgcc >=13
   constrains:
   - __glibc >=2.17
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 3309007
@@ -20857,8 +20510,6 @@ packages:
   - __osx >=10.13
   constrains:
   - __osx >=10.13
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 2770986
@@ -20881,8 +20532,6 @@ packages:
   - __osx >=11.0
   constrains:
   - __osx >=11.0
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 2727320
@@ -20906,8 +20555,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 2584082
@@ -20982,8 +20629,6 @@ packages:
   - libstdcxx >=13
   - python >=3.13.0rc1,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 13916
@@ -21040,8 +20685,6 @@ packages:
   - python >=3.13.0rc1,<3.14.0a0
   - python >=3.13.0rc1,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: aarch64
-  platform: linux
   license: MIT
   license_family: MIT
   size: 14819
@@ -21096,8 +20739,6 @@ packages:
   - libcxx >=17
   - python >=3.13.0rc1,<3.14.0a0
   - python_abi 3.13.* *_cp313
-  arch: x86_64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 13126
@@ -21154,8 +20795,6 @@ packages:
   - python >=3.13.0rc1,<3.14.0a0
   - python >=3.13.0rc1,<3.14.0a0 *_cp313
   - python_abi 3.13.* *_cp313
-  arch: arm64
-  platform: osx
   license: MIT
   license_family: MIT
   size: 13689
@@ -21214,8 +20853,6 @@ packages:
   - ucrt >=10.0.20348.0
   - vc >=14.2,<15
   - vc14_runtime >=14.29.30139
-  arch: x86_64
-  platform: win
   license: MIT
   license_family: MIT
   size: 17210
