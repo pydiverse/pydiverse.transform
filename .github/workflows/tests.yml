@@ -35,6 +35,7 @@ jobs:
           - py310
           - py311
           - py312
+          - py313
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
