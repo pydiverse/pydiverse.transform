@@ -5,8 +5,6 @@
 # the backend on import / export.
 
 
-from __future__ import annotations
-
 import sqlalchemy as sqa
 
 

@@ -1,8 +1,6 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
-from __future__ import annotations
-
 import copy
 import dataclasses
 import uuid
@@ -21,7 +19,7 @@ class Verb(AstNode):
     def __post_init__(self):
         self.name = self.child.name
 
-    def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
+    def _clone(self) -> tuple["Verb", dict[AstNode, AstNode], dict[UUID, UUID]]:
         child, nd_map, uuid_map = self.child._clone()
         cloned = copy.copy(self)
         cloned.child = child
@@ -198,7 +196,7 @@ class Join(Verb):
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
     suffix: str
 
-    def _clone(self) -> tuple[Join, dict[AstNode, AstNode], dict[UUID, UUID]]:
+    def _clone(self) -> tuple["Join", dict[AstNode, AstNode], dict[UUID, UUID]]:
         child, nd_map, uuid_map = self.child._clone()
         right_child, right_nd_map, right_uuid_map = self.right._clone()
         nd_map.update(right_nd_map)

@@ -1,8 +1,6 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
-from __future__ import annotations
-
 import dataclasses
 import inspect
 from collections.abc import Callable, Sequence
@@ -17,7 +15,7 @@ class ImplStore:
 
     impl_trie: dict[Operator, SignatureTrie]
     default_impl: dict[Operator, Callable | None]
-    impl_manager: ImplContextManager
+    impl_manager: "ImplContextManager"
 
     def __init__(self) -> None:
         self.impl_trie = dict()

@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # ruff: noqa: A002
-
 from __future__ import annotations
 
 import copy

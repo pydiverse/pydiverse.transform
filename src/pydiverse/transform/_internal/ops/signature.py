@@ -1,8 +1,6 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
-from __future__ import annotations
-
 import dataclasses
 from collections.abc import Sequence
 from types import EllipsisType
@@ -33,7 +31,7 @@ class Signature:
 class SignatureTrie:
     @dataclasses.dataclass(slots=True)
     class Node:
-        children: dict[Dtype, SignatureTrie.Node] = dataclasses.field(
+        children: dict[Dtype, "SignatureTrie.Node"] = dataclasses.field(
             default_factory=dict
         )
         data: Any = None

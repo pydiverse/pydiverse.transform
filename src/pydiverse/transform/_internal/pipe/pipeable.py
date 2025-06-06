@@ -1,8 +1,6 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
-from __future__ import annotations
-
 from functools import partial, wraps
 
 from pydiverse.transform._internal.errors import SubqueryError
@@ -18,7 +16,7 @@ class Pipeable:
         else:
             self.calls = calls
 
-    def __rshift__(self, other) -> Pipeable:
+    def __rshift__(self, other) -> "Pipeable":
         """
         The pipe operator for chaining verbs.
         """

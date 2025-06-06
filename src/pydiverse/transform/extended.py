@@ -3,8 +3,6 @@
 
 # ruff: noqa: A004
 
-from __future__ import annotations
-
 from ._internal.pipe.functions import (
     all,
     any,
