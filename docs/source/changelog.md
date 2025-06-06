@@ -1,7 +1,10 @@
 # Changelog
 
-## 0.3.3 (2025-06-02)
+## 0.4.0 (2025-06-06)
+- adjust to pydiverse.common 0.2.0
+- Decimal becomes subtype of Float
 
+## 0.3.3 (2025-06-02)
 - fix error messages
 - fix polars count()
 
