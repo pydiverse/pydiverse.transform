@@ -8,14 +8,22 @@ authors = [
   { name = "Finn Rudolph", email = "finn.rudolph@t-online.de" },
   { name = "Martin Trautmann", email = "windiana@users.sf.net" },
 ]
-license = "BSD-3-Clause"
+license = { file = "LICENSE" }
 readme = "docs/package/README.md"
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: BSD License",
   "Programming Language :: SQL",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Database",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Software Development",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -29,16 +37,15 @@ fix = true
 [tool.ruff.lint]
 select = ["F", "E", "UP", "W", "I001", "I002", "B", "A"]
 ignore = [
-  "B017",
-  "B028",
+  #  "B017",
+  #  "B028",
   "A001", # Keep while filter verb still is called filter
   "A003", # Keep while filter verb still is called filter
 ]
-ignore-init-module-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401", "F403"]
-"tests/*" = ["F403", "F405"]     # "E711"
+"__init__.py" = ["F403"]
+"tests/*" = ["F403", "F405"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["pydiverse"]

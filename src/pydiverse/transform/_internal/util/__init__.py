@@ -2,3 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from .reraise import reraise
+
+__all__ = [
+    "reraise",
+]
