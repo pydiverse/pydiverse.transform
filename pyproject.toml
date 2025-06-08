@@ -1,10 +1,11 @@
 [project]
 name = "pydiverse-transform"
-version = "0.4.0"
+version = "0.5.0"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
   { name = "QuantCo, Inc." },
   { name = "Nicolas Camenisch", email = "garnele007@gmail.com" },
+  { name = "Finn Rudolph", email = "finn.rudolph@t-online.de" },
   { name = "Martin Trautmann", email = "windiana@users.sf.net" },
 ]
 license = "BSD-3-Clause"

@@ -332,7 +332,7 @@ def export(
     elif isinstance(target, ListOfDicts):
         return (table >> export(Polars())).to_dicts()
 
-    # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
+    # TODO: allow stuff like pdt.Int(): pl.UInt32() in schema_overrides and resolve that
     # to columns
     SourceBackend: type[TableImpl] = get_backend(table._ast)
     if schema_overrides is None:

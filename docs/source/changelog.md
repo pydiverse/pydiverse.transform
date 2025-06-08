@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 (2025-06-08)
+- rename Uint type to UInt (see pydiverse.common 0.3)
+- pydiverse.transform.__version__ (implemented via importlib.metadata)
+
 ## 0.4.0 (2025-06-06)
 - adjust to pydiverse.common 0.2.0
 - Decimal becomes subtype of Float

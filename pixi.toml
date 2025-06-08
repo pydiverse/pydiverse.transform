@@ -8,7 +8,7 @@ python = ">=3.10.18,<3.14"
 pandas = ">=2.3.0,<3"
 pyarrow = ">=20.0.0,<21"
 polars = ">=1.30.0,<2"
-pydiverse-common = ">=0.2.0,<0.3"
+pydiverse-common = ">=0.3,<0.4"
 sqlalchemy = ">=2.0.41,<3"
 
 [host-dependencies]

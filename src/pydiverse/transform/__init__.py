@@ -8,9 +8,10 @@ from .extended import *
 from .extended import __all__ as __extended
 from .types import *
 from .types import __all__ as __types
+from .version import __version__
 
 __all__ = (
-    ["Table", "ColExpr", "Col", "verb", "backend", "is_sql_backed"]
+    ["__version__", "Table", "ColExpr", "Col", "verb", "backend", "is_sql_backed"]
     + __extended
     + __types
 )

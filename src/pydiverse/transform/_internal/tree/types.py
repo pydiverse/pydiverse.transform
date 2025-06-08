@@ -5,7 +5,6 @@ import copy
 import datetime
 import functools
 import operator
-from types import NoneType
 from typing import Any
 
 from pydiverse.common import (
@@ -27,13 +26,15 @@ from pydiverse.common import (
     NullType,
     String,
     Time,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
 )
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.ops import signature
+
+NoneType = type(None)
 
 
 class Const(Dtype):
@@ -198,10 +199,10 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
 
 
 INT_SUBTYPES = (
-    Uint8(),
-    Uint16(),
-    Uint32(),
-    Uint64(),
+    UInt8(),
+    UInt16(),
+    UInt32(),
+    UInt64(),
     Int8(),
     Int16(),
     Int32(),

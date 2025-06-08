@@ -9,7 +9,7 @@ from uuid import UUID
 import sqlalchemy as sqa
 from sqlalchemy.dialects.mssql import BIT, DATETIME2, TINYINT
 
-from pydiverse.common import Bool, Decimal, Float, Int, String, Uint8
+from pydiverse.common import Bool, Decimal, Float, Int, String, UInt8
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Target
@@ -117,7 +117,7 @@ class MsSqlImpl(SqlImpl):
 
     @classmethod
     def sqa_type(cls, pdt_type):
-        if isinstance(pdt_type, Uint8):
+        if isinstance(pdt_type, UInt8):
             return TINYINT
         if isinstance(pdt_type, Decimal):
             return sqa.DECIMAL(15, 6)
