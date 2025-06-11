@@ -362,11 +362,11 @@ def build_query(table: Table) -> Pipeable:
 
 
 @overload
-def show_query() -> Pipeable: ...
+def show_query(pipe: bool = False) -> Pipeable: ...
 
 
 @verb
-def show_query(table: Table) -> Pipeable:
+def show_query(table: Table, pipe: bool = False) -> Pipeable:
     """
     Prints the compiled SQL query to stdout.
     """
@@ -374,9 +374,12 @@ def show_query(table: Table) -> Pipeable:
     if query := table >> build_query():
         print(query)
     else:
-        print(f"no query to show for {table._ast.name}")
+        print(
+            f"No query to show for table {table._ast.name}. "
+            f"(backend: {get_backend(table._ast).backend_name})"
+        )
 
-    return table
+    return table if pipe else None
 
 
 @overload
@@ -1281,6 +1284,18 @@ def show(table: Table) -> Pipeable:
     """
     print(table)
     return table
+
+
+@overload
+def name() -> str: ...
+
+
+@verb
+def name(table: Table) -> str:
+    """
+    Returns the name of the table.
+    """
+    return table._ast.name
 
 
 def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) -> Any:

@@ -683,6 +683,12 @@ class TestPolarsLazyImpl:
         assert (tbl2.col1 == tbl3.col1).uses_table(tbl3)
         assert not tbl2.col1.uses_table(tbl2 >> mutate(x=0))
 
+    def test_name(self, tbl3):
+        assert tbl3 >> name() == "df3"
+
+    def test_name_alias(self, tbl2):
+        assert tbl2 >> alias("tbl") >> name() == "tbl"
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
