@@ -363,11 +363,11 @@ def build_query(table: Table) -> Pipeable:
 
 
 @overload
-def show_query(pipe: bool = False) -> Pipeable: ...
+def show_query(pipe: bool = False) -> Pipeable | None: ...
 
 
 @verb
-def show_query(table: Table, pipe: bool = False) -> Pipeable:
+def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
     """
     Prints the compiled SQL query to stdout.
     """
@@ -1275,16 +1275,16 @@ def cross_join(
 
 
 @overload
-def show() -> Pipeable: ...
+def show(pipe: bool = False) -> Pipeable | None: ...
 
 
 @verb
-def show(table: Table) -> Pipeable:
+def show(table: Table, pipe: bool = False) -> Pipeable | None:
     """
     Prints the table to stdout.
     """
     print(table)
-    return table
+    return table if pipe else None
 
 
 @overload
