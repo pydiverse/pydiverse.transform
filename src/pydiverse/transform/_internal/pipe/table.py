@@ -224,22 +224,42 @@ class Table:
         )
 
     def __str__(self):
-        from pydiverse.transform._internal.backend.targets import Polars
-        from pydiverse.transform._internal.pipe.verbs import export, get_backend
+        return repr(self)
 
-        backend = get_backend(self._ast)
+    def __repr__(self):
+        import pydiverse.transform as pdt
+        from pydiverse.transform._internal.pipe.verbs import (
+            export,
+            get_backend,
+            name,
+            slice_head,
+            summarize,
+        )
+
+        res = (
+            f"Table `{self >> name()}` "
+            f"(backend: {get_backend(self._ast).backend_name})\n"
+        )
         try:
-            df = self >> export(Polars(lazy=False))
-        except Exception as e:
-            return (
-                f"Table {self._ast.name}, backend: {backend.__name__}\n"
-                f"Failed to collect table.\n{type(e).__name__}: {str(e)}"
+            height = self >> summarize(num_rows=pdt.count()) >> export(pdt.Scalar)
+            tbl_rows = int(pl.Config.state().get("POLARS_FMT_MAX_ROWS") or 10)
+            head_tail_len = tbl_rows // 2 + 1
+            res += f"shape: ({height}, {len(self)})\n"
+
+            # Only export the first and last few rows.
+            head: pl.DataFrame = self >> slice_head(head_tail_len) >> export(pdt.Polars)
+            tail: pl.DataFrame = (
+                self
+                >> slice_head(
+                    head_tail_len, offset=max(head_tail_len, height - head_tail_len)
+                )
+                >> export(pdt.Polars)
             )
+            df = pl.concat([head, tail])
+        except Exception as e:
+            return res + f"failed to collect table\n{type(e).__name__}: {str(e)}"
 
-        table_str = f"Table {self._ast.name}, backend: {backend.__name__}\n{df}"
-        # TODO: cache the result for a polars backend
-
-        return table_str
+        return res + str(df).split("\n", 1)[1]
 
     def __dir__(self) -> list[str]:
         return [name for name in self._cache.name_to_uuid.keys()]

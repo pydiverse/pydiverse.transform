@@ -695,31 +695,36 @@ class TestPrintAndRepr:
         tbl_str = str(tbl1)
 
         assert "df1" in tbl_str
-        assert "PolarsImpl" in tbl_str
+        assert "polars" in tbl_str
         assert str(df1) in tbl_str
         tbl1 >> show()
 
     def test_table_repr_html(self, tbl1):
         # jupyter html
-        assert "Failed" not in tbl1._repr_html_()
+        assert "failed" not in tbl1._repr_html_()
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
         series = tbl1._ast.df.collect().get_column("col1")
 
         assert str(series) in col1_str
-        assert "Failed" not in col1_str
+        assert "failed" not in col1_str
 
     def test_col_html_repr(self, tbl1):
-        assert "Failed" not in tbl1.col1._repr_html_()
+        assert "failed" not in tbl1.col1._repr_html_()
 
     def test_expr_str(self, tbl1):
         expr_str = str(tbl1.col1 * 2)
-        assert "Failed" not in expr_str
+        assert "failed" not in expr_str
 
     def test_expr_html_repr(self, tbl1):
-        assert "Failed" not in (tbl1.col1 * 2)._repr_html_()
+        assert "failed" not in (tbl1.col1 * 2)._repr_html_()
 
     def test_lambda_str(self, tbl1):
-        assert "Failed" not in str(C.col)
-        assert "Failed" not in str(C.col1 + tbl1.col1)
+        assert "failed" not in str(C.col)
+        assert "failed" not in str(C.col1 + tbl1.col1)
+
+    def test_preview_print(self, tbl3):
+        tbl3_str = str(tbl3)
+        assert "failed" not in tbl3_str
+        assert "shape: (12, 5)" in tbl3_str
