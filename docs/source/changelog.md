@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.2 (2025-06-11)
+- require pydiverse.common 0.3.4 to ensure its dependencies are installed
+
 ## 0.5.1 (2025-06-11)
 - fixed pypi package dependencies
 

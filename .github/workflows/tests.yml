@@ -23,6 +23,8 @@ jobs:
         run: pixi run postinstall
       - name: pre-commit
         run: pixi run pre-commit run -a --color=always --show-diff-on-failure
+      - name: Check pyproject.toml dependencies
+        run: pixi run -e lint ./.github/scripts/check-deps.sh
 
   test:
     name: pytest
