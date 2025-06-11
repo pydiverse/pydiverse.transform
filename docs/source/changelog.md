@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.1 (2025-06-11)
+- fixed pypi package dependencies
+
 ## 0.5.0 (2025-06-08)
 - rename Uint type to UInt (see pydiverse.common 0.3)
 - pydiverse.transform.__version__ (implemented via importlib.metadata)
