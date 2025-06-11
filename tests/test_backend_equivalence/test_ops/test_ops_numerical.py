@@ -36,6 +36,14 @@ def test_round(df_num):
         df_num,
         lambda t: t >> mutate(**{c.name: c.round() for c in t}),
     )
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{c.name: c.round(2) for c in t}),
+    )
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{c.name: c.round(-2) for c in t}),
+    )
 
 
 def test_add(df_num):

@@ -663,7 +663,10 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.round)
     def _round(x, digits):
-        return x.round(pl.select(digits).item())
+        digits = pl.select(digits).item()
+        if digits < 0:
+            return (x / (10**-digits)).round() * (10**-digits)
+        return x.round(digits)
 
     @impl(ops.exp)
     def _exp(x):
