@@ -369,7 +369,9 @@ class SqlImpl(TableImpl):
             )
 
         if query.limit is not None:
-            sel = sel.limit(query.limit).offset(query.offset)
+            sel = sel.limit(query.limit)
+            if query.offset:
+                sel = sel.offset(query.offset)
 
         if query.order_by:
             sel = sel.order_by(
