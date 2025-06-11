@@ -703,6 +703,7 @@ class TestPrintAndRepr:
     def test_table_repr_html(self, tbl1):
         # jupyter html
         assert "failed" not in tbl1._repr_html_()
+        assert tbl1._repr_html_() == df1._repr_html_()
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
