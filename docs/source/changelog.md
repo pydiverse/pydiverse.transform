@@ -1,7 +1,17 @@
 # Changelog
 
-## 0.3.3 (2025-06-02)
+## 0.5.1 (2025-06-11)
+- fixed pypi package dependencies
 
+## 0.5.0 (2025-06-08)
+- rename Uint type to UInt (see pydiverse.common 0.3)
+- pydiverse.transform.__version__ (implemented via importlib.metadata)
+
+## 0.4.0 (2025-06-06)
+- adjust to pydiverse.common 0.2.0
+- Decimal becomes subtype of Float
+
+## 0.3.3 (2025-06-02)
 - fix error messages
 - fix polars count()
 

@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import uuid
 from collections.abc import Iterable
@@ -74,7 +75,7 @@ class PolarsImpl(TableImpl):
 
         raise AssertionError
 
-    def _clone(self) -> tuple[PolarsImpl, dict[AstNode, AstNode], dict[UUID, UUID]]:
+    def _clone(self) -> tuple["PolarsImpl", dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned = PolarsImpl(self.name, self.df.clone())
         return (
             cloned,

@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import inspect
 from collections.abc import Callable, Iterable
@@ -200,7 +201,7 @@ class Table:
     def __len__(self) -> int:
         return len(self._cache.name_to_uuid)
 
-    def __rshift__(self, rhs) -> Table:
+    def __rshift__(self, rhs) -> "Table":
         """
         The pipe operator for chaining verbs.
         """

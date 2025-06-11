@@ -1,8 +1,9 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import copy
 import dataclasses
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydiverse.transform._internal.backend.table_impl import TableImpl
@@ -33,7 +34,7 @@ class Cache:
     # `summarize``)
 
     @staticmethod
-    def from_ast(node: AstNode) -> Cache:
+    def from_ast(node: AstNode) -> "Cache":
         if isinstance(node, verbs.Verb):
             if isinstance(node, verbs.Join):
                 return Cache.from_ast(node.child).update(
@@ -55,7 +56,9 @@ class Cache:
             backend=node.backend_name,
         )
 
-    def update(self, node: verbs.Verb, *, right_cache: Cache | None = None) -> Cache:
+    def update(
+        self, node: verbs.Verb, *, right_cache: Optional["Cache"] = None
+    ) -> "Cache":
         """
         Returns a new cache for `node`, assuming `self` is the cache of `node.child`.
         Does not modify `self`.

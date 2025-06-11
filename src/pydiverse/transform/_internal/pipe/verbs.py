@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import copy
 import functools
@@ -331,7 +332,7 @@ def export(
     elif isinstance(target, ListOfDicts):
         return (table >> export(Polars())).to_dicts()
 
-    # TODO: allow stuff like pdt.Int(): pl.Uint32() in schema_overrides and resolve that
+    # TODO: allow stuff like pdt.Int(): pl.UInt32() in schema_overrides and resolve that
     # to columns
     SourceBackend: type[TableImpl] = get_backend(table._ast)
     if schema_overrides is None:

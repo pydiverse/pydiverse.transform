@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import contextlib
 import warnings
@@ -86,10 +87,10 @@ def assert_result_equal(
             query_y = pipe_factory(*y)
 
             dfx: pl.DataFrame = (query_x >> export(Polars(lazy=False))).with_columns(
-                pl.col(pl.Decimal).cast(pl.Decimal(35, 10))
+                pl.col(pl.Decimal).cast(pl.Float64)
             )
             dfy: pl.DataFrame = (query_y >> export(Polars(lazy=False))).with_columns(
-                pl.col(pl.Decimal).cast(pl.Decimal(35, 10))
+                pl.col(pl.Decimal).cast(pl.Float64)
             )
 
             # TODO: after a join, cols containing only null values get type Null on

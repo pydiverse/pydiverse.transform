@@ -1,6 +1,7 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
-from ._internal.tree.types import (
+from pydiverse.common import (
     Bool,
     Date,
     Datetime,
@@ -16,10 +17,10 @@ from ._internal.tree.types import (
     Int64,
     List,
     String,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
 )
 
 __all__ = [
@@ -37,10 +38,10 @@ __all__ = [
     "Int32",
     "Int64",
     "String",
-    "Uint8",
-    "Uint16",
-    "Uint32",
-    "Uint64",
+    "UInt8",
+    "UInt16",
+    "UInt32",
+    "UInt64",
     "Dtype",
     "List",
 ]

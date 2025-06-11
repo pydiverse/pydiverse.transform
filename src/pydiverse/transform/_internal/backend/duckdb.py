@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 from typing import Any
 from uuid import UUID
@@ -9,7 +10,7 @@ import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.sql.type_api import TypeEngine as TypeEngine
 
-from pydiverse.common import Decimal, Dtype, Int8, Int64, Uint8, Uint16, Uint32, Uint64
+from pydiverse.common import Decimal, Dtype, Int8, Int64, UInt8, UInt16, UInt32, UInt64
 from pydiverse.transform._internal.backend import sql
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.backend.targets import Polars, Target
@@ -73,13 +74,13 @@ class DuckDbImpl(SqlImpl):
     def sqa_type(cls, pdt_type: Dtype):
         if isinstance(pdt_type, Int8):
             return duckdb_types.TinyInteger()
-        if isinstance(pdt_type, Uint8):
+        if isinstance(pdt_type, UInt8):
             return duckdb_types.UTinyInteger()
-        if isinstance(pdt_type, Uint16):
+        if isinstance(pdt_type, UInt16):
             return duckdb_types.UInt16()
-        if isinstance(pdt_type, Uint32):
+        if isinstance(pdt_type, UInt32):
             return duckdb_types.UInt32()
-        if isinstance(pdt_type, Uint64):
+        if isinstance(pdt_type, UInt64):
             return duckdb_types.UInt64()
         if isinstance(pdt_type, Decimal):
             return sqa.DECIMAL(35, 10)

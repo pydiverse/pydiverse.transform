@@ -1,4 +1,5 @@
-from __future__ import annotations
+# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# SPDX-License-Identifier: BSD-3-Clause
 
 import functools
 import operator
@@ -49,7 +50,7 @@ class TableImpl(AstNode):
         *,
         name: str | None = None,
         uuids: dict[str, UUID] | None = None,
-    ) -> TableImpl:
+    ) -> "TableImpl":
         from pydiverse.transform._internal.backend.targets import (
             DuckDb,
             Polars,
@@ -126,7 +127,7 @@ class TableImpl(AstNode):
     ) -> Any: ...
 
     @classmethod
-    def get_impl(cls, op: Operator, sig: Sequence[Dtype]) -> Any:
+    def get_impl(cls, op: "Operator", sig: Sequence[Dtype]) -> Any:
         if (impl := cls.impl_store.get_impl(op, sig)) is not None:
             return impl
 
