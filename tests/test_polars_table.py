@@ -606,13 +606,23 @@ class TestPolarsLazyImpl:
             (t_ex["u"] + t_ex["col2"]).exp() - t_ex["v"],
             (t >> mutate(h=(t.u + C.col2).exp() - t.v)).h.export(Polars()),
         )
+        assert_equal(
+            (t_ex["u"] + t_ex["col2"]).exp() - t_ex["v"],
+            ((t.u + C.col2).exp() - t.v).export(Polars()),
+        )
+
         e = t >> inner_join(
             tbl1, tbl1.col1.cast(pdt.Float64()) <= tbl2.col1 + tbl2.col3
         )
         e_ex = e >> export(Polars(lazy=False))
+
         assert_equal(
             e_ex["col2"] + e_ex["col1_df1"],
             (e >> mutate(j=e.col2 + tbl1.col1)).j.export(Polars()),
+        )
+        assert_equal(
+            e_ex["col2"] + e_ex["col1_df1"],
+            (e.col2 + tbl1.col1).export(Polars),
         )
 
     def test_list(self, tbl1, tbl3):

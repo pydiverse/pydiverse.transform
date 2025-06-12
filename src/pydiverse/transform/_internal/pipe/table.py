@@ -155,7 +155,9 @@ class Table:
         :doc:`/database_testing`.
         """
 
-        if not isinstance(resource, TableImpl):
+        # AstNodes are also allowed for `resource`, but we do not expose this to the
+        # user.
+        if not isinstance(resource, AstNode):
             errors.check_arg_type(
                 pl.DataFrame | pl.LazyFrame | pd.DataFrame | sqa.Table | str | dict,
                 "Table.__init__",
@@ -224,10 +226,10 @@ class Table:
             "and must return a `Table`."
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return repr(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         from pydiverse.transform._internal.pipe.verbs import get_backend, name
 
         res = (
@@ -246,7 +248,7 @@ class Table:
     def __dir__(self) -> list[str]:
         return [name for name in self._cache.name_to_uuid.keys()]
 
-    def _repr_html_(self) -> str | None:
+    def _repr_html_(self) -> str:
         from pydiverse.transform._internal.pipe.verbs import get_backend, name
 
         html = (

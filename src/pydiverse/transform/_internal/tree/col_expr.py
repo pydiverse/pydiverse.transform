@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
+import pandas as pd
 import polars as pl
 
 from pydiverse.common import (
@@ -89,6 +90,88 @@ class ColExpr(Generic[T]):
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+    def export(self, target: Target) -> pl.Series | pd.Series:
+        """
+        Exports a column expression.
+
+        :param target:
+            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
+            object. The ``lazy`` kwarg for polars is ignored.
+
+        :return:
+            A polars or pandas Series.
+
+        Note
+        ----
+        Not every column expression can be exported. Unlike `mutate` or other verbs,
+        there is no ambient table the expression lives in, which is required to resolve
+        `C`-columns and correctly deal with columns from different tables. Thus, the
+        expression must contain one column whose table contains all other columns
+        appearing in the expression. The table of this column is then used to export the
+        expression.
+
+        Examples
+        --------
+        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
+        >>> t1.h.export(Polars)
+        shape: (6,)
+        Series: 'h' [f64]
+        [
+                2.465
+                0.22
+                -4.477
+                10.8
+                -81.2
+                0.0
+        ]
+        >>> t1.h.export(Pandas())
+        0    2.465
+        1     0.22
+        2   -4.477
+        3     10.8
+        4    -81.2
+        5      0.0
+        Name: h, dtype: double[pyarrow]
+        """
+
+        from pydiverse.transform._internal.pipe.table import Table
+        from pydiverse.transform._internal.pipe.verbs import export, mutate, select
+
+        cols = [col for col in self.iter_subtree() if isinstance(col, Col)]
+        # We need one column whose AST is an ancestor of all other columns' ASTs.
+        # The following could be done in linear time.
+        subtrees = [set(col._ast.iter_subtree()) for col in cols]
+        ancestor_index = None
+        for i, tree in enumerate(subtrees):
+            if all(col._ast in tree for col in cols):
+                ancestor_index = i
+                break
+
+        if ancestor_index is None:
+            raise ValueError(
+                "column expression cannot be exported, since no common ancestor table "
+                "was found\n"
+                "hint: To export a column expression, it must contain one column whose "
+                "table contains all other columns."
+            )
+
+        tbl = Table(cols[ancestor_index]._ast)
+        col_name = "<unnamed col>"
+        if isinstance(self, Col):
+            col_name = self.name
+        df = tbl >> mutate(**{col_name: self}) >> select(col_name) >> export(target)
+
+        if isinstance(target, Polars) or target is Polars:
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(col_name)
+        elif isinstance(target, Pandas) or target is Pandas:
+            import pandas as pd
+
+            return pd.Series(df[col_name])
+
+        raise TypeError("`target` can only be `Polars` or `Pandas`")
 
     def iter_children(self) -> Iterable[ColExpr]:
         return iter(())
@@ -2057,56 +2140,6 @@ class Col(ColExpr):
 
     def __hash__(self) -> int:
         return hash(self._uuid)
-
-    def export(self, target: Target) -> Any:
-        """
-        Exports a column to a polars or pandas Series.
-
-        :param target:
-            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
-            object. The ``lazy`` kwarg for polars is ignored.
-
-        :return:
-            A polars or pandas Series.
-
-        Examples
-        --------
-        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
-        >>> t1.h.show()
-        shape: (6,)
-        Series: 'h' [f64]
-        [
-                2.465
-                0.22
-                -4.477
-                10.8
-                -81.2
-                0.0
-        ]
-        >>> t1.h.export(Pandas())
-        0    2.465
-        1     0.22
-        2   -4.477
-        3     10.8
-        4    -81.2
-        5      0.0
-        Name: h, dtype: double[pyarrow]
-        """
-
-        from pydiverse.transform._internal.backend.table_impl import get_backend
-        from pydiverse.transform._internal.tree.verbs import Select
-
-        ast = Select(self._ast, [self])
-        df = get_backend(self._ast).export(ast, target, schema_overrides={})
-        if isinstance(target, Polars):
-            if isinstance(df, pl.LazyFrame):
-                df = df.collect()
-            return df.get_column(self.name)
-        else:
-            assert isinstance(target, Pandas)
-            import pandas as pd
-
-            return pd.Series(df[self.name])
 
 
 class ColName(ColExpr):

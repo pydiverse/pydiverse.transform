@@ -57,7 +57,7 @@ class TableImpl(AstNode):
             SqlAlchemy,
         )
 
-        if isinstance(resource, TableImpl):
+        if isinstance(resource, AstNode):
             res = resource
 
         elif isinstance(resource, dict):
