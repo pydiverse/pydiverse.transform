@@ -241,7 +241,7 @@ class Table:
             res += f"shape: ({height}, {len(self)})\n"
 
         except Exception as e:
-            return res + f"failed to collect table\n{type(e).__name__}: {str(e)}"
+            return res + f"export failed\n{type(e).__name__}: {str(e)}"
 
         return res + str(df).split("\n", 1)[1]
 
@@ -267,7 +267,7 @@ class Table:
 
         except Exception as e:
             return html + (
-                "</br><pre>failed to collect table\n"
+                "</br><pre>export failed\n"
                 f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
             )
 
