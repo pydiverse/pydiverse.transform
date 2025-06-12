@@ -7,13 +7,14 @@ from __future__ import annotations
 import copy
 import dataclasses
 import functools
-import html
 import itertools
 import operator
+import re
 from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
+import pandas as pd
 import polars as pl
 
 from pydiverse.common import (
@@ -84,11 +85,91 @@ class ColExpr(Generic[T]):
             "converted to a boolean or used with the and, or, not keywords"
         )
 
+    def __str__(self) -> str:
+        return repr(self)
+
+    def __repr__(self) -> str:
+        # We reduce column representation to table representation.
+        tbl = get_expr_as_table(self)
+        tbl_repr = repr(tbl)
+        if isinstance(self, Col):
+            # There is a sensible name, so we print it.
+            return tbl_repr.replace("Table", "Column", 1)
+        return tbl_repr.split("\n", 1)[1]
+
     def _repr_html_(self) -> str:
-        return f"<pre>{html.escape(repr(self))}</pre>"
+        tbl = get_expr_as_table(self)
+        tbl_repr = tbl._repr_html_()
+        if isinstance(self, Col):
+            return tbl_repr.replace("Table", "Column", 1)
+
+        return re.sub(
+            r"Table <code>.*<code> \(backend: .+<code>\)</br>", "", tbl_repr, count=1
+        )
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+    def ast_repr(self) -> str: ...
+
+    def export(self, target: Target) -> pl.Series | pd.Series:
+        """
+        Exports a column expression.
+
+        :param target:
+            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
+            object. The ``lazy`` kwarg for polars is ignored.
+
+        :return:
+            A polars or pandas Series.
+
+        Note
+        ----
+        Not every column expression can be exported. Unlike `mutate` or other verbs,
+        there is no ambient table the expression lives in, which is required to resolve
+        `C`-columns and correctly deal with columns from different tables. Thus, the
+        expression must contain one column whose table contains all other columns
+        appearing in the expression. The table of this column is then used to export the
+        expression.
+
+        Examples
+        --------
+        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
+        >>> t1.h.export(Polars)
+        shape: (6,)
+        Series: 'h' [f64]
+        [
+                2.465
+                0.22
+                -4.477
+                10.8
+                -81.2
+                0.0
+        ]
+        >>> t1.h.export(Pandas())
+        0    2.465
+        1     0.22
+        2   -4.477
+        3     10.8
+        4    -81.2
+        5      0.0
+        Name: h, dtype: double[pyarrow]
+        """
+
+        from pydiverse.transform._internal.pipe.verbs import export
+
+        df = get_expr_as_table(self) >> export(target)
+
+        if isinstance(target, Polars) or target is Polars:
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(df.columns[0])
+        elif isinstance(target, Pandas) or target is Pandas:
+            import pandas as pd
+
+            return pd.Series(df[df.columns.values.tolist()[0]])
+
+        raise TypeError("`target` can only be `Polars` or `Pandas`")
 
     def iter_children(self) -> Iterable[ColExpr]:
         return iter(())
@@ -2042,7 +2123,7 @@ class Col(ColExpr):
         self._uuid = _uuid
         super().__init__(_dtype, _ftype)
 
-    def __repr__(self) -> str:
+    def ast_repr(self) -> str:
         dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
         return f"{self._ast.name}.{self.name}{dtype_str}"
 
@@ -2057,56 +2138,6 @@ class Col(ColExpr):
 
     def __hash__(self) -> int:
         return hash(self._uuid)
-
-    def export(self, target: Target) -> Any:
-        """
-        Exports a column to a polars or pandas Series.
-
-        :param target:
-            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
-            object. The ``lazy`` kwarg for polars is ignored.
-
-        :return:
-            A polars or pandas Series.
-
-        Examples
-        --------
-        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
-        >>> t1.h.show()
-        shape: (6,)
-        Series: 'h' [f64]
-        [
-                2.465
-                0.22
-                -4.477
-                10.8
-                -81.2
-                0.0
-        ]
-        >>> t1.h.export(Pandas())
-        0    2.465
-        1     0.22
-        2   -4.477
-        3     10.8
-        4    -81.2
-        5      0.0
-        Name: h, dtype: double[pyarrow]
-        """
-
-        from pydiverse.transform._internal.backend.table_impl import get_backend
-        from pydiverse.transform._internal.tree.verbs import Select
-
-        ast = Select(self._ast, [self])
-        df = get_backend(self._ast).export(ast, target, schema_overrides={})
-        if isinstance(target, Polars):
-            if isinstance(df, pl.LazyFrame):
-                df = df.collect()
-            return df.get_column(self.name)
-        else:
-            assert isinstance(target, Pandas)
-            import pandas as pd
-
-            return pd.Series(df[self.name])
 
 
 class ColName(ColExpr):
@@ -2622,3 +2653,36 @@ def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
             for ord in arrange
         ]
     return {key: [wrap_literal(val) for val in arr] for key, arr in kwargs.items()}
+
+
+# returns a table with the expression as the only column
+def get_expr_as_table(expr: ColExpr):
+    from pydiverse.transform._internal.pipe.table import Table
+    from pydiverse.transform._internal.pipe.verbs import mutate, select
+
+    cols = [col for col in expr.iter_subtree() if isinstance(col, Col)]
+    # We need one column whose AST is an ancestor of all other columns' ASTs.
+    # The following could be done in linear time.
+    subtrees = [set(col._ast.iter_subtree()) for col in cols]
+    ancestor_index = None
+    for i, tree in enumerate(subtrees):
+        if all(col._ast in tree for col in cols):
+            ancestor_index = i
+            break
+
+    if ancestor_index is None:
+        raise ValueError(
+            "column expression cannot be exported, since no common ancestor table "
+            "was found\n"
+            "hint: To export a column expression, it must contain one column whose "
+            "table contains all other columns."
+        )
+
+    name = None
+    if isinstance(expr, Col):
+        name = expr.name
+    tbl = Table(cols[ancestor_index]._ast, name=name)
+    col_name = "_unnamed_expr_"
+    if isinstance(expr, Col):
+        col_name = expr.name
+    return tbl >> mutate(**{col_name: expr}) >> select(col_name)

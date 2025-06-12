@@ -6,7 +6,6 @@ import sqlalchemy as sqa
 from pydiverse.common import (
     Date,
     Datetime,
-    Decimal,
     String,
 )
 from pydiverse.transform._internal.backend.sql import SqlImpl
@@ -99,8 +98,8 @@ class SqliteImpl(SqlImpl):
 
 with SqliteImpl.impl_store.impl_manager as impl:
 
-    @impl(ops.round, Decimal())
-    def _round(x, decimals=0):
+    @impl(ops.round)
+    def _round(x, decimals):
         if decimals >= 0:
             return sqa.func.ROUND(x, decimals, type_=x.type)
         # For some reason SQLite doesn't like negative decimals values

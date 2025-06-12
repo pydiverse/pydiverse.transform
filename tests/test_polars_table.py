@@ -606,13 +606,23 @@ class TestPolarsLazyImpl:
             (t_ex["u"] + t_ex["col2"]).exp() - t_ex["v"],
             (t >> mutate(h=(t.u + C.col2).exp() - t.v)).h.export(Polars()),
         )
+        assert_equal(
+            (t_ex["u"] + t_ex["col2"]).exp() - t_ex["v"],
+            ((t.u + C.col2).exp() - t.v).export(Polars()),
+        )
+
         e = t >> inner_join(
             tbl1, tbl1.col1.cast(pdt.Float64()) <= tbl2.col1 + tbl2.col3
         )
         e_ex = e >> export(Polars(lazy=False))
+
         assert_equal(
             e_ex["col2"] + e_ex["col1_df1"],
             (e >> mutate(j=e.col2 + tbl1.col1)).j.export(Polars()),
+        )
+        assert_equal(
+            e_ex["col2"] + e_ex["col1_df1"],
+            (e.col2 + tbl1.col1).export(Polars),
         )
 
     def test_list(self, tbl1, tbl3):
@@ -684,37 +694,49 @@ class TestPolarsLazyImpl:
         assert (tbl2.col1 == tbl3.col1).uses_table(tbl3)
         assert not tbl2.col1.uses_table(tbl2 >> mutate(x=0))
 
+    def test_name(self, tbl3):
+        assert tbl3 >> name() == "df3"
+
+    def test_name_alias(self, tbl2):
+        assert tbl2 >> alias("tbl") >> name() == "tbl"
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
         tbl_str = str(tbl1)
 
         assert "df1" in tbl_str
-        assert "PolarsImpl" in tbl_str
+        assert "polars" in tbl_str
         assert str(df1) in tbl_str
         tbl1 >> show()
 
     def test_table_repr_html(self, tbl1):
         # jupyter html
-        assert "Failed" not in tbl1._repr_html_()
+        assert "failed" not in tbl1._repr_html_()
+        assert tbl1._repr_html_() == df1._repr_html_()
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
         series = tbl1._ast.df.collect().get_column("col1")
 
         assert str(series) in col1_str
-        assert "Failed" not in col1_str
+        assert "failed" not in col1_str
 
     def test_col_html_repr(self, tbl1):
-        assert "Failed" not in tbl1.col1._repr_html_()
+        assert "failed" not in tbl1.col1._repr_html_()
 
     def test_expr_str(self, tbl1):
         expr_str = str(tbl1.col1 * 2)
-        assert "Failed" not in expr_str
+        assert "failed" not in expr_str
 
     def test_expr_html_repr(self, tbl1):
-        assert "Failed" not in (tbl1.col1 * 2)._repr_html_()
+        assert "failed" not in (tbl1.col1 * 2)._repr_html_()
 
     def test_lambda_str(self, tbl1):
-        assert "Failed" not in str(C.col)
-        assert "Failed" not in str(C.col1 + tbl1.col1)
+        assert "failed" not in str(C.col)
+        assert "failed" not in str(C.col1 + tbl1.col1)
+
+    def test_preview_print(self, tbl3):
+        tbl3_str = str(tbl3)
+        assert "failed" not in tbl3_str
+        assert "shape: (12, 5)" in tbl3_str

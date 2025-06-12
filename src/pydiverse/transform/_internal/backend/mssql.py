@@ -95,6 +95,11 @@ class MsSqlImpl(SqlImpl):
         table, query, sqa_expr = cls.compile_ast(
             nd, {col._uuid: 1 for col in final_select}
         )
+
+        # mssql complains about OFFSET if there is no ORDER BY
+        if query.offset and not query.order_by:
+            query.order_by = [Order(final_select[0])]
+
         return cls.compile_query(table, query, sqa_expr)
 
     @classmethod

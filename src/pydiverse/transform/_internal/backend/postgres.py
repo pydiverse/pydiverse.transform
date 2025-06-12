@@ -93,7 +93,9 @@ with PostgresImpl.impl_store.impl_manager as impl:
         if isinstance(x.type, sqa.Float):
             # Postgres doesn't support rounding of doubles to specific precision
             # -> Must first cast to numeric
-            return sqa.func.ROUND(sqa.cast(x, sqa.Numeric), decimals, type_=sqa.Numeric)
+            return sqa.func.ROUND(
+                sqa.cast(x, sqa.Numeric), decimals, type_=sqa.Numeric
+            ).cast(x.type)
 
         return sqa.func.ROUND(x, decimals, type_=x.type)
 
