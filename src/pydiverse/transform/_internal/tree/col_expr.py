@@ -10,6 +10,7 @@ import functools
 import itertools
 import operator
 import re
+import textwrap
 from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
@@ -2147,7 +2148,7 @@ class ColName(ColExpr):
         self.name = name
         super().__init__(dtype, ftype)
 
-    def __repr__(self) -> str:
+    def ast_repr(self) -> str:
         dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
         return f"C.{self.name}{dtype_str}"
 
@@ -2167,7 +2168,7 @@ class LiteralCol(ColExpr):
         dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
-    def __repr__(self):
+    def ast_repr(self):
         return f"lit({repr(self.val)}, {self.dtype()})"
 
 
@@ -2200,11 +2201,16 @@ class ColFn(ColExpr):
         # try to eagerly resolve the types to get a nicer stack trace on type errors
         self.dtype()
 
-    def __repr__(self) -> str:
-        args = [repr(e) for e in self.args] + [
-            f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
+    def ast_repr(self) -> str:
+        args = [textwrap.indent(e.ast_repr(), "  ") for e in self.args] + [
+            (
+                f"  {ckwarg}="
+                f"[\n{',\n'.join(textwrap.indent(v.ast_repr(), '    ') for v in val)}\n"
+                "  ]"
+            )
+            for ckwarg, val in self.context_kwargs.items()
         ]
-        return f"{self.op.name}({', '.join(args)})"
+        return f"{self.op.name}(\n{',\n'.join(args)}\n)"
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -2336,13 +2342,25 @@ class CaseExpr(ColExpr):
         super().__init__()
         self.dtype()
 
-    def __repr__(self) -> str:
-        return (
-            "case_when( "
-            + functools.reduce(
-                operator.add, (f"{cond} -> {val}, " for cond, val in self.cases), ""
+    def ast_repr(self) -> str:
+        default_val_str = ""
+        if self.default_val is not None:
+            default_val_str = (
+                f"  default={textwrap.indent(self.default_val.ast_repr(), '  ')[2:]}\n"
             )
-            + f"default={self.default_val})"
+        return (
+            "CaseWhen(\n"
+            + functools.reduce(
+                operator.add,
+                (
+                    f"  {textwrap.indent(cond.ast_repr(), '  ')[2:]} -> "
+                    f"{textwrap.indent(val.ast_repr(), '  ')[2:]},\n"
+                    for cond, val in self.cases
+                ),
+                "",
+            )
+            + default_val_str
+            + ")"
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -2370,8 +2388,8 @@ class CaseExpr(ColExpr):
                 and not types.without_const(cond.dtype()) == types.Bool()
             ):
                 raise TypeError(
-                    f"argument `{cond}` for `when` must be of boolean type, but has "
-                    f"type `{cond.dtype()}`"
+                    f"argument `{cond.ast_repr()}` for `when` must be of boolean type, "
+                    f"but has type `{cond.dtype()}`"
                 )
 
         val_types = [val.dtype() for _, val in self.cases]
@@ -2535,6 +2553,14 @@ class Cast(ColExpr):
             self._dtype = types.with_const(self._dtype)
         return self._dtype
 
+    def ast_repr(self) -> str:
+        return (
+            "Cast(\n"
+            f"  {textwrap.indent(self.val.ast_repr(), '  ')[2:]},\n"
+            f"  to={self.target_type},\n"
+            ")"
+        )
+
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self.val.ftype(agg_is_window=agg_is_window)
 
@@ -2588,6 +2614,15 @@ class Order:
             descending = False
 
         return Order(expr, descending, nulls_last)
+
+    def ast_repr(self) -> str:
+        return (
+            "Order(\n"
+            f"  by={textwrap.indent(self.ast_repr(), '  ')[2:]},\n"
+            f"  descending={self.descending},\n"
+            f"  nulls_last={self.nulls_last},\n"
+            ")"
+        )
 
     def dtype(self) -> Dtype:
         return self.order_by.dtype()
