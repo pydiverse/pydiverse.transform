@@ -92,6 +92,8 @@ def assert_result_equal(
             dfy: pl.DataFrame = (query_y >> export(Polars(lazy=False))).with_columns(
                 pl.col(pl.Decimal).cast(pl.Float64)
             )
+            # TODO: for some reason, REALs on postgres and SQLite are converted to
+            # Float64 instead of Float32.
 
             # TODO: after a join, cols containing only null values get type Null on
             # SQLite and Postgres. maybe we can fix this but for now we just ignore them

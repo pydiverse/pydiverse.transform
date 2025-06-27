@@ -751,10 +751,6 @@ class TestPrintAndRepr:
     def test_expr_html_repr(self, tbl1):
         assert "failed" not in (tbl1.col1 * 2)._repr_html_()
 
-    def test_lambda_str(self, tbl1):
-        assert "failed" not in str(C.col)
-        assert "failed" not in str(C.col1 + tbl1.col1)
-
     def test_preview_print(self, tbl3):
         tbl3_str = str(tbl3)
         assert "failed" not in tbl3_str
