@@ -2205,13 +2205,13 @@ class ColFn(ColExpr):
     def ast_repr(self) -> str:
         args = [textwrap.indent(e.ast_repr(), "  ") for e in self.args] + [
             (
-                f"  {ckwarg}="
-                f"[\n{',\n'.join(textwrap.indent(v.ast_repr(), '    ') for v in val)}\n"
-                "  ]"
+                f"  {ckwarg}=[\n"
+                + ",\n".join(textwrap.indent(v.ast_repr(), "    ") for v in val)
+                + "\n  ]"
             )
             for ckwarg, val in self.context_kwargs.items()
         ]
-        return f"{self.op.name}(\n{',\n'.join(args)}\n)"
+        return self.op.name + "(\n" + ",\n".join(args) + "\n)"
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
