@@ -4,7 +4,7 @@
 import sqlalchemy as sqa
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 
-from pydiverse.common import Bool, Dtype, Float, Int, Int32, Int64, String
+from pydiverse.common import Bool, Dtype, Float, Float32, Int, Int32, Int64, String
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
@@ -16,11 +16,6 @@ class PostgresImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
-        if not cast.strict:
-            raise TypeError(
-                "backend `postgres` does not support `strict=False` in `cast`"
-            )
-
         if types.without_const(cast.val.dtype()).is_float():
             if cast.target_type.is_int():
                 return cls.cast_compiled(
@@ -46,9 +41,71 @@ class PostgresImpl(SqlImpl):
         return super().compile_cast(cast, sqa_col)
 
     @classmethod
+    def cast_compiled(cls, cast: Cast, compiled_expr: sqa.ColumnElement) -> sqa.Cast:
+        if not cast.strict:
+            cast.strict = True  # postgres does not have TRY_CAST
+
+            if types.without_const(cast.val.dtype()) == String():
+                compiled_expr = sqa.case(
+                    (
+                        sqa.func.pg_input_is_valid(
+                            compiled_expr,
+                            str(cls.sqa_type(cast.target_type))
+                            .lower()
+                            .replace(" ", ""),
+                        ),
+                        compiled_expr,
+                    ),
+                    else_=sqa.null(),
+                )
+
+            def int_type_range(dtype: Int) -> tuple[int, int]:
+                is_signed = dtype.__class__.__name__[0] == "I"
+                bits = int(dtype.__class__.__name__[4 - is_signed :])
+
+                if is_signed:
+                    return (-(2 ** (bits - 1)), 2 ** (bits - 1) - 1)
+                else:
+                    return (0, 2**bits - 1)
+
+            if cast.val.dtype().is_int() and cast.target_type.is_int():
+                source_range = int_type_range(cast.val.dtype())
+                target_range = int_type_range(cast.target_type)
+
+                if source_range[0] < target_range[0]:
+                    compiled_expr = sqa.case(
+                        (compiled_expr >= target_range[0], compiled_expr),
+                        else_=sqa.null(),
+                    )
+                if source_range[1] > target_range[1]:
+                    compiled_expr = sqa.case(
+                        (compiled_expr <= target_range[1], compiled_expr),
+                        else_=sqa.null(),
+                    )
+
+            if cast.val.dtype().is_float() and cast.target_type.is_int():
+                target_range = int_type_range(cast.target_type)
+
+                compiled_expr = sqa.case(
+                    (
+                        (compiled_expr != cls.nan())
+                        & (compiled_expr != cls.inf())
+                        & (compiled_expr != -cls.inf())
+                        & (compiled_expr >= target_range[0])
+                        & (compiled_expr <= target_range[1]),
+                        compiled_expr,
+                    ),
+                    else_=sqa.null(),
+                )
+
+        return super().cast_compiled(cast, compiled_expr)
+
+    @classmethod
     def sqa_type(cls, pdt_type: Dtype):
         if isinstance(pdt_type, types.List):
             return sqa.types.ARRAY(item_type=cls.sqa_type())
+        if isinstance(pdt_type, Float32):
+            return sqa.REAL()
 
         return super().sqa_type(pdt_type)
 

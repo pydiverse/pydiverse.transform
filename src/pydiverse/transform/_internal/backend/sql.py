@@ -865,11 +865,11 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.is_inf)
     def _is_inf(x, *, _Impl):
-        return x == _Impl.inf()
+        return (x == _Impl.inf()) | (x == -_Impl.inf())
 
     @impl(ops.is_not_inf)
     def _is_not_inf(x, *, _Impl):
-        return x != _Impl.inf()
+        return (x != _Impl.inf()) & (x != -_Impl.inf())
 
     @impl(ops.coalesce)
     def _coalesce(*x):
