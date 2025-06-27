@@ -16,6 +16,11 @@ class PostgresImpl(SqlImpl):
 
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
+        if not cast.strict:
+            raise TypeError(
+                "backend `postgres` does not support `strict=False` in `cast`"
+            )
+
         if types.without_const(cast.val.dtype()).is_float():
             if cast.target_type.is_int():
                 return cls.cast_compiled(
