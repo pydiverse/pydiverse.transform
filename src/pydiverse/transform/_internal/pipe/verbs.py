@@ -418,11 +418,11 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     for col in cols:
         if isinstance(col, ColName | str) and col not in table:
             raise ColumnNotFoundError(
-                f"column `{col}` does not exist in table `{table._ast.name}`"
+                f"column `{col.ast_repr()}` does not exist in table `{table._ast.name}`"
             )
         elif col not in table and col._uuid in table._cache.cols:
             raise ColumnNotFoundError(
-                f"cannot select hidden column `{col}` again\n"
+                f"cannot select hidden column `{col.ast_repr()}` again\n"
                 "hint: A column becomes hidden if you deselected it before or "
                 "overwrite it in `mutate` or `summarize`."
             )
@@ -1306,7 +1306,8 @@ def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) ->
     def _preprocess_expr(expr: ColExpr):
         if isinstance(expr, Col) and expr._uuid not in table._cache.cols:
             raise ColumnNotFoundError(
-                f"column `{repr(expr)}` does not exist in table `{table._ast.name}`"
+                f"column `{expr.ast_repr()}` does not exist in table "
+                f"`{table._ast.name}`"
             )
 
         if (

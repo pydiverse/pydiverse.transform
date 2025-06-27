@@ -7,6 +7,7 @@ from pydiverse.common import (
     Datetime,
     Decimal,
     Dtype,
+    Enum,
     Float,
     Float32,
     Float64,
@@ -44,4 +45,5 @@ __all__ = [
     "UInt64",
     "Dtype",
     "List",
+    "Enum",
 ]

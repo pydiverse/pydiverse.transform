@@ -24,6 +24,7 @@ from pydiverse.common import (
     Datetime,
     Dtype,
     Duration,
+    Enum,
     Float,
     Int,
     List,
@@ -2388,8 +2389,8 @@ class CaseExpr(ColExpr):
                 and not types.without_const(cond.dtype()) == types.Bool()
             ):
                 raise TypeError(
-                    f"argument `{cond.ast_repr()}` for `when` must be of boolean type, "
-                    f"but has type `{cond.dtype()}`"
+                    f"argument \n``{cond.ast_repr()}``\n for `when` must be of boolean "
+                    f"type, but has type `{cond.dtype()}`"
                 )
 
         val_types = [val.dtype() for _, val in self.cases]
@@ -2486,6 +2487,44 @@ class Cast(ColExpr):
         super().__init__(copy.copy(target_type))
         self.dtype()
 
+    @staticmethod
+    def is_valid_cast(source, target) -> bool:
+        VALID_CASTS = {
+            *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
+            *((ft, it) for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)),
+            (Datetime(), Date()),
+            (Date(), Datetime()),
+            *(
+                (t, String())
+                for t in (
+                    Int(),
+                    *INT_SUBTYPES,
+                    Float(),
+                    *FLOAT_SUBTYPES,
+                    Datetime(),
+                    Date(),
+                )
+            ),
+            *(
+                (t, u)
+                for t, u in itertools.chain(
+                    itertools.product(
+                        (Int(), *INT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
+                    ),
+                    itertools.product(
+                        (Float(), *FLOAT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
+                    ),
+                )
+            ),
+            *((Bool(), t) for t in itertools.chain(FLOAT_SUBTYPES, INT_SUBTYPES)),
+        }
+
+        source = types.without_const(source)
+
+        if isinstance(source, String) and isinstance(target, Enum):
+            return True
+        return (source, target) in VALID_CASTS
+
     def dtype(self) -> Dtype:
         # Since `ColExpr.dtype` is also responsible for type checking, we may not set
         # `_dtype` until we are able to retrieve the type of `val`.
@@ -2495,43 +2534,7 @@ class Cast(ColExpr):
         assert not types.is_const(self.target_type)
 
         if not types.converts_to(self.val.dtype(), self.target_type):
-            valid_casts = {
-                *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
-                *(
-                    (ft, it)
-                    for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)
-                ),
-                (Datetime(), Date()),
-                (Date(), Datetime()),
-                *(
-                    (t, String())
-                    for t in (
-                        Int(),
-                        *INT_SUBTYPES,
-                        Float(),
-                        *FLOAT_SUBTYPES,
-                        Datetime(),
-                        Date(),
-                    )
-                ),
-                *(
-                    (t, u)
-                    for t, u in itertools.chain(
-                        itertools.product(
-                            (Int(), *INT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
-                        ),
-                        itertools.product(
-                            (Float(), *FLOAT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
-                        ),
-                    )
-                ),
-                *((Bool(), t) for t in itertools.chain(FLOAT_SUBTYPES, INT_SUBTYPES)),
-            }
-
-            if (
-                types.without_const(self.val.dtype()),
-                self.target_type,
-            ) not in valid_casts:
+            if not Cast.is_valid_cast(self.val.dtype(), self.target_type):
                 hint = ""
                 if types.without_const(
                     self.val.dtype()

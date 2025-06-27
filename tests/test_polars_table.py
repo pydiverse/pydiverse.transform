@@ -700,6 +700,25 @@ class TestPolarsLazyImpl:
     def test_name_alias(self, tbl2):
         assert tbl2 >> alias("tbl") >> name() == "tbl"
 
+    def test_enum(self, tbl1):
+        tbl1_enum = tbl1 >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "c", "d")))
+        df1_enum = df1.with_columns(
+            p=pl.col("col2").cast(pl.Enum(["a", "b", "c", "d"]))
+        )
+        assert_equal(tbl1_enum, df1_enum)
+
+        with pytest.raises(pl.exceptions.InvalidOperationError):
+            (
+                tbl1
+                >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "d")))
+                >> export(Polars)
+            )
+
+        assert_equal(
+            tbl1_enum >> mutate(q=C.p + "l"),
+            df1_enum.with_columns(q=pl.col("p") + "l"),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
