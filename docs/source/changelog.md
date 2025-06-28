@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3 (2025-06-29)
+
+- improve repr for interactive development (a preview of the data is shown now)
+- add basic Enum support
+- add name verb
+- add AST repr for column expressions
+
 ## 0.5.2 (2025-06-11)
 - require pydiverse.common 0.3.4 to ensure its dependencies are installed
 
