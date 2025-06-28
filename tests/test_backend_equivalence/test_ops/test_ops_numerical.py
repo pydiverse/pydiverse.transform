@@ -36,6 +36,14 @@ def test_round(df_num):
         df_num,
         lambda t: t >> mutate(**{c.name: c.round() for c in t}),
     )
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{c.name: c.round(2) for c in t}),
+    )
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{c.name: c.round(-2) for c in t}),
+    )
 
 
 def test_add(df_num):
@@ -144,10 +152,13 @@ def test_is_inf(df_num):
         df_num,
         lambda t: t
         >> mutate(inf=float("inf"))
+        >> mutate(neg_inf=-C.inf)
         >> mutate(
             inf_is_inf=C.inf.is_inf(),
+            neg_inf_is_inf=C.neg_inf.is_inf(),
             **{c.name + "is_inf": c.is_inf() for c in t},
             inf_is_not_inf=C.inf.is_not_inf(),
+            neg_inf_is_not_inf=C.neg_inf.is_not_inf(),
             **{c.name + "is_not_inf": c.is_not_inf() for c in t},
         ),
     )

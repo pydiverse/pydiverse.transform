@@ -155,7 +155,9 @@ class Table:
         :doc:`/database_testing`.
         """
 
-        if not isinstance(resource, TableImpl):
+        # AstNodes are also allowed for `resource`, but we do not expose this to the
+        # user.
+        if not isinstance(resource, AstNode):
             errors.check_arg_type(
                 pl.DataFrame | pl.LazyFrame | pd.DataFrame | sqa.Table | str | dict,
                 "Table.__init__",
@@ -224,49 +226,73 @@ class Table:
             "and must return a `Table`."
         )
 
-    def __str__(self):
-        from pydiverse.transform._internal.backend.targets import Polars
-        from pydiverse.transform._internal.pipe.verbs import export, get_backend
+    def __str__(self) -> str:
+        return repr(self)
 
-        backend = get_backend(self._ast)
+    def __repr__(self) -> str:
+        from pydiverse.transform._internal.pipe.verbs import get_backend, name
+
+        res = (
+            f"Table `{self >> name()}` "
+            f"(backend: {get_backend(self._ast).backend_name})\n"
+        )
         try:
-            df = self >> export(Polars(lazy=False))
+            df, height = get_head_tail(self)
+            res += f"shape: ({height}, {len(self)})\n"
+
         except Exception as e:
-            return (
-                f"Table {self._ast.name}, backend: {backend.__name__}\n"
-                f"Failed to collect table.\n{type(e).__name__}: {str(e)}"
-            )
+            return res + f"export failed\n{type(e).__name__}: {str(e)}"
 
-        table_str = f"Table {self._ast.name}, backend: {backend.__name__}\n{df}"
-        # TODO: cache the result for a polars backend
-
-        return table_str
+        return res + str(df).split("\n", 1)[1]
 
     def __dir__(self) -> list[str]:
         return [name for name in self._cache.name_to_uuid.keys()]
 
-    def _repr_html_(self) -> str | None:
+    def _repr_html_(self) -> str:
+        from pydiverse.transform._internal.pipe.verbs import get_backend, name
+
         html = (
-            f"Table <code>{self._ast.name}</code> using"
-            f" <code>{type(self._ast).__name__}</code> backend</br>"
+            f"Table <code>{self >> name()}</code> "
+            f"(backend: <code>{get_backend(self._ast).backend_name}</code>)</br>"
         )
         try:
-            from pydiverse.transform._internal.backend.targets import Polars
-            from pydiverse.transform._internal.pipe.verbs import export
+            # We use polars' _repr_html_ on the first and last few rows of the table and
+            # fix the `shape` afterwards.
+            df, height = get_head_tail(self)
+            html += f"<small>shape: ({height}, {len(self)})</small>"
 
-            # TODO: For lazy backend only show preview (eg. take first 20 rows)
-            # TODO: also cache the table here for a polars backend. maybe we should call
-            # collect() and manage this there?
-            html += (self >> export(Polars()))._repr_html_()
+            df_html = df._repr_html_()
+            num_rows_begin = df_html.find("shape: (")
+            num_rows_end = df_html.find(",", num_rows_begin)
+
         except Exception as e:
-            html += (
-                "</br><pre>Failed to collect table.\n"
+            return html + (
+                "</br><pre>export failed\n"
                 f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
             )
-        return html
+
+        return f"{df_html[: num_rows_begin + 8]}{height}{df_html[num_rows_end:]}"
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+
+def get_head_tail(tbl: Table) -> tuple[pl.DataFrame, int]:
+    import pydiverse.transform as pdt
+    from pydiverse.transform._internal.pipe.verbs import export, slice_head, summarize
+
+    height = tbl >> summarize(num_rows=pdt.count()) >> export(pdt.Scalar)
+    tbl_rows = int(pl.Config.state().get("POLARS_FMT_MAX_ROWS") or 10)
+    head_tail_len = tbl_rows // 2 + 1
+
+    # Only export the first and last few rows.
+    head: pl.DataFrame = tbl >> slice_head(head_tail_len) >> export(pdt.Polars)
+    tail: pl.DataFrame = (
+        tbl
+        >> slice_head(head_tail_len, offset=max(head_tail_len, height - head_tail_len))
+        >> export(pdt.Polars)
+    )
+    return pl.concat([head, tail]), height
 
 
 def backend(table: Table) -> Literal["polars", "sqlite", "postgres", "duckdb", "mssql"]:

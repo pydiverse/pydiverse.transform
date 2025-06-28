@@ -606,13 +606,23 @@ class TestPolarsLazyImpl:
             (t_ex["u"] + t_ex["col2"]).exp() - t_ex["v"],
             (t >> mutate(h=(t.u + C.col2).exp() - t.v)).h.export(Polars()),
         )
+        assert_equal(
+            (t_ex["u"] + t_ex["col2"]).exp() - t_ex["v"],
+            ((t.u + C.col2).exp() - t.v).export(Polars()),
+        )
+
         e = t >> inner_join(
             tbl1, tbl1.col1.cast(pdt.Float64()) <= tbl2.col1 + tbl2.col3
         )
         e_ex = e >> export(Polars(lazy=False))
+
         assert_equal(
             e_ex["col2"] + e_ex["col1_df1"],
             (e >> mutate(j=e.col2 + tbl1.col1)).j.export(Polars()),
+        )
+        assert_equal(
+            e_ex["col2"] + e_ex["col1_df1"],
+            (e.col2 + tbl1.col1).export(Polars),
         )
 
     def test_list(self, tbl1, tbl3):
@@ -684,37 +694,150 @@ class TestPolarsLazyImpl:
         assert (tbl2.col1 == tbl3.col1).uses_table(tbl3)
         assert not tbl2.col1.uses_table(tbl2 >> mutate(x=0))
 
+    def test_name(self, tbl3):
+        assert tbl3 >> name() == "df3"
+
+    def test_name_alias(self, tbl2):
+        assert tbl2 >> alias("tbl") >> name() == "tbl"
+
+    def test_enum(self, tbl1):
+        tbl1_enum = tbl1 >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "c", "d")))
+        df1_enum = df1.with_columns(
+            p=pl.col("col2").cast(pl.Enum(["a", "b", "c", "d"]))
+        )
+        assert_equal(tbl1_enum, df1_enum)
+
+        with pytest.raises(pl.exceptions.InvalidOperationError):
+            (
+                tbl1
+                >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "d")))
+                >> export(Polars)
+            )
+
+        assert_equal(
+            tbl1_enum >> mutate(q=C.p + "l"),
+            df1_enum.with_columns(q=pl.col("p") + "l"),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
         tbl_str = str(tbl1)
 
         assert "df1" in tbl_str
-        assert "PolarsImpl" in tbl_str
+        assert "polars" in tbl_str
         assert str(df1) in tbl_str
         tbl1 >> show()
 
     def test_table_repr_html(self, tbl1):
         # jupyter html
-        assert "Failed" not in tbl1._repr_html_()
+        assert "failed" not in tbl1._repr_html_()
+        assert tbl1._repr_html_() == df1._repr_html_()
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
         series = tbl1._ast.df.collect().get_column("col1")
 
         assert str(series) in col1_str
-        assert "Failed" not in col1_str
+        assert "failed" not in col1_str
 
     def test_col_html_repr(self, tbl1):
-        assert "Failed" not in tbl1.col1._repr_html_()
+        assert "failed" not in tbl1.col1._repr_html_()
 
     def test_expr_str(self, tbl1):
         expr_str = str(tbl1.col1 * 2)
-        assert "Failed" not in expr_str
+        assert "failed" not in expr_str
 
     def test_expr_html_repr(self, tbl1):
-        assert "Failed" not in (tbl1.col1 * 2)._repr_html_()
+        assert "failed" not in (tbl1.col1 * 2)._repr_html_()
 
-    def test_lambda_str(self, tbl1):
-        assert "Failed" not in str(C.col)
-        assert "Failed" not in str(C.col1 + tbl1.col1)
+    def test_preview_print(self, tbl3):
+        tbl3_str = str(tbl3)
+        assert "failed" not in tbl3_str
+        assert "shape: (12, 5)" in tbl3_str
+
+    def test_ast_repr(self, tbl4):
+        assert tbl4.col1.ast_repr() == "df4.col1 (Int64)"
+        assert (tbl4.col1 + tbl4.col2).ast_repr() == (
+            """__add__(
+  df4.col1 (Int64),
+  df4.col2 (Int64)
+)"""
+        )
+        assert (tbl4.col1 + tbl4.col2 + tbl4.col3).ast_repr() == (
+            """__add__(
+  __add__(
+    df4.col1 (Int64),
+    df4.col2 (Int64)
+  ),
+  df4.col3 (Int64)
+)"""
+        )
+        assert (
+            pdt.when(tbl4.col1 > 1)
+            .then(tbl4.col2)
+            .when(tbl4.col1 < -1)
+            .then(tbl4.col3)
+            .otherwise(7)
+        ).ast_repr() == (
+            """CaseWhen(
+  __gt__(
+    df4.col1 (Int64),
+    lit(1, const Int64)
+  ) -> df4.col2 (Int64),
+  __lt__(
+    df4.col1 (Int64),
+    lit(-1, const Int64)
+  ) -> df4.col3 (Int64),
+  default=lit(7, const Int64)
+)"""
+        )
+
+        assert (
+            (tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2).ast_repr()
+            == """__add__(
+  Cast(
+    df4.col1 (Int64),
+    to=Float64,
+  ),
+  __truediv__(
+    df4.col2 (Int64),
+    lit(2, const Int64)
+  )
+)"""
+        )
+
+        # TODO: This is currently how `filter` is translated to the AST. We could also
+        # only do this transformation during backend translation, so that there is a
+        # real `filter` context kwarg visible in the AST.
+        assert (
+            tbl4.col1.max(
+                partition_by=[tbl4.col2, tbl4.col3],
+                filter=pdt.when(tbl4.col1 > 0)
+                .then(tbl4.col2.is_not_null())
+                .otherwise((tbl4.col3 % 2) == 0),
+            ).ast_repr()
+            == """max(
+  CaseWhen(
+    CaseWhen(
+      __gt__(
+        df4.col1 (Int64),
+        lit(0, const Int64)
+      ) -> is_not_null(
+        df4.col2 (Int64)
+      ),
+      default=__eq__(
+        __mod__(
+          df4.col3 (Int64),
+          lit(2, const Int64)
+        ),
+        lit(0, const Int64)
+      )
+    ) -> df4.col1 (Int64),
+  ),
+  partition_by=[
+    df4.col2 (Int64),
+    df4.col3 (Int64)
+  ]
+)"""
+        )

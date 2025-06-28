@@ -7,13 +7,15 @@ from __future__ import annotations
 import copy
 import dataclasses
 import functools
-import html
 import itertools
 import operator
+import re
+import textwrap
 from collections.abc import Callable, Iterable
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
+import pandas as pd
 import polars as pl
 
 from pydiverse.common import (
@@ -22,6 +24,7 @@ from pydiverse.common import (
     Datetime,
     Dtype,
     Duration,
+    Enum,
     Float,
     Int,
     List,
@@ -84,11 +87,91 @@ class ColExpr(Generic[T]):
             "converted to a boolean or used with the and, or, not keywords"
         )
 
+    def __str__(self) -> str:
+        return repr(self)
+
+    def __repr__(self) -> str:
+        # We reduce column representation to table representation.
+        tbl = get_expr_as_table(self)
+        tbl_repr = repr(tbl)
+        if isinstance(self, Col):
+            # There is a sensible name, so we print it.
+            return tbl_repr.replace("Table", "Column", 1)
+        return tbl_repr.split("\n", 1)[1]
+
     def _repr_html_(self) -> str:
-        return f"<pre>{html.escape(repr(self))}</pre>"
+        tbl = get_expr_as_table(self)
+        tbl_repr = tbl._repr_html_()
+        if isinstance(self, Col):
+            return tbl_repr.replace("Table", "Column", 1)
+
+        return re.sub(
+            r"Table <code>.*<code> \(backend: .+<code>\)</br>", "", tbl_repr, count=1
+        )
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
+
+    def ast_repr(self) -> str: ...
+
+    def export(self, target: Target) -> pl.Series | pd.Series:
+        """
+        Exports a column expression.
+
+        :param target:
+            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
+            object. The ``lazy`` kwarg for polars is ignored.
+
+        :return:
+            A polars or pandas Series.
+
+        Note
+        ----
+        Not every column expression can be exported. Unlike `mutate` or other verbs,
+        there is no ambient table the expression lives in, which is required to resolve
+        `C`-columns and correctly deal with columns from different tables. Thus, the
+        expression must contain one column whose table contains all other columns
+        appearing in the expression. The table of this column is then used to export the
+        expression.
+
+        Examples
+        --------
+        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
+        >>> t1.h.export(Polars)
+        shape: (6,)
+        Series: 'h' [f64]
+        [
+                2.465
+                0.22
+                -4.477
+                10.8
+                -81.2
+                0.0
+        ]
+        >>> t1.h.export(Pandas())
+        0    2.465
+        1     0.22
+        2   -4.477
+        3     10.8
+        4    -81.2
+        5      0.0
+        Name: h, dtype: double[pyarrow]
+        """
+
+        from pydiverse.transform._internal.pipe.verbs import export
+
+        df = get_expr_as_table(self) >> export(target)
+
+        if isinstance(target, Polars) or target is Polars:
+            if isinstance(df, pl.LazyFrame):
+                df = df.collect()
+            return df.get_column(df.columns[0])
+        elif isinstance(target, Pandas) or target is Pandas:
+            import pandas as pd
+
+            return pd.Series(df[df.columns.values.tolist()[0]])
+
+        raise TypeError("`target` can only be `Polars` or `Pandas`")
 
     def iter_children(self) -> Iterable[ColExpr]:
         return iter(())
@@ -2042,7 +2125,7 @@ class Col(ColExpr):
         self._uuid = _uuid
         super().__init__(_dtype, _ftype)
 
-    def __repr__(self) -> str:
+    def ast_repr(self) -> str:
         dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
         return f"{self._ast.name}.{self.name}{dtype_str}"
 
@@ -2058,56 +2141,6 @@ class Col(ColExpr):
     def __hash__(self) -> int:
         return hash(self._uuid)
 
-    def export(self, target: Target) -> Any:
-        """
-        Exports a column to a polars or pandas Series.
-
-        :param target:
-            The data frame library to export to. Can be a ``Polars`` or ``Pandas``
-            object. The ``lazy`` kwarg for polars is ignored.
-
-        :return:
-            A polars or pandas Series.
-
-        Examples
-        --------
-        >>> t1 = pdt.Table({"h": [2.465, 0.22, -4.477, 10.8, -81.2, 0.0]})
-        >>> t1.h.show()
-        shape: (6,)
-        Series: 'h' [f64]
-        [
-                2.465
-                0.22
-                -4.477
-                10.8
-                -81.2
-                0.0
-        ]
-        >>> t1.h.export(Pandas())
-        0    2.465
-        1     0.22
-        2   -4.477
-        3     10.8
-        4    -81.2
-        5      0.0
-        Name: h, dtype: double[pyarrow]
-        """
-
-        from pydiverse.transform._internal.backend.table_impl import get_backend
-        from pydiverse.transform._internal.tree.verbs import Select
-
-        ast = Select(self._ast, [self])
-        df = get_backend(self._ast).export(ast, target, schema_overrides={})
-        if isinstance(target, Polars):
-            if isinstance(df, pl.LazyFrame):
-                df = df.collect()
-            return df.get_column(self.name)
-        else:
-            assert isinstance(target, Pandas)
-            import pandas as pd
-
-            return pd.Series(df[self.name])
-
 
 class ColName(ColExpr):
     def __init__(
@@ -2116,7 +2149,7 @@ class ColName(ColExpr):
         self.name = name
         super().__init__(dtype, ftype)
 
-    def __repr__(self) -> str:
+    def ast_repr(self) -> str:
         dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
         return f"C.{self.name}{dtype_str}"
 
@@ -2136,7 +2169,7 @@ class LiteralCol(ColExpr):
         dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
-    def __repr__(self):
+    def ast_repr(self):
         return f"lit({repr(self.val)}, {self.dtype()})"
 
 
@@ -2169,11 +2202,16 @@ class ColFn(ColExpr):
         # try to eagerly resolve the types to get a nicer stack trace on type errors
         self.dtype()
 
-    def __repr__(self) -> str:
-        args = [repr(e) for e in self.args] + [
-            f"{key}={repr(val)}" for key, val in self.context_kwargs.items()
+    def ast_repr(self) -> str:
+        args = [textwrap.indent(e.ast_repr(), "  ") for e in self.args] + [
+            (
+                f"  {ckwarg}=[\n"
+                + ",\n".join(textwrap.indent(v.ast_repr(), "    ") for v in val)
+                + "\n  ]"
+            )
+            for ckwarg, val in self.context_kwargs.items()
         ]
-        return f"{self.op.name}({', '.join(args)})"
+        return self.op.name + "(\n" + ",\n".join(args) + "\n)"
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -2305,13 +2343,25 @@ class CaseExpr(ColExpr):
         super().__init__()
         self.dtype()
 
-    def __repr__(self) -> str:
-        return (
-            "case_when( "
-            + functools.reduce(
-                operator.add, (f"{cond} -> {val}, " for cond, val in self.cases), ""
+    def ast_repr(self) -> str:
+        default_val_str = ""
+        if self.default_val is not None:
+            default_val_str = (
+                f"  default={textwrap.indent(self.default_val.ast_repr(), '  ')[2:]}\n"
             )
-            + f"default={self.default_val})"
+        return (
+            "CaseWhen(\n"
+            + functools.reduce(
+                operator.add,
+                (
+                    f"  {textwrap.indent(cond.ast_repr(), '  ')[2:]} -> "
+                    f"{textwrap.indent(val.ast_repr(), '  ')[2:]},\n"
+                    for cond, val in self.cases
+                ),
+                "",
+            )
+            + default_val_str
+            + ")"
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -2339,8 +2389,8 @@ class CaseExpr(ColExpr):
                 and not types.without_const(cond.dtype()) == types.Bool()
             ):
                 raise TypeError(
-                    f"argument `{cond}` for `when` must be of boolean type, but has "
-                    f"type `{cond.dtype()}`"
+                    f"argument \n``{cond.ast_repr()}``\n for `when` must be of boolean "
+                    f"type, but has type `{cond.dtype()}`"
                 )
 
         val_types = [val.dtype() for _, val in self.cases]
@@ -2437,6 +2487,44 @@ class Cast(ColExpr):
         super().__init__(copy.copy(target_type))
         self.dtype()
 
+    @staticmethod
+    def is_valid_cast(source, target) -> bool:
+        VALID_CASTS = {
+            *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
+            *((ft, it) for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)),
+            (Datetime(), Date()),
+            (Date(), Datetime()),
+            *(
+                (t, String())
+                for t in (
+                    Int(),
+                    *INT_SUBTYPES,
+                    Float(),
+                    *FLOAT_SUBTYPES,
+                    Datetime(),
+                    Date(),
+                )
+            ),
+            *(
+                (t, u)
+                for t, u in itertools.chain(
+                    itertools.product(
+                        (Int(), *INT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
+                    ),
+                    itertools.product(
+                        (Float(), *FLOAT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
+                    ),
+                )
+            ),
+            *((Bool(), t) for t in itertools.chain(FLOAT_SUBTYPES, INT_SUBTYPES)),
+        }
+
+        source = types.without_const(source)
+
+        if isinstance(source, String) and isinstance(target, Enum):
+            return True
+        return (source, target) in VALID_CASTS
+
     def dtype(self) -> Dtype:
         # Since `ColExpr.dtype` is also responsible for type checking, we may not set
         # `_dtype` until we are able to retrieve the type of `val`.
@@ -2446,43 +2534,7 @@ class Cast(ColExpr):
         assert not types.is_const(self.target_type)
 
         if not types.converts_to(self.val.dtype(), self.target_type):
-            valid_casts = {
-                *((String(), t) for t in (*INT_SUBTYPES, *FLOAT_SUBTYPES)),
-                *(
-                    (ft, it)
-                    for ft, it in itertools.product(FLOAT_SUBTYPES, INT_SUBTYPES)
-                ),
-                (Datetime(), Date()),
-                (Date(), Datetime()),
-                *(
-                    (t, String())
-                    for t in (
-                        Int(),
-                        *INT_SUBTYPES,
-                        Float(),
-                        *FLOAT_SUBTYPES,
-                        Datetime(),
-                        Date(),
-                    )
-                ),
-                *(
-                    (t, u)
-                    for t, u in itertools.chain(
-                        itertools.product(
-                            (Int(), *INT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
-                        ),
-                        itertools.product(
-                            (Float(), *FLOAT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
-                        ),
-                    )
-                ),
-                *((Bool(), t) for t in itertools.chain(FLOAT_SUBTYPES, INT_SUBTYPES)),
-            }
-
-            if (
-                types.without_const(self.val.dtype()),
-                self.target_type,
-            ) not in valid_casts:
+            if not Cast.is_valid_cast(self.val.dtype(), self.target_type):
                 hint = ""
                 if types.without_const(
                     self.val.dtype()
@@ -2503,6 +2555,14 @@ class Cast(ColExpr):
         if types.is_const(self.val.dtype()):
             self._dtype = types.with_const(self._dtype)
         return self._dtype
+
+    def ast_repr(self) -> str:
+        return (
+            "Cast(\n"
+            f"  {textwrap.indent(self.val.ast_repr(), '  ')[2:]},\n"
+            f"  to={self.target_type},\n"
+            ")"
+        )
 
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self.val.ftype(agg_is_window=agg_is_window)
@@ -2557,6 +2617,15 @@ class Order:
             descending = False
 
         return Order(expr, descending, nulls_last)
+
+    def ast_repr(self) -> str:
+        return (
+            "Order(\n"
+            f"  by={textwrap.indent(self.ast_repr(), '  ')[2:]},\n"
+            f"  descending={self.descending},\n"
+            f"  nulls_last={self.nulls_last},\n"
+            ")"
+        )
 
     def dtype(self) -> Dtype:
         return self.order_by.dtype()
@@ -2622,3 +2691,36 @@ def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
             for ord in arrange
         ]
     return {key: [wrap_literal(val) for val in arr] for key, arr in kwargs.items()}
+
+
+# returns a table with the expression as the only column
+def get_expr_as_table(expr: ColExpr):
+    from pydiverse.transform._internal.pipe.table import Table
+    from pydiverse.transform._internal.pipe.verbs import mutate, select
+
+    cols = [col for col in expr.iter_subtree() if isinstance(col, Col)]
+    # We need one column whose AST is an ancestor of all other columns' ASTs.
+    # The following could be done in linear time.
+    subtrees = [set(col._ast.iter_subtree()) for col in cols]
+    ancestor_index = None
+    for i, tree in enumerate(subtrees):
+        if all(col._ast in tree for col in cols):
+            ancestor_index = i
+            break
+
+    if ancestor_index is None:
+        raise ValueError(
+            "column expression cannot be exported, since no common ancestor table "
+            "was found\n"
+            "hint: To export a column expression, it must contain one column whose "
+            "table contains all other columns."
+        )
+
+    name = None
+    if isinstance(expr, Col):
+        name = expr.name
+    tbl = Table(cols[ancestor_index]._ast, name=name)
+    col_name = "_unnamed_expr_"
+    if isinstance(expr, Col):
+        col_name = expr.name
+    return tbl >> mutate(**{col_name: expr}) >> select(col_name)

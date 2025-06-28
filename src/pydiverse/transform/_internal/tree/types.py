@@ -14,6 +14,7 @@ from pydiverse.common import (
     Decimal,
     Dtype,
     Duration,
+    Enum,
     Float,
     Float32,
     Float64,
@@ -96,6 +97,8 @@ def with_const(dtype: Dtype) -> Dtype:
 def converts_to(source: Dtype, target: Dtype) -> bool:
     if isinstance(source, List):
         return isinstance(target, List) and converts_to(source.inner, target.inner)
+    if isinstance(source, Enum):
+        return target == source or target == String()
     return (not is_const(target) or is_const(source)) and (
         without_const(target) in IMPLICIT_CONVS[without_const(source)]
     )
@@ -110,6 +113,8 @@ def to_python(dtype: Dtype):
         return float
     elif isinstance(dtype, List):
         return list
+    elif isinstance(dtype, Enum):
+        return str
 
     return {
         String(): str,
@@ -178,6 +183,13 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
 
         return List(lca_type([dtype.inner for dtype in dtypes]))
 
+    if any(isinstance(dtype, Enum) for dtype in dtypes):
+        if all(dtype == dtypes[0] for dtype in dtypes):
+            return copy.copy(dtypes[0])
+        if all(isinstance(dtype, Enum | String) for dtype in dtypes):
+            return String()
+        raise TypeError(f"incompatible types `{', '.join(dtypes)}`")
+
     if not (
         common_ancestors := functools.reduce(
             operator.and_,
@@ -237,6 +249,8 @@ def is_subtype(dtype: Dtype) -> bool:
 def implicit_conversions(dtype: Dtype) -> list[Dtype]:
     if isinstance(dtype, List):
         return [List(inner) for inner in implicit_conversions(dtype.inner)]
+    if isinstance(dtype, Enum):
+        return [dtype, String()]
     return list(IMPLICIT_CONVS[dtype].keys())
 
 
@@ -281,6 +295,8 @@ for start_type in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
 def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
     if isinstance(dtype, List):
         return conversion_cost(dtype.inner, target.inner)
+    if isinstance(dtype, Enum):
+        return (0, 0) if dtype == target else (0, 1)
     return IMPLICIT_CONVS[without_const(dtype)][without_const(target)]
 
 

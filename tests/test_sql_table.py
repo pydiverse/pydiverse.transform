@@ -120,7 +120,7 @@ class TestSqlTable:
         assert out.lower().split() == expected_out.lower().split()
 
         # Verify that it is chainable
-        tbl1 >> show_query() >> collect()
+        tbl1 >> show_query(pipe=True) >> collect()
 
     def test_export(self, tbl1):
         assert_equal(tbl1 >> export(Polars()), df1)

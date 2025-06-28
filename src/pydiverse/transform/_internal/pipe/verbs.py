@@ -363,11 +363,11 @@ def build_query(table: Table) -> Pipeable:
 
 
 @overload
-def show_query() -> Pipeable: ...
+def show_query(pipe: bool = False) -> Pipeable | None: ...
 
 
 @verb
-def show_query(table: Table) -> Pipeable:
+def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
     """
     Prints the compiled SQL query to stdout.
     """
@@ -375,9 +375,12 @@ def show_query(table: Table) -> Pipeable:
     if query := table >> build_query():
         print(query)
     else:
-        print(f"no query to show for {table._ast.name}")
+        print(
+            f"No query to show for table {table._ast.name}. "
+            f"(backend: {get_backend(table._ast).backend_name})"
+        )
 
-    return table
+    return table if pipe else None
 
 
 @overload
@@ -415,11 +418,11 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     for col in cols:
         if isinstance(col, ColName | str) and col not in table:
             raise ColumnNotFoundError(
-                f"column `{col}` does not exist in table `{table._ast.name}`"
+                f"column `{col.ast_repr()}` does not exist in table `{table._ast.name}`"
             )
         elif col not in table and col._uuid in table._cache.cols:
             raise ColumnNotFoundError(
-                f"cannot select hidden column `{col}` again\n"
+                f"cannot select hidden column `{col.ast_repr()}` again\n"
                 "hint: A column becomes hidden if you deselected it before or "
                 "overwrite it in `mutate` or `summarize`."
             )
@@ -1272,16 +1275,28 @@ def cross_join(
 
 
 @overload
-def show() -> Pipeable: ...
+def show(pipe: bool = False) -> Pipeable | None: ...
 
 
 @verb
-def show(table: Table) -> Pipeable:
+def show(table: Table, pipe: bool = False) -> Pipeable | None:
     """
     Prints the table to stdout.
     """
     print(table)
-    return table
+    return table if pipe else None
+
+
+@overload
+def name() -> str: ...
+
+
+@verb
+def name(table: Table) -> str:
+    """
+    Returns the name of the table.
+    """
+    return table._ast.name
 
 
 def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) -> Any:
@@ -1291,7 +1306,8 @@ def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) ->
     def _preprocess_expr(expr: ColExpr):
         if isinstance(expr, Col) and expr._uuid not in table._cache.cols:
             raise ColumnNotFoundError(
-                f"column `{repr(expr)}` does not exist in table `{table._ast.name}`"
+                f"column `{expr.ast_repr()}` does not exist in table "
+                f"`{table._ast.name}`"
             )
 
         if (
