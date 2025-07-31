@@ -60,6 +60,10 @@ furo = ">=2024.8.6"
 sphinxcontrib-apidoc = ">=0.3.0"
 myst-parser = ">=4.0.1"
 sphinx-autosummary-accessors = ">=2025.3.1"
+sphinx-click = ">=6.0.0"
+sphinx-autobuild = ">=2024.10.3"
+sphinx-copybutton = ">=0.5.2"
+
 [feature.docs.tasks]
 docs = "cd docs && make html "
 readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/build/html $READTHEDOCS_OUTPUT/html"
