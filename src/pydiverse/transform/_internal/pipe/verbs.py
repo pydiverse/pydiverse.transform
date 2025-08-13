@@ -777,6 +777,10 @@ def group_by(table: Table, *cols: Col | ColName | str, add=False) -> Pipeable:
     errors.check_arg_type(bool, "group_by", "add", add)
     cols = [ColName(col) if isinstance(col, str) else col for col in cols]
 
+    for col in cols:
+        if isinstance(col, Col) and col._uuid not in table._cache.uuid_to_name:
+            raise ValueError(f"cannot group by non-selected column `{col.ast_repr()}`")
+
     new = copy.copy(table)
     new._ast = GroupBy(table._ast, [preprocess_arg(col, table) for col in cols], add)
 
