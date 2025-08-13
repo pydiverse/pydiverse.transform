@@ -374,6 +374,15 @@ def show_query(pipe: bool = False) -> Pipeable | None: ...
 def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
     """
     Prints the compiled SQL query to stdout.
+
+    :param pipe:
+        If set to `True`, the table is returned, else `None` is returned.
+
+    Note
+    ----
+    During interactive development in the python shell, you usually want to keep
+    `pipe = False`, else the table is printed, too. The main use for `pipe = True` is
+    when you don't want to break a long sequence of verbs in a file.
     """
 
     if query := table >> build_query():
@@ -1317,6 +1326,15 @@ def show(pipe: bool = False) -> Pipeable | None: ...
 def show(table: Table, pipe: bool = False) -> Pipeable | None:
     """
     Prints the table to stdout.
+
+    :param pipe:
+        If set to `True`, the table is returned, else `None` is returned.
+
+    Note
+    ----
+    During interactive development in the python shell, you usually want to keep
+    `pipe = False`, else the table is printed twice. The main use for `pipe = True` is
+    when you don't want to break a long sequence of verbs in a file.
     """
     print(table)
     return table if pipe else None
@@ -1341,7 +1359,16 @@ def ast_repr(pipe: bool = False) -> Pipeable | None: ...
 @verb
 def ast_repr(table: Table, pipe: bool = False) -> Pipeable | None:
     """
-        Prints the AST of the table to stdout.
+    Prints the AST of the table to stdout.
+
+    :param pipe:
+        If set to `True`, the table is returned, else `None` is returned.
+
+    Note
+    ----
+    During interactive development in the python shell, you usually want to keep
+    `pipe = False`, else the table is printed, too. The main use for `pipe = True` is
+    when you don't want to break a long sequence of verbs in a file.
 
     Examples
     --------
