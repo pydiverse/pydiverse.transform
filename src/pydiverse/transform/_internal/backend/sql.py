@@ -114,6 +114,14 @@ class SqlImpl(TableImpl):
             {col.name: self.pdt_type(col.type) for col in self.table.columns},
         )
 
+    def __repr__(self) -> str:
+        return (
+            "SqlImpl(\n"
+            + f"  name = {self.name},\n"
+            + f"  engine = {repr(self.engine)},\n"
+            + ")\n"
+        )
+
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]
 

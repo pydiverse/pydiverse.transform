@@ -202,7 +202,11 @@ def collect(
     │ 4   ┆ --   r ┆ 10  │
     └─────┴────────┴─────┘
     """
-    errors.check_arg_type(Target | None, "collect", "target", target)
+    errors.check_arg_type(Target | type(Target), "collect", "target", target)
+
+    if not isinstance(target, Target):
+        assert issubclass(target, Target)
+        target = target()
 
     df = table >> export(Polars(lazy=False))
     if target is None:
@@ -1328,6 +1332,19 @@ def name(table: Table) -> str | None:
     Returns the name of the table.
     """
     return table._ast.name
+
+
+@overload
+def ast_repr(pipe: bool = False) -> Pipeable | None: ...
+
+
+@verb
+def ast_repr(table: Table, pipe: bool = False) -> Pipeable | None:
+    """
+    Prints the AST of the table to stdout.
+    """
+    print(repr(table._ast), end="")
+    return table if pipe else None
 
 
 def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) -> Any:

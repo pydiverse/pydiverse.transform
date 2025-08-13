@@ -3,6 +3,7 @@
 
 import copy
 import dataclasses
+import textwrap
 import uuid
 from collections.abc import Callable, Iterable
 from typing import Literal
@@ -62,6 +63,11 @@ class Verb(AstNode):
 class Alias(Verb):
     uuid_map: dict[UUID, UUID] | None
 
+    def __repr__(self) -> str:
+        return f"Alias({'' if self.name == self.child.name else self.name}),\n" + repr(
+            self.child
+        )
+
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned, nd_map, uuid_map = Verb._clone(self)
         if self.uuid_map is not None:  # happens if and only if keep_col_refs=False
@@ -85,10 +91,29 @@ class Select(Verb):
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.select = [g(col) for col in self.select]
 
+    def __repr__(self) -> str:
+        if len(self.select) == 0:
+            return "Select(),\n" + repr(self.child)
+
+        return (
+            "Select(\n  "
+            + ",\n  ".join(col.ast_repr() for col in self.select)
+            + "\n),\n"
+            + repr(self.child)
+        )
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class Rename(Verb):
     name_map: dict[str, str]
+
+    def __repr__(self) -> str:
+        return (
+            "Rename(\n  "
+            + ",\n  ".join(f"{k} -> {v}" for k, v in self.name_map.items())
+            + "\n),\n"
+            + repr(self.child)
+        )
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -96,6 +121,17 @@ class Mutate(Verb):
     names: list[str]
     values: list[ColExpr]
     uuids: list[UUID]
+
+    def __repr__(self) -> str:
+        return (
+            "Mutate(\n  "
+            + ",\n  ".join(
+                f"{k} = {textwrap.indent(v.ast_repr(), '  ')[2:]}"
+                for k, v in zip(self.names, self.values, strict=True)
+            )
+            + "\n),\n"
+            + repr(self.child)
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -120,6 +156,14 @@ class Mutate(Verb):
 class Filter(Verb):
     predicates: list[ColExpr]
 
+    def __repr__(self) -> str:
+        return (
+            "Filter(\n"
+            + ",\n".join(textwrap.indent(f.ast_repr(), "  ") for f in self.predicates)
+            + "\n),\n"
+            + repr(self.child)
+        )
+
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.predicates
 
@@ -132,6 +176,19 @@ class Summarize(Verb):
     names: list[str]
     values: list[ColExpr]
     uuids: list[UUID]
+
+    def __repr__(self) -> str:
+        if len(self.names) == 0:
+            return "Summarize(),\n" + repr(self.child)
+        return (
+            "Summarize(\n  "
+            + ",\n  ".join(
+                f"{k} = {textwrap.indent(v.ast_repr(), '  ')[2:]}"
+                for k, v in zip(self.names, self.values, strict=True)
+            )
+            + "\n),\n"
+            + repr(self.child)
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.values
@@ -156,6 +213,14 @@ class Summarize(Verb):
 class Arrange(Verb):
     order_by: list[Order]
 
+    def __repr__(self) -> str:
+        return (
+            "Arrange(\n"
+            + ",\n".join(textwrap.indent(f.ast_repr(), "  ") for f in self.order_by)
+            + "\n),\n"
+            + repr(self.child)
+        )
+
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
 
@@ -171,11 +236,22 @@ class SliceHead(Verb):
     n: int
     offset: int
 
+    def __repr__(self) -> str:
+        return f"SliceHead(n = {self.n}, offset = {self.offset}),\n" + repr(self.child)
+
 
 @dataclasses.dataclass(eq=False, slots=True)
 class GroupBy(Verb):
     group_by: list[Col]
     add: bool
+
+    def __repr__(self) -> str:
+        return (
+            "GroupBy(\n"
+            + ",\n".join(textwrap.indent(f.ast_repr(), "  ") for f in self.group_by)
+            + "\n),\n"
+            + repr(self.child)
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
@@ -185,7 +261,9 @@ class GroupBy(Verb):
 
 
 @dataclasses.dataclass(eq=False, slots=True)
-class Ungroup(Verb): ...
+class Ungroup(Verb):
+    def __repr__(self) -> str:
+        return "Ungroup(),\n" + repr(self.child)
 
 
 @dataclasses.dataclass(eq=False, slots=True)
@@ -195,6 +273,17 @@ class Join(Verb):
     how: Literal["inner", "left", "full"]
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
     suffix: str
+
+    def __repr__(self) -> str:
+        return (
+            "Join(\n  right = "
+            + textwrap.indent(repr(self.right), "  ")[2:]
+            + f"  how = `{self.how}`,\n"
+            + f"  on = {textwrap.indent(self.on.ast_repr(), '  ')[2:]},\n"
+            + f"  validate = `{self.validate}`,\n"
+            + "),\n"
+            + repr(self.child)
+        )
 
     def _clone(self) -> tuple["Join", dict[AstNode, AstNode], dict[UUID, UUID]]:
         child, nd_map, uuid_map = self.child._clone()
@@ -232,4 +321,6 @@ class Join(Verb):
         self.on = g(self.on)
 
 
-class SubqueryMarker(Verb): ...
+class SubqueryMarker(Verb):
+    def __repr__(self) -> str:
+        return "SubqueryMarker(),\n"

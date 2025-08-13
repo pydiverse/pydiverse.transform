@@ -23,7 +23,7 @@ from pydiverse.transform._internal.tree.ast import AstNode
 class DuckDbPolarsImpl(TableImpl):
     backend_name = "polars"
 
-    def __init__(self, name: str, df: pl.DataFrame | pl.LazyFrame):
+    def __init__(self, name: str | None, df: pl.DataFrame | pl.LazyFrame):
         self.df = df if isinstance(df, pl.LazyFrame) else df.lazy()
 
         super().__init__(
@@ -35,13 +35,16 @@ class DuckDbPolarsImpl(TableImpl):
         )
 
         self.table = sqa.Table(
-            name,
+            name or "?",
             sqa.MetaData(),
             *(
                 sqa.Column(col.name, DuckDbImpl.sqa_type(col.dtype()))
                 for col in self.cols.values()
             ),
         )
+
+    def __repr__(self) -> str:
+        return f"DuckDbPolarsImpl(name = {self.name}, df = {repr(self.df)})\n"
 
     @staticmethod
     def build_query(nd: AstNode) -> str | None:

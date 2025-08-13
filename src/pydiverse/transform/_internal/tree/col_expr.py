@@ -2617,7 +2617,7 @@ class Order:
     def ast_repr(self) -> str:
         return (
             "Order(\n"
-            f"  by={textwrap.indent(self.ast_repr(), '  ')[2:]},\n"
+            f"  by={textwrap.indent(self.order_by.ast_repr(), '  ')[2:]},\n"
             f"  descending={self.descending},\n"
             f"  nulls_last={self.nulls_last},\n"
             ")"
