@@ -50,9 +50,14 @@ Expression methods
    abs
    all
    any
+   arccos
+   arcsin
+   arctan
    ascending
    cast
+   cbrt
    ceil
+   cos
    count
    dense_rank
    descending
@@ -84,6 +89,7 @@ Expression methods
    is_null
    list.agg
    log
+   log10
    map
    max
    mean
@@ -94,6 +100,8 @@ Expression methods
    rank
    round
    shift
+   sin
+   sqrt
    str.contains
    str.ends_with
    str.join
@@ -107,6 +115,7 @@ Expression methods
    str.to_datetime
    str.upper
    sum
+   tan
 
 Global functions
 ----------------

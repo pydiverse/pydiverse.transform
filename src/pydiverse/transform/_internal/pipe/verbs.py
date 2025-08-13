@@ -202,15 +202,18 @@ def collect(
     │ 4   ┆ --   r ┆ 10  │
     └─────┴────────┴─────┘
     """
-    errors.check_arg_type(Target | type(Target), "collect", "target", target)
+    errors.check_arg_type(
+        Target | type(Target) | type(None), "collect", "target", target
+    )
+
+    if target is None:
+        target = Polars()
 
     if not isinstance(target, Target):
         assert issubclass(target, Target)
         target = target()
 
     df = table >> export(Polars(lazy=False))
-    if target is None:
-        target = Polars()
 
     if not keep_col_refs:
         return Table(df)

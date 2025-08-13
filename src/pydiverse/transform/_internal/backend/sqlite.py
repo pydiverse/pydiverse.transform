@@ -8,7 +8,7 @@ from pydiverse.common import (
     Datetime,
     String,
 )
-from pydiverse.transform._internal.backend.sql import SqlImpl
+from pydiverse.transform._internal.backend.sql import SqlImpl, _pow
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
@@ -186,3 +186,9 @@ with SqliteImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return True
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        return sqa.func.sign(x) * _pow(
+            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
+        )

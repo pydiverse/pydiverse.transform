@@ -744,3 +744,39 @@ with PolarsImpl.impl_store.impl_manager as impl:
         if _empty_group_by:
             return x.implode()
         return x
+
+    @impl(ops.sin)
+    def _sin(x):
+        return x.sin()
+
+    @impl(ops.cos)
+    def _cos(x):
+        return x.cos()
+
+    @impl(ops.tan)
+    def _tan(x):
+        return x.tan()
+
+    @impl(ops.arcsin)
+    def _arcsin(x):
+        return x.arcsin()
+
+    @impl(ops.arccos)
+    def _arccos(x):
+        return x.arccos()
+
+    @impl(ops.arctan)
+    def _arctan(x):
+        return x.arctan()
+
+    @impl(ops.sqrt)
+    def _sqrt(x):
+        return x.sqrt()
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        return x.cbrt()
+
+    @impl(ops.log10)
+    def _log10(x):
+        return x.log10()

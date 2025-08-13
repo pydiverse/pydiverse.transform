@@ -183,3 +183,52 @@ def test_int_pow(df_int):
     assert_result_equal(
         df_int, lambda t: t >> mutate(u=pdt.min(t.a, 10) ** pdt.min(t.b.abs(), 5))
     )
+
+
+def test_sin(df_num):
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.sin() for c in t}))
+
+
+def test_cos(df_num):
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.cos() for c in t}))
+
+
+def test_tan(df_num):
+    assert_result_equal(
+        df_num, lambda t: t >> mutate(**{c.name: c.arctan().tan() for c in t})
+    )
+
+
+def test_arcsin(df_num):
+    assert_result_equal(
+        df_num, lambda t: t >> mutate(**{c.name: c.sin().arcsin() for c in t})
+    )
+
+
+def test_arccos(df_num):
+    assert_result_equal(
+        df_num, lambda t: t >> mutate(**{c.name: c.cos().arccos() for c in t})
+    )
+
+
+def test_arctan(df_num):
+    assert_result_equal(
+        df_num, lambda t: t >> mutate(**{c.name: c.arctan() for c in t})
+    )
+
+
+def test_sqrt(df_num):
+    assert_result_equal(
+        df_num, lambda t: t >> mutate(**{c.name: c.abs().sqrt() for c in t})
+    )
+
+
+def test_cbrt(df_num):
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.cbrt() for c in t}))
+
+
+def test_log10(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t >> mutate(**{c.name: pdt.max(1e-16, c).log10() for c in t}),
+    )

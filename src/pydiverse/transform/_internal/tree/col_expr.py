@@ -478,6 +478,21 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
+    def arccos(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the inverse cosine function."""
+
+        return ColFn(ops.arccos, self)
+
+    def arcsin(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the inverse sine function."""
+
+        return ColFn(ops.arcsin, self)
+
+    def arctan(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the inverse tangent function."""
+
+        return ColFn(ops.arctan, self)
+
     def ascending(self: ColExpr) -> ColExpr:
         """
         The default ordering.
@@ -712,10 +727,20 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.bool_xor, rhs, self)
 
+    def cbrt(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the cube root."""
+
+        return ColFn(ops.cbrt, self)
+
     def ceil(self: ColExpr[Float]) -> ColExpr[Float]:
         """Returns the smallest integer greater than or equal to the input."""
 
         return ColFn(ops.ceil, self)
+
+    def cos(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the cosine function."""
+
+        return ColFn(ops.cos, self)
 
     def count(
         self: ColExpr,
@@ -1008,6 +1033,11 @@ class ColExpr(Generic[T]):
         """Computes the natural logarithm."""
 
         return ColFn(ops.log, self)
+
+    def log10(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the base-10 logarithm."""
+
+        return ColFn(ops.log10, self)
 
     @overload
     def max(
@@ -1481,6 +1511,16 @@ class ColExpr(Generic[T]):
             ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange
         )
 
+    def sin(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the sine function."""
+
+        return ColFn(ops.sin, self)
+
+    def sqrt(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the square root."""
+
+        return ColFn(ops.sqrt, self)
+
     @overload
     def __sub__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]: ...
 
@@ -1552,6 +1592,11 @@ class ColExpr(Generic[T]):
         """Computes the sum of values in each group."""
 
         return ColFn(ops.sum, self, partition_by=partition_by, filter=filter)
+
+    def tan(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the tangent function."""
+
+        return ColFn(ops.tan, self)
 
     @overload
     def __truediv__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Float]: ...

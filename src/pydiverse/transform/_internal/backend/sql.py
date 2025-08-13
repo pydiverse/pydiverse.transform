@@ -890,3 +890,39 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.fill_null)
     def _fill_null(x, y):
         return sqa.func.coalesce(x, y)
+
+    @impl(ops.sin)
+    def _sin(x):
+        return sqa.func.sin(x)
+
+    @impl(ops.cos)
+    def _cos(x):
+        return sqa.func.cos(x)
+
+    @impl(ops.tan)
+    def _tan(x):
+        return sqa.func.tan(x)
+
+    @impl(ops.arcsin)
+    def _arcsin(x):
+        return sqa.func.asin(x)
+
+    @impl(ops.arccos)
+    def _arccos(x):
+        return sqa.func.acos(x)
+
+    @impl(ops.arctan)
+    def _arctan(x):
+        return sqa.func.atan(x)
+
+    @impl(ops.sqrt)
+    def _sqrt(x):
+        return sqa.func.sqrt(x)
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        return sqa.func.cbrt(x)
+
+    @impl(ops.log10)
+    def _log10(x):
+        return sqa.func.log10(x)

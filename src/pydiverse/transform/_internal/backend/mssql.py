@@ -396,3 +396,9 @@ with MsSqlImpl.impl_store.impl_manager as impl:
         if not isinstance(y.type, Float):
             y = sqa.cast(y, sqa.Double)
         return x / y
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        return sqa.func.sign(x) * _pow(
+            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
+        )

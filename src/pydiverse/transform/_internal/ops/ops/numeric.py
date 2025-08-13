@@ -25,6 +25,7 @@ Polars throws on negative exponents in the integer case. A polars error like
 """,
 )
 
+
 neg = Operator(
     "__neg__",
     *(Signature(t, return_type=t) for t in NUMERIC),
@@ -79,6 +80,51 @@ exp = Operator(
     Signature(Float(), return_type=Float()),
     doc="Computes the exponential function.",
 )
+
+log10 = Operator(
+    "log10",
+    Signature(Float(), return_type=Float()),
+    doc="Computes the base-10 logarithm.",
+)
+
+sin = Operator(
+    "sin", Signature(Float(), return_type=Float()), doc="Computes the sine function."
+)
+
+cos = Operator(
+    "cos", Signature(Float(), return_type=Float()), doc="Computes the cosine function."
+)
+
+tan = Operator(
+    "tan", Signature(Float(), return_type=Float()), doc="Computes the tangent function."
+)
+
+arcsin = Operator(
+    "arcsin",
+    Signature(Float(), return_type=Float()),
+    doc="Computes the inverse sine function.",
+)
+
+arccos = Operator(
+    "arccos",
+    Signature(Float(), return_type=Float()),
+    doc="Computes the inverse cosine function.",
+)
+
+arctan = Operator(
+    "arctan",
+    Signature(Float(), return_type=Float()),
+    doc="Computes the inverse tangent function.",
+)
+
+sqrt = Operator(
+    "sqrt", Signature(Float(), return_type=Float()), doc="Computes the square root."
+)
+
+cbrt = Operator(
+    "cbrt", Signature(Float(), return_type=Float()), doc="Computes the cube root."
+)
+
 
 is_inf = Operator(
     "is_inf",
