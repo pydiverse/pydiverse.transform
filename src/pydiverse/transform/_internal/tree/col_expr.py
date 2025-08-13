@@ -2127,7 +2127,7 @@ class Col(ColExpr):
 
     def ast_repr(self) -> str:
         dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
-        return f"{self._ast.name}.{self.name}{dtype_str}"
+        return f"{self._ast.name or '?'}.{self.name}{dtype_str}"
 
     def __str__(self) -> str:
         try:

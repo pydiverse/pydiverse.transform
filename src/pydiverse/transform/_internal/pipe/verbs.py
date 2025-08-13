@@ -28,7 +28,7 @@ from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTy
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.pipeable import Pipeable, modify_ast, verb
-from pydiverse.transform._internal.pipe.table import Table
+from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
@@ -376,7 +376,7 @@ def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
         print(query)
     else:
         print(
-            f"No query to show for table {table._ast.name}. "
+            f"No query to show for table {get_print_tbl_name(table)}. "
             f"(backend: {get_backend(table._ast).backend_name})"
         )
 
@@ -418,7 +418,8 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
     for col in cols:
         if isinstance(col, ColName | str) and col not in table:
             raise ColumnNotFoundError(
-                f"column `{col.ast_repr()}` does not exist in table `{table._ast.name}`"
+                f"column `{col.ast_repr()}` does not exist in table "
+                f"`{get_print_tbl_name(table)}`"
             )
         elif col not in table and col._uuid in table._cache.cols:
             raise ColumnNotFoundError(
@@ -559,25 +560,24 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
             )
 
     name_map = {
-        preprocess_arg(k, table): v
+        (preprocess_arg(k, table) if isinstance(k, ColName | Col) else k): v
         for k, v in name_map.items()
-        if isinstance(k, ColName | Col)
     }
     name_map = {
-        table._cache.uuid_to_name[k._uuid]: v
+        (table._cache.uuid_to_name[k._uuid] if isinstance(k, Col) else k): v
         for k, v in name_map.items()
-        if isinstance(k, Col)
     }
 
     if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(
-            f"no column with name `{next(iter(d))}` in table `{table._ast.name}`"
+            f"no column with name `{next(iter(d))}` in table "
+            f"`{get_print_tbl_name(table)}`"
         )
 
     if d := (set(table._cache.name_to_uuid).difference(name_map)) & set(
         name_map.values()
     ):
-        raise ValueError(f"duplicate column name `{next(iter(d))}`")
+        raise ValueError(f"rename would cause duplicate column name `{next(iter(d))}`")
 
     new = copy.copy(table)
     new._ast = Rename(table._ast, name_map)
@@ -1092,9 +1092,9 @@ def join(
         raise TypeError("cannot join two tables with different backends")
 
     if left._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{left._ast.name}`")
+        raise ValueError(f"cannot join grouped table `{get_print_tbl_name(left)}`")
     elif right._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{right._ast.name}`")
+        raise ValueError(f"cannot join grouped table `{get_print_tbl_name(right)}`")
 
     if intersection := left._cache.derived_from & right._cache.derived_from:
         raise ValueError(
@@ -1104,7 +1104,7 @@ def join(
         )
 
     user_suffix = suffix
-    if suffix is None and right._ast.name:
+    if suffix is None and right._ast.name is not None:
         suffix = f"_{right._ast.name}"
     if suffix is None:
         suffix = "_right"
@@ -1160,8 +1160,9 @@ def join(
         ):
             raise ValueError(
                 f"column `{repr(expr)}` used in `on` neither exists in the table "
-                f"`{left._ast.name}` nor in the table `{right._ast.name}`. "
-                f"The source table `{expr._ast.name}` of the column must be an "
+                f"`{get_print_tbl_name(left)}` nor in the table "
+                f"`{get_print_tbl_name(right)}`. The source table "
+                f"`{get_print_tbl_name(expr._ast)}` of the column must be an "
                 "ancestor of one of the two input tables."
             )
 
@@ -1312,11 +1313,11 @@ def show(table: Table, pipe: bool = False) -> Pipeable | None:
 
 
 @overload
-def name() -> str: ...
+def name() -> str | None: ...
 
 
 @verb
-def name(table: Table) -> str:
+def name(table: Table) -> str | None:
     """
     Returns the name of the table.
     """

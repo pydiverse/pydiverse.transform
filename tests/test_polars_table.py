@@ -719,6 +719,16 @@ class TestPolarsLazyImpl:
             df1_enum.with_columns(q=pl.col("p") + "l"),
         )
 
+    def test_col_rename(self, tbl2, tbl4):
+        assert_equal(tbl4 >> rename({tbl4.col1: "s"}), df4.rename({"col1": "s"}))
+        assert_equal(
+            tbl2
+            >> left_join(tbl4, on=tbl2.col1 == tbl4.col1, suffix="_right")
+            >> rename({tbl4.col5: "col5", tbl4.col4: "col4"})
+            >> drop(tbl4.col1),
+            df2.join(df4, how="left", on="col1"),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

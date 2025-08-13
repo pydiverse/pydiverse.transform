@@ -180,7 +180,7 @@ class Table:
             raise AttributeError
         if name not in self._cache.name_to_uuid:
             raise ColumnNotFoundError(
-                f"column `{name}` does not exist in table `{self._ast.name}`"
+                f"column `{name}` does not exist in table `{get_print_tbl_name(self)}`"
             )
         col = self._cache.cols[self._cache.name_to_uuid[name]]
         return Col(name, self._ast, col._uuid, col._dtype, col._ftype)
@@ -232,10 +232,13 @@ class Table:
     def __repr__(self) -> str:
         from pydiverse.transform._internal.pipe.verbs import get_backend, name
 
-        res = (
-            f"Table `{self >> name()}` "
-            f"(backend: {get_backend(self._ast).backend_name})\n"
-        )
+        if self >> name() is None:
+            tbl_name = "Table without name "
+        else:
+            tbl_name = f"Table `{self >> name()}` "
+
+        res = tbl_name + f"(backend: {get_backend(self._ast).backend_name})\n"
+
         try:
             df, height = get_head_tail(self)
             res += f"shape: ({height}, {len(self)})\n"
@@ -251,9 +254,14 @@ class Table:
     def _repr_html_(self) -> str:
         from pydiverse.transform._internal.pipe.verbs import get_backend, name
 
+        if self >> name() is None:
+            tbl_name = "Table without name "
+        else:
+            tbl_name = f"Table <code>{self >> name()}</code> "
+
         html = (
-            f"Table <code>{self >> name()}</code> "
-            f"(backend: <code>{get_backend(self._ast).backend_name}</code>)</br>"
+            tbl_name
+            + f"(backend: <code>{get_backend(self._ast).backend_name}</code>)</br>"
         )
         try:
             # We use polars' _repr_html_ on the first and last few rows of the table and
@@ -301,3 +309,11 @@ def backend(table: Table) -> Literal["polars", "sqlite", "postgres", "duckdb", "
 
 def is_sql_backed(table: Table) -> bool:
     return table._cache.backend != "polars"
+
+
+def get_print_tbl_name(table: Table | AstNode) -> str:
+    if isinstance(table, Table):
+        table = table._ast
+    if (nm := table.name) is None:
+        return table.__class__.__name__ + "(...)"
+    return nm

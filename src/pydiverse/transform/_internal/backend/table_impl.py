@@ -78,8 +78,6 @@ class TableImpl(AstNode):
                 # name attribute was added.
                 if hasattr(resource, "name"):
                     name = resource.name
-                else:
-                    name = "<unnamed>"
             if backend is None or isinstance(backend, Polars):
                 from pydiverse.transform._internal.backend.polars import PolarsImpl
 
