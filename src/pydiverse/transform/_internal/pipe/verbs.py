@@ -912,23 +912,25 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
         )
 
     def check_summarize_col_expr(expr: ColExpr, agg_fn_above: bool):
-        # TODO: does not catch everything (test_alias_window)
         if (
             isinstance(expr, Col)
             and expr._uuid not in partition_by
             and not agg_fn_above
         ):
             raise FunctionTypeError(
-                f"column `{expr}` is neither aggregated nor part of the grouping "
-                "columns."
+                f"column `{expr.ast_repr()}` is neither aggregated nor part of the "
+                "grouping columns"
             )
 
         elif isinstance(expr, ColFn):
-            if expr.ftype(agg_is_window=False) == Ftype.WINDOW:
+            if expr.op.ftype == Ftype.WINDOW:
                 raise FunctionTypeError(
                     f"forbidden window function `{expr.op.name}` in `summarize`"
                 )
-            elif expr.ftype(agg_is_window=False) == Ftype.AGGREGATE:
+            elif (
+                expr.op.ftype == Ftype.AGGREGATE
+                and "partition_by" not in expr.context_kwargs
+            ):
                 agg_fn_above = True
 
         for child in expr.iter_children():
