@@ -10,6 +10,7 @@ Verbs
 
     alias
     arrange
+    ast_repr
     build_query
     collect
     drop
@@ -21,6 +22,7 @@ Verbs
     join
     left_join
     mutate
+    name
     rename
     select
     show

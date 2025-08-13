@@ -1341,8 +1341,40 @@ def ast_repr(pipe: bool = False) -> Pipeable | None: ...
 @verb
 def ast_repr(table: Table, pipe: bool = False) -> Pipeable | None:
     """
-    Prints the AST of the table to stdout.
+        Prints the AST of the table to stdout.
+
+    Examples
+    --------
+    >>> t = pdt.Table({"a": [4, 4, 1, 7], "b": ["f", "g", "h", "i"]}, name="t")
+    >>> (
+    ...     t
+    ...     >> mutate(c=t.a + t.b.str.len() * 2)
+    ...     >> group_by(t.a)
+    ...     >> summarize(m=C.c.max())
+    ...     >> ast_repr()
+    ... )
+    Summarize(
+      m = max(
+        t.c (Int)
+      )
+    ),
+    GroupBy(
+      t.a (Int64)
+    ),
+    Mutate(
+      c = __add__(
+        t.a (Int64),
+        __mul__(
+          str.len(
+            t.b (String)
+          ),
+          lit(2, const Int64)
+        )
+      )
+    ),
+    PolarsImpl(name = t, df = <LazyFrame at 0x14D1F24B0>)
     """
+
     print(repr(table._ast), end="")
     return table if pipe else None
 
