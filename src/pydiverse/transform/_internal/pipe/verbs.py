@@ -545,6 +545,30 @@ def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
     """
     errors.check_arg_type(dict, "rename", "name_map", name_map)
 
+    for v in name_map.values():
+        if not isinstance(v, str):
+            raise TypeError(
+                "values in the `name_map` of `rename` must have type `str`, found "
+                f"`{v.__class__.__name__}` instead"
+            )
+    for k in name_map.keys():
+        if not isinstance(k, str | Col | ColName):
+            raise TypeError(
+                "keys in the `name_map` of `rename` must have type `str | Col | "
+                f"ColName`, found `{k.__class__.__name__}` instead"
+            )
+
+    name_map = {
+        preprocess_arg(k, table): v
+        for k, v in name_map.items()
+        if isinstance(k, ColName | Col)
+    }
+    name_map = {
+        table._cache.uuid_to_name[k._uuid]: v
+        for k, v in name_map.items()
+        if isinstance(k, Col)
+    }
+
     if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(
             f"no column with name `{next(iter(d))}` in table `{table._ast.name}`"
