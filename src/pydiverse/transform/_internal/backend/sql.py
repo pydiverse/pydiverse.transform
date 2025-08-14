@@ -38,6 +38,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
+from pydiverse.transform._internal.util.warnings import warn
 
 
 @dataclasses.dataclass(slots=True)
@@ -88,6 +89,20 @@ class SqlImpl(TableImpl):
             from .duckdb import DuckDbImpl
 
             Impl = DuckDbImpl
+
+        elif dialect == "ibm_db2":
+            from .ibm_db2 import IbmDb2Impl
+
+            Impl = IbmDb2Impl
+
+        else:
+            warn(
+                f"Pydiverse transform is not tested for dialect '{dialect}'. "
+                f"Assuming Postgres compatible SQL."
+            )
+            from .postgres import PostgresImpl
+
+            Impl = PostgresImpl
 
         return super().__new__(Impl)
 
