@@ -729,6 +729,21 @@ class TestPolarsLazyImpl:
             df2.join(df4, how="left", on="col1"),
         )
 
+    def test_join_renaming(self, tbl2, tbl3):
+        assert_equal(
+            tbl2 >> rename({"col3": "c"}) >> left_join(tbl3, on=["col1", "col2"]),
+            df2.rename({"col3": "c"})
+            .join(df3, how="left", on=["col1", "col2"])
+            .with_columns(
+                col1_df3=pl.when(pl.col("col4").is_null())
+                .then(None)
+                .otherwise(pl.col("col1")),
+                col2_df3=pl.when(pl.col("col4").is_null())
+                .then(None)
+                .otherwise(pl.col("col2")),
+            ),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

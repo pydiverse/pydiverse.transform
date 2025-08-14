@@ -147,6 +147,7 @@ def test_with_group_by(df3):
         lambda t: t
         >> arrange(C.col1, *t)
         >> slice_head(6, offset=1)
+        >> rename({"col2": "c"})
         >> alias()
         >> group_by(C.col1)
         >> mutate(x=C.col4.mean())
