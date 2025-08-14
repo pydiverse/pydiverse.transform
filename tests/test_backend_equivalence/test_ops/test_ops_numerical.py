@@ -12,15 +12,13 @@ from tests.util.assertion import assert_result_equal
 def test_exp(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(**{c.name: pdt.max(-700, pdt.min(700, c)).exp() for c in t}),
+        lambda t: t >> mutate(**{c.name: c.clip(-700, 700).exp() for c in t}),
     )
 
 
 def test_log(df_num):
     assert_result_equal(
-        df_num,
-        lambda t: t >> mutate(**{c.name: pdt.max(1e-16, c).log() for c in t}),
+        df_num, lambda t: t >> mutate(**{c.name: pdt.max(1e-16, c).log() for c in t})
     )
 
 
@@ -195,26 +193,24 @@ def test_cos(df_num):
 
 def test_tan(df_num):
     assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.arctan().tan() for c in t})
+        df_num, lambda t: t >> mutate(**{c.name: c.atan().tan() for c in t})
     )
 
 
-def test_arcsin(df_num):
+def test_asin(df_num):
     assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.sin().arcsin() for c in t})
+        df_num, lambda t: t >> mutate(**{c.name: c.sin().asin() for c in t})
     )
 
 
-def test_arccos(df_num):
+def test_acos(df_num):
     assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.cos().arccos() for c in t})
+        df_num, lambda t: t >> mutate(**{c.name: c.cos().acos() for c in t})
     )
 
 
-def test_arctan(df_num):
-    assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.arctan() for c in t})
-    )
+def test_atan(df_num):
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.atan() for c in t}))
 
 
 def test_sqrt(df_num):
@@ -231,4 +227,15 @@ def test_log10(df_num):
     assert_result_equal(
         df_num,
         lambda t: t >> mutate(**{c.name: pdt.max(1e-16, c).log10() for c in t}),
+    )
+
+
+def test_clip(df_num):
+    assert_result_equal(
+        df_num,
+        lambda t: t
+        >> mutate(
+            **{c.name + "1": c.clip(0.1, 10) for c in t},
+            **{c.name + "2": c.clip(-500, 1024) for c in t},
+        ),
     )

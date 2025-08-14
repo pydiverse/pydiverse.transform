@@ -6,7 +6,7 @@ import functools
 import inspect
 import math
 import operator
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 from uuid import UUID
 
@@ -903,16 +903,16 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _tan(x):
         return sqa.func.tan(x)
 
-    @impl(ops.arcsin)
-    def _arcsin(x):
+    @impl(ops.asin)
+    def _asin(x):
         return sqa.func.asin(x)
 
-    @impl(ops.arccos)
-    def _arccos(x):
+    @impl(ops.acos)
+    def _acos(x):
         return sqa.func.acos(x)
 
-    @impl(ops.arctan)
-    def _arctan(x):
+    @impl(ops.atan)
+    def _atan(x):
         return sqa.func.atan(x)
 
     @impl(ops.sqrt)
@@ -926,3 +926,12 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.log10)
     def _log10(x):
         return sqa.func.log10(x)
+
+    @impl(ops.clip)
+    def _clip(x, lower, upper, *, _Impl: SqlImpl, _sig: Sequence[Dtype]):
+        return sqa.case(
+            (x.is_(sqa.null()), sqa.null()),
+            else_=_Impl.get_impl(ops.horizontal_max, _sig)(
+                _Impl.get_impl(ops.horizontal_min, _sig)(x, upper), lower
+            ),
+        )

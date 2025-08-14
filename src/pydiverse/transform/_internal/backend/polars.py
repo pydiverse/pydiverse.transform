@@ -757,16 +757,16 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _tan(x):
         return x.tan()
 
-    @impl(ops.arcsin)
-    def _arcsin(x):
+    @impl(ops.asin)
+    def _asin(x):
         return x.arcsin()
 
-    @impl(ops.arccos)
-    def _arccos(x):
+    @impl(ops.acos)
+    def _acos(x):
         return x.arccos()
 
-    @impl(ops.arctan)
-    def _arctan(x):
+    @impl(ops.atan)
+    def _atan(x):
         return x.arctan()
 
     @impl(ops.sqrt)
@@ -780,3 +780,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.log10)
     def _log10(x):
         return x.log10()
+
+    @impl(ops.clip)
+    def _clip(x, lower, upper):
+        return x.clip(lower, upper)

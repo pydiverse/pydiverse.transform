@@ -87,35 +87,34 @@ log10 = Operator(
     doc="Computes the base-10 logarithm.",
 )
 
-sin = Operator(
-    "sin", Signature(Float(), return_type=Float()), doc="Computes the sine function."
-)
+sin = Operator("sin", Signature(Float(), return_type=Float()), doc="Computes the sine.")
 
 cos = Operator(
-    "cos", Signature(Float(), return_type=Float()), doc="Computes the cosine function."
+    "cos", Signature(Float(), return_type=Float()), doc="Computes the cosine."
 )
 
 tan = Operator(
-    "tan", Signature(Float(), return_type=Float()), doc="Computes the tangent function."
+    "tan", Signature(Float(), return_type=Float()), doc="Computes the tangent."
 )
 
-arcsin = Operator(
-    "arcsin",
+asin = Operator(
+    "asin",
     Signature(Float(), return_type=Float()),
-    doc="Computes the inverse sine function.",
+    doc="Computes the inverse sine.",
 )
 
-arccos = Operator(
-    "arccos",
+acos = Operator(
+    "acos",
     Signature(Float(), return_type=Float()),
-    doc="Computes the inverse cosine function.",
+    doc="Computes the inverse cosine.",
 )
 
-arctan = Operator(
-    "arctan",
+atan = Operator(
+    "atan",
     Signature(Float(), return_type=Float()),
-    doc="Computes the inverse tangent function.",
+    doc="Computes the inverse tangent.",
 )
+
 
 sqrt = Operator(
     "sqrt", Signature(Float(), return_type=Float()), doc="Computes the square root."

@@ -12,6 +12,7 @@ import operator
 import re
 import textwrap
 from collections.abc import Callable, Iterable
+from datetime import date, datetime, time, timedelta
 from typing import Any, Generic, TypeVar, overload
 from uuid import UUID
 
@@ -394,6 +395,11 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.abs, self)
 
+    def acos(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the inverse cosine."""
+
+        return ColFn(ops.acos, self)
+
     @overload
     def __add__(self: ColExpr[Int], rhs: ColExpr[Int]) -> ColExpr[Int]: ...
 
@@ -478,21 +484,6 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
-    def arccos(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the inverse cosine function."""
-
-        return ColFn(ops.arccos, self)
-
-    def arcsin(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the inverse sine function."""
-
-        return ColFn(ops.arcsin, self)
-
-    def arctan(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the inverse tangent function."""
-
-        return ColFn(ops.arctan, self)
-
     def ascending(self: ColExpr) -> ColExpr:
         """
         The default ordering.
@@ -502,6 +493,16 @@ class ColExpr(Generic[T]):
         """
 
         return ColFn(ops.ascending, self)
+
+    def asin(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the inverse sine."""
+
+        return ColFn(ops.asin, self)
+
+    def atan(self: ColExpr[Float]) -> ColExpr[Float]:
+        """Computes the inverse tangent."""
+
+        return ColFn(ops.atan, self)
 
     def __and__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]:
         """
@@ -737,8 +738,57 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.ceil, self)
 
+    @overload
+    def clip(
+        self: ColExpr[Int], lower_bound: int, upper_bound: int
+    ) -> ColExpr[Int]: ...
+
+    @overload
+    def clip(
+        self: ColExpr[Float], lower_bound: float, upper_bound: float
+    ) -> ColExpr[Float]: ...
+
+    @overload
+    def clip(
+        self: ColExpr[String], lower_bound: str, upper_bound: str
+    ) -> ColExpr[String]: ...
+
+    @overload
+    def clip(
+        self: ColExpr[Datetime], lower_bound: datetime, upper_bound: datetime
+    ) -> ColExpr[Datetime]: ...
+
+    @overload
+    def clip(
+        self: ColExpr[Time], lower_bound: time, upper_bound: time
+    ) -> ColExpr[Time]: ...
+
+    @overload
+    def clip(
+        self: ColExpr[Duration], lower_bound: timedelta, upper_bound: timedelta
+    ) -> ColExpr[Duration]: ...
+
+    @overload
+    def clip(
+        self: ColExpr[Date], lower_bound: date, upper_bound: date
+    ) -> ColExpr[Date]: ...
+
+    @overload
+    def clip(
+        self: ColExpr[Bool], lower_bound: bool, upper_bound: bool
+    ) -> ColExpr[Bool]: ...
+
+    def clip(self: ColExpr, lower_bound: int, upper_bound: int) -> ColExpr:
+        """
+        Replaces values outside `[lower_bound, upper_bound]` with the closer boundary
+        value. If the input is not null, this is equivalent to `pdt.max(pdt.min(self,
+        upper_bound), lower_bound)`.
+        """
+
+        return ColFn(ops.clip, self, lower_bound, upper_bound)
+
     def cos(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the cosine function."""
+        """Computes the cosine."""
 
         return ColFn(ops.cos, self)
 
@@ -1512,7 +1562,7 @@ class ColExpr(Generic[T]):
         )
 
     def sin(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the sine function."""
+        """Computes the sine."""
 
         return ColFn(ops.sin, self)
 
@@ -1594,7 +1644,7 @@ class ColExpr(Generic[T]):
         return ColFn(ops.sum, self, partition_by=partition_by, filter=filter)
 
     def tan(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the tangent function."""
+        """Computes the tangent."""
 
         return ColFn(ops.tan, self)
 

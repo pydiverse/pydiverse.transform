@@ -6,9 +6,10 @@ import sqlalchemy as sqa
 from pydiverse.common import (
     Date,
     Datetime,
+    Float,
     String,
 )
-from pydiverse.transform._internal.backend.sql import SqlImpl, _pow
+from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.errors import NotSupportedError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.tree import types
@@ -189,6 +190,11 @@ with SqliteImpl.impl_store.impl_manager as impl:
 
     @impl(ops.cbrt)
     def _cbrt(x):
-        return sqa.func.sign(x) * _pow(
+        pow_impl = SqliteImpl.get_impl(ops.pow, (Float(), Float()))
+        return sqa.func.sign(x) * pow_impl(
             sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
         )
+
+    @impl(ops.clip)
+    def _clip(x, lower, upper):
+        return sqa.func.max(sqa.func.min(x, upper), lower)

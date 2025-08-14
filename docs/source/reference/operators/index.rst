@@ -48,15 +48,16 @@ Expression methods
    __truediv__
    __xor__
    abs
+   acos
    all
    any
-   arccos
-   arcsin
-   arctan
    ascending
+   asin
+   atan
    cast
    cbrt
    ceil
+   clip
    cos
    count
    dense_rank
