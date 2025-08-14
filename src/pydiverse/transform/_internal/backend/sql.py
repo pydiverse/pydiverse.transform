@@ -203,6 +203,10 @@ class SqlImpl(TableImpl):
                         if types.without_const(col.dtype()) == NullType()
                     },
                 )
+                # fix column names in case default case is modified by database driver
+                # (for example IBM DB2 returns lowercase columns as uppercase column
+                # names)
+                df.columns = [c.name for c in sel.columns]
                 df.name = nd.name
                 return df
 
