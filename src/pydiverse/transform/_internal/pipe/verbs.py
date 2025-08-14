@@ -3,6 +3,7 @@
 
 import copy
 import functools
+import itertools
 import operator
 import uuid
 from typing import Any, Literal, overload
@@ -14,6 +15,7 @@ from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import (
     TableImpl,
     get_backend,
+    get_left_right_on,
     split_join_cond,
 )
 from pydiverse.transform._internal.backend.targets import (
@@ -27,9 +29,14 @@ from pydiverse.transform._internal.backend.targets import (
 from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
-from pydiverse.transform._internal.pipe.pipeable import Pipeable, modify_ast, verb
+from pydiverse.transform._internal.pipe.pipeable import (
+    Pipeable,
+    check_subquery,
+    modify_ast,
+    verb,
+)
 from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
-from pydiverse.transform._internal.tree import types
+from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
@@ -499,12 +506,12 @@ def rename(name_map: dict[str, str]) -> Pipeable: ...
 
 @verb
 @modify_ast
-def rename(table: Table, name_map: dict[str, str]) -> Pipeable:
+def rename(table: Table, name_map: dict[str | Col | ColName, str]) -> Pipeable:
     """
     Renames columns.
 
     :param name_map:
-        A dictionary assigning some columns (given by their name) new names.
+        A dictionary assigning some columns new names.
 
     Examples
     --------
@@ -1019,7 +1026,6 @@ def join(
 
 
 @verb
-@modify_ast
 def join(
     left: Table,
     right: Table,
@@ -1059,7 +1065,9 @@ def join(
         original name. If there are name collisions, the name of the right table is
         appended to all columns of the right table. If this still does not resolve all
         name collisions, additionally an integer is appended to the column names of the
-        right table.
+        right table. If the join condition only contains equalities of columns of the
+        same name, only the columns of the right table colliding with a column of the
+        left table are renamed.
 
     Note
     ----
@@ -1134,15 +1142,66 @@ def join(
     left_names = set(left._cache.uuid_to_name[col._uuid] for col in left)
     right_names = set(right._cache.uuid_to_name[col._uuid] for col in right)
 
-    if user_suffix is not None:
+    # Lambda column resolution and checks for existence of columns are done manually
+    # here since we need to incorporate columns from the right.
+    def _preprocess_on(expr: ColExpr):
+        if isinstance(expr, ColName):
+            if expr in left:
+                if expr in right:
+                    raise ValueError(
+                        f"`{expr.ast_repr()}` is ambiguous here. Please use the source "
+                        "table of the column to reference it."
+                    )
+                return left[expr.name]
+            if expr not in right:
+                raise ValueError(
+                    f"no column with name `{expr.name}` found in the left or right "
+                    "table"
+                )
+            return right[expr.name]
+
+        if (
+            isinstance(expr, Col)
+            and expr._ast not in left._cache.derived_from
+            and expr._ast not in right._cache.derived_from
+        ):
+            raise ValueError(
+                f"column `{expr.ast_repr()}` used in `on` neither exists in the table "
+                f"`{get_print_tbl_name(left)}` nor in the table "
+                f"`{get_print_tbl_name(right)}`. The source table "
+                f"`{get_print_tbl_name(expr._ast)}` of the column must be an "
+                "ancestor of one of the two input tables."
+            )
+
+        return expr
+
+    # bring join condition in standard expression form
+    if not isinstance(on, list):
+        on = [on]
+    on = [left[expr] == right[expr] if isinstance(expr, str) else expr for expr in on]
+
+    on = [pred.map_subtree(_preprocess_on) for pred in on]
+    for pred in on:
+        if types.without_const(pred.dtype()) != Bool():
+            raise TypeError(
+                "predicates in `on` must have boolean type, found "
+                f"`{pred.dtype()}` instead"
+            )
+
+    # apply `rename` to the right table if necessary
+    if user_suffix:
         for name in right._cache.name_to_uuid.keys():
             if name + suffix in left_names:
                 raise ValueError(
                     f"column name `{name + suffix}` appears both in the left and right "
                     f"table using the user-provided suffix `{suffix}`\n"
                     "hint: Specify a different suffix to prevent name collisions or "
-                    "none at all for automatic name collision resolution."
+                    "no suffix for automatic name collision resolution."
                 )
+
+        # If the user actively specifies a suffix, we apply it to all right columns.
+        right >>= rename({col: col.name + user_suffix for col in right})
+
     elif right_names & left_names:
         cnt = 0
         for name in right_names:
@@ -1153,50 +1212,33 @@ def join(
 
         if cnt > 0:
             suffix += f"_{cnt}"
-    else:
-        suffix = ""
 
-    if not isinstance(on, list):
-        on = [on]
-    on = [left[expr] == right[expr] if isinstance(expr, str) else expr for expr in on]
-
-    # Lambda column resolution and checks for existence of columns are done manually
-    # here since we need to incorporate columns from the right.
-    def _preprocess_on(expr: ColExpr):
-        if isinstance(expr, ColName):
-            if expr in left:
-                return left[expr.name]
-            old_right_name = expr.name[: len(expr.name) - len(suffix)]
-            if old_right_name not in right:
-                raise ValueError(
-                    f"no column with name `{expr.name}` found"
-                    "\nhint: To reference a column of the right table in the `on` "
-                    "clause using `C`, you must append the suffix to the column name."
-                )
-            return right[old_right_name]
-
-        if (
-            isinstance(expr, Col)
-            and expr._ast not in left._cache.derived_from
-            and expr._ast not in right._cache.derived_from
+        predicates = list(itertools.chain(*(split_join_cond(elem) for elem in on)))
+        if all(
+            pred.op == ops.equal
+            and isinstance(pred.args[0], Col)
+            and isinstance(pred.args[1], Col)
+            for pred in predicates
         ):
-            raise ValueError(
-                f"column `{repr(expr)}` used in `on` neither exists in the table "
-                f"`{get_print_tbl_name(left)}` nor in the table "
-                f"`{get_print_tbl_name(right)}`. The source table "
-                f"`{get_print_tbl_name(expr._ast)}` of the column must be an "
-                "ancestor of one of the two input tables."
+            _, right_on = get_left_right_on(
+                predicates, left._cache.cols, right._cache.cols
+            )
+            right_on_names = set(
+                right._cache.uuid_to_name[col._uuid] for col in right_on
             )
 
-        return expr
+            if not (right_names - right_on_names) & left_names:
+                # If nothing except join columns clashes, we only rename the clashing
+                # columns on the right.
+                right >>= rename(
+                    {col: col.name + suffix for col in right if col.name in left_names}
+                )
 
-    on = [pred.map_subtree(_preprocess_on) for pred in on]
-    for pred in on:
-        if types.without_const(pred.dtype()) != Bool():
-            raise TypeError(
-                "predicates in `on` must have boolean type, found "
-                f"`{pred.dtype()}` instead"
-            )
+            else:
+                right >>= rename({col: col.name + suffix for col in right})
+        else:
+            right >>= rename({col: col.name + suffix for col in right})
+
     on = functools.reduce(operator.and_, on, LiteralCol(True))
 
     if how == "full" and not all(pred.op == ops.equal for pred in split_join_cond(on)):
@@ -1209,11 +1251,18 @@ def join(
                 "hint: First add the result of the window function to the table using "
                 "`mutate`."
             )
-
     on.ftype(agg_is_window=False)
 
     new = copy.copy(left)
-    new._ast = Join(left._ast, right._ast, on, how, validate, suffix)
+    new._ast = Join(left._ast, right._ast, on, how, validate)
+
+    if check_subquery(new, right._cache, right._ast):
+        new._ast.right = verbs.SubqueryMarker(new._ast.right)
+        right_cache = right._cache.update(new._ast.right)
+    else:
+        right_cache = right._cache
+
+    new._cache = new._cache.update(new._ast, right_cache=right_cache)
 
     return new
 

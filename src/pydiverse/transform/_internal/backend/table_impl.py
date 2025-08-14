@@ -150,18 +150,40 @@ def get_backend(nd: AstNode) -> type[TableImpl]:
     return nd.__class__
 
 
-def split_join_cond(expr: ColFn) -> list[ColFn]:
-    assert isinstance(expr, ColFn | LiteralCol)
-    if isinstance(expr, LiteralCol):
+def split_join_cond(on: ColFn) -> list[ColFn]:
+    if isinstance(on, LiteralCol):
         return []
-    elif expr.op == ops.bool_and:
-        return split_join_cond(expr.args[0]) + split_join_cond(expr.args[1])
-    elif expr.op == ops.horizontal_all:
-        return functools.reduce(
-            operator.add, (split_join_cond(arg) for arg in expr.args)
-        )
+    elif on.op == ops.bool_and:
+        return split_join_cond(on.args[0]) + split_join_cond(on.args[1])
+    elif on.op == ops.horizontal_all:
+        return functools.reduce(operator.add, (split_join_cond(arg) for arg in on.args))
     else:
-        return [expr]
+        return [on]
+
+
+# Returns the left and right columns of a list of equality predicates.
+def get_left_right_on(
+    eq_predicates: list[ColFn], left_uuids: set[UUID], right_uuids: set[UUID]
+) -> tuple[list[Col], list[Col]] | None:
+    left_on = []
+    right_on = []
+    for pred in eq_predicates:
+        left_on.append(pred.args[0])
+        right_on.append(pred.args[1])
+
+        must_swap_cols = None
+        for e in pred.args[0].iter_subtree():
+            if isinstance(e, Col):
+                must_swap_cols = e._uuid in right_uuids
+                assert must_swap_cols or e._uuid in left_uuids
+                break
+
+        assert must_swap_cols is not None
+
+        if must_swap_cols:
+            left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
+
+    return (left_on, right_on)
 
 
 with TableImpl.impl_store.impl_manager as impl:

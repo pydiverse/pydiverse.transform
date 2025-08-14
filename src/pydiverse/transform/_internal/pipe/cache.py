@@ -148,10 +148,7 @@ class Cache:
             assert right_cache is not None
 
             res.cols = self.cols | right_cache.cols
-            res.name_to_uuid = self.name_to_uuid | {
-                name + node.suffix: uid
-                for name, uid in right_cache.name_to_uuid.items()
-            }
+            res.name_to_uuid = self.name_to_uuid | right_cache.name_to_uuid
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
             res.derived_from = self.derived_from | right_cache.derived_from
@@ -236,7 +233,7 @@ class Cache:
 
             if (
                 node.how == "full"
-                or (node.right in self.derived_from and node.how == "left")
+                or (node.child not in self.derived_from and node.how == "left")
             ) and any(
                 types.is_const(self.cols[uid].dtype())
                 for uid in self.uuid_to_name.keys()

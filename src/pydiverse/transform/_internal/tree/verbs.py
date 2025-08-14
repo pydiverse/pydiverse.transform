@@ -272,7 +272,6 @@ class Join(Verb):
     on: ColExpr
     how: Literal["inner", "left", "full"]
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
-    suffix: str
 
     def __repr__(self) -> str:
         return (

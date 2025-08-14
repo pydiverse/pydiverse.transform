@@ -67,8 +67,8 @@ def test_with_join(df1, df2):
         lambda t, u: t
         >> arrange(*t)
         >> slice_head(3)
-        >> alias()
-        >> left_join(u, C.col1 == u.col1),
+        >> alias(keep_col_refs=True)
+        >> left_join(u, t.col1 == u.col1),
         check_row_order=False,
     )
 

@@ -4,7 +4,9 @@
 from functools import partial, wraps
 
 from pydiverse.transform._internal.errors import SubqueryError
+from pydiverse.transform._internal.pipe.cache import Cache
 from pydiverse.transform._internal.tree import verbs
+from pydiverse.transform._internal.tree.ast import AstNode
 
 
 class Pipeable:
@@ -58,46 +60,40 @@ def verb(fn):
     return wrapper
 
 
+def check_subquery(new_tbl, cache: Cache, ast_node: AstNode):
+    if (reason := cache.requires_subquery(new_tbl._ast)) is not None:
+        ast_node.iter_subtree()
+        # TODO: we should also search for aliases in the subtree and see if we
+        # can make it work by inserting a subquery at one of those.
+        if not isinstance(ast_node, verbs.Alias):
+            raise SubqueryError(
+                f"Executing the `{new_tbl._ast.__class__.__name__.lower()}` verb "
+                f"on the table `{ast_node.name}` requires a subquery, which "
+                "is forbidden in transform by default.\n"
+                f"reason for the subquery: {reason}\n"
+                f"hint: Materialize the table `{ast_node.name}` before this "
+                "verb. If you are sure you want to do a subquery, put an "
+                "`>> alias()` before this verb. "
+            )
+        return True
+    return False
+
+
+# Checks for subqueries and updates the cache for all verbs except `join`. Since `join`
+# is much more complex, we do these tasks manually in the verb.
 def modify_ast(fn):
     @wraps(fn)
     def _fn(table, *args, **kwargs):
         new = fn(table, *args, **kwargs)
         assert new._ast != table._ast
 
-        def _check_subquery(cache, ast_node):
-            if (reason := cache.requires_subquery(new._ast)) is not None:
-                # TODO: we should also search for aliases in the subtree and see if we
-                # can make it work by inserting a subquery at one of those.
-                if not isinstance(ast_node, verbs.Alias):
-                    raise SubqueryError(
-                        f"Executing the `{new._ast.__class__.__name__.lower()}` verb "
-                        f"on the table `{ast_node.name}` requires a subquery, which "
-                        "is forbidden in transform by default.\n"
-                        f"reason for the subquery: {reason}\n"
-                        f"hint: Materialize the table `{ast_node.name}` before this "
-                        "verb. If you are sure you want to do a subquery, put an "
-                        "`>> alias()` before this verb. "
-                    )
-                return True
-            return False
-
         # If a subquery is required, we put a marker in between
         assert new._ast.child == table._ast
-        if _check_subquery(table._cache, table._ast):
+        if check_subquery(new, table._cache, table._ast):
             new._ast.child = verbs.SubqueryMarker(new._ast.child)
             new._cache = new._cache.update(new._ast.child)
 
-        if isinstance(new._ast, verbs.Join):
-            if _check_subquery(args[0]._cache, args[0]._ast):
-                new._ast.right = verbs.SubqueryMarker(new._ast.right)
-                right_cache = args[0]._cache.update(new._ast.right)
-            else:
-                right_cache = args[0]._cache
-
-        new._cache = new._cache.update(
-            new._ast,
-            right_cache=right_cache if isinstance(new._ast, verbs.Join) else None,
-        )
+        new._cache = new._cache.update(new._ast)
 
         return new
 

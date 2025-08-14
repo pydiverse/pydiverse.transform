@@ -120,12 +120,13 @@ def test_self_join(df3, how):
 
 def test_ineq_join(df3, df4, df_strings):
     assert_result_equal((df3, df4), lambda t, s: t >> inner_join(s, t.col1 <= s.col1))
+
     assert_result_equal(
         (df4, df_strings),
         lambda s, t: s
         >> inner_join(
-            t >> mutate(u=t.col1.str.len()),
-            s.col3 <= C.u_42,
+            tm := t >> mutate(u=t.col1.str.len()),
+            s.col3 <= tm.u,
             suffix="_42",
         ),
     )
@@ -233,10 +234,10 @@ def test_join_where(df2, df3, df4):
         (df3, df4),
         lambda t3, t4: t3
         >> filter(t3.col1 % 2 == 0)
-        >> alias()
+        >> alias(keep_col_refs=True)
         >> full_join(
             t4_filtered := t4 >> filter(t4.col1.is_not_null()) >> alias(),
-            on=C.col2 == t4_filtered.col2,
+            on=t3.col2 == t4_filtered.col2,
         ),
     )
 
@@ -244,7 +245,7 @@ def test_join_where(df2, df3, df4):
 def test_join_const_col(df3, df4):
     assert_result_equal(
         (df3, df4),
-        lambda s, t: s >> left_join(t >> mutate(y=0) >> alias(), on=s.col1 == C.y_df4),
+        lambda s, t: s >> left_join(t >> mutate(y=0) >> alias(), on=s.col1 == C.y),
     )
 
     assert_result_equal(
@@ -260,8 +261,8 @@ def test_join_const_col(df3, df4):
         lambda t: t
         >> mutate(x=4, y=5)
         >> mutate(z=C.x + C.y)
-        >> alias()
-        >> full_join(t_ := t >> alias(), on=C.col1 == t_.col2),
+        >> alias(keep_col_refs=True)
+        >> full_join(t_ := t >> alias(), on=t.col1 == t_.col2),
     )
 
 

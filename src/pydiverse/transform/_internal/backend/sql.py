@@ -533,12 +533,7 @@ class SqlImpl(TableImpl):
             right_table, right_query, right_sqa_expr = cls.compile_ast(
                 nd.right, needed_cols
             )
-            sqa_expr.update(
-                {
-                    uid: sqa.label(lb.name + nd.suffix, lb)
-                    for uid, lb in right_sqa_expr.items()
-                }
-            )
+            sqa_expr.update(right_sqa_expr)
 
             compiled_on = cls.compile_col_expr(nd.on, sqa_expr)
 
