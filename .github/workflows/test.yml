@@ -13,9 +13,6 @@ on:
       pytest-arguments:
         required: false
         type: string
-      workers:
-        default: 4
-        type: number
       timeout-minutes:
         default: 30
         type: number
@@ -77,4 +74,4 @@ jobs:
           ERROR_ONLY: 1
           LOG_TEST_NAME: 0
         run: |
-          pixi run -e ${{ inputs.environment }} pytest tests ${RUNNER_DEBUG:+-v} --color=yes --workers=${{ inputs.workers }} ${{ inputs.pytest-arguments }}
+          pixi run -e ${{ inputs.environment }} pytest tests ${RUNNER_DEBUG:+-v} --color=yes ${{ inputs.pytest-arguments }}
