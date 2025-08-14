@@ -42,9 +42,13 @@ class Verb(AstNode):
 
         return cloned, nd_map, uuid_map
 
-    def iter_subtree(self) -> Iterable[AstNode]:
-        yield from self.child.iter_subtree()
+    def iter_subtree_postorder(self) -> Iterable[AstNode]:
+        yield from self.child.iter_subtree_postorder()
         yield self
+
+    def iter_subtree_preorder(self):
+        yield self
+        yield from self.child.iter_subtree_preorder()
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         return iter(())
@@ -308,10 +312,15 @@ class Join(Verb):
         nd_map[self] = cloned
         return cloned, nd_map, uuid_map
 
-    def iter_subtree(self) -> Iterable[AstNode]:
-        yield from self.child.iter_subtree()
-        yield from self.right.iter_subtree()
+    def iter_subtree_postorder(self) -> Iterable[AstNode]:
+        yield from self.child.iter_subtree_postorder()
+        yield from self.right.iter_subtree_postorder()
         yield self
+
+    def iter_subtree_preorder(self):
+        yield self
+        yield from self.child.iter_subtree_preorder()
+        yield from self.right.iter_subtree_preorder()
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield self.on

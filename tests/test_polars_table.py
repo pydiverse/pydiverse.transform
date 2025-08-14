@@ -591,7 +591,7 @@ class TestPolarsLazyImpl:
             >> group_by(C.col2)
             >> summarize(y=C.col3_right.sum()),
             tbl3
-            >> left_join(tbl2, C.col1 == C.col1_right, suffix="_right")
+            >> left_join(tbl2, tbl3.col1 == tbl2.col1, suffix="_right")
             >> mutate(v=C.col3 + C.col2_right)
             >> group_by(C.col2)
             >> summarize(y=C.col3_right.sum()),

@@ -109,7 +109,10 @@ class TableImpl(AstNode):
 
         return res
 
-    def iter_subtree(self) -> Iterable[AstNode]:
+    def iter_subtree_postorder(self) -> Iterable[AstNode]:
+        yield self
+
+    def iter_subtree_preorder(self) -> Iterable[AstNode]:
         yield self
 
     @classmethod

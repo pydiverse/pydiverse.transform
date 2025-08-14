@@ -97,7 +97,9 @@ class ColExpr(Generic[T]):
         tbl_repr = repr(tbl)
         if isinstance(self, Col):
             # There is a sensible name, so we print it.
-            return tbl_repr.replace("Table", "Column", 1)
+            i = tbl_repr.find("Table")
+            j = tbl_repr.find("(", i + 1)
+            return tbl_repr[:i] + f"Column `{self.name}` " + tbl_repr[j:]
         return tbl_repr.split("\n", 1)[1]
 
     def _repr_html_(self) -> str:
@@ -192,7 +194,7 @@ class ColExpr(Generic[T]):
 
         errors.check_arg_type(Table, "ColExpr.uses_table", "table", table)
         return any(
-            any(node == table._ast for node in col._ast.iter_subtree())
+            any(node == table._ast for node in col._ast.iter_subtree_postorder())
             for col in self.iter_subtree()
             if isinstance(col, Col)
         )
@@ -2792,7 +2794,7 @@ def get_expr_as_table(expr: ColExpr):
     cols = [col for col in expr.iter_subtree() if isinstance(col, Col)]
     # We need one column whose AST is an ancestor of all other columns' ASTs.
     # The following could be done in linear time.
-    subtrees = [set(col._ast.iter_subtree()) for col in cols]
+    subtrees = [set(col._ast.iter_subtree_postorder()) for col in cols]
     ancestor_index = None
     for i, tree in enumerate(subtrees):
         if all(col._ast in tree for col in cols):

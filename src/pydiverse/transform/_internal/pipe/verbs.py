@@ -36,7 +36,7 @@ from pydiverse.transform._internal.pipe.pipeable import (
     verb,
 )
 from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
-from pydiverse.transform._internal.tree import types, verbs
+from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
@@ -1256,13 +1256,10 @@ def join(
     new = copy.copy(left)
     new._ast = Join(left._ast, right._ast, on, how, validate)
 
-    if check_subquery(new, right._cache, right._ast):
-        new._ast.right = verbs.SubqueryMarker(new._ast.right)
-        right_cache = right._cache.update(new._ast.right)
-    else:
-        right_cache = right._cache
+    new, left = check_subquery(new, left)
+    new, right = check_subquery(new, right, is_right=True)
 
-    new._cache = new._cache.update(new._ast, right_cache=right_cache)
+    new._cache = left._cache.update(new._ast, right_cache=right._cache)
 
     return new
 
