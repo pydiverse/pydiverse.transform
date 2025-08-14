@@ -83,7 +83,7 @@ def duckdb_parquet_table(df: pl.DataFrame, name: str):
         engine = sqa.create_engine("duckdb:///:memory:")
     _sql_engine_cache["duckdb_parquet"] = engine
     path = Path(tempfile.gettempdir()) / "pdtransform" / "tests"
-    file = path / "test.parquet"
+    file = path / f"{name}.parquet"
     os.makedirs(path, exist_ok=True)
     if file.exists():
         os.unlink(file)
@@ -94,7 +94,7 @@ def duckdb_parquet_table(df: pl.DataFrame, name: str):
         conn.execute(
             sqa.text(
                 f"CREATE VIEW {name} AS SELECT * FROM "
-                f"read_parquet('{path / 'test.parquet'}')"
+                f"read_parquet('{path / f'{name}.parquet'}')"
             )
         )
         conn.commit()

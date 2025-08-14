@@ -41,7 +41,7 @@ jobs:
       docker-services: ""
 
   other_test:
-    name: Postgres Tests
+    name: Other Tests (sqlite, duckdb_parquet)
     needs: [smoke_test]
     strategy:
       matrix:
