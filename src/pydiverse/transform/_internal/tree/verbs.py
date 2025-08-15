@@ -68,10 +68,14 @@ class Alias(Verb):
     uuid_map: dict[UUID, UUID] | None
 
     def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
-        return f"alias\n{'' if self.name == self.child.name else self.name + '\n'}" + (
-            ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
-            if verb_depth != 0
-            else ""
+        return (
+            "alias\n"
+            + ("" if self.name == self.child.name else self.name + "\n")
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
@@ -320,13 +324,13 @@ class Join(Verb):
             + f"how = `{self.how}`\n"
             + f"on = {self.on.ast_repr(expr_depth)}\n"
             + f"validate = `{self.validate}`\n"
-            + f"right = {
+            + f"""right = {
                 textwrap.indent(
-                    self.right.ast_repr(verb_depth - 1, expr_depth), ' ' * 8
+                    self.right.ast_repr(verb_depth - 1, expr_depth), " " * 8
                 )[8:]
                 if verb_depth != 0
-                else '...'
-            }"
+                else "..."
+            }"""
             + "\n"
             + (
                 ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
