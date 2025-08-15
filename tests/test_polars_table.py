@@ -761,9 +761,9 @@ class TestPrintAndRepr:
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
-        series = tbl1._ast.df.collect().get_column("col1")
+        col_tbl = tbl1._ast.df.select("col1").collect()
 
-        assert str(series) in col1_str
+        assert str(col_tbl).split("\n", 1)[1] in col1_str
         assert "failed" not in col1_str
 
     def test_col_html_repr(self, tbl1):

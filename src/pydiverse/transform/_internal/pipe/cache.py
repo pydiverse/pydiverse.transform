@@ -3,6 +3,7 @@
 
 import copy
 import dataclasses
+from pprint import pformat
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -27,6 +28,40 @@ class Cache:
     is_filtered: bool
 
     backend: Literal["polars", "sqlite", "postgres", "duckdb", "mssql"]
+
+    def __repr__(self) -> str:
+        return (
+            "Cache(\n"
+            + "  name_to_uuid="
+            + f"{
+                '{' + pformat(self.name_to_uuid, indent=16)[16:]
+                if len(self.name_to_uuid) > 1
+                else pformat(self.name_to_uuid)
+            }"
+            + ",\n"
+            + "  uuid_to_name="
+            + f"{
+                '{' + pformat(self.uuid_to_name, indent=16)[16:]
+                if len(self.uuid_to_name) > 1
+                else pformat(self.name_to_uuid)
+            }"
+            + ",\n"
+            + f"  partition_by={self.partition_by}\n"
+            + "  derived_from={"
+            + f"{', '.join(d.__class__.__name__.lower() for d in self.derived_from)}"
+            + "},\n"
+            + "  cols={"
+            + f"{
+                pformat(
+                    {uid: col.ast_repr(depth=0) for uid, col in self.cols.items()},
+                    indent=8,
+                )[8:]
+            }"
+            + ",\n"
+            + f"  limit={self.limit},\n"
+            + f"  group_by={self.group_by},\n"
+            + f"  is_filtered={self.is_filtered},\n)"
+        )
 
     # For a column to be usable in an expression, the table it comes from must be an
     # ancestor of the current table AND the column's UUID must be in `all_cols` of the

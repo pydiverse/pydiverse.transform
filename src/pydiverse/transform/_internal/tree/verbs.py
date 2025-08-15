@@ -13,7 +13,7 @@ from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import Col, ColExpr, Order
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Verb(AstNode):
     child: AstNode
 
@@ -63,13 +63,15 @@ class Verb(AstNode):
         self.map_col_roots(lambda root: root.map_subtree(g))
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Alias(Verb):
     uuid_map: dict[UUID, UUID] | None
 
-    def __repr__(self) -> str:
-        return f"Alias({'' if self.name == self.child.name else self.name}),\n" + repr(
-            self.child
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
+        return f"alias\n{'' if self.name == self.child.name else self.name + '\n'}" + (
+            ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+            if verb_depth != 0
+            else ""
         )
 
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
@@ -85,7 +87,7 @@ class Alias(Verb):
         return cloned, nd_map, uuid_map
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Select(Verb):
     select: list[Col]
 
@@ -95,46 +97,55 @@ class Select(Verb):
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.select = [g(col) for col in self.select]
 
-    def __repr__(self) -> str:
-        if len(self.select) == 0:
-            return "Select(),\n" + repr(self.child)
-
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "Select(\n  "
-            + ",\n  ".join(col.ast_repr() for col in self.select)
-            + "\n),\n"
-            + repr(self.child)
+            "select\n"
+            + ", ".join(col.ast_repr() for col in self.select)
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Rename(Verb):
     name_map: dict[str, str]
 
-    def __repr__(self) -> str:
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "Rename(\n  "
-            + ",\n  ".join(f"{k} -> {v}" for k, v in self.name_map.items())
-            + "\n),\n"
-            + repr(self.child)
+            "rename\n"
+            + ",\n".join(f"{k} -> {v}" for k, v in self.name_map.items())
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Mutate(Verb):
     names: list[str]
     values: list[ColExpr]
     uuids: list[UUID]
 
-    def __repr__(self) -> str:
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "Mutate(\n  "
-            + ",\n  ".join(
-                f"{k} = {textwrap.indent(v.ast_repr(), '  ')[2:]}"
+            "mutate\n"
+            + ",\n".join(
+                f"{k} = {v.ast_repr(expr_depth)}"
                 for k, v in zip(self.names, self.values, strict=True)
             )
-            + "\n),\n"
-            + repr(self.child)
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -156,16 +167,20 @@ class Mutate(Verb):
         return cloned, nd_map, uuid_map
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Filter(Verb):
     predicates: list[ColExpr]
 
-    def __repr__(self) -> str:
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "Filter(\n"
-            + ",\n".join(textwrap.indent(f.ast_repr(), "  ") for f in self.predicates)
-            + "\n),\n"
-            + repr(self.child)
+            "filter\n"
+            + ",\n".join(pred.ast_repr(expr_depth) for pred in self.predicates)
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -175,23 +190,25 @@ class Filter(Verb):
         self.predicates = [g(predicate) for predicate in self.predicates]
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Summarize(Verb):
     names: list[str]
     values: list[ColExpr]
     uuids: list[UUID]
 
-    def __repr__(self) -> str:
-        if len(self.names) == 0:
-            return "Summarize(),\n" + repr(self.child)
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "Summarize(\n  "
-            + ",\n  ".join(
-                f"{k} = {textwrap.indent(v.ast_repr(), '  ')[2:]}"
+            "summarize\n"
+            + ",\n".join(
+                f"{k} = {v.ast_repr(expr_depth)}"
                 for k, v in zip(self.names, self.values, strict=True)
             )
-            + "\n),\n"
-            + repr(self.child)
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -213,16 +230,20 @@ class Summarize(Verb):
         return cloned, nd_map, uuid_map
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Arrange(Verb):
     order_by: list[Order]
 
-    def __repr__(self) -> str:
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "Arrange(\n"
-            + ",\n".join(textwrap.indent(f.ast_repr(), "  ") for f in self.order_by)
-            + "\n),\n"
-            + repr(self.child)
+            "arrange\n"
+            + ",\n".join(ord.ast_repr(expr_depth) for ord in self.order_by)
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -235,26 +256,38 @@ class Arrange(Verb):
         ]
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class SliceHead(Verb):
     n: int
     offset: int
 
-    def __repr__(self) -> str:
-        return f"SliceHead(n = {self.n}, offset = {self.offset}),\n" + repr(self.child)
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
+        return (
+            "slice_head\n"
+            + f"n = {self.n}, offset = {self.offset}),\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
+        )
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class GroupBy(Verb):
     group_by: list[Col]
     add: bool
 
-    def __repr__(self) -> str:
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "GroupBy(\n"
-            + ",\n".join(textwrap.indent(f.ast_repr(), "  ") for f in self.group_by)
-            + "\n),\n"
-            + repr(self.child)
+            "group_by\n"
+            + ", ".join(col.ast_repr() for col in self.group_by)
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -264,28 +297,42 @@ class GroupBy(Verb):
         self.group_by = [g(col) for col in self.group_by]
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Ungroup(Verb):
-    def __repr__(self) -> str:
-        return "Ungroup(),\n" + repr(self.child)
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
+        return "ungroup\n" + (
+            ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+            if verb_depth != 0
+            else ""
+        )
 
 
-@dataclasses.dataclass(eq=False, slots=True)
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Join(Verb):
     right: AstNode
     on: ColExpr
     how: Literal["inner", "left", "full"]
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
 
-    def __repr__(self) -> str:
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         return (
-            "Join(\n  right = "
-            + textwrap.indent(repr(self.right), "  ")[2:]
-            + f"  how = `{self.how}`,\n"
-            + f"  on = {textwrap.indent(self.on.ast_repr(), '  ')[2:]},\n"
-            + f"  validate = `{self.validate}`,\n"
-            + "),\n"
-            + repr(self.child)
+            "join\n"
+            + f"how = `{self.how}`\n"
+            + f"on = {self.on.ast_repr(expr_depth)}\n"
+            + f"validate = `{self.validate}`\n"
+            + f"right = {
+                textwrap.indent(
+                    self.right.ast_repr(verb_depth - 1, expr_depth), ' ' * 8
+                )[8:]
+                if verb_depth != 0
+                else '...'
+            }"
+            + "\n"
+            + (
+                ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+                if verb_depth != 0
+                else ""
+            )
         )
 
     def _clone(self) -> tuple["Join", dict[AstNode, AstNode], dict[UUID, UUID]]:
@@ -330,5 +377,9 @@ class Join(Verb):
 
 
 class SubqueryMarker(Verb):
-    def __repr__(self) -> str:
-        return "SubqueryMarker(),\n"
+    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
+        return "SubqueryMarker\n" + (
+            ("\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
+            if verb_depth != 0
+            else ""
+        )
