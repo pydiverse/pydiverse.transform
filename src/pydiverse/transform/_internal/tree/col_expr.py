@@ -2229,8 +2229,7 @@ class Col(ColExpr):
         super().__init__(_dtype, _ftype)
 
     def ast_repr(self, depth: int = -1) -> str:
-        dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
-        return f"{self._ast.name or '?'}.{self.name}{dtype_str}"
+        return f"{self._ast.name or '?'}.{self.name}"
 
     def __hash__(self) -> int:
         return hash(self._uuid)
@@ -2244,8 +2243,7 @@ class ColName(ColExpr):
         super().__init__(dtype, ftype)
 
     def ast_repr(self, depth: int = -1) -> str:
-        dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
-        return f"C.{self.name}{dtype_str}"
+        return f"C.{self.name}"
 
 
 class LiteralCol(ColExpr):
@@ -2264,7 +2262,7 @@ class LiteralCol(ColExpr):
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
     def ast_repr(self, depth: int = -1):
-        return f"{repr(self.val)} ({self.dtype()})"
+        return repr(self.val)
 
 
 class ColFn(ColExpr):
@@ -2436,7 +2434,7 @@ class CaseExpr(ColExpr):
             return "case_when(...)"
         default_val_str = ""
         if self.default_val is not None:
-            default_val_str = f"default={self.default_val.ast_repr(depth - 1)}"
+            default_val_str = f", default={self.default_val.ast_repr(depth - 1)}"
         return (
             "case_when("
             + ", ".join(

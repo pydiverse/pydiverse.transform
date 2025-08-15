@@ -782,21 +782,10 @@ class TestPrintAndRepr:
         assert "shape: (12, 5)" in tbl3_str
 
     def test_ast_repr(self, tbl4):
-        assert tbl4.col1.ast_repr() == "df4.col1 (Int64)"
-        assert (tbl4.col1 + tbl4.col2).ast_repr() == (
-            """__add__(
-  df4.col1 (Int64),
-  df4.col2 (Int64)
-)"""
-        )
+        assert tbl4.col1.ast_repr() == "df4.col1"
+        assert (tbl4.col1 + tbl4.col2).ast_repr() == ("__add__(df4.col1, df4.col2)")
         assert (tbl4.col1 + tbl4.col2 + tbl4.col3).ast_repr() == (
-            """__add__(
-  __add__(
-    df4.col1 (Int64),
-    df4.col2 (Int64)
-  ),
-  df4.col3 (Int64)
-)"""
+            "__add__(__add__(df4.col1, df4.col2), df4.col3)"
         )
         assert (
             pdt.when(tbl4.col1 > 1)
@@ -805,32 +794,13 @@ class TestPrintAndRepr:
             .then(tbl4.col3)
             .otherwise(7)
         ).ast_repr() == (
-            """CaseWhen(
-  __gt__(
-    df4.col1 (Int64),
-    lit(1, const Int64)
-  ) -> df4.col2 (Int64),
-  __lt__(
-    df4.col1 (Int64),
-    lit(-1, const Int64)
-  ) -> df4.col3 (Int64),
-  default=lit(7, const Int64)
-)"""
+            "case_when(__gt__(df4.col1, 1) -> df4.col2, "
+            "__lt__(df4.col1, -1) -> df4.col3, default=7)"
         )
 
         assert (
-            (tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2).ast_repr()
-            == """__add__(
-  Cast(
-    df4.col1 (Int64),
-    to=Float64,
-  ),
-  __truediv__(
-    df4.col2 (Int64),
-    lit(2, const Int64)
-  )
-)"""
-        )
+            tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2
+        ).ast_repr() == "__add__(cast(df4.col1, Float64), __truediv__(df4.col2, 2))"
 
         # TODO: This is currently how `filter` is translated to the AST. We could also
         # only do this transformation during backend translation, so that there is a
@@ -842,27 +812,7 @@ class TestPrintAndRepr:
                 .then(tbl4.col2.is_not_null())
                 .otherwise((tbl4.col3 % 2) == 0),
             ).ast_repr()
-            == """max(
-  CaseWhen(
-    CaseWhen(
-      __gt__(
-        df4.col1 (Int64),
-        lit(0, const Int64)
-      ) -> is_not_null(
-        df4.col2 (Int64)
-      ),
-      default=__eq__(
-        __mod__(
-          df4.col3 (Int64),
-          lit(2, const Int64)
-        ),
-        lit(0, const Int64)
-      )
-    ) -> df4.col1 (Int64),
-  ),
-  partition_by=[
-    df4.col2 (Int64),
-    df4.col3 (Int64)
-  ]
-)"""
+            == "max(case_when(case_when(__gt__(df4.col1, 0) -> is_not_null(df4.col2), "
+            "default=__eq__(__mod__(df4.col3, 2), 0)) -> df4.col1), "
+            "partition_by=[df4.col2, df4.col3])"
         )
