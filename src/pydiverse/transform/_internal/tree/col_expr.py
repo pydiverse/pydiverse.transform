@@ -10,7 +10,6 @@ import functools
 import itertools
 import operator
 import re
-import textwrap
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta
 from typing import Any, Generic, TypeVar, overload
@@ -92,15 +91,22 @@ class ColExpr(Generic[T]):
         return repr(self)
 
     def __repr__(self) -> str:
+        first_line = ""
+        if isinstance(self, Col | ColName):
+            first_line = "Col "
+        elif isinstance(self, LiteralCol):
+            first_line = "Literal "
+
+        first_line += self.ast_repr(depth=0) + f" ({self.dtype()})\n"
+
         # We reduce column representation to table representation.
-        tbl = get_expr_as_table(self)
+        try:
+            tbl = get_expr_as_table(self)
+        except ValueError as e:
+            return first_line + f"cannot print data: {e}"
         tbl_repr = repr(tbl)
-        if isinstance(self, Col):
-            # There is a sensible name, so we print it.
-            i = tbl_repr.find("Table")
-            j = tbl_repr.find("(", i + 1)
-            return tbl_repr[:i] + f"Column `{self.name}` " + tbl_repr[j:]
-        return tbl_repr.split("\n", 1)[1]
+
+        return first_line + tbl_repr.split("\n", 1)[1]
 
     def _repr_html_(self) -> str:
         tbl = get_expr_as_table(self)
@@ -115,7 +121,7 @@ class ColExpr(Generic[T]):
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
-    def ast_repr(self) -> str: ...
+    def ast_repr(self, depth: int = -1) -> str: ...
 
     def export(self, target: Target) -> pl.Series | pd.Series:
         """
@@ -2222,18 +2228,9 @@ class Col(ColExpr):
         self._uuid = _uuid
         super().__init__(_dtype, _ftype)
 
-    def ast_repr(self) -> str:
+    def ast_repr(self, depth: int = -1) -> str:
         dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
         return f"{self._ast.name or '?'}.{self.name}{dtype_str}"
-
-    def __str__(self) -> str:
-        try:
-            return str(self.export(Polars(lazy=False)))
-        except Exception as e:
-            return (
-                f"could not evaluate {repr(self)} due to "
-                f"{e.__class__.__name__}: {str(e)}"
-            )
 
     def __hash__(self) -> int:
         return hash(self._uuid)
@@ -2246,7 +2243,7 @@ class ColName(ColExpr):
         self.name = name
         super().__init__(dtype, ftype)
 
-    def ast_repr(self) -> str:
+    def ast_repr(self, depth: int = -1) -> str:
         dtype_str = f" ({self.dtype()})" if self.dtype() is not None else ""
         return f"C.{self.name}{dtype_str}"
 
@@ -2266,8 +2263,8 @@ class LiteralCol(ColExpr):
         dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
-    def ast_repr(self):
-        return f"lit({repr(self.val)}, {self.dtype()})"
+    def ast_repr(self, depth: int = -1):
+        return f"{repr(self.val)} ({self.dtype()})"
 
 
 class ColFn(ColExpr):
@@ -2299,16 +2296,14 @@ class ColFn(ColExpr):
         # try to eagerly resolve the types to get a nicer stack trace on type errors
         self.dtype()
 
-    def ast_repr(self) -> str:
-        args = [textwrap.indent(e.ast_repr(), "  ") for e in self.args] + [
-            (
-                f"  {ckwarg}=[\n"
-                + ",\n".join(textwrap.indent(v.ast_repr(), "    ") for v in val)
-                + "\n  ]"
-            )
+    def ast_repr(self, depth: int = -1) -> str:
+        if depth == 0:
+            return f"{self.op.name}(...)"
+        args = [e.ast_repr(depth - 1) for e in self.args] + [
+            (f"{ckwarg}=[" + ", ".join(v.ast_repr(depth - 1) for v in val) + "]")
             for ckwarg, val in self.context_kwargs.items()
         ]
-        return self.op.name + "(\n" + ",\n".join(args) + "\n)"
+        return self.op.name + "(" + ", ".join(args) + ")"
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -2418,7 +2413,7 @@ class WhenClause:
         return CaseExpr((*self.cases, (self.cond, wrap_literal(value))))
 
     def __repr__(self) -> str:
-        return f"when_clause({self.cond})"
+        return f"when({self.cond})"
 
 
 class CaseExpr(ColExpr):
@@ -2436,22 +2431,17 @@ class CaseExpr(ColExpr):
         super().__init__()
         self.dtype()
 
-    def ast_repr(self) -> str:
+    def ast_repr(self, depth: int = -1) -> str:
+        if depth == 0:
+            return "case_when(...)"
         default_val_str = ""
         if self.default_val is not None:
-            default_val_str = (
-                f"  default={textwrap.indent(self.default_val.ast_repr(), '  ')[2:]}\n"
-            )
+            default_val_str = f"default={self.default_val.ast_repr(depth - 1)}"
         return (
-            "CaseWhen(\n"
-            + functools.reduce(
-                operator.add,
-                (
-                    f"  {textwrap.indent(cond.ast_repr(), '  ')[2:]} -> "
-                    f"{textwrap.indent(val.ast_repr(), '  ')[2:]},\n"
-                    for cond, val in self.cases
-                ),
-                "",
+            "case_when("
+            + ", ".join(
+                f"{cond.ast_repr(depth - 1)} -> {val.ast_repr(depth - 1)}"
+                for cond, val in self.cases
             )
             + default_val_str
             + ")"
@@ -2649,13 +2639,10 @@ class Cast(ColExpr):
             self._dtype = types.with_const(self._dtype)
         return self._dtype
 
-    def ast_repr(self) -> str:
-        return (
-            "Cast(\n"
-            f"  {textwrap.indent(self.val.ast_repr(), '  ')[2:]},\n"
-            f"  to={self.target_type},\n"
-            ")"
-        )
+    def ast_repr(self, depth: int = -1) -> str:
+        if depth == 0:
+            return "cast(...)"
+        return f"cast({self.val.ast_repr(depth - 1)}, {self.target_type})"
 
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self.val.ftype(agg_is_window=agg_is_window)
@@ -2711,12 +2698,12 @@ class Order:
 
         return Order(expr, descending, nulls_last)
 
-    def ast_repr(self) -> str:
+    def ast_repr(self, depth: int = -1) -> str:
         return (
-            "Order(\n"
-            f"  by={textwrap.indent(self.order_by.ast_repr(), '  ')[2:]},\n"
-            f"  descending={self.descending},\n"
-            f"  nulls_last={self.nulls_last},\n"
+            "Order("
+            f"by={self.order_by.ast_repr(depth)}, "
+            f"descending={self.descending}, "
+            f"nulls_last={self.nulls_last}"
             ")"
         )
 
