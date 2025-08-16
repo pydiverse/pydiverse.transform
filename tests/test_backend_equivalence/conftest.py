@@ -31,6 +31,14 @@ dataframes = {
             "col3": [0, 1, 2, 3, 0, 1, 2, 3, 1, 1, 2, 3],
             "col4": [-1729, 2, 1, 3, 4, 5, 13, 7, 8, 9, 10, 11],
             "col5": list("abcdafghijkk"),
+            "col6": [
+                "a" * 30000,
+            ]
+            * 12,
+            "col7": [
+                "b" * 70000,
+            ]
+            * 12,
         }
     ),
     "df4": pl.DataFrame(
@@ -40,6 +48,16 @@ dataframes = {
             "col3": [None, None, None, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
             "col4": [None, -42, 2, 33, 4, 5, -10, 7, 8, 90, 10, 11, 12],
             "col5": list("abcdefghijkl") + [None],
+            "col6": [
+                "a" * 30000,
+            ]
+            * 12
+            + [None],
+            "col7": [
+                "b" * 70000,
+            ]
+            * 12
+            + [None],
         }
     ),
     "df_strings": pl.DataFrame(
@@ -115,6 +133,14 @@ dataframes = {
                 "$&/)",
             ],
             "gb": ["a", "b", "a", "a", "0", "", "", "a", "", "c", "d", "b"],
+            "long": [
+                "a" * 30000,
+            ]
+            * 12,
+            "clob": [
+                "b" * 70000,
+            ]
+            * 12,
         }
     ),
     "df_datetime": pl.DataFrame(
