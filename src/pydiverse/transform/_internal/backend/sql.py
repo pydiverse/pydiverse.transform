@@ -90,7 +90,7 @@ class SqlImpl(TableImpl):
 
             Impl = DuckDbImpl
 
-        elif dialect == "ibm_db2":
+        elif dialect == "ibm_db_sa":
             from .ibm_db2 import IbmDb2Impl
 
             Impl = IbmDb2Impl
@@ -155,7 +155,7 @@ class SqlImpl(TableImpl):
         return sqa.cast(sqa.literal("nan"), sqa.Double)
 
     @classmethod
-    def default_collation(cls):
+    def default_collation(cls) -> str | None:
         return "POSIX"
 
     @classmethod
@@ -242,7 +242,10 @@ class SqlImpl(TableImpl):
     ) -> sqa.UnaryExpression:
         order_expr = cls.compile_col_expr(order.order_by, sqa_expr)
         if types.without_const(order.order_by.dtype()) == String():
-            order_expr = order_expr.collate(cls.default_collation())
+            if cls.default_collation() is not None:
+                # SQLAlchemy does not support collations for all backends, so we
+                # only apply it if the backend supports it.
+                order_expr = order_expr.collate(cls.default_collation())
         order_expr = order_expr.desc() if order.descending else order_expr.asc()
         if order.nulls_last is not None:
             order_expr = (

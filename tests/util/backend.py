@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 import polars as pl
+import sqlalchemy as sa
 
 from pydiverse.transform._internal.backend.targets import SqlAlchemy
 from pydiverse.transform._internal.pipe.table import Table
@@ -36,7 +37,13 @@ def polars_table(df: pl.DataFrame, name: str):
 _sql_engine_cache = {}
 
 
-def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict | None = None):
+def sql_table(
+    df: pl.DataFrame,
+    name: str,
+    url: str,
+    dtypes_map: dict | None = None,
+    sql_dtypes: dict | None = None,
+):
     import sqlalchemy as sqa
 
     global _sql_engine_cache
@@ -50,9 +57,9 @@ def sql_table(df: pl.DataFrame, name: str, url: str, dtypes_map: dict | None = N
         engine = sqa.create_engine(url)
         _sql_engine_cache[url] = engine
 
-    sql_dtypes = {}
+    sql_dtypes = sql_dtypes or {}
     for col, dtype in zip(df.columns, df.dtypes, strict=True):
-        if dtype in dtypes_map:
+        if dtype in dtypes_map and col not in sql_dtypes:
             sql_dtypes[col] = dtypes_map[dtype]
 
     df.write_database(
@@ -124,7 +131,18 @@ def mssql_table(df: pl.DataFrame, name: str):
 def ibm_db2_table(df: pl.DataFrame, name: str):
     url = "db2+ibm_db://db2inst1:password@localhost:50000/testdb"
 
-    return sql_table(df, name, url)
+    map = {}
+    for col, dtype in zip(df.columns, df.dtypes, strict=True):
+        if dtype == pl.String:
+            max_length = df[col].str.len_chars().max()
+            if max_length > 32_672:
+                map[col] = sa.CLOB()
+            elif max_length > 256:
+                map[col] = sa.VARCHAR(32_672)
+            else:
+                map[col] = sa.VARCHAR(256)
+
+    return sql_table(df, name, url, sql_dtypes=map)
 
 
 BACKEND_TABLES = {
