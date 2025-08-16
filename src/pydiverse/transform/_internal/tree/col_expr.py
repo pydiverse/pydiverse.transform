@@ -2282,6 +2282,7 @@ class ColFn(ColExpr):
             wrap_literal(arg, allow_markers=True) for arg in args
         ]
         self.context_kwargs = clean_kwargs(**kwargs)
+
         # An id to recognize the expression also after copying / preprocessing. Useful
         # to give precise error messages.
         self._fn_id = uuid.uuid1()
@@ -2506,7 +2507,11 @@ class CaseExpr(ColExpr):
         if any(cond.dtype() is None for cond, _ in self.cases):
             return None
 
-        self._dtype = types.lca_type(val_types)
+        try:
+            self._dtype = types.lca_type(val_types)
+        except DataTypeError as e:
+            e.source = self._fn_id
+            raise
 
         if all(
             (
@@ -2738,8 +2743,11 @@ class Order:
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self.order_by.ftype(agg_is_window=agg_is_window)
 
-    def iter_subtree(self) -> Iterable[ColExpr]:
+    def iter_subtree_postorder(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_subtree_postorder()
+
+    def iter_subtree_preorder(self) -> Iterable[ColExpr]:
+        yield from self.order_by.iter_subtree_preorder()
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_children()

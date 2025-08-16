@@ -696,7 +696,7 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     """
     new = copy.copy(table)
     preprocessed = []
-    for i, pred in enumerate(predicates):
+    for i, pred in enumerate(predicates, 1):
         try:
             preprocessed.append(preprocess_arg(pred, table))
         except ErrorWithSource as e:
@@ -788,7 +788,7 @@ def arrange(table: Table, by: ColExpr, *more_by: ColExpr) -> Pipeable:
     new = copy.copy(table)
 
     preprocessed = []
-    for i, ord in enumerate(order_by):
+    for i, ord in enumerate(order_by, 1):
         try:
             preprocessed.append(preprocess_arg(Order.from_col_expr(ord), table))
         except ErrorWithSource as e:
@@ -954,7 +954,7 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     preprocessed = []
     for name, val in zip(names, values, strict=True):
         try:
-            preprocessed.append(preprocess_arg(val, table))
+            preprocessed.append(preprocess_arg(val, table, agg_is_window=False))
         except ErrorWithSource as e:
             raise type(e)(
                 e.args[0] + f"\noccurred in `summarize` argument `{name}`\n"
@@ -1217,7 +1217,7 @@ def join(
     on = [left[expr] == right[expr] if isinstance(expr, str) else expr for expr in on]
 
     on = [pred.map_subtree(_preprocess_on) for pred in on]
-    for i, pred in enumerate(on):
+    for i, pred in enumerate(on, 1):
         try:
             dtype = pred.dtype()
             pred.ftype(agg_is_window=False)

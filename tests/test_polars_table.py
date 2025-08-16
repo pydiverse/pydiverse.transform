@@ -817,8 +817,16 @@ class TestPrintAndRepr:
             "partition_by=[df4.col2, df4.col3])"
         )
 
-    def test_error_source_ptr(self, tbl1):
-        with pytest.raises(DataTypeError):
+    def test_error_source_ptr(self, tbl1, tbl2):
+        with pytest.raises(DataTypeError) as r:
             tbl1 >> mutate(
                 z=(2 * (tbl1.col1 + C.col2) - tbl1.col1.exp()) * tbl1.col1.acos()
             )
+        assert "AST path" in r.value.args[0]
+
+        with pytest.raises(DataTypeError) as r:
+            tbl1 >> inner_join(
+                tbl2 >> rename({c: c.name + "42" for c in tbl2}),
+                on=C.col2 == tbl2.col1,
+            )
+        assert "AST path" in r.value.args[0]
