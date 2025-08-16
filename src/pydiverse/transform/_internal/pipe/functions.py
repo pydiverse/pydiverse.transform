@@ -38,7 +38,7 @@ def when(condition: ColExpr) -> WhenClause:
         condition.dtype() is not None
         and not types.without_const(condition.dtype()) == Bool()
     ):
-        raise TypeError(
+        raise errors.DataTypeError(
             "argument for `when` must be of boolean type, but has type "
             f"`{condition.dtype()}`"
         )

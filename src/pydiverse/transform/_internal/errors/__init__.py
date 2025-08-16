@@ -5,7 +5,21 @@ import typing
 from typing import Any
 
 
-class FunctionTypeError(Exception):
+class ErrorWithSource(Exception):
+    def __init__(self, message, *, source=None):
+        super().__init__(message)
+        self.source = source
+
+
+class DataTypeError(ErrorWithSource):
+    """
+    Invalid usage of data types. This error type is reserved for errors related to
+    the pydiverse-internal types. For errors related to python types, we use the
+    standard `TypeError`.
+    """
+
+
+class FunctionTypeError(ErrorWithSource):
     """
     Exception related to function type
     """

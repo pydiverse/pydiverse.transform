@@ -48,11 +48,17 @@ Expression methods
    __truediv__
    __xor__
    abs
+   acos
    all
    any
    ascending
+   asin
+   atan
    cast
+   cbrt
    ceil
+   clip
+   cos
    count
    dense_rank
    descending
@@ -84,6 +90,7 @@ Expression methods
    is_null
    list.agg
    log
+   log10
    map
    max
    mean
@@ -94,6 +101,8 @@ Expression methods
    rank
    round
    shift
+   sin
+   sqrt
    str.contains
    str.ends_with
    str.join
@@ -107,6 +116,7 @@ Expression methods
    str.to_datetime
    str.upper
    sum
+   tan
 
 Global functions
 ----------------

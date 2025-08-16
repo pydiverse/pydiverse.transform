@@ -14,6 +14,7 @@ from ._internal.backend.targets import (
 from ._internal.pipe.pipeable import verb
 from ._internal.pipe.verbs import (
     arrange,
+    ast_repr,
     cross_join,
     drop,
     full_join,
@@ -35,6 +36,7 @@ from .base import __all__ as __base
 __all__ = __base + [
     "verb",
     "arrange",
+    "ast_repr",
     "drop",
     "group_by",
     "name",

@@ -3,6 +3,7 @@
 
 import pytest
 
+from pydiverse.transform._internal.errors import FunctionTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
@@ -41,7 +42,6 @@ def test_alias_mutate(df3):
         run(post_op)
 
 
-@pytest.mark.xfail  # TODO: fix problem with errors
 def test_alias_window(df3):
     def run(post_op):
         assert_result_equal(
@@ -58,9 +58,11 @@ def test_alias_window(df3):
         mutate(y=C.col1.count()),
         mutate(y=C.col1.count(partition_by=C.col2)),
         summarize(y=C.col1.count() + C.x.sum()),
-        summarize(y=C.col1.count() + C.x),
     ]:
         run(post_op)
+
+    with pytest.raises(FunctionTypeError):
+        run(summarize(y=C.col1.count() + C.x))
 
 
 @pytest.mark.xfail  # TODO: fix problem with errors

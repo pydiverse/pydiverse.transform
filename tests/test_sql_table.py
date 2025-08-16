@@ -403,3 +403,6 @@ class TestSqlTable:
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
         )
+
+    def test_ast_repr(self, tbl3):
+        tbl3 >> ast_repr()

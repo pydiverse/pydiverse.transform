@@ -97,11 +97,13 @@ class Operator:
         self.default_values = default_values
         self.doc = doc
 
-    def return_type(self, signature: Sequence[Dtype]) -> Dtype:
+    def __repr__(self) -> str:
+        return f"Operator `{self.name}`"
+
+    # The return type of the operator given certain input types, or `None` if the
+    # input signature is invalid.
+    def return_type(self, signature: Sequence[Dtype]) -> Dtype | None:
         match = self.trie.best_match(signature)
         if match is None:
-            raise TypeError(
-                f"operator `{self.name}` cannot be called with arguments of type "
-                f"{', '.join(str(t) for t in signature)}"
-            )
+            return None
         return match[1]

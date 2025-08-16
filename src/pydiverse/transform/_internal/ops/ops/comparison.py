@@ -3,7 +3,7 @@
 
 from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import COMPARABLE, Bool, S
+from pydiverse.transform._internal.tree.types import COMPARABLE, Bool, Const, S
 
 equal = Operator(
     "__eq__", Signature(S, S, return_type=Bool()), doc="Equality comparison =="
@@ -68,5 +68,16 @@ The expression ``t.c.is_in(a1, a2, ...)`` is equivalent to
 ``(t.c == a1) | (t.c == a2) | ...``, so passing null to ``is_in`` will result in
 null. To compare for equality with null, use
 :doc:`pydiverse.transform.ColExpr.is_null`.
+""",
+)
+
+clip = Operator(
+    "clip",
+    *(Signature(t, Const(t), Const(t), return_type=t) for t in COMPARABLE),
+    param_names=["self", "lower_bound", "upper_bound"],
+    doc="""
+Replaces values outside `[lower_bound, upper_bound]` with the closer boundary
+value. If the input is not null, this is equivalent to `pdt.max(pdt.min(self,
+upper_bound), lower_bound)`.
 """,
 )

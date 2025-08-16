@@ -4,6 +4,7 @@
 from datetime import datetime
 
 import pydiverse.transform as pdt
+from pydiverse.transform._internal.errors import DataTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
@@ -100,7 +101,7 @@ def test_hour(df_datetime):
     assert_result_equal(
         df_datetime,
         lambda t: t >> mutate(z=t.cdate.dt.hour()),
-        exception=TypeError,
+        exception=DataTypeError,
     )
 
 

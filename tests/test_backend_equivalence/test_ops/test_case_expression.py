@@ -3,7 +3,7 @@
 
 import pydiverse.transform as pdt
 from pydiverse.transform import C
-from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.errors import DataTypeError, FunctionTypeError
 from pydiverse.transform._internal.pipe.verbs import (
     group_by,
     mutate,
@@ -135,7 +135,7 @@ def test_invalid_value_dtype(df4):
                 }
             )
         ),
-        exception=TypeError,
+        exception=DataTypeError,
     )
 
 
