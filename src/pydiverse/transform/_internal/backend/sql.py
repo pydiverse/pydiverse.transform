@@ -40,6 +40,10 @@ from pydiverse.transform._internal.tree.col_expr import (
 )
 from pydiverse.transform._internal.util.warnings import warn
 
+from . import sqlalchemy_fixes
+
+_ = sqlalchemy_fixes
+
 
 @dataclasses.dataclass(slots=True)
 class Query:
