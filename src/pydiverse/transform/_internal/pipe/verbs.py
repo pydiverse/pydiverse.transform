@@ -26,7 +26,12 @@ from pydiverse.transform._internal.backend.targets import (
     Scalar,
     Target,
 )
-from pydiverse.transform._internal.errors import ColumnNotFoundError, FunctionTypeError
+from pydiverse.transform._internal.errors import (
+    ColumnNotFoundError,
+    DataTypeError,
+    ErrorWithSource,
+    FunctionTypeError,
+)
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.pipe.pipeable import (
@@ -44,6 +49,7 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColName,
     LiteralCol,
     Order,
+    get_ast_path_str,
     wrap_literal,
 )
 from pydiverse.transform._internal.tree.verbs import (
@@ -646,9 +652,16 @@ def mutate(table: Table, **kwargs: ColExpr) -> Pipeable:
     names, values = list(kwargs.keys()), list(kwargs.values())
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
-    new._ast = Mutate(
-        table._ast, names, [preprocess_arg(val, table) for val in values], uuids
-    )
+    preprocessed = []
+    for name, val in zip(names, values, strict=True):
+        try:
+            preprocessed.append(preprocess_arg(val, table))
+        except ErrorWithSource as e:
+            raise type(e)(
+                e.args[0] + f"\noccurred in `mutate` argument `{name}`\n"
+                f"AST path to error source: {get_ast_path_str(val, e.source)}"
+            ) from e
+    new._ast = Mutate(table._ast, names, preprocessed, uuids)
 
     return new
 
@@ -682,16 +695,26 @@ def filter(table: Table, *predicates: ColExpr[Bool]) -> Pipeable:
     └─────┴─────┘
     """
     new = copy.copy(table)
-    new._ast = Filter(table._ast, [preprocess_arg(pred, table) for pred in predicates])
+    preprocessed = []
+    for i, pred in enumerate(predicates):
+        try:
+            preprocessed.append(preprocess_arg(pred, table))
+        except ErrorWithSource as e:
+            raise type(e)(
+                e.args[0] + f"\noccurred in {i}-{ordinal_suffix(i)} `filter` argument\n"
+                f"AST path to error source: {get_ast_path_str(pred, e.source)}"
+            ) from e
+
+    new._ast = Filter(table._ast, preprocessed)
 
     for cond in new._ast.predicates:
         if not types.without_const(cond.dtype()) == Bool():
-            raise TypeError(
+            raise DataTypeError(
                 "predicates given to `filter` must be of boolean type.\n"
                 f"hint: {cond} is of type {cond.dtype()} instead."
             )
 
-        for fn in cond.iter_subtree():
+        for fn in cond.iter_subtree_postorder():
             if isinstance(fn, ColFn) and fn.op.ftype in (
                 Ftype.WINDOW,
                 Ftype.AGGREGATE,
@@ -763,10 +786,19 @@ def arrange(table: Table, by: ColExpr, *more_by: ColExpr) -> Pipeable:
 
     order_by = [ColName(col) if isinstance(col, str) else col for col in (by, *more_by)]
     new = copy.copy(table)
-    new._ast = Arrange(
-        table._ast,
-        [preprocess_arg(Order.from_col_expr(ord), table) for ord in order_by],
-    )
+
+    preprocessed = []
+    for i, ord in enumerate(order_by):
+        try:
+            preprocessed.append(preprocess_arg(Order.from_col_expr(ord), table))
+        except ErrorWithSource as e:
+            raise type(e)(
+                e.args[0]
+                + f"\noccurred in {i}-{ordinal_suffix(i)} `arrange` argument\n"
+                f"AST path to error source: {get_ast_path_str(ord, e.source)}"
+            ) from e
+
+    new._ast = Arrange(table._ast, preprocessed)
 
     return new
 
@@ -919,12 +951,16 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     uuids = [uuid.uuid1() for _ in names]
     new = copy.copy(table)
 
-    new._ast = Summarize(
-        table._ast,
-        names,
-        [preprocess_arg(val, table, agg_is_window=False) for val in values],
-        uuids,
-    )
+    preprocessed = []
+    for name, val in zip(names, values, strict=True):
+        try:
+            preprocessed.append(preprocess_arg(val, table))
+        except ErrorWithSource as e:
+            raise type(e)(
+                e.args[0] + f"\noccurred in `summarize` argument `{name}`\n"
+                f"AST path to error source: {get_ast_path_str(val, e.source)}"
+            ) from e
+    new._ast = Summarize(table._ast, names, preprocessed, uuids)
 
     partition_by = set(table._cache.partition_by)
 
@@ -1181,11 +1217,20 @@ def join(
     on = [left[expr] == right[expr] if isinstance(expr, str) else expr for expr in on]
 
     on = [pred.map_subtree(_preprocess_on) for pred in on]
-    for pred in on:
-        if types.without_const(pred.dtype()) != Bool():
-            raise TypeError(
-                "predicates in `on` must have boolean type, found "
-                f"`{pred.dtype()}` instead"
+    for i, pred in enumerate(on):
+        try:
+            dtype = pred.dtype()
+            pred.ftype(agg_is_window=False)
+        except ErrorWithSource as e:
+            raise type(e)(
+                e.args[0] + f"\noccurred in {i}-{ordinal_suffix(i)} element of `on`\n"
+                f"AST path to error source: {get_ast_path_str(pred, e.source)}"
+            ) from e
+
+        if types.without_const(dtype) != Bool():
+            raise DataTypeError(
+                f"{i}-{ordinal_suffix(i)} element of `on` has type `{pred.dtype()}`, "
+                "but join conditions must have boolean type"
             )
 
     # apply `rename` to the right table if necessary
@@ -1244,14 +1289,13 @@ def join(
     if how == "full" and not all(pred.op == ops.equal for pred in split_join_cond(on)):
         raise ValueError("in a `full` join, only equality predicates can be used")
 
-    for fn in on.iter_subtree():
+    for fn in on.iter_subtree_postorder():
         if isinstance(fn, ColFn) and fn.op.ftype != Ftype.ELEMENT_WISE:
             raise FunctionTypeError(
                 f"window function `{fn.op.name}` not allowed in `on`\n"
                 "hint: First add the result of the window function to the table using "
                 "`mutate`."
             )
-    on.ftype(agg_is_window=False)
 
     new = copy.copy(left)
     new._ast = Join(left._ast, right._ast, on, how, validate)
@@ -1496,3 +1540,7 @@ def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) ->
     res.dtype()
     res.ftype(agg_is_window=agg_is_window)
     return res
+
+
+def ordinal_suffix(n: int):
+    return {1: "st", 2: "nd"}.get(n % 10, "th")

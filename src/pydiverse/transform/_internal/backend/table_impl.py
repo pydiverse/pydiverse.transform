@@ -175,7 +175,7 @@ def get_left_right_on(
         right_on.append(pred.args[1])
 
         must_swap_cols = None
-        for e in pred.args[0].iter_subtree():
+        for e in pred.args[0].iter_subtree_postorder():
             if isinstance(e, Col):
                 must_swap_cols = e._uuid in right_uuids
                 assert must_swap_cols or e._uuid in left_uuids

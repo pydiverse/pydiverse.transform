@@ -10,6 +10,7 @@ import functools
 import itertools
 import operator
 import re
+import uuid
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta
 from typing import Any, Generic, TypeVar, overload
@@ -33,7 +34,10 @@ from pydiverse.common import (
 )
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
-from pydiverse.transform._internal.errors import FunctionTypeError
+from pydiverse.transform._internal.errors import (
+    DataTypeError,
+    FunctionTypeError,
+)
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype, Operator
 from pydiverse.transform._internal.ops.ops.markers import Marker
@@ -187,10 +191,15 @@ class ColExpr(Generic[T]):
 
     # yields all ColExpr`s appearing in the subtree of `self`. Python builtin types
     # and `Order` expressions are not yielded.
-    def iter_subtree(self) -> Iterable[ColExpr]:
+    def iter_subtree_postorder(self) -> Iterable[ColExpr]:
         for node in self.iter_children():
-            yield from node.iter_subtree()
+            yield from node.iter_subtree_postorder()
         yield self
+
+    def iter_subtree_preorder(self) -> Iterable[ColExpr]:
+        yield self
+        for node in self.iter_children():
+            yield from node.iter_subtree_preorder()
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
         return g(self)
@@ -201,7 +210,7 @@ class ColExpr(Generic[T]):
         errors.check_arg_type(Table, "ColExpr.uses_table", "table", table)
         return any(
             any(node == table._ast for node in col._ast.iter_subtree_postorder())
-            for col in self.iter_subtree()
+            for col in self.iter_subtree_postorder()
             if isinstance(col, Col)
         )
 
@@ -2273,6 +2282,9 @@ class ColFn(ColExpr):
             wrap_literal(arg, allow_markers=True) for arg in args
         ]
         self.context_kwargs = clean_kwargs(**kwargs)
+        # An id to recognize the expression also after copying / preprocessing. Useful
+        # to give precise error messages.
+        self._fn_id = uuid.uuid1()
 
         # TODO: probably it is faster and produces nicer SQL code if we put this in
         # WITHIN GROUP for aggregation functions. On polars use col.filter().
@@ -2331,6 +2343,13 @@ class ColFn(ColExpr):
             return None
 
         self._dtype = self.op.return_type(arg_dtypes)
+        if self._dtype is None:
+            raise DataTypeError(
+                f"operator `{self.op.name}` cannot be called with arguments of type "
+                f"{', '.join(str(t) for t in arg_dtypes)}",
+                source=self._fn_id,
+            )
+
         if self.op.ftype == Ftype.ELEMENT_WISE and all(
             types.is_const(argt)
             for argt in itertools.chain(arg_dtypes, context_kwarg_dtypes)
@@ -2378,7 +2397,7 @@ class ColFn(ColExpr):
             self._ftype = actual_ftype
 
             # kick out nested window / aggregation functions
-            for node in self.iter_subtree():
+            for node in self.iter_subtree_postorder():
                 if (
                     node is not self
                     and isinstance(node, ColFn)
@@ -2396,7 +2415,8 @@ class ColFn(ColExpr):
                         f"inside {ftype_string[self._ftype]} function `{self.op.name}`"
                         ".\nnote: There may be at most one window / aggregation "
                         "function in a column expression on any path from the root to "
-                        "a leaf."
+                        "a leaf.",
+                        source=self._fn_id,
                     )
 
         return self._ftype
@@ -2421,6 +2441,7 @@ class CaseExpr(ColExpr):
         default_val: ColExpr | None = None,
     ):
         self.cases = list(cases)
+        self._fn_id = uuid.uuid1()
 
         # We distinguish `None` and `LiteralCol(None)` as a `default_val`. The first one
         # signals that the user has not yet set a default value, the second one
@@ -2469,9 +2490,10 @@ class CaseExpr(ColExpr):
                 cond.dtype() is not None
                 and not types.without_const(cond.dtype()) == types.Bool()
             ):
-                raise TypeError(
-                    f"argument \n``{cond.ast_repr()}``\n for `when` must be of boolean "
-                    f"type, but has type `{cond.dtype()}`"
+                raise DataTypeError(
+                    f"argument `{cond.ast_repr()}` for `when` must be of boolean "
+                    f"type, but has type `{cond.dtype()}`",
+                    source=self._fn_id,
                 )
 
         val_types = [val.dtype() for _, val in self.cases]
@@ -2529,7 +2551,8 @@ class CaseExpr(ColExpr):
             raise FunctionTypeError(
                 "incompatible function types found in case statement: , ".join(
                     val_ftypes
-                )
+                ),
+                source=self._fn_id,
             )
 
         return self._ftype
@@ -2542,7 +2565,7 @@ class CaseExpr(ColExpr):
         if condition.dtype() is not None and not isinstance(
             condition.dtype(), types.Bool
         ):
-            raise TypeError(
+            raise DataTypeError(
                 "argument for `when` must be of boolean type, but has type "
                 f"`{condition.dtype()}`"
             )
@@ -2565,6 +2588,7 @@ class Cast(ColExpr):
         self.val = val
         self.target_type = copy.copy(target_type)
         self.strict = strict
+        self._fn_id = uuid.uuid1()
         super().__init__(copy.copy(target_type))
         self.dtype()
 
@@ -2630,7 +2654,8 @@ class Cast(ColExpr):
                     )
 
                 raise TypeError(
-                    f"cannot cast type {self.val.dtype()} to {self.target_type}.{hint}"
+                    f"cannot cast type {self.val.dtype()} to {self.target_type}.{hint}",
+                    source=self._fn_id,
                 )
 
         if types.is_const(self.val.dtype()):
@@ -2649,7 +2674,9 @@ class Cast(ColExpr):
         yield self.val
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        return g(Cast(self.val.map_subtree(g), self.target_type, strict=self.strict))
+        new = copy.copy(self)
+        new.val = self.val.map_subtree(g)
+        return g(new)
 
 
 @dataclasses.dataclass(slots=True)
@@ -2712,13 +2739,15 @@ class Order:
         return self.order_by.ftype(agg_is_window=agg_is_window)
 
     def iter_subtree(self) -> Iterable[ColExpr]:
-        yield from self.order_by.iter_subtree()
+        yield from self.order_by.iter_subtree_postorder()
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from self.order_by.iter_children()
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> Order:
-        return Order(self.order_by.map_subtree(g), self.descending, self.nulls_last)
+        new = copy.copy(self)
+        new.order_by = self.order_by.map_subtree(g)
+        return new
 
 
 def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
@@ -2776,7 +2805,7 @@ def get_expr_as_table(expr: ColExpr):
     from pydiverse.transform._internal.pipe.table import Table
     from pydiverse.transform._internal.pipe.verbs import mutate, select
 
-    cols = [col for col in expr.iter_subtree() if isinstance(col, Col)]
+    cols = [col for col in expr.iter_subtree_postorder() if isinstance(col, Col)]
     # We need one column whose AST is an ancestor of all other columns' ASTs.
     # The following could be done in linear time.
     subtrees = [set(col._ast.iter_subtree_postorder()) for col in cols]
@@ -2803,7 +2832,28 @@ def get_expr_as_table(expr: ColExpr):
     if isinstance(expr, Col):
         name = expr.name
     tbl = Table(cols[ancestor_index]._ast, name=name)
-    col_name = "_unnamed_expr_"
+    col_name = "_unnamed_expr_"  # TODO?
     if isinstance(expr, Col):
         col_name = expr.name
     return tbl >> mutate(**{col_name: expr}) >> select(col_name)
+
+
+# This is used when an exception in `dtype` or `ftype` is raised. If some C-columns
+# are used in the expression the data and function type can only be computed after C-
+# column resolution, hence the python stack trace does not directly point to the source
+# of the exception. To help the user find the error, we print the path of the root of
+# the AST to the source of the exception.
+def get_ast_path_str(tree_root: ColExpr, fn_id: UUID) -> str:
+    preorder_traversal = []
+    for node in tree_root.iter_subtree_preorder():
+        preorder_traversal.append(node)
+        # We have to do this marker magic since the id of the node may have changed
+        # since the exception was thrown.
+        if hasattr(node, "_fn_id") and node._fn_id == fn_id:
+            break
+    path = [preorder_traversal[-1]]
+    for node in reversed(preorder_traversal):
+        if any(nd is path[-1] for nd in node.iter_children()):
+            path.append(node)
+
+    return "  --->  ".join(nd.ast_repr(depth=0) for nd in reversed(path))

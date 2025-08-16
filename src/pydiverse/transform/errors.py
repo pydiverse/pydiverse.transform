@@ -3,6 +3,7 @@
 
 from ._internal.errors import (
     ColumnNotFoundError,
+    DataTypeError,
     FunctionTypeError,
     NotSupportedError,
     SubqueryError,
@@ -10,6 +11,7 @@ from ._internal.errors import (
 
 __all__ = [
     "SubqueryError",
+    "DataTypeError",
     "FunctionTypeError",
     "NotSupportedError",
     "ColumnNotFoundError",

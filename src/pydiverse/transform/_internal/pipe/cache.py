@@ -233,7 +233,7 @@ class Cache:
         if isinstance(node, verbs.Mutate) and any(
             any(
                 col.ftype(agg_is_window=True) in (Ftype.WINDOW, Ftype.AGGREGATE)
-                for col in fn.iter_subtree()
+                for col in fn.iter_subtree_postorder()
                 if isinstance(col, Col)
             )
             for fn in node.iter_col_nodes()
@@ -283,7 +283,7 @@ class Cache:
 
             if any(
                 col.ftype() != Ftype.ELEMENT_WISE and col._uuid in self.cols
-                for col in node.on.iter_subtree()
+                for col in node.on.iter_subtree_postorder()
                 if isinstance(col, Col)
             ):
                 return "window / aggregation functions in join condition"

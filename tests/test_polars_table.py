@@ -7,7 +7,7 @@ import polars as pl
 import pytest
 
 import pydiverse.transform as pdt
-from pydiverse.transform._internal.errors import ColumnNotFoundError
+from pydiverse.transform._internal.errors import ColumnNotFoundError, DataTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_equal
 
@@ -122,7 +122,7 @@ class TestPolarsLazyImpl:
         assert isinstance(tbl2.col3.dtype(), pdt.Float64)
 
         # test that column expression type errors are checked immediately
-        with pytest.raises(TypeError):
+        with pytest.raises(DataTypeError):
             tbl1.col1 + tbl1.col2
 
         # here, transform should not be able to resolve the type and throw an error
@@ -816,3 +816,9 @@ class TestPrintAndRepr:
             "default=__eq__(__mod__(df4.col3, 2), 0)) -> df4.col1), "
             "partition_by=[df4.col2, df4.col3])"
         )
+
+    def test_error_source_ptr(self, tbl1):
+        with pytest.raises(DataTypeError):
+            tbl1 >> mutate(
+                z=(2 * (tbl1.col1 + C.col2) - tbl1.col1.exp()) * tbl1.col1.acos()
+            )

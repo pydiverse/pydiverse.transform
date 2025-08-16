@@ -55,7 +55,7 @@ class Verb(AstNode):
 
     def iter_col_nodes(self) -> Iterable[ColExpr]:
         for col in self.iter_col_roots():
-            yield from col.iter_subtree()
+            yield from col.iter_subtree_postorder()
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]): ...
 
