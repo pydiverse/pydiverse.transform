@@ -2394,7 +2394,7 @@ class ColFn(ColExpr):
                     raise FunctionTypeError(
                         f"{ftype_string[desc_ftype]} function `{node.op.name}` nested "
                         f"inside {ftype_string[self._ftype]} function `{self.op.name}`"
-                        ".\nhint: There may be at most one window / aggregation "
+                        ".\nnote: There may be at most one window / aggregation "
                         "function in a column expression on any path from the root to "
                         "a leaf."
                     )
@@ -2787,9 +2787,14 @@ def get_expr_as_table(expr: ColExpr):
             break
 
     if ancestor_index is None:
+        c, d = next(
+            (c, d)
+            for (i, c), (j, d) in itertools.product(enumerate(cols), enumerate(cols))
+            if c._ast not in subtrees[j] and d._ast not in subtrees[i]
+        )
         raise ValueError(
             "column expression cannot be exported, since no common ancestor table "
-            "was found\n"
+            f"between the columns `{c.ast_repr()}` and `{d.ast_repr()}` was found\n"
             "hint: To export a column expression, it must contain one column whose "
             "table contains all other columns."
         )
