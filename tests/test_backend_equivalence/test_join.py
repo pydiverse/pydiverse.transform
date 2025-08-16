@@ -38,6 +38,34 @@ def test_join(df1, df2, how):
 
     assert_result_equal(
         (df1, df2),
+        lambda t, u: u
+        >> join(
+            s := t >> left_join(u, on=t.col1 == u.col2) >> alias("b"),
+            on=s.col1 == u.col1,
+            how=how,
+        ),
+    )
+
+    assert_result_equal(
+        df1,
+        lambda t: t
+        >> left_join(
+            r := t
+            >> left_join(s := t >> alias("s"), on=t.col1 == s.col1)
+            >> alias("r"),
+            on=t.col1 == r.col1,
+        ),
+    )
+
+    assert_result_equal(
+        df1,
+        lambda t: t
+        >> left_join(s := t >> alias("s"), on=t.col1 == s.col1)
+        >> left_join(r := t >> alias("r"), on=t.col1 == r.col1),
+    )
+
+    assert_result_equal(
+        (df1, df2),
         lambda t, u: t
         >> join(u, (t.col1 == u.col1) & (t.col1 == u.col2), how=how)
         >> mutate(l=t.col2.str.len())
