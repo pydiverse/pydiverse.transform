@@ -2254,6 +2254,9 @@ class ColName(ColExpr):
     def ast_repr(self, depth: int = -1) -> str:
         return f"C.{self.name}"
 
+    def __repr__(self) -> str:
+        return self.ast_repr()
+
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any, dtype: Dtype | None = None):
@@ -2840,7 +2843,16 @@ def get_expr_as_table(expr: ColExpr):
     if isinstance(expr, Col):
         name = expr.name
     tbl = Table(cols[ancestor_index]._ast, name=name)
-    col_name = "_unnamed_expr_"  # TODO?
+
+    # check that all C-columns are in the common ancestor
+    for col in expr.iter_subtree_postorder():
+        if isinstance(col, ColName) and col not in tbl:
+            raise ValueError(
+                f"column expression cannot be exported since the C-column `{col}` is "
+                "not contained in the table"
+            )
+
+    col_name = expr.ast_repr(depth=0)
     if isinstance(expr, Col):
         col_name = expr.name
     return tbl >> mutate(**{col_name: expr}) >> select(col_name)

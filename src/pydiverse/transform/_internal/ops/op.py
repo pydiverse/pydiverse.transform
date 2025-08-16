@@ -97,6 +97,9 @@ class Operator:
         self.default_values = default_values
         self.doc = doc
 
+    def __repr__(self) -> str:
+        return f"Operator `{self.name}`"
+
     # The return type of the operator given certain input types, or `None` if the
     # input signature is invalid.
     def return_type(self, signature: Sequence[Dtype]) -> Dtype | None:
