@@ -849,9 +849,19 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.shift)
     def _shift(x, by, empty_value=None):
         if by >= 0:
-            return sqa.func.LAG(x, by, empty_value, type_=x.type)
+            if empty_value is not None and not isinstance(
+                empty_value.type, sqa.types.NullType
+            ):
+                return sqa.func.LAG(x, by, empty_value, type_=x.type)
+            else:
+                return sqa.func.LAG(x, by, type_=x.type)
         if by < 0:
-            return sqa.func.LEAD(x, -by, empty_value, type_=x.type)
+            if empty_value is not None and not isinstance(
+                empty_value.type, sqa.types.NullType
+            ):
+                return sqa.func.LEAD(x, -by, empty_value, type_=x.type)
+            else:
+                return sqa.func.LEAD(x, -by, type_=x.type)
 
     @impl(ops.row_number)
     def _row_number():

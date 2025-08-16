@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 import polars as pl
-import sqlalchemy as sa
+import sqlalchemy as sqa
 
 from pydiverse.transform._internal.backend.targets import SqlAlchemy
 from pydiverse.transform._internal.pipe.table import Table
@@ -136,11 +136,11 @@ def ibm_db2_table(df: pl.DataFrame, name: str):
         if dtype == pl.String:
             max_length = df[col].str.len_chars().max()
             if max_length > 32_672:
-                map[col] = sa.CLOB()
+                map[col] = sqa.CLOB()
             elif max_length > 256:
-                map[col] = sa.VARCHAR(32_672)
+                map[col] = sqa.VARCHAR(32_672)
             else:
-                map[col] = sa.VARCHAR(256)
+                map[col] = sqa.VARCHAR(256)
 
     return sql_table(df, name, url, sql_dtypes=map)
 
