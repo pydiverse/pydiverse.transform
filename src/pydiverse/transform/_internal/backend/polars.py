@@ -24,6 +24,7 @@ from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
+    AlignedCol,
     CaseExpr,
     Cast,
     Col,
@@ -249,8 +250,10 @@ def compile_col_expr(
 
         return compiled
 
-    else:
-        raise AssertionError
+    elif isinstance(expr, AlignedCol):
+        return expr.data
+
+    raise AssertionError
 
 
 def rename_overwritten_cols(

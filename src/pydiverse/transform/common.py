@@ -11,6 +11,7 @@ from ._internal.backend.targets import (
     Scalar,
     SqlAlchemy,
 )
+from ._internal.pipe.aligned import aligned
 from ._internal.pipe.pipeable import verb
 from ._internal.pipe.verbs import (
     arrange,
@@ -35,6 +36,7 @@ from .base import __all__ as __base
 
 __all__ = __base + [
     "verb",
+    "aligned",
     "arrange",
     "ast_repr",
     "drop",

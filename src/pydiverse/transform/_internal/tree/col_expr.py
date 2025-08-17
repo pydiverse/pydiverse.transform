@@ -2687,6 +2687,14 @@ class Cast(ColExpr):
         return g(new)
 
 
+class AlignedCol(ColExpr):
+    def __init__(self, data: pl.Series, with_):
+        self.data = data
+        self.with_ = with_
+        self._dtype = Dtype.from_polars(data.dtype)
+        self._ftype = Ftype.ELEMENT_WISE
+
+
 @dataclasses.dataclass(slots=True)
 class Order:
     order_by: ColExpr
