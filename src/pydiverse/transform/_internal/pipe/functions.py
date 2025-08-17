@@ -28,12 +28,12 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColName,
     LiteralCol,
     WhenClause,
-    wrap_literal,
+    wrap_literals,
 )
 
 
 def when(condition: ColExpr) -> WhenClause:
-    condition = wrap_literal(condition)
+    condition = wrap_literals(condition)
     if (
         condition.dtype() is not None
         and not types.without_const(condition.dtype()) == Bool()
@@ -43,7 +43,7 @@ def when(condition: ColExpr) -> WhenClause:
             f"`{condition.dtype()}`"
         )
 
-    return WhenClause([], wrap_literal(condition))
+    return WhenClause([], wrap_literals(condition))
 
 
 def lit(val: Any, dtype: Dtype | type[Dtype] | None = None) -> LiteralCol:

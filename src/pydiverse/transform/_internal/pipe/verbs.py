@@ -47,10 +47,12 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColExpr,
     ColFn,
     ColName,
+    EvalAligned,
     LiteralCol,
     Order,
+    Series,
     get_ast_path_str,
-    wrap_literal,
+    wrap_literals,
 )
 from pydiverse.transform._internal.tree.verbs import (
     Alias,
@@ -1504,14 +1506,25 @@ def ast_repr(
 
 
 def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) -> Any:
-    arg = wrap_literal(arg)
+    arg = wrap_literals(arg)
     assert isinstance(arg, ColExpr | Order)
 
-    def _preprocess_expr(expr: ColExpr):
-        if isinstance(expr, Col) and expr._uuid not in table._cache.cols:
+    def _preprocess_expr(expr: ColExpr, eval_aligned: bool = False):
+        if (
+            isinstance(expr, Col)
+            and expr._uuid not in table._cache.cols
+            and not eval_aligned
+        ):
             raise ColumnNotFoundError(
                 f"column `{expr.ast_repr()}` does not exist in table "
                 f"`{table._ast.name}`"
+            )
+
+        if not eval_aligned and isinstance(expr, Series):
+            raise TypeError(
+                f"invalid use of series `{expr.ast_repr()}` in a column expression"
+                "\nnote: polars / pandas series must be wrapped in `eval_aligned` for "
+                "use in pydiverse.transform"
             )
 
         if (
@@ -1524,25 +1537,33 @@ def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) ->
                 table._cache.cols[uid] for uid in table._cache.partition_by
             ]
 
+        if isinstance(expr, ColName):
+            return table[expr.name]
+
+        new = copy.copy(expr)
+        new.map_children(
+            functools.partial(
+                _preprocess_expr,
+                eval_aligned=eval_aligned | isinstance(expr, EvalAligned),
+            )
+        )
+
         # add casts for boolean add / sum
         # If we have more operations like these, which we want to map to other
         # operations on the AST, consider streamlining this in some special function
         if (
-            isinstance(expr, ColFn)
-            and len(expr.args) > 0
-            and types.without_const(expr.args[0].dtype()) == Bool()
-            and expr.op in (ops.add, ops.sum)
+            isinstance(new, ColFn)
+            and len(new.args) > 0
+            and types.without_const(new.args[0].dtype()) == Bool()
+            and new.op in (ops.add, ops.sum)
         ):
-            expr.args = [arg.cast(Int64) for arg in expr.args]
+            new.args = [arg.cast(Int64) for arg in new.args]
 
-        if isinstance(expr, ColName):
-            return table[expr.name]
+        return new
 
-        return expr
-
-    res = arg.map_subtree(_preprocess_expr)
-    res.dtype()
-    res.ftype(agg_is_window=agg_is_window)
+    res = _preprocess_expr(arg)
+    assert res.dtype() is not None
+    assert res.ftype(agg_is_window=agg_is_window) is not None
     return res
 
 

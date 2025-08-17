@@ -202,7 +202,11 @@ class ColExpr(Generic[T]):
             yield from node.iter_subtree_preorder()
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        return g(self)
+        new = copy.copy(self)
+        new.map_children(functools.partial(ColExpr.map_subtree, g=g))
+        return g(new)
+
+    def map_children(self, g: Callable[[ColExpr], ColExpr]): ...
 
     def uses_table(self, table) -> bool:
         from pydiverse.transform._internal.pipe.table import Table
@@ -273,16 +277,16 @@ class ColExpr(Generic[T]):
                 (
                     self.is_in(
                         *(
-                            (wrap_literal(elem) for elem in key)
+                            (wrap_literals(elem) for elem in key)
                             if isinstance(key, Iterable)
-                            else (wrap_literal(key),)
+                            else (wrap_literals(key),)
                         ),
                     ),
-                    wrap_literal(val),
+                    wrap_literals(val),
                 )
                 for key, val in mapping.items()
             ),
-            wrap_literal(default) if default is not None else self,
+            wrap_literals(default) if default is not None else self,
         )
 
     def cast(self, target_type: Dtype | type, *, strict: bool = True) -> Cast:
@@ -2282,7 +2286,7 @@ class ColFn(ColExpr):
         self.op = op
         # While building the expression tree, we have to allow markers.
         self.args: list[ColExpr] = [
-            wrap_literal(arg, allow_markers=True) for arg in args
+            wrap_literals(arg, allow_markers=True) for arg in args
         ]
         self.context_kwargs = clean_kwargs(**kwargs)
 
@@ -2322,15 +2326,11 @@ class ColFn(ColExpr):
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
 
-    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        new_fn = copy.copy(self)
-        new_fn.args = [arg.map_subtree(g) for arg in self.args]
-
-        new_fn.context_kwargs = {
-            key: [val.map_subtree(g) for val in arr]
-            for key, arr in self.context_kwargs.items()
+    def map_children(self, g: Callable[[ColExpr], ColExpr]):
+        self.args = [g(arg) for arg in self.args]
+        self.context_kwargs = {
+            key: [g(val) for val in arr] for key, arr in self.context_kwargs.items()
         }
-        return g(new_fn)
 
     def dtype(self) -> Dtype:
         if self._dtype is not None:
@@ -2432,7 +2432,7 @@ class WhenClause:
     cond: ColExpr
 
     def then(self, value: ColExpr) -> CaseExpr:
-        return CaseExpr((*self.cases, (self.cond, wrap_literal(value))))
+        return CaseExpr((*self.cases, (self.cond, wrap_literals(value))))
 
     def __repr__(self) -> str:
         return f"when({self.cond})"
@@ -2475,15 +2475,9 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             yield self.default_val
 
-    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        new_case_expr = copy.copy(self)
-        new_case_expr.cases = [
-            (cond.map_subtree(g), val.map_subtree(g)) for cond, val in self.cases
-        ]
-        new_case_expr.default_val = (
-            self.default_val.map_subtree(g) if self.default_val is not None else None
-        )
-        return g(new_case_expr)
+    def map_children(self, g: Callable[[ColExpr], ColExpr]):
+        self.cases = [(g(cond), g(val)) for cond, val in self.cases]
+        self.default_val = g(self.default_val) if self.default_val is not None else None
 
     def dtype(self):
         if self._dtype is not None:
@@ -2569,7 +2563,7 @@ class CaseExpr(ColExpr):
         if self.default_val is not None:
             raise TypeError("cannot call `when` on a closed case expression after")
 
-        condition = wrap_literal(condition)
+        condition = wrap_literals(condition)
         if condition.dtype() is not None and not isinstance(
             condition.dtype(), types.Bool
         ):
@@ -2578,12 +2572,12 @@ class CaseExpr(ColExpr):
                 f"`{condition.dtype()}`"
             )
 
-        return WhenClause(self.cases, wrap_literal(condition))
+        return WhenClause(self.cases, wrap_literals(condition))
 
     def otherwise(self, value: ColExpr) -> CaseExpr:
         if self.default_val is not None:
             raise TypeError("default value is already set on this case expression")
-        return CaseExpr(self.cases, wrap_literal(value))
+        return CaseExpr(self.cases, wrap_literals(value))
 
 
 class Cast(ColExpr):
@@ -2638,7 +2632,7 @@ class Cast(ColExpr):
             return True
         return (source, target) in VALID_CASTS
 
-    def dtype(self) -> Dtype:
+    def dtype(self) -> Dtype | None:
         # Since `ColExpr.dtype` is also responsible for type checking, we may not set
         # `_dtype` until we are able to retrieve the type of `val`.
         if self.val.dtype() is None:
@@ -2675,26 +2669,58 @@ class Cast(ColExpr):
             return "cast(...)"
         return f"cast({self.val.ast_repr(depth - 1)}, {self.target_type})"
 
-    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
-        return self.val.ftype(agg_is_window=agg_is_window)
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype | None:
+        if self._ftype is None:
+            self._ftype = self.val.ftype(agg_is_window=agg_is_window)
+        return self._ftype
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield self.val
 
-    def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> ColExpr:
-        new = copy.copy(self)
-        new.val = self.val.map_subtree(g)
-        return g(new)
+    def map_children(self, g: Callable[[ColExpr], ColExpr]):
+        self.val = g(self.val)
 
 
-class AlignedCol(ColExpr):
-    def __init__(self, data: pl.Series, with_):
-        self.data = data
-        self.with_ = with_
-        self._dtype = Dtype.from_polars(data.dtype)
+class Series(ColExpr):
+    def __init__(self, val: pl.Series | pd.Series):
+        if isinstance(val, pd.Series):
+            val = pl.Series(val.name, val)  # TODO: arrow?
+        self.val = val
+        self._dtype = Dtype.from_polars(val.dtype)
         self._ftype = Ftype.ELEMENT_WISE
 
+    def ast_repr(self, depth: int = -1) -> str:
+        return f"Series('{self.val.name}')"
 
+
+class EvalAligned(ColExpr):
+    def __init__(self, val: ColExpr | pl.Series, with_):
+        self.val: ColExpr = wrap_literals(val)
+        self.with_ = with_
+        self._dtype = self.val.dtype()
+        self._ftype = self.val.ftype()
+
+    def dtype(self) -> Dtype | None:
+        if self._dtype is None:
+            self._dtype = self.val.dtype()
+        return self._dtype
+
+    def ftype(self, *, agg_is_window: bool | None = None) -> Ftype | None:
+        if self._ftype is None:
+            self._ftype = self.val.ftype(agg_is_window=agg_is_window)
+        return self._ftype
+
+    def iter_children(self):
+        return self.val.iter_children()
+
+    def map_children(self, g):
+        self.val = g(self.val)
+
+    def ast_repr(self, depth: int = -1) -> str:
+        return f"eval_aligned({self.val.ast_repr(depth)})"
+
+
+# TODO: maybe it would simplify things if we made this a subclass of ColExpr
 @dataclasses.dataclass(slots=True)
 class Order:
     order_by: ColExpr
@@ -2765,11 +2791,14 @@ class Order:
 
     def map_subtree(self, g: Callable[[ColExpr], ColExpr]) -> Order:
         new = copy.copy(self)
-        new.order_by = self.order_by.map_subtree(g)
+        new.map_children(functools.partial(ColExpr.map_subtree, g=g))
         return new
 
+    def map_children(self, g: Callable[[ColExpr], ColExpr]):
+        self.order_by = g(self.order_by)
 
-def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
+
+def wrap_literals(expr: Any, *, allow_markers=False) -> Any:
     if isinstance(expr, ColExpr | Order):
         if isinstance(expr, ColFn) and (
             (isinstance(expr.op, Marker) and not allow_markers)
@@ -2795,6 +2824,9 @@ def wrap_literal(expr: Any, *, allow_markers=False) -> Any:
             )
         return expr
 
+    elif isinstance(expr, pl.Series | pd.Series):
+        return Series(expr)
+
     else:
         return LiteralCol(expr)
 
@@ -2816,7 +2848,7 @@ def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
             Order.from_col_expr(ColName(ord) if isinstance(ord, str) else ord)
             for ord in arrange
         ]
-    return {key: [wrap_literal(val) for val in arr] for key, arr in kwargs.items()}
+    return {key: [wrap_literals(val) for val in arr] for key, arr in kwargs.items()}
 
 
 # returns a table with the expression as the only column

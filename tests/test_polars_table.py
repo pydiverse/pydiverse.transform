@@ -747,14 +747,19 @@ class TestPolarsLazyImpl:
     def test_aligned(self, tbl4):
         assert_equal(
             tbl4,
-            tbl4 >> drop(tbl4.col1) >> mutate(col1=aligned(df4.get_column("col1"))),
+            tbl4
+            >> drop(tbl4.col1)
+            >> mutate(col1=eval_aligned(df4.get_column("col1"))),
         )
 
         s = pl.Series([1.2**i for i in range(df4.height)])
         assert_equal(
-            tbl4 >> filter(tbl4.col3 <= aligned(s, with_=tbl4)),
+            tbl4 >> filter(tbl4.col3 <= eval_aligned(s, with_=tbl4)),
             df4.filter(pl.col("col3") <= s),
         )
+
+        with pytest.raises(TypeError):
+            tbl4 >> arrange(s)
 
 
 class TestPrintAndRepr:

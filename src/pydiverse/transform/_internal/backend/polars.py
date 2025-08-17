@@ -24,14 +24,15 @@ from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
 from pydiverse.transform._internal.tree.ast import AstNode
 from pydiverse.transform._internal.tree.col_expr import (
-    AlignedCol,
     CaseExpr,
     Cast,
     Col,
     ColExpr,
     ColFn,
+    EvalAligned,
     LiteralCol,
     Order,
+    Series,
 )
 
 
@@ -250,8 +251,11 @@ def compile_col_expr(
 
         return compiled
 
-    elif isinstance(expr, AlignedCol):
-        return expr.data
+    elif isinstance(expr, EvalAligned):
+        return compile_col_expr(expr.val, name_in_df, op_kwargs)
+
+    elif isinstance(expr, Series):
+        return expr.val
 
     raise AssertionError
 
