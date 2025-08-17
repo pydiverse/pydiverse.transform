@@ -11,25 +11,31 @@ from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree.col_expr import ColExpr, EvalAligned
 
 
-def aligned(*, with_: str | None = None):
+def aligned(fn=None, *, with_: str | None = None):
     errors.check_arg_type(str | None, "aligned", "with_", with_)
 
     def decorator(fn):
         signature = inspect.signature(fn)
-        if with_ not in signature.parameters:
+        if with_ is not None and with_ not in signature.parameters:
             raise ValueError(
                 f"function `{fn.__name__}` has no argument named `{with_}`"
             )
 
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            bound_sig = signature.bind(*args, **kwargs)
-            bound_sig.apply_defaults()
-            with_obj = bound_sig.arguments[with_]
+            if with_ is not None:
+                bound_sig = signature.bind(*args, **kwargs)
+                bound_sig.apply_defaults()
+                with_obj = bound_sig.arguments[with_]
+            else:
+                with_obj = None
 
             return eval_aligned(fn(*args, **kwargs), with_=with_obj)
 
         return wrapper
+
+    if fn is not None:
+        return decorator(fn)
 
     return decorator
 

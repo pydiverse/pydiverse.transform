@@ -374,17 +374,6 @@ class ColExpr(Generic[T]):
             )
         return Cast(self, target_type, strict=strict)
 
-    def __rshift__(self, rhs):
-        from pydiverse.transform._internal.pipe.pipeable import Pipeable
-
-        if not isinstance(rhs, Pipeable):
-            raise TypeError(
-                "the right shift operator `>>` can only be applied to a column "
-                "expression if a verb is on the right"
-            )
-
-        return rhs(self)
-
     def rank(
         self: ColExpr,
         partition_by: Col | ColName | Iterable[Col | ColName] | None = None,
@@ -2684,7 +2673,7 @@ class Cast(ColExpr):
 class Series(ColExpr):
     def __init__(self, val: pl.Series | pd.Series):
         if isinstance(val, pd.Series):
-            val = pl.Series(val.name, val)  # TODO: arrow?
+            val = pl.from_pandas(val)
         self.val = val
         self._dtype = Dtype.from_polars(val.dtype)
         self._ftype = Ftype.ELEMENT_WISE

@@ -761,6 +761,30 @@ class TestPolarsLazyImpl:
         with pytest.raises(TypeError):
             tbl4 >> arrange(s)
 
+        # pandas series
+        s_pd = s.to_pandas()
+        assert_equal(
+            tbl4
+            >> mutate(z=eval_aligned(tbl4.col1 + s_pd))
+            >> group_by(tbl4.col3)
+            >> summarize(u=C.z.sum()),
+            df4.with_columns(z=pl.col("col1") + s)
+            .group_by("col3")
+            .agg(u=pl.col("z").sum()),
+            check_row_order=False,
+        )
+
+    def test_aligned_decorator(self, tbl3):
+        @aligned(with_="tbl")
+        def reverse_col(col: pdt.ColExpr, tbl: pdt.Table) -> pdt.ColExpr:
+            pl_col: pl.Series = col.export(Polars())
+            return pl_col.reverse()
+
+        assert_equal(
+            tbl3 >> mutate(r=reverse_col(tbl3.col1 + tbl3.col2, tbl3)),
+            df3.with_columns(r=(pl.col("col1") + pl.col("col2")).reverse()),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
