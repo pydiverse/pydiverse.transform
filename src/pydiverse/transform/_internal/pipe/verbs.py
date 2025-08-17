@@ -1446,11 +1446,15 @@ def name(table: Table) -> str | None:
 
 
 @overload
-def ast_repr(pipe: bool = False) -> Pipeable | None: ...
+def ast_repr(
+    verb_depth: int = -1, expr_depth: int = -1, pipe: bool = False
+) -> Pipeable | None: ...
 
 
 @verb
-def ast_repr(table: Table, pipe: bool = False) -> Pipeable | None:
+def ast_repr(
+    table: Table, verb_depth: int = 7, expr_depth: int = 2, *, pipe: bool = False
+) -> Pipeable | None:
     """
     Prints the AST of the table to stdout.
 
@@ -1495,7 +1499,7 @@ def ast_repr(table: Table, pipe: bool = False) -> Pipeable | None:
     PolarsImpl(name = t, df = <LazyFrame at 0x14D1F24B0>)
     """
 
-    print(repr(table._ast), end="")
+    print(table._ast.ast_repr(verb_depth, expr_depth), end="")
     return table if pipe else None
 
 

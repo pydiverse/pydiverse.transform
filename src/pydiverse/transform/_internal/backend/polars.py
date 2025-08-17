@@ -53,7 +53,7 @@ class PolarsImpl(TableImpl):
             },
         )
 
-    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int = -1) -> str:
         return f"PolarsImpl\nname = '{self.name}',\ndf = {repr(self.df)}\n"
 
     @staticmethod

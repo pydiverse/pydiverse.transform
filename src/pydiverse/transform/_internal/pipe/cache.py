@@ -48,7 +48,7 @@ class Cache:
             + ",\n"
             + f"  partition_by={self.partition_by}\n"
             + "  derived_from={"
-            + f"{', '.join(d.__class__.__name__.lower() for d in self.derived_from)}"
+            + f"{', '.join(d.__class__.__name__ for d in self.derived_from)}"
             + "},\n"
             + "  cols={"
             + f"""{

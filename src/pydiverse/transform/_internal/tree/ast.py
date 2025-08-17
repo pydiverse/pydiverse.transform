@@ -22,6 +22,8 @@ class AstNode:
     def iter_subtree_preorder(self) -> Iterable["AstNode"]: ...
 
     def __repr__(self) -> str:
-        return self.ast_repr(verb_depth=3, expr_depth=0)
+        return self.ast_repr(verb_depth=7, expr_depth=2)
 
     def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str: ...
+
+    def _ast_node_repr(self, expr_depth: int): ...
