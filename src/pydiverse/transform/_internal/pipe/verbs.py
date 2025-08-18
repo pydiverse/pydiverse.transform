@@ -15,7 +15,6 @@ from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import (
     TableImpl,
     get_backend,
-    get_left_right_on,
     split_join_cond,
 )
 from pydiverse.transform._internal.backend.targets import (
@@ -1260,29 +1259,20 @@ def join(
         if cnt > 0:
             suffix += f"_{cnt}"
 
-        predicates = list(itertools.chain(*(split_join_cond(elem) for elem in on)))
-        if all(
-            pred.op == ops.equal
-            and isinstance(pred.args[0], Col)
-            and isinstance(pred.args[1], Col)
-            for pred in predicates
-        ):
-            _, right_on = get_left_right_on(
-                predicates, left._cache.cols, right._cache.cols
-            )
-            right_on_names = set(
-                right._cache.uuid_to_name[col._uuid] for col in right_on
+        on_uuids = set(
+            col._uuid
+            for col in itertools.chain(*(pred.iter_subtree_preorder() for pred in on))
+            if isinstance(col, Col)
+        )
+        right_on_names = set(col.name for col in right if col._uuid in on_uuids)
+
+        if not (right_names - right_on_names) & left_names:
+            # If nothing except join columns clashes, we only rename the clashing
+            # columns on the right.
+            right >>= rename(
+                {col: col.name + suffix for col in right if col.name in left_names}
             )
 
-            if not (right_names - right_on_names) & left_names:
-                # If nothing except join columns clashes, we only rename the clashing
-                # columns on the right.
-                right >>= rename(
-                    {col: col.name + suffix for col in right if col.name in left_names}
-                )
-
-            else:
-                right >>= rename({col: col.name + suffix for col in right})
         else:
             right >>= rename({col: col.name + suffix for col in right})
 
@@ -1460,7 +1450,7 @@ def ast_repr(
 def ast_repr(
     table: Table, verb_depth: int = 7, expr_depth: int = 2, *, pipe: bool = False
 ) -> Pipeable | None:
-    """
+    r"""
     Prints the AST of the table to stdout.
 
     :param pipe:
