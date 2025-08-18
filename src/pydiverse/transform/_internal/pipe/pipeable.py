@@ -53,6 +53,48 @@ class inverse_partial(partial):
 
 
 def verb(fn):
+    """
+    Decorator for creating verbs.
+
+    A verb is simply a function decorated with this decorator that takes a
+    pydiverse.transform Table as the first argument. `@verb` enables usage of
+    the function with the pipe `>>` syntax.
+
+    Example
+    -------
+    >>> @verb
+    ... def strip_all_strings(tbl: pdt.Table) -> pdt.Table:
+    ...     return tbl >> mutate(
+    ...         **{c.name: c.str.strip() for c in tbl if c.dtype() == pdt.String()}
+    ...     )
+    >>> t = pdt.Table(
+    ...     {
+    ...         "a": ["  abcd 5 ", "212"],
+    ...         "b": [" 917. __ ", " 2 "],
+    ...         "c": [1, 2],
+    ...     },
+    ...     name="t",
+    ... )
+    >>> t >> strip_all_strings() >> show()
+    Table `t` (backend: polars)
+    shape: (2, 3)
+    ┌─────┬────────┬─────────┐
+    │ c   ┆ a      ┆ b       │
+    │ --- ┆ ---    ┆ ---     │
+    │ i64 ┆ str    ┆ str     │
+    ╞═════╪════════╪═════════╡
+    │ 1   ┆ abcd 5 ┆ 917. __ │
+    │ 2   ┆ 212    ┆ 2       │
+    └─────┴────────┴─────────┘
+
+    Note
+    ----
+    To make the code completion of your IDE not show the table as the first argument,
+    simply add an `@overload` before the verb definition:
+    >>> @overload
+    ... def strip_all_strings() -> pdt.Table: ...
+    """
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
         return Pipeable(inverse_partial(fn, *args, **kwargs))
