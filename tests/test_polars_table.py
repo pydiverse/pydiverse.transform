@@ -744,7 +744,7 @@ class TestPolarsLazyImpl:
             ),
         )
 
-    def test_aligned(self, tbl4):
+    def test_eval_aligned(self, tbl4):
         assert_equal(
             tbl4,
             tbl4
@@ -783,6 +783,17 @@ class TestPolarsLazyImpl:
         assert_equal(
             tbl3 >> mutate(r=reverse_col(tbl3.col1 + tbl3.col2, tbl3)),
             df3.with_columns(r=(pl.col("col1") + pl.col("col2")).reverse()),
+        )
+
+    def test_aligned_col_export(self, tbl3):
+        s = pl.Series(list(2**i for i in range(df3.height)))
+        assert_equal(
+            eval_aligned(tbl3.col1 + s, with_=tbl3).export(Polars),
+            df3.get_column("col1") + s,
+        )
+        assert_equal(
+            eval_aligned(pdt.lit(3) * s, with_=tbl3).export(Polars),
+            s * 3,
         )
 
 

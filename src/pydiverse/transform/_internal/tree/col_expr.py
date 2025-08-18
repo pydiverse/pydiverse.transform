@@ -2707,7 +2707,8 @@ class EvalAligned(ColExpr):
 
     def ast_repr(self, depth: int = -1) -> str:
         return (
-            f"eval_aligned(with={self.with_.ast_repr(oneline=True)}, "
+            "eval_aligned("
+            f"with={self.with_.ast_repr(oneline=True) if self.with_ else None}, "
             f"{self.val.ast_repr(depth)})"
         )
 
