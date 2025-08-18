@@ -792,7 +792,11 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.dt_millisecond)
     def _dt_millisecond(x):
-        return sqa.extract("milliseconds", x) % 1000
+        return sqa.extract("millisecond", x) % 1000
+
+    @impl(ops.dt_microsecond)
+    def _dt_microsecond(x):
+        return sqa.extract("microsecond", x) % 1_000_000
 
     @impl(ops.dt_day_of_week)
     def _day_of_week(x):

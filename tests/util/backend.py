@@ -43,6 +43,8 @@ def sql_table(
     url: str,
     dtypes_map: dict | None = None,
     sql_dtypes: dict | None = None,
+    fix_sql_dtypes: dict | None = None,
+    dialect_infix="",
 ):
     import sqlalchemy as sqa
 
@@ -65,6 +67,19 @@ def sql_table(
     df.write_database(
         name, engine, if_table_exists="replace", engine_options={"dtype": sql_dtypes}
     )
+    if fix_sql_dtypes is not None and len(fix_sql_dtypes) > 0:
+        # this is a hack to fix sql types after creation of the table
+        # the main reason for this is that ibm_db_sa renders sqa.boolean as SMALLINT
+        # (https://github.com/ibmdb/python-ibmdbsa/issues/161)
+        with engine.connect() as conn:
+            for col, dtype in fix_sql_dtypes.items():
+                conn.execute(
+                    sqa.text(
+                        f"ALTER TABLE {name} ALTER COLUMN {col} {dialect_infix} {dtype}"
+                    )
+                )
+            conn.execute(sqa.text(f"call sysproc.admin_cmd('REORG TABLE {name}')"))
+            conn.commit()
     return Table(name, SqlAlchemy(engine))
 
 
@@ -132,6 +147,7 @@ def ibm_db2_table(df: pl.DataFrame, name: str):
     url = "db2+ibm_db://db2inst1:password@localhost:50000/testdb"
 
     map = {}
+    fix_map = {}
     for col, dtype in zip(df.columns, df.dtypes, strict=True):
         if dtype == pl.String:
             max_length = df[col].str.len_chars().max()
@@ -141,8 +157,17 @@ def ibm_db2_table(df: pl.DataFrame, name: str):
                 map[col] = sqa.VARCHAR(32_672)
             else:
                 map[col] = sqa.VARCHAR(256)
+        if dtype == pl.Boolean:
+            fix_map[col] = sqa.Boolean()
 
-    return sql_table(df, name, url, sql_dtypes=map)
+    return sql_table(
+        df,
+        name,
+        url,
+        sql_dtypes=map,
+        fix_sql_dtypes=fix_map,
+        dialect_infix="SET DATA TYPE",
+    )
 
 
 BACKEND_TABLES = {

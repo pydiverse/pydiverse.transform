@@ -25,21 +25,26 @@ class DateExtract(Operator):
         )
 
 
-dt_year = DateExtract("dt.year")
+dt_year = DateExtract("dt.year", doc="The year component of the date or datetime.")
 
-dt_month = DateExtract("dt.month")
+dt_month = DateExtract("dt.month", doc="The month component of the date or datetime.")
 
-dt_day = DateExtract("dt.day")
+dt_day = DateExtract("dt.day", doc="The day component of the date or datetime.")
 
-dt_hour = DatetimeExtract("dt.hour")
+dt_hour = DatetimeExtract("dt.hour", doc="The hour component of the datetime.")
 
-dt_minute = DatetimeExtract("dt.minute")
+dt_minute = DatetimeExtract("dt.minute", doc="The minute component of the datetime.")
 
-dt_second = DatetimeExtract("dt.second")
+dt_second = DatetimeExtract("dt.second", doc="The second component of the datetime.")
 
-dt_millisecond = DatetimeExtract("dt.millisecond")
+dt_millisecond = DatetimeExtract(
+    "dt.millisecond",
+    doc="The microsecond component of the datetime int-divided by 1000 (see polars).",
+)
 
-dt_microsecond = DatetimeExtract("dt.microsecond")
+dt_microsecond = DatetimeExtract(
+    "dt.microsecond", doc="The microsecond component of the datetime."
+)
 
 dt_day_of_week = DateExtract(
     "dt.day_of_week",

@@ -137,9 +137,17 @@ with SqliteImpl.impl_store.impl_manager as impl:
         warn_non_standard(
             "SQLite returns rounded milliseconds",
         )
+        frac_seconds = sqa.cast(sqa.func.STRFTIME("%f", x), sqa.Numeric())
+        return sqa.cast((frac_seconds * 1e3), sqa.Integer()) % 1000
+
+    @impl(ops.dt_microsecond)
+    def _dt_microsecond(x):
+        warn_non_standard(
+            "SQLite returns rounded microseconds",
+        )
         _1000 = sqa.literal_column("1000")
         frac_seconds = sqa.cast(sqa.func.STRFTIME("%f", x), sqa.Numeric())
-        return sqa.cast((frac_seconds * _1000) % _1000, sqa.Integer())
+        return sqa.cast(frac_seconds * 1e6, sqa.Integer()) % 1_000_000
 
     @impl(ops.horizontal_max)
     def _greatest(*x):
