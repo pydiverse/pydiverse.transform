@@ -1474,34 +1474,68 @@ def ast_repr(
 
     Examples
     --------
-    >>> t = pdt.Table({"a": [4, 4, 1, 7], "b": ["f", "g", "h", "i"]}, name="t")
+    >>> tbl1 = Table(dict(a=[1, 2], b=["x", "y"]), name="tbl1")
+    >>> tbl2 = Table(dict(a=[1, 2], c=["z", "zz"]), name="tbl2")
     >>> (
-    ...     t
-    ...     >> mutate(c=t.a + t.b.str.len() * 2)
-    ...     >> group_by(t.a)
-    ...     >> summarize(m=C.c.max())
+    ...     tbl1
+    ...     >> mutate(u=C.a + 5)
+    ...     >> select(tbl1.a)
+    ...     >> left_join(
+    ...         tbl2
+    ...         >> arrange(tbl2.a)
+    ...         >> filter(tbl2.c.str.len() <= 10)
+    ...         >> full_join(s := tbl2 >> alias("s"), on="c"),
+    ...         on="a",
+    ...     )
+    ...     >> slice_head(32)
     ...     >> ast_repr()
     ... )
-    Summarize(
-      m = max(
-        t.c (Int)
-      )
-    ),
-    GroupBy(
-      t.a (Int64)
-    ),
-    Mutate(
-      c = __add__(
-        t.a (Int64),
-        __mul__(
-          str.len(
-            t.b (String)
-          ),
-          lit(2, const Int64)
-        )
-      )
-    ),
-    PolarsImpl(name = t, df = <LazyFrame at 0x14D1F24B0>)
+    * slice_head
+    | n = 32, offset = 0
+    |
+    *   join
+    |\  how = `left`
+    | | on = __eq__(tbl1.a, tbl2.a)
+    | | validate = `m:m`
+    | |
+    | * rename
+    | | a -> a_tbl2
+    | |
+    | *   join
+    | |\  how = `full`
+    | | | on = __eq__(tbl2.c, s.c)
+    | | | validate = `m:m`
+    | | |
+    | | * rename
+    | | | a -> a_s,
+    | | | c -> c_s
+    | | |
+    | | * alias
+    | | | s
+    | | |
+    | | * PolarsImpl
+    | | | name = 'tbl2',
+    | | | df = <LazyFrame at 0x16CCE8080>
+    | |
+    | * filter
+    | | __le__(str.len(tbl2.c), 10)
+    | |
+    | * arrange
+    | | Order(by=tbl2.a, descending=False, nulls_last=None)
+    | |
+    | * PolarsImpl
+    | | name = 'tbl2',
+    | | df = <LazyFrame at 0x16CCE8080>
+    |
+    * select
+    | tbl1.a
+    |
+    * mutate
+    | u = __add__(tbl1.a, 5)
+    |
+    * PolarsImpl
+    | name = 'tbl1',
+    | df = <LazyFrame at 0x16BD74860>
     """
 
     print(table._ast.ast_repr(verb_depth, expr_depth), end="")

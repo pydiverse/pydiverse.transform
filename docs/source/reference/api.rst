@@ -9,6 +9,7 @@ API
     operators/index
     targets
     types
+    aligned
 
 
 .. currentmodule:: pydiverse.transform
