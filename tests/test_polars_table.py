@@ -796,6 +796,12 @@ class TestPolarsLazyImpl:
             s * 3,
         )
 
+    def test_aligned_multiple_tables(self, tbl1, tbl_right):
+        assert_equal(
+            tbl1 >> mutate(z=eval_aligned(tbl1.col1 + tbl_right.b)),
+            df1.with_columns(z=pl.col("col1") + df_right.get_column("b")),
+        )
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):

@@ -134,7 +134,9 @@ def compile_col_expr(
     op_kwargs: dict[str, Any] | None = None,
 ) -> pl.Expr:
     if isinstance(expr, Col):
-        return pl.col(name_in_df[expr._uuid])
+        if expr._uuid in name_in_df:
+            return pl.col(name_in_df[expr._uuid])
+        return expr.export(Polars)
 
     elif isinstance(expr, ColFn):
         impl = PolarsImpl.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))

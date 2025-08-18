@@ -2683,7 +2683,7 @@ class Series(ColExpr):
 
 
 class EvalAligned(ColExpr):
-    def __init__(self, val: ColExpr | pl.Series, with_):
+    def __init__(self, val: ColExpr | pl.Series | pd.Series, with_):
         self.val: ColExpr = wrap_literals(val)
         self.with_: AstNode = None if with_ is None else with_._ast
         self._dtype = self.val.dtype()

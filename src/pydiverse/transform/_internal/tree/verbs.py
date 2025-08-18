@@ -52,7 +52,7 @@ class Verb(AstNode):
                 # If the current ast is not in nd_map (happens after collect with
                 # keep_col_refs=True), the node wasn't really present anyway.
                 nd_map.get(col._ast, col._ast),
-                uuid_map[col._uuid],
+                uuid_map.get(col._uuid, col._uuid),
                 col._dtype,
                 col._ftype,
             )

@@ -60,8 +60,8 @@ def verb(fn):
     pydiverse.transform Table as the first argument. `@verb` enables usage of
     the function with the pipe `>>` syntax.
 
-    Example
-    -------
+    Examples
+    --------
     >>> @verb
     ... def strip_all_strings(tbl: pdt.Table) -> pdt.Table:
     ...     return tbl >> mutate(
