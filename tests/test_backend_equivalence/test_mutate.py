@@ -63,6 +63,8 @@ def test_none(df4):
     )
 
 
+# DB2 container screws up expression reuse and fast path and-evaluation
+@skip_backends("ibm_db2")
 def test_mutate_bool_expr(df4):
     assert_result_equal(
         df4,
