@@ -40,6 +40,7 @@ def aligned(fn=None, *, with_: str | None = None):
     return decorator
 
 
+# TODO: documentation + allow cols for with_
 def eval_aligned(data: ColExpr | pl.Series, with_: Table | None = None) -> EvalAligned:
     errors.check_arg_type(ColExpr | pl.Series, "eval_aligned", "data", data)
     errors.check_arg_type(Table | None, "eval_aligned", "with_", with_)

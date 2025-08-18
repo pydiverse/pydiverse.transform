@@ -97,7 +97,7 @@ class ColExpr(Generic[T]):
     def __repr__(self) -> str:
         first_line = ""
         if isinstance(self, Col | ColName):
-            first_line = "Col "
+            first_line = "Column "
         elif isinstance(self, LiteralCol):
             first_line = "Literal "
 
@@ -2685,7 +2685,7 @@ class Series(ColExpr):
 class EvalAligned(ColExpr):
     def __init__(self, val: ColExpr | pl.Series, with_):
         self.val: ColExpr = wrap_literals(val)
-        self.with_ = with_
+        self.with_: AstNode = None if with_ is None else with_._ast
         self._dtype = self.val.dtype()
         self._ftype = self.val.ftype()
 
@@ -2706,7 +2706,10 @@ class EvalAligned(ColExpr):
         self.val = g(self.val)
 
     def ast_repr(self, depth: int = -1) -> str:
-        return f"eval_aligned({self.val.ast_repr(depth)})"
+        return (
+            f"eval_aligned(with={self.with_.ast_repr(oneline=True)}, "
+            f"{self.val.ast_repr(depth)})"
+        )
 
 
 # TODO: maybe it would simplify things if we made this a subclass of ColExpr
@@ -2845,33 +2848,65 @@ def get_expr_as_table(expr: ColExpr):
     from pydiverse.transform._internal.pipe.table import Table
     from pydiverse.transform._internal.pipe.verbs import mutate, select
 
-    cols = [col for col in expr.iter_subtree_postorder() if isinstance(col, Col)]
+    for nd in expr.iter_subtree_preorder():
+        if isinstance(nd, EvalAligned) and nd.with_ is None:
+            raise ValueError(
+                "missing `with_` argument for `eval_aligned`\n"
+                "note: To export a column expression, all `aligned` / `eval_aligned`"
+                "calls need a `with_`.\n"
+                f"AST path to error source: {get_ast_path_str(expr, nd)}"
+            )
+
+    cols: list[Col] = []
+
+    def get_cols(nd: ColExpr):
+        if isinstance(nd, Col):
+            cols.append(nd)
+        if not isinstance(nd, EvalAligned):
+            for child in nd.iter_children():
+                get_cols(child)
+
+    get_cols(expr)
+
+    aligned_nodes = [
+        ea for ea in expr.iter_subtree_postorder() if isinstance(ea, EvalAligned)
+    ]
+
     # We need one column whose AST is an ancestor of all other columns' ASTs.
     # The following could be done in linear time.
-    subtrees = [set(col._ast.iter_subtree_postorder()) for col in cols]
+    roots = [col._ast for col in cols] + [ea.with_ for ea in aligned_nodes]
+    subtrees = [set(r.iter_subtree_postorder()) for r in roots]
     ancestor_index = None
     for i, tree in enumerate(subtrees):
-        if all(col._ast in tree for col in cols):
+        if all(root in tree for root in roots):
             ancestor_index = i
             break
 
     if ancestor_index is None:
         c, d = next(
             (c, d)
-            for (i, c), (j, d) in itertools.product(enumerate(cols), enumerate(cols))
-            if c._ast not in subtrees[j] and d._ast not in subtrees[i]
+            for (i, c), (j, d) in itertools.product(
+                enumerate(cols + aligned_nodes), enumerate(cols + aligned_nodes)
+            )
+            if roots[i] not in subtrees[j] and roots[j] not in subtrees[i]
         )
+
+        def text_repr(x: Col | EvalAligned):
+            return (
+                "the column " if isinstance(x, Col) else "the `with_` argument of "
+            ) + f"`{x.ast_repr(depth=1)}`"
+
         raise ValueError(
-            "column expression cannot be exported, since no common ancestor table "
-            f"between the columns `{c.ast_repr()}` and `{d.ast_repr()}` was found\n"
-            "hint: To export a column expression, it must contain one column whose "
-            "table contains all other columns."
+            "cannot export column expression since no common ancestor table "
+            f"between {text_repr(c)} and {text_repr(d)} was found\n"
+            "hint: To export a column expression, it must contain one column or "
+            "eval_aligned whose table contains all other columns."
         )
 
     name = None
     if isinstance(expr, Col):
         name = expr.name
-    tbl = Table(cols[ancestor_index]._ast, name=name)
+    tbl = Table(roots[ancestor_index], name=name)
 
     # check that all C-columns are in the common ancestor
     for col in expr.iter_subtree_postorder():
@@ -2892,13 +2927,16 @@ def get_expr_as_table(expr: ColExpr):
 # column resolution, hence the python stack trace does not directly point to the source
 # of the exception. To help the user find the error, we print the path of the root of
 # the AST to the source of the exception.
-def get_ast_path_str(tree_root: ColExpr, fn_id: UUID) -> str:
+def get_ast_path_str(tree_root: ColExpr, error_source: UUID | ColExpr) -> str:
+    is_uuid: bool = isinstance(error_source, UUID)
     preorder_traversal = []
     for node in tree_root.iter_subtree_preorder():
         preorder_traversal.append(node)
-        # We have to do this marker magic since the id of the node may have changed
-        # since the exception was thrown.
-        if hasattr(node, "_fn_id") and node._fn_id == fn_id:
+        # We have to do this marker magic for usage in verbs since the id of the node
+        # may have changed since the exception was thrown.
+        if (
+            is_uuid and hasattr(node, "_fn_id") and node._fn_id == error_source
+        ) or error_source is node:
             break
     path = [preorder_traversal[-1]]
     for node in reversed(preorder_traversal):

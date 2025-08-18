@@ -34,16 +34,22 @@ class TableImpl(AstNode):
     backend_name: str
     impl_store = ImplStore()
 
-    def __init__(self, name: str, schema: dict[str, Dtype]):
+    def __init__(self, name: str | None, schema: dict[str, Dtype]):
         self.name = name
         self.cols = {
             name: Col(name, self, uuid.uuid1(), dtype, Ftype.ELEMENT_WISE)
             for name, dtype in schema.items()
         }
 
-    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
+    def ast_repr(
+        self, verb_depth: int = -1, expr_depth: int = -1, oneline: bool = False
+    ) -> str:
+        if oneline:
+            return self.__class__.__name__ + (
+                f"('{self.name}')" if self.name is not None else ""
+            )
         nd_repr = self._ast_node_repr(expr_depth)
-        return "* " + textwrap.indent(nd_repr, "| ")[2:]
+        return f"* {self.__class__.__name__}\n" + textwrap.indent(nd_repr, "| ")
 
     def __init_subclass__(cls) -> None:
         cls.impl_store = ImplStore()

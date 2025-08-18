@@ -44,7 +44,7 @@ class DuckDbPolarsImpl(TableImpl):
         )
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return f"DuckDbPolarsImpl\nname = `{self.name}`\ndf = {repr(self.df)}\n"
+        return f"name = `{self.name}`\ndf = {repr(self.df)}\n"
 
     @staticmethod
     def build_query(nd: AstNode) -> str | None:

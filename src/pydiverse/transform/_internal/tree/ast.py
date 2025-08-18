@@ -24,6 +24,8 @@ class AstNode:
     def __repr__(self) -> str:
         return self.ast_repr(verb_depth=7, expr_depth=2)
 
-    def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str: ...
+    def ast_repr(
+        self, verb_depth: int = -1, expr_depth: int = -1, *, oneline: bool = False
+    ) -> str: ...
 
     def _ast_node_repr(self, expr_depth: int): ...

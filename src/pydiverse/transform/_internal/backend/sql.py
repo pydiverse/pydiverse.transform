@@ -115,7 +115,7 @@ class SqlImpl(TableImpl):
         )
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return f"SqlImpl\nname = `{self.name}`\nengine = {repr(self.engine)}\n"
+        return f"name = `{self.name}`\nengine = {repr(self.engine)}\n"
 
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]

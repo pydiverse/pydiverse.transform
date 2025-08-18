@@ -1286,7 +1286,10 @@ def join(
         else:
             right >>= rename({col: col.name + suffix for col in right})
 
-    on = functools.reduce(operator.and_, on, LiteralCol(True))
+    if len(on) == 0:
+        on = LiteralCol(True)
+    else:
+        on = functools.reduce(operator.and_, on[1:], on[0])
 
     if how == "full" and not all(pred.op == ops.equal for pred in split_join_cond(on)):
         raise ValueError("in a `full` join, only equality predicates can be used")
