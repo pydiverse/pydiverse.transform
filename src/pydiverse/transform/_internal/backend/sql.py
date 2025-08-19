@@ -166,6 +166,10 @@ class SqlImpl(TableImpl):
         return "POSIX"
 
     @classmethod
+    def random_col(cls):
+        return sqa.text("RANDOM()")
+
+    @classmethod
     def build_select(
         cls, nd: AstNode, *, final_select: list[Col] | None = None
     ) -> sqa.Select:
@@ -338,6 +342,9 @@ class SqlImpl(TableImpl):
 
             else:
                 value: sqa.FunctionElement = impl(*args)
+
+                if expr.op == ops.cum_sum:
+                    order_by += [cls.random_col()]
 
                 if (
                     partition_by is not None
@@ -965,3 +972,7 @@ with SqlImpl.impl_store.impl_manager as impl:
                 _Impl.get_impl(ops.horizontal_min, _sig)(x, upper), lower
             ),
         )
+
+    @impl(ops.cum_sum)
+    def _cum_sum(x):
+        return sqa.func.sum(x)

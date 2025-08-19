@@ -390,3 +390,14 @@ def test_partition_by_const_col(df3):
     assert_result_equal(
         df3, lambda t: t >> mutate(x=0) >> mutate(y=t.col3.sum(partition_by=C.x))
     )
+
+
+def test_cum_sum(df4):
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            p=t.col1.cum_sum(arrange=t.col4.nulls_last()),
+            r=t.col4.cum_sum(arrange=t.col4.nulls_first()),
+        ),
+    )

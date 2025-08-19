@@ -814,6 +814,36 @@ class ColExpr(Generic[T]):
 
         return ColFn(ops.count, self, partition_by=partition_by, filter=filter)
 
+    @overload
+    def cum_sum(
+        self: ColExpr[Int],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr],
+    ) -> ColExpr[Int]: ...
+
+    @overload
+    def cum_sum(
+        self: ColExpr[Float],
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr],
+    ) -> ColExpr[Float]: ...
+
+    def cum_sum(
+        self: ColExpr,
+        *,
+        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
+        arrange: ColExpr | Iterable[ColExpr],
+    ) -> ColExpr:
+        """
+        The sum of all preceding elements and the current element.
+
+        Null values are assigned the sum of all preceding elements.
+        """
+
+        return ColFn(ops.cum_sum, self, partition_by=partition_by, arrange=arrange)
+
     def descending(self: ColExpr) -> ColExpr:
         """
         Reverses the default ordering.
@@ -1471,34 +1501,6 @@ class ColExpr(Generic[T]):
         """
 
         return ColFn(ops.pow, rhs, self)
-
-    @overload
-    def prefix_sum(
-        self: ColExpr[Int],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
-    ) -> ColExpr[Int]: ...
-
-    @overload
-    def prefix_sum(
-        self: ColExpr[Float],
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
-    ) -> ColExpr[Float]: ...
-
-    def prefix_sum(
-        self: ColExpr,
-        *,
-        partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
-        arrange: ColExpr | Iterable[ColExpr] | None = None,
-    ) -> ColExpr:
-        """
-        The sum of all preceding elements and the current element.
-        """
-
-        return ColFn(ops.prefix_sum, self, partition_by=partition_by, arrange=arrange)
 
     @overload
     def round(self: ColExpr[Int], decimals: int = 0) -> ColExpr[Int]: ...

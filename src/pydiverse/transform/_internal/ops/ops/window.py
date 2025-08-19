@@ -3,9 +3,10 @@
 
 from typing import Any
 
+from pydiverse.common import Int
 from pydiverse.transform._internal.ops.op import ContextKwarg, Ftype, Operator
 from pydiverse.transform._internal.ops.signature import Signature
-from pydiverse.transform._internal.tree.types import NUMERIC, Const, Int, S
+from pydiverse.transform._internal.tree.types import NUMERIC, Const, S
 
 
 class Window(Operator):
@@ -204,12 +205,14 @@ shape: (7, 3)
 """,
 )
 
-prefix_sum = Window(
-    "prefix_sum",
+
+cum_sum = Window(
+    "cum_sum",
     *(Signature(dtype, return_type=dtype) for dtype in NUMERIC),
     generate_expr_method=True,
-    arrange_required=False,
     doc="""
 The sum of all preceding elements and the current element.
+
+Null values are assigned the sum of all preceding elements.
 """,
 )

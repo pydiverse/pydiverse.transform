@@ -648,9 +648,9 @@ class TestPolarsLazyImpl:
             .sort("col1"),
         )
 
-    def test_prefix_sum(self, tbl1):
+    def test_cum_sum(self, tbl1):
         assert_equal(
-            tbl1 >> mutate(p=tbl1.col1.prefix_sum()),
+            tbl1 >> mutate(p=tbl1.col1.cum_sum()),
             df1.with_columns(p=pl.col("col1").cum_sum()),
         )
 

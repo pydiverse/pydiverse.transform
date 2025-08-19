@@ -206,6 +206,7 @@ def compile_col_expr(
         elif arrange and expr.op.ftype == Ftype.WINDOW:
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
+            # TODO: use arg_sort?
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
                 by=order_by,
                 descending=descending,
@@ -727,9 +728,9 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _str_join(x, delim):
         return x.str.join(pl.select(delim).item())
 
-    @impl(ops.prefix_sum)
-    def _prefix_sum(x):
-        return x.cum_sum()
+    @impl(ops.cum_sum)
+    def _cum_sum(x: pl.Expr):
+        return x.cum_sum().fill_null(strategy="forward")
 
     @impl(ops.list_agg)
     def _list_agg(x, *, _empty_group_by: bool):
