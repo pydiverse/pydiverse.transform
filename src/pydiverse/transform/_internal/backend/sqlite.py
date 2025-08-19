@@ -194,3 +194,7 @@ with SqliteImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return True
+
+    @impl(ops.dt_day_of_week)
+    def _day_of_week(x):
+        return (sqa.extract("dow", x) + 6) % sqa.literal_column("7") + 1

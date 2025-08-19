@@ -305,22 +305,22 @@ with MsSqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.str_replace_all)
     def _str_replace_all(x, y, z):
-        x = x.collate("Latin1_General_CS_AS")
+        x = x.collate(MsSqlImpl.default_collation())
         return sqa.func.REPLACE(x, y, z, type_=x.type)
 
     @impl(ops.str_starts_with)
     def _str_starts_with(x, y):
-        x = x.collate("Latin1_General_CS_AS")
+        x = x.collate(MsSqlImpl.default_collation())
         return x.startswith(y, autoescape=True)
 
     @impl(ops.str_ends_with)
     def _str_ends_with(x, y):
-        x = x.collate("Latin1_General_CS_AS")
+        x = x.collate(MsSqlImpl.default_collation())
         return x.endswith(y, autoescape=True)
 
     @impl(ops.str_contains)
     def _contains(x, y):
-        x = x.collate("Latin1_General_CS_AS")
+        x = x.collate(MsSqlImpl.default_collation())
         return x.contains(y, autoescape=True)
 
     @impl(ops.str_slice)
