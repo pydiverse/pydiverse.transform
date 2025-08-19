@@ -31,6 +31,11 @@ class IbmDb2Impl(SqlImpl):
             return sqa.DECIMAL(15, 6)
         return super().sqa_type(pdt_type)
 
+    @classmethod
+    def dialect_order_append_rand(cls):
+        # DB2 hates non-deterministic behavior and forbids rand in ORDER BY clauses.
+        return False
+
 
 with IbmDb2Impl.impl_store.impl_manager as impl:
 

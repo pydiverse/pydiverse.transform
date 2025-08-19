@@ -339,7 +339,7 @@ class SqlImpl(TableImpl):
             else:
                 value: sqa.FunctionElement = impl(*args)
 
-                if expr.op == ops.cum_sum:
+                if expr.op == ops.cum_sum and cls.dialect_order_append_rand():
                     order_by += [cls.get_impl(ops.rand, [])()]
 
                 if (
@@ -619,6 +619,12 @@ class SqlImpl(TableImpl):
     @classmethod
     def pdt_type(cls, sqa_type: sqa.types.TypeEngine) -> Dtype:
         return Dtype.from_sql(sqa_type)
+
+    @classmethod
+    def dialect_order_append_rand(cls):
+        # by default we want to follow polars for cum_sum to ensure equal order values
+        # don't get the same result value
+        return True
 
 
 # MSSQL complains about duplicates in ORDER BY.
