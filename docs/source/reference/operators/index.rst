@@ -60,6 +60,7 @@ Expression methods
    clip
    cos
    count
+   cum_sum
    dense_rank
    descending
    dt.day
@@ -97,7 +98,6 @@ Expression methods
    min
    nulls_first
    nulls_last
-   prefix_sum
    rank
    round
    shift

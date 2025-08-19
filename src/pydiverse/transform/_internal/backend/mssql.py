@@ -45,6 +45,10 @@ class MsSqlImpl(SqlImpl):
         return "Latin1_General_bin"
 
     @classmethod
+    def random_col(cls):
+        return sqa.text("NEWID()")
+
+    @classmethod
     def export(
         cls,
         nd: AstNode,
