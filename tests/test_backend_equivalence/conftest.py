@@ -152,9 +152,9 @@ dataframes = {
                 datetime(1700, 4, 27, 1, 2, 3),
                 None,
                 datetime(2250, 12, 24, 23, 0, 0),
-                datetime(2023, 7, 31, 10, 16, 13),
+                datetime(2023, 7, 30, 10, 16, 13),
                 datetime(2004, 12, 31),
-                datetime(1970, 1, 1),
+                datetime(1970, 1, 5),
             ],
             "col2": [
                 datetime(2023, 7, 31, 10, 16, 13),

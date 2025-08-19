@@ -6,16 +6,24 @@ from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
-def test_eq(df_strings):
+@skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
+def test_eq_whitespace(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == " "))
+
+
+def test_eq(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == "foo"))
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == C.col2))
 
 
-def test_nq(df_strings):
+@skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
+def test_nq_whitespace(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 != " "))
-    assert_result_equal(df_strings, lambda t: t >> filter(C.col1 != "foo"))
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 != C.col2))
+
+
+def test_nq(df_strings):
+    assert_result_equal(df_strings, lambda t: t >> filter(C.col1 != "foo"))
 
 
 def test_lt(df_strings):
@@ -24,8 +32,12 @@ def test_lt(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 < C.col2))
 
 
-def test_gt(df_strings):
+@skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
+def test_gt_whitespace(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > " x"))
+
+
+def test_gt(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > "E"))
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > C.col2))
 
@@ -146,7 +158,8 @@ def test_contains(df_strings):
     )
 
 
-def test_slice(df_strings):
+@skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
+def test_slice_whitespace(df_strings):
     assert_result_equal(
         df_strings,
         lambda t: t
@@ -158,6 +171,21 @@ def test_slice(df_strings):
     )
 
 
+def test_slice(df_strings):
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> mutate(
+            u=t.col1.str.replace_all(" ", "").str.slice(1, 3),
+            v=t.col2.str.replace_all(" ", "").str.slice(
+                t.col1.str.len() % (t.col2.str.len() + 1), 42
+            ),
+            w=t.col1.str.replace_all(" ", "").str.slice(2, t.col1.str.len()),
+        ),
+    )
+
+
+@skip_backends("ibm_db2")  # ibm_db_sa does not support aggregate_order_by
 def test_str_join(df_strings):
     assert_result_equal(
         df_strings,
@@ -174,12 +202,26 @@ def test_str_join(df_strings):
     )
 
 
+@skip_backends("mssql", "ibm_db2")  # IBM DB2 is not good with whitespaces
+def test_str_arrange_whitespace(df_strings):
+    def bind(col):
+        assert_result_equal(
+            df_strings,
+            lambda t: t >> arrange(t[col].nulls_last(), t.c.nulls_last()),
+            check_row_order=True,
+        )
+
+    for col in ["col1", "col2", "c", "d", "e", "gb"]:
+        bind(col)
+
+
 @skip_backends("mssql")
 def test_str_arrange(df_strings):
     def bind(col):
         assert_result_equal(
             df_strings,
-            lambda t: t >> arrange(t[col].nulls_last(), t.c.nulls_last()),
+            lambda t: t
+            >> arrange(t[col].str.replace_all(" ", "").nulls_last(), t.c.nulls_last()),
             check_row_order=True,
         )
 

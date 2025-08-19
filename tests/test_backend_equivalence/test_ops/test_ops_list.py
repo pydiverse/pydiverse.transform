@@ -6,7 +6,7 @@ from tests.fixtures.backend import skip_backends
 from tests.util.assertion import assert_result_equal
 
 
-@skip_backends("mssql", "sqlite")
+@skip_backends("mssql", "sqlite", "ibm_db2")
 def test_list_agg(df3):
     assert_result_equal(
         df3,
@@ -30,7 +30,7 @@ def test_list_agg(df3):
     )
 
 
-@skip_backends("mssql", "sqlite")
+@skip_backends("mssql", "sqlite", "ibm_db2")
 def test_list_agg_no_grouping(df3):
     assert_result_equal(
         df3,

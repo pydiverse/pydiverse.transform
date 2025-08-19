@@ -1,8 +1,10 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
+
 import sqlalchemy as sqa
 from sqlalchemy import Cast
 
+from pydiverse.common import Decimal
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
 
@@ -22,6 +24,12 @@ class IbmDb2Impl(SqlImpl):
             _type = sqa.String(length=32_672)
         # For SQLite, we ignore the `strict` parameter to `cast`.
         return sqa.cast(compiled_expr, _type)
+
+    @classmethod
+    def sqa_type(cls, pdt_type):
+        if isinstance(pdt_type, Decimal):
+            return sqa.DECIMAL(15, 6)
+        return super().sqa_type(pdt_type)
 
 
 with IbmDb2Impl.impl_store.impl_manager as impl:
@@ -71,3 +79,7 @@ with IbmDb2Impl.impl_store.impl_manager as impl:
             (sqa.extract("second", x) * sqa.literal_column("1000000.")),
             type_=sqa.Integer(),
         ) % sqa.literal_column("1000000")
+
+    @impl(ops.dt_day_of_week)
+    def _day_of_week(x):
+        return (sqa.extract("dow", x) + 5) % sqa.literal_column("7") + 1
