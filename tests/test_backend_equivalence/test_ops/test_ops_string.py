@@ -9,11 +9,16 @@ from tests.util import assert_result_equal
 @skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
 def test_eq_whitespace(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == " "))
+    assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == C.col2))
 
 
 def test_eq(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == "foo"))
-    assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == C.col2))
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> filter(C.col1.str.replace_all(" ", "") == C.col2.str.replace_all(" ", "")),
+    )
 
 
 @skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
@@ -24,6 +29,11 @@ def test_nq_whitespace(df_strings):
 
 def test_nq(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 != "foo"))
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> filter(C.col1.str.replace_all(" ", "") != C.col2.str.replace_all(" ", "")),
+    )
 
 
 def test_lt(df_strings):
@@ -35,14 +45,20 @@ def test_lt(df_strings):
 @skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
 def test_gt_whitespace(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > " x"))
+    assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > C.col2))
 
 
 def test_gt(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > "E"))
-    assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > C.col2))
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> filter(C.col1.str.replace_all(" ", "") > C.col2.str.replace_all(" ", "")),
+    )
 
 
-def test_le(df_strings):
+@skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
+def test_le_whitespace(df_strings):
     assert_result_equal(
         df_strings,
         lambda t: t
@@ -53,6 +69,24 @@ def test_le(df_strings):
         ),
     )
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 <= C.col2))
+
+
+def test_le(df_strings):
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> mutate(
+            col1_le_c=C.col1 <= C.c,
+            col1_le_col2=t.col1.str.replace_all(" ", "")
+            <= t.col2.str.replace_all(" ", ""),
+            d_le_c=t.d <= t.c,
+        ),
+    )
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> filter(C.col1.str.replace_all(" ", "") <= C.col2.str.replace_all(" ", "")),
+    )
 
 
 def test_ge(df_strings):
@@ -176,11 +210,13 @@ def test_slice(df_strings):
         df_strings,
         lambda t: t
         >> mutate(
-            u=t.col1.str.replace_all(" ", "").str.slice(1, 3),
-            v=t.col2.str.replace_all(" ", "").str.slice(
-                t.col1.str.len() % (t.col2.str.len() + 1), 42
-            ),
-            w=t.col1.str.replace_all(" ", "").str.slice(2, t.col1.str.len()),
+            u=t.col1.str.replace_all(" ", "").str.slice(1, 3).str.replace_all(" ", ""),
+            v=t.col2.str.replace_all(" ", "")
+            .str.slice(t.col1.str.len() % (t.col2.str.len() + 1), 42)
+            .str.replace_all(" ", ""),
+            w=t.col1.str.replace_all(" ", "")
+            .str.slice(2, t.col1.str.len())
+            .str.replace_all(" ", ""),
         ),
     )
 
@@ -215,7 +251,6 @@ def test_str_arrange_whitespace(df_strings):
         bind(col)
 
 
-@skip_backends("mssql")
 def test_str_arrange(df_strings):
     def bind(col):
         assert_result_equal(
