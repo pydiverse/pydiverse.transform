@@ -46,22 +46,44 @@ Afterwards you can run:
 pixi run pytest --postgres --mssql
 ```
 
-## Testing db2 functionality
+### IBM DB2 development
 
-For running @pytest.mark.ibm_db2 tests, you need to spin up a docker container without `docker compose` since it needs
-the `--privileged` option which `docker compose` does not offer.
+The `ibm_db` package is only available on the following platforms: linux-64, osx-arm64, win-64.
 
-```bash
-docker run -h db2server --name db2server --restart=always --detach --privileged=true -p 50000:50000 --env-file docker_db2.env_list -v /Docker:/database ibmcom/db2
+> [!NOTE]
+> Because of this, the IBM DB2 drivers are only available in the `py312ibm` and `py310ibm`
+> environments.
+> You can run tests using `pixi run -e py312ibm pytest --ibm_db2 -m ibm_db2`.
+
+## Troubleshooting
+
+### IBM DB2 container not yet up and running
+
+The IBM DB2 container takes a long time to start. You can find out the name of the container with `docker ps`
+(see column `NAMES`):
+```
+CONTAINER ID   IMAGE                                        COMMAND                  CREATED         STATUS         PORTS                                                                                 NAMES
+8578e0e471ff   icr.io/db2_community/db2                     "/var/db2_setup/lib/…"   3 minutes ago   Up 3 minutes   22/tcp, 55000/tcp, 60006-60007/tcp, 0.0.0.0:50000->50000/tcp, [::]:50000->50000/tcp   pydiversepipedag-ibm_db2-1
 ```
 
-Then check `docker logs db2server | grep -i completed` until you see `(*) Setup has completed.`.
+If it is `pydiversepipedag-ibm_db2-1`, then you can look for `Setup has completed` in the log with
+`docker logs pydiversepipedag-ibm_db2-1`.
 
-Afterwards you can run:
+### Installing mssql odbc driver for macOS and Linux
 
-```bash
-pixi run -e py312ibm pytest --ibm_db2
-```
+Install via Microsoft's
+instructions for [Linux](https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server)
+or [macOS](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/install-microsoft-odbc-driver-sql-server-macos).
+
+In one Linux installation case, `odbcinst -j` revealed that it installed the configuration in `/etc/unixODBC/*`.
+But conda installed pyodbc brings its own `odbcinst` executable and that shows odbc config files are expected in
+`/etc/*`. Symlinks were enough to fix the problem. Try `pixi run python -c 'import pyodbc;print(pyodbc.drivers())'`
+and see whether you get more than an empty list.
+
+Same happened for MacOS. The driver was installed in `/opt/homebrew/etc/odbcinst.ini` but pyodbc expected it in
+`/etc/odbcinst.ini`. This can also be solved by `sudo ln -s /opt/homebrew/etc/odbcinst.ini /etc/odbcinst.ini`.
+
+Furthermore, make sure you use 127.0.0.1 instead of localhost. It seems that /etc/hosts is ignored.
 
 ## Packaging and publishing to pypi and conda-forge using github actions
 
