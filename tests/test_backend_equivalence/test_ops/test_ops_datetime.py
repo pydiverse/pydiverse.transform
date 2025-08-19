@@ -137,6 +137,17 @@ def test_millisecond(df_datetime):
     )
 
 
+def test_microseconds(df_datetime):
+    assert_result_equal(
+        df_datetime,
+        lambda t: t
+        >> mutate(
+            x=C.col1.dt.microsecond(),
+            y=C.col2.dt.microsecond(),
+        ),
+    )
+
+
 def test_day_of_week(df_datetime):
     assert_result_equal(
         df_datetime,

@@ -7,6 +7,8 @@ import pytest
 
 
 supported_options = [
+    "duckdb_parquet",
+    "sqlite",
     "postgres",
     "mssql",
     "ibm_db2",
@@ -28,5 +30,10 @@ def pytest_collection_modifyitems(config: pytest.Config, items):
         if not config.getoption("--" + opt):
             skip = pytest.mark.skip(reason=f"{opt} not selected")
             for item in items:
-                if opt in item.keywords:
+                if opt in item.keywords or any(
+                    kw.startswith(f"{opt}-")
+                    or kw.endswith(f"-{opt}")
+                    or f"-{opt}-" in kw
+                    for kw in item.keywords
+                ):
                     item.add_marker(skip)

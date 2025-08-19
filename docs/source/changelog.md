@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.4 (2025-08-19)
+- support IBM DB2 dialect
+
 ## 0.5.3 (2025-06-29)
 
 - improve repr for interactive development (a preview of the data is shown now)

@@ -26,7 +26,9 @@ class Cache:
     group_by: set[UUID]
     is_filtered: bool
 
-    backend: Literal["polars", "sqlite", "postgres", "duckdb", "mssql"]
+    backend: Literal[
+        "polars", "polars_parquet", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
+    ]
 
     # For a column to be usable in an expression, the table it comes from must be an
     # ancestor of the current table AND the column's UUID must be in `all_cols` of the

@@ -24,11 +24,13 @@ The following SQL dialects are currently supported:
 - Postgres
 - Microsoft SQL Server/TSQL
 - DuckDB
+- IBM DB2
 - Sqlite (rather used for testing so far)
 
 Example sqlalchemy connection strings:
 - Postgres: `postgresql://user:password@localhost:5432/{database}`
 - Microsoft SQL Server: `mssql+pyodbc://user:password@127.0.0.1:1433/{database}?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no`
+- IBM DB2: `db2+ibm_db://db2inst1:password@localhost:50000/testdb`
 - DuckDB: `duckdb:////tmp/db.duckdb`
 
 See [Database Testing](database_testing.md) for an example how to spin up a database for testing.
@@ -53,3 +55,18 @@ with tempfile.TemporaryDirectory() as temp_dir:
         conn.commit()
     example(engine)
 ```
+
+## Deficiencies of backends
+
+### Microsoft SQL Server
+- TSQL does not support special floatingpoint values like inf/nan in a usable way
+- list aggregation not supported for this backend
+
+### IBM DB2
+- Boolean columns seem to be newer and buggy feature (see https://github.com/ibmdb/python-ibmdbsa/issues/161)
+- DB2 supports inf/nan values only for DECFLOAT and this type is not supported by sqlalchemy
+- Whitespaces are handled in a strange way
+- VARCHAR(max) does not exist. VARCHAR(32672) is the maximum length. Beyond CLOB is an alternative, but limits
+supported operations. Pydiverse.transform will not prevent invalid operations before sending queries to DB2.
+- list aggregation not supported for this backend
+- ordered aggregation not supported for this backend

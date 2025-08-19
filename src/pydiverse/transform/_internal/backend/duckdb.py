@@ -117,3 +117,7 @@ with DuckDbImpl.impl_store.impl_manager as impl:
     @impl(ops.list_agg)
     def _list_agg(x):
         return sqa.func.array_agg(x)
+
+    @impl(ops.dt_day_of_week)
+    def _day_of_week(x):
+        return (sqa.extract("dow", x) + 6) % sqa.literal_column("7") + 1

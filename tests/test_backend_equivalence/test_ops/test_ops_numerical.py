@@ -113,7 +113,9 @@ def test_ceil(df_num):
     )
 
 
-@skip_backends("mssql")
+# MSSQL is really bad with inf/nan handling. IBM DB2 supports it with DECFLOAT but
+# sqlalchemy doesn't support that.
+@skip_backends("mssql", "ibm_db2")
 def test_inf_lit(df_num):
     assert_result_equal(
         df_num,
@@ -134,7 +136,9 @@ def test_inf_lit(df_num):
     )
 
 
-@skip_backends("mssql", "sqlite")
+# MSSQL is really bad with inf/nan handling. IBM DB2 supports it with DECFLOAT but
+# sqlalchemy doesn't support that.
+@skip_backends("mssql", "sqlite", "ibm_db2")
 def test_nan_lit(df_num):
     assert_result_equal(
         df_num,
@@ -146,7 +150,9 @@ def test_nan_lit(df_num):
     )
 
 
-@skip_backends("mssql")
+# MSSQL is really bad with inf/nan handling. IBM DB2 supports it with DECFLOAT but
+# sqlalchemy doesn't support that.
+@skip_backends("mssql", "ibm_db2")
 def test_is_inf(df_num):
     assert_result_equal(
         df_num,
@@ -164,7 +170,9 @@ def test_is_inf(df_num):
     )
 
 
-@skip_backends("mssql", "sqlite")
+# MSSQL is really bad with inf/nan handling. IBM DB2 supports it with DECFLOAT but
+# sqlalchemy doesn't support that.
+@skip_backends("mssql", "sqlite", "ibm_db2")
 def test_is_nan(df_num):
     assert_result_equal(
         df_num,

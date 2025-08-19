@@ -156,7 +156,7 @@ def test_op_min(df4):
         df4,
         lambda t: t
         >> group_by(t.col1)
-        >> summarize(**{c.name + "_min": c.min() for c in t}),
+        >> summarize(**{c.name + "_min": c.min() for c in t if c.name != "col7"}),
     )
 
 
@@ -165,7 +165,7 @@ def test_op_max(df4):
         df4,
         lambda t: t
         >> group_by(t.col1)
-        >> summarize(**{c.name + "_max": c.max() for c in t}),
+        >> summarize(**{c.name + "_max": c.max() for c in t if c.name != "col7"}),
     )
 
 

@@ -167,9 +167,13 @@ with PostgresImpl.impl_store.impl_manager as impl:
 
     @impl(ops.dt_millisecond)
     def _dt_millisecond(x):
-        _1000 = sqa.literal_column("1000")
-        return sqa.func.FLOOR(
-            sqa.extract("milliseconds", x) % _1000, type_=sqa.Integer()
+        return sqa.func.FLOOR(sqa.extract("millisecond", x), type_=sqa.Integer()) % 1000
+
+    @impl(ops.dt_microsecond)
+    def _dt_microsecond(x):
+        return (
+            sqa.func.FLOOR(sqa.extract("microsecond", x), type_=sqa.Integer())
+            % 1_000_000
         )
 
     @impl(ops.horizontal_max, String(), String(), ...)
@@ -214,3 +218,7 @@ with PostgresImpl.impl_store.impl_manager as impl:
         if not isinstance(y.type, Float):
             y = sqa.cast(y, sqa.Double)
         return x / y
+
+    @impl(ops.dt_day_of_week)
+    def _day_of_week(x):
+        return (sqa.extract("dow", x) + 6) % sqa.literal_column("7") + 1
