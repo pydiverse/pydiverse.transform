@@ -781,4 +781,6 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.rand)
     def _rand():
-        return pl.int_range(pl.len()).map_elements(lambda x: random.random())
+        return pl.int_range(pl.len()).map_elements(
+            lambda x: random.random(), pl.Float64()
+        )
