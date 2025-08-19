@@ -337,6 +337,12 @@ def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
     return ColFn(ops.horizontal_sum, arg, *args)
 
 
+def rand() -> ColExpr[Float]:
+    """Generates a column of random floating point number between 0 and 1."""
+
+    return ColFn(ops.rand)
+
+
 def rank(
     *,
     partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,

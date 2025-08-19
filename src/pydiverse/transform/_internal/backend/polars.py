@@ -1,6 +1,7 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
+import random
 import uuid
 from collections.abc import Iterable
 from typing import Any
@@ -773,3 +774,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
     @impl(ops.clip)
     def _clip(x, lower, upper):
         return x.clip(lower, upper)
+
+    @impl(ops.rand)
+    def _rand():
+        return pl.int_range(pl.len()).map_elements(lambda x: random.random())

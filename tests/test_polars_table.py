@@ -650,7 +650,7 @@ class TestPolarsLazyImpl:
 
     def test_cum_sum(self, tbl1):
         assert_equal(
-            tbl1 >> mutate(p=tbl1.col1.cum_sum()),
+            tbl1 >> mutate(p=tbl1.col1.cum_sum(arrange=tbl1.col1)),
             df1.with_columns(p=pl.col("col1").cum_sum()),
         )
 
@@ -801,6 +801,9 @@ class TestPolarsLazyImpl:
             tbl1 >> mutate(z=eval_aligned(tbl1.col1 + tbl_right.b)),
             df1.with_columns(z=pl.col("col1") + df_right.get_column("b")),
         )
+
+    def test_rand(self, tbl4):
+        tbl4 >> mutate(r=pdt.rand()) >> export(Polars)
 
 
 class TestPrintAndRepr:

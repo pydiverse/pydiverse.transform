@@ -239,3 +239,12 @@ def test_clip(df_num):
             **{c.name + "2": c.clip(-500, 1024) for c in t},
         ),
     )
+
+
+def test_rand(df_num):
+    # just see that it runs
+    def f(t):
+        t >> mutate(r=pdt.rand()) >> export(Polars)
+        return pdt.Table({"a": [1]})
+
+    assert_result_equal(df_num, f)

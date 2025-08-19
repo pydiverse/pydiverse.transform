@@ -45,10 +45,6 @@ class MsSqlImpl(SqlImpl):
         return "Latin1_General_bin"
 
     @classmethod
-    def random_col(cls):
-        return sqa.text("NEWID()")
-
-    @classmethod
     def export(
         cls,
         nd: AstNode,
@@ -406,3 +402,7 @@ with MsSqlImpl.impl_store.impl_manager as impl:
         return sqa.func.sign(x) * _pow(
             sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
         )
+
+    @impl(ops.rand)
+    def _rand():
+        return sqa.func.RAND(sqa.text("convert(varbinary, newid())"))

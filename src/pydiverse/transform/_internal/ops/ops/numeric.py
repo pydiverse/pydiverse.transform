@@ -143,3 +143,10 @@ is_not_inf = Operator("is_not_inf", Signature(Float(), return_type=Bool()))
 is_nan = Operator("is_nan", Signature(Float(), return_type=Bool()))
 
 is_not_nan = Operator("is_not_nan", Signature(Float(), return_type=Bool()))
+
+rand = Operator(
+    "rand",
+    Signature(return_type=Float()),
+    generate_expr_method=False,
+    doc="Generates a column of random floating point number between 0 and 1.",
+)

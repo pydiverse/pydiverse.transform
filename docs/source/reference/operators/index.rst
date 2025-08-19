@@ -134,6 +134,7 @@ Global functions
    lit
    max
    min
+   rand
    rank
    row_number
    sum
