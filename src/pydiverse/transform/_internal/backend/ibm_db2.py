@@ -90,3 +90,7 @@ with IbmDb2Impl.impl_store.impl_manager as impl:
         return sqa.func.sign(x) * pow_impl(
             sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
         )
+
+    @impl(ops.rand)
+    def _rand():
+        return sqa.func.RANDOM(1729)
