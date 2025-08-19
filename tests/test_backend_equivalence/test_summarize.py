@@ -6,13 +6,14 @@ from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
 
 
-def test_ungrouped(df3):
+def test_ungrouped(df3, df4):
     assert_result_equal(df3, lambda t: t >> summarize(mean3=t.col3.mean()))
     assert_result_equal(
         df3,
         lambda t: t >> summarize(mean3=t.col3.mean(), mean4=t.col4.mean()),
     )
-    assert_result_equal(df3, lambda t: t >> group_by() >> summarize(y=t.col1.sum()))
+    assert_result_equal(df3, lambda t: t >> summarize(y=t.col1.sum()))
+    assert_result_equal(df4, lambda t: t >> summarize(y=t.col3.sum()))
 
 
 def test_empty_ungrouped_fail(df3):

@@ -1,10 +1,12 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
+import copy
 from functools import partial, wraps
 
 from pydiverse.transform._internal.errors import SubqueryError
 from pydiverse.transform._internal.tree import verbs
+from pydiverse.transform._internal.tree.col_expr import Col
 
 
 class Pipeable:
@@ -51,6 +53,48 @@ class inverse_partial(partial):
 
 
 def verb(fn):
+    """
+    Decorator for creating verbs.
+
+    A verb is simply a function decorated with this decorator that takes a
+    pydiverse.transform Table as the first argument. `@verb` enables usage of
+    the function with the pipe `>>` syntax.
+
+    Examples
+    --------
+    >>> @verb
+    ... def strip_all_strings(tbl: pdt.Table) -> pdt.Table:
+    ...     return tbl >> mutate(
+    ...         **{c.name: c.str.strip() for c in tbl if c.dtype() == pdt.String()}
+    ...     )
+    >>> t = pdt.Table(
+    ...     {
+    ...         "a": ["  abcd 5 ", "212"],
+    ...         "b": [" 917. __ ", " 2 "],
+    ...         "c": [1, 2],
+    ...     },
+    ...     name="t",
+    ... )
+    >>> t >> strip_all_strings() >> show()
+    Table `t` (backend: polars)
+    shape: (2, 3)
+    ┌─────┬────────┬─────────┐
+    │ c   ┆ a      ┆ b       │
+    │ --- ┆ ---    ┆ ---     │
+    │ i64 ┆ str    ┆ str     │
+    ╞═════╪════════╪═════════╡
+    │ 1   ┆ abcd 5 ┆ 917. __ │
+    │ 2   ┆ 212    ┆ 2       │
+    └─────┴────────┴─────────┘
+
+    Note
+    ----
+    To make the code completion of your IDE not show the table as the first argument,
+    simply add an `@overload` before the verb definition:
+    >>> @overload
+    ... def strip_all_strings() -> pdt.Table: ...
+    """
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
         return Pipeable(inverse_partial(fn, *args, **kwargs))
@@ -58,46 +102,69 @@ def verb(fn):
     return wrapper
 
 
+def check_subquery(new_tbl, child_tbl, *, is_right: bool = False):
+    if (reason := child_tbl._cache.requires_subquery(new_tbl._ast)) is not None:
+        # Search among descendants of the current node for an `Alias` that can be used
+        # to create a subquery. If we hit a `Join` or `SubqueryMarker`, we stop.
+        chain: list[verbs.Verb] = [new_tbl._ast]
+        for nd in child_tbl._ast.iter_subtree_preorder():
+            if isinstance(nd, verbs.Alias):
+                new_chain = [copy.copy(c) for c in chain]
+                new_chain.append(verbs.SubqueryMarker(nd))
+
+                # rebuild the part of the AST leading to the `Alias`
+                for i in range(1, len(new_chain) - 1):
+                    new_chain[i].child = new_chain[i + 1]
+                if is_right:
+                    assert isinstance(new_tbl._ast, verbs.Join)
+                    new_chain[0].right = new_chain[1]
+                else:
+                    new_chain[0].child = new_chain[1]
+
+                from pydiverse.transform._internal.pipe.table import Table
+
+                # See if we still need a subquery
+                test_tbl = Table(new_chain[1])
+                new_chain[0].map_col_nodes(
+                    lambda expr: test_tbl._cache.cols[expr._uuid]  # noqa: B023
+                    if isinstance(expr, Col) and expr._uuid in test_tbl._cache.cols  # noqa: B023
+                    else expr
+                )
+                if test_tbl._cache.requires_subquery(new_chain[0]):
+                    break
+
+                modified_new_tbl = copy.copy(new_tbl)
+                modified_new_tbl._ast = new_chain[0]
+                return (modified_new_tbl, test_tbl)
+
+            if isinstance(nd, verbs.SubqueryMarker | verbs.Join):
+                break
+            chain.append(nd)
+
+        raise SubqueryError(
+            f"Executing the `{new_tbl._ast.__class__.__name__.lower()}` verb "
+            f"on the table `{new_tbl._ast.child.name}` requires a subquery, which "
+            "is forbidden in transform by default.\n"
+            f"reason for the subquery: {reason}\n"
+            f"hint: Materialize the table `{new_tbl._ast.child.name}` before this "
+            "verb. If you are sure you want to do a subquery, put an "
+            "`>> alias()` before this verb. "
+        )
+
+    return (new_tbl, child_tbl)
+
+
+# Checks for subqueries and updates the cache for all verbs except `join`. Since `join`
+# is much more complex, we do these tasks manually in the verb.
 def modify_ast(fn):
     @wraps(fn)
     def _fn(table, *args, **kwargs):
         new = fn(table, *args, **kwargs)
         assert new._ast != table._ast
 
-        def _check_subquery(cache, ast_node):
-            if (reason := cache.requires_subquery(new._ast)) is not None:
-                # TODO: we should also search for aliases in the subtree and see if we
-                # can make it work by inserting a subquery at one of those.
-                if not isinstance(ast_node, verbs.Alias):
-                    raise SubqueryError(
-                        f"Executing the `{new._ast.__class__.__name__.lower()}` verb "
-                        f"on the table `{ast_node.name}` requires a subquery, which "
-                        "is forbidden in transform by default.\n"
-                        f"reason for the subquery: {reason}\n"
-                        f"hint: Materialize the table `{ast_node.name}` before this "
-                        "verb. If you are sure you want to do a subquery, put an "
-                        "`>> alias()` before this verb. "
-                    )
-                return True
-            return False
-
-        # If a subquery is required, we put a marker in between
         assert new._ast.child == table._ast
-        if _check_subquery(table._cache, table._ast):
-            new._ast.child = verbs.SubqueryMarker(new._ast.child)
-            new._cache = new._cache.update(new._ast.child)
-
-        if isinstance(new._ast, verbs.Join):
-            if _check_subquery(args[0]._cache, args[0]._ast):
-                new._ast.right = verbs.SubqueryMarker(new._ast.right)
-                right_cache = args[0]._cache.update(new._ast.right)
-            else:
-                right_cache = args[0]._cache
-
-        new._cache = new._cache.update(
-            new._ast,
-            right_cache=right_cache if isinstance(new._ast, verbs.Join) else None,
-        )
+        new, child = check_subquery(new, table)
+        new._cache = child._cache.update(new._ast)
 
         return new
 

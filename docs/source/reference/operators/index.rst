@@ -48,12 +48,19 @@ Expression methods
    __truediv__
    __xor__
    abs
+   acos
    all
    any
    ascending
+   asin
+   atan
    cast
+   cbrt
    ceil
+   clip
+   cos
    count
+   cum_sum
    dense_rank
    descending
    dt.day
@@ -84,16 +91,18 @@ Expression methods
    is_null
    list.agg
    log
+   log10
    map
    max
    mean
    min
    nulls_first
    nulls_last
-   prefix_sum
    rank
    round
    shift
+   sin
+   sqrt
    str.contains
    str.ends_with
    str.join
@@ -107,6 +116,7 @@ Expression methods
    str.to_datetime
    str.upper
    sum
+   tan
 
 Global functions
 ----------------
@@ -124,6 +134,7 @@ Global functions
    lit
    max
    min
+   rand
    rank
    row_number
    sum

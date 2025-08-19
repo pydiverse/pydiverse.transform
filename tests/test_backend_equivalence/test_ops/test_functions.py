@@ -3,6 +3,7 @@
 
 import pydiverse.transform as pdt
 from pydiverse.transform import C
+from pydiverse.transform._internal.errors import DataTypeError
 from pydiverse.transform._internal.pipe.verbs import mutate
 from pydiverse.transform._internal.tree.col_expr import LiteralCol
 from tests.fixtures.backend import skip_backends
@@ -93,7 +94,9 @@ def test_sum(df4):
 
 def test_coalesce(df4):
     assert_result_equal(
-        df4, lambda t: t >> mutate(w=pdt.coalesce(*(c for c in t))), exception=TypeError
+        df4,
+        lambda t: t >> mutate(w=pdt.coalesce(*(c for c in t))),
+        exception=DataTypeError,
     )
 
     assert_result_equal(

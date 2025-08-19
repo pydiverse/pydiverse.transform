@@ -6,7 +6,7 @@ import functools
 import inspect
 import math
 import operator
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 from uuid import UUID
 
@@ -132,6 +132,9 @@ class SqlImpl(TableImpl):
             name,
             {col.name: self.pdt_type(col.type) for col in self.table.columns},
         )
+
+    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+        return f"name = `{self.name}`\nengine = {repr(self.engine)}\n"
 
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]
@@ -335,6 +338,9 @@ class SqlImpl(TableImpl):
 
             else:
                 value: sqa.FunctionElement = impl(*args)
+
+                if expr.op == ops.cum_sum and cls.dialect_order_append_rand():
+                    order_by += [cls.get_impl(ops.rand, [])()]
 
                 if (
                     partition_by is not None
@@ -551,12 +557,7 @@ class SqlImpl(TableImpl):
             right_table, right_query, right_sqa_expr = cls.compile_ast(
                 nd.right, needed_cols
             )
-            sqa_expr.update(
-                {
-                    uid: sqa.label(lb.name + nd.suffix, lb)
-                    for uid, lb in right_sqa_expr.items()
-                }
-            )
+            sqa_expr.update(right_sqa_expr)
 
             compiled_on = cls.compile_col_expr(nd.on, sqa_expr)
 
@@ -619,6 +620,12 @@ class SqlImpl(TableImpl):
     def pdt_type(cls, sqa_type: sqa.types.TypeEngine) -> Dtype:
         return Dtype.from_sql(sqa_type)
 
+    @classmethod
+    def dialect_order_append_rand(cls):
+        # by default we want to follow polars for cum_sum to ensure equal order values
+        # don't get the same result value
+        return True
+
 
 # MSSQL complains about duplicates in ORDER BY.
 def dedup_order_by(
@@ -652,7 +659,7 @@ def create_aliases(nd: AstNode, num_occurrences: dict[str, int]) -> dict[str, in
     elif isinstance(nd, TableImpl):
         table_name = nd.table.name
         if cnt := num_occurrences.get(table_name):
-            nd.table = nd.table.alias(f"{table_name}__{cnt}")
+            nd.table = nd.table.alias(f"{table_name}_{cnt}")
         else:
             # always set alias to shorten queries with schemas
             nd.table = nd.table.alias(table_name)
@@ -922,3 +929,56 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.fill_null)
     def _fill_null(x, y):
         return sqa.func.coalesce(x, y)
+
+    @impl(ops.sin)
+    def _sin(x):
+        return sqa.func.sin(x)
+
+    @impl(ops.cos)
+    def _cos(x):
+        return sqa.func.cos(x)
+
+    @impl(ops.tan)
+    def _tan(x):
+        return sqa.func.tan(x)
+
+    @impl(ops.asin)
+    def _asin(x):
+        return sqa.func.asin(x)
+
+    @impl(ops.acos)
+    def _acos(x):
+        return sqa.func.acos(x)
+
+    @impl(ops.atan)
+    def _atan(x):
+        return sqa.func.atan(x)
+
+    @impl(ops.sqrt)
+    def _sqrt(x):
+        return sqa.func.sqrt(x)
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        return sqa.func.cbrt(x)
+
+    @impl(ops.log10)
+    def _log10(x):
+        return sqa.func.log10(x)
+
+    @impl(ops.clip)
+    def _clip(x, lower, upper, *, _Impl: SqlImpl, _sig: Sequence[Dtype]):
+        return sqa.case(
+            (x.is_(sqa.null()), sqa.null()),
+            else_=_Impl.get_impl(ops.horizontal_max, _sig)(
+                _Impl.get_impl(ops.horizontal_min, _sig)(x, upper), lower
+            ),
+        )
+
+    @impl(ops.cum_sum)
+    def _cum_sum(x):
+        return sqa.func.sum(x)
+
+    @impl(ops.rand)
+    def _rand():
+        return sqa.func.random()

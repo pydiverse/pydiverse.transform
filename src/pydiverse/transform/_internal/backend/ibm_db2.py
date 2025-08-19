@@ -4,7 +4,7 @@
 import sqlalchemy as sqa
 from sqlalchemy import Cast
 
-from pydiverse.common import Decimal
+from pydiverse.common import Decimal, Float
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
 
@@ -30,6 +30,11 @@ class IbmDb2Impl(SqlImpl):
         if isinstance(pdt_type, Decimal):
             return sqa.DECIMAL(15, 6)
         return super().sqa_type(pdt_type)
+
+    @classmethod
+    def dialect_order_append_rand(cls):
+        # DB2 hates non-deterministic behavior and forbids rand in ORDER BY clauses.
+        return False
 
 
 with IbmDb2Impl.impl_store.impl_manager as impl:
@@ -83,3 +88,14 @@ with IbmDb2Impl.impl_store.impl_manager as impl:
     @impl(ops.dt_day_of_week)
     def _day_of_week(x):
         return (sqa.extract("dow", x) + 5) % sqa.literal_column("7") + 1
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        pow_impl = IbmDb2Impl.get_impl(ops.pow, (Float(), Float()))
+        return sqa.func.sign(x) * pow_impl(
+            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
+        )
+
+    @impl(ops.rand)
+    def _rand():
+        return sqa.func.RANDOM(1729)

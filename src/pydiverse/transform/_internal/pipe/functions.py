@@ -28,22 +28,22 @@ from pydiverse.transform._internal.tree.col_expr import (
     ColName,
     LiteralCol,
     WhenClause,
-    wrap_literal,
+    wrap_literals,
 )
 
 
 def when(condition: ColExpr) -> WhenClause:
-    condition = wrap_literal(condition)
+    condition = wrap_literals(condition)
     if (
         condition.dtype() is not None
         and not types.without_const(condition.dtype()) == Bool()
     ):
-        raise TypeError(
+        raise errors.DataTypeError(
             "argument for `when` must be of boolean type, but has type "
             f"`{condition.dtype()}`"
         )
 
-    return WhenClause([], wrap_literal(condition))
+    return WhenClause([], wrap_literals(condition))
 
 
 def lit(val: Any, dtype: Dtype | type[Dtype] | None = None) -> LiteralCol:
@@ -335,6 +335,12 @@ def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
     """"""
 
     return ColFn(ops.horizontal_sum, arg, *args)
+
+
+def rand() -> ColExpr[Float]:
+    """Generates a column of random floating point number between 0 and 1."""
+
+    return ColFn(ops.rand)
 
 
 def rank(

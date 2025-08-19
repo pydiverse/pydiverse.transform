@@ -3,6 +3,7 @@
 
 import copy
 import dataclasses
+from pprint import pformat
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -29,6 +30,40 @@ class Cache:
     backend: Literal[
         "polars", "polars_parquet", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
     ]
+
+    def __repr__(self) -> str:
+        return (
+            "Cache(\n"
+            + "  name_to_uuid="
+            + f"""{
+                "{" + pformat(self.name_to_uuid, indent=16)[16:]
+                if len(self.name_to_uuid) > 1
+                else pformat(self.name_to_uuid)
+            }"""
+            + ",\n"
+            + "  uuid_to_name="
+            + f"""{
+                "{" + pformat(self.uuid_to_name, indent=16)[16:]
+                if len(self.uuid_to_name) > 1
+                else pformat(self.name_to_uuid)
+            }"""
+            + ",\n"
+            + f"  partition_by={self.partition_by}\n"
+            + "  derived_from={"
+            + f"{', '.join(d.ast_repr(oneline=True) for d in self.derived_from)}"
+            + "},\n"
+            + "  cols={"
+            + f"""{
+                pformat(
+                    {uid: col.ast_repr(depth=0) for uid, col in self.cols.items()},
+                    indent=8,
+                )[8:]
+            }"""
+            + ",\n"
+            + f"  limit={self.limit},\n"
+            + f"  group_by={self.group_by},\n"
+            + f"  is_filtered={self.is_filtered},\n)"
+        )
 
     # For a column to be usable in an expression, the table it comes from must be an
     # ancestor of the current table AND the column's UUID must be in `all_cols` of the
@@ -150,10 +185,7 @@ class Cache:
             assert right_cache is not None
 
             res.cols = self.cols | right_cache.cols
-            res.name_to_uuid = self.name_to_uuid | {
-                name + node.suffix: uid
-                for name, uid in right_cache.name_to_uuid.items()
-            }
+            res.name_to_uuid = self.name_to_uuid | right_cache.name_to_uuid
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
             res.derived_from = self.derived_from | right_cache.derived_from
@@ -203,7 +235,7 @@ class Cache:
         if isinstance(node, verbs.Mutate) and any(
             any(
                 col.ftype(agg_is_window=True) in (Ftype.WINDOW, Ftype.AGGREGATE)
-                for col in fn.iter_subtree()
+                for col in fn.iter_subtree_postorder()
                 if isinstance(col, Col)
             )
             for fn in node.iter_col_nodes()
@@ -238,7 +270,7 @@ class Cache:
 
             if (
                 node.how == "full"
-                or (node.right in self.derived_from and node.how == "left")
+                or (node.child not in self.derived_from and node.how == "left")
             ) and any(
                 types.is_const(self.cols[uid].dtype())
                 for uid in self.uuid_to_name.keys()
@@ -253,7 +285,7 @@ class Cache:
 
             if any(
                 col.ftype() != Ftype.ELEMENT_WISE and col._uuid in self.cols
-                for col in node.on.iter_subtree()
+                for col in node.on.iter_subtree_postorder()
                 if isinstance(col, Col)
             ):
                 return "window / aggregation functions in join condition"

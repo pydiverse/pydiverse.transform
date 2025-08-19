@@ -1,6 +1,7 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
+import random
 import uuid
 from collections.abc import Iterable
 from typing import Any
@@ -13,7 +14,11 @@ from pydiverse.common import (
     Int,
     String,
 )
-from pydiverse.transform._internal.backend.table_impl import TableImpl, split_join_cond
+from pydiverse.transform._internal.backend.table_impl import (
+    TableImpl,
+    get_left_right_on,
+    split_join_cond,
+)
 from pydiverse.transform._internal.backend.targets import Pandas, Polars, Target
 from pydiverse.transform._internal.ops import ops
 from pydiverse.transform._internal.ops.op import Ftype
@@ -25,8 +30,10 @@ from pydiverse.transform._internal.tree.col_expr import (
     Col,
     ColExpr,
     ColFn,
+    EvalAligned,
     LiteralCol,
     Order,
+    Series,
 )
 
 
@@ -48,6 +55,9 @@ class PolarsImpl(TableImpl):
                 for name, pl_type in df.collect_schema().items()
             },
         )
+
+    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+        return f"name = '{self.name}',\ndf = {repr(self.df)}\n"
 
     @staticmethod
     def build_query(nd: AstNode) -> None:
@@ -125,7 +135,9 @@ def compile_col_expr(
     op_kwargs: dict[str, Any] | None = None,
 ) -> pl.Expr:
     if isinstance(expr, Col):
-        return pl.col(name_in_df[expr._uuid])
+        if expr._uuid in name_in_df:
+            return pl.col(name_in_df[expr._uuid])
+        return expr.export(Polars)
 
     elif isinstance(expr, ColFn):
         impl = PolarsImpl.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
@@ -195,6 +207,7 @@ def compile_col_expr(
         elif arrange and expr.op.ftype == Ftype.WINDOW:
             # the function was executed on the ordered arguments. here we
             # restore the original order of the table.
+            # TODO: use arg_sort?
             inv_permutation = pl.int_range(0, pl.len(), dtype=pl.Int64()).sort_by(
                 by=order_by,
                 descending=descending,
@@ -242,8 +255,13 @@ def compile_col_expr(
 
         return compiled
 
-    else:
-        raise AssertionError
+    elif isinstance(expr, EvalAligned):
+        return compile_col_expr(expr.val, name_in_df, op_kwargs)
+
+    elif isinstance(expr, Series):
+        return expr.val
+
+    raise AssertionError
 
 
 def rename_overwritten_cols(
@@ -394,16 +412,7 @@ def compile_ast(
         # we maintain sensible names in the dataframe for all visible columns and try
         # to do so for hidden columns, too. If a hidden column has the same name as a
         # visible column, it gets a hash suffix. If two hidden columns collide, the
-        # right one gets a hash. (this is all after applying `nd.suffix`; we don't want
-        # to bother the user to provide a suffix only to prevent name collisions of
-        # hidden columns)
-
-        right_name_in_df = {
-            uid: name + nd.suffix for uid, name in right_name_in_df.items()
-        }
-        right_df = right_df.rename(
-            {name: name + nd.suffix for name in right_df.collect_schema().names()}
-        )
+        # right one gets a hash.
 
         # visible columns
         right_df, right_name_in_df = rename_overwritten_cols(
@@ -424,25 +433,9 @@ def compile_ast(
         name_in_df.update(right_name_in_df)
 
         eq_predicates = [pred for pred in predicates if pred.op == ops.equal]
-        left_on = []
-        right_on = []
-        for pred in eq_predicates:
-            left_on.append(pred.args[0])
-            right_on.append(pred.args[1])
-
-            must_swap_cols = None
-            for e in pred.args[0].iter_subtree():
-                if isinstance(e, Col):
-                    must_swap_cols = e._uuid in right_name_in_df
-                    assert e._uuid in name_in_df
-                    break
-            # TODO: find a good place to throw an error if one side of an equality
-            # predicate is constant. or do not consider such predicates as equality
-            # predicates and put them in join_where
-            assert must_swap_cols is not None
-
-            if must_swap_cols:
-                left_on[-1], right_on[-1] = right_on[-1], left_on[-1]
+        left_on, right_on = get_left_right_on(
+            eq_predicates, name_in_df, right_name_in_df
+        )
 
         # If there are only equality predicates, use normal join. Else use join_where
         if len(eq_predicates) == len(predicates):
@@ -736,12 +729,58 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _str_join(x, delim):
         return x.str.join(pl.select(delim).item())
 
-    @impl(ops.prefix_sum)
-    def _prefix_sum(x):
-        return x.cum_sum()
+    @impl(ops.cum_sum)
+    def _cum_sum(x: pl.Expr):
+        return x.cum_sum().fill_null(strategy="forward")
 
     @impl(ops.list_agg)
     def _list_agg(x, *, _empty_group_by: bool):
         if _empty_group_by:
             return x.implode()
         return x
+
+    @impl(ops.sin)
+    def _sin(x):
+        return x.sin()
+
+    @impl(ops.cos)
+    def _cos(x):
+        return x.cos()
+
+    @impl(ops.tan)
+    def _tan(x):
+        return x.tan()
+
+    @impl(ops.asin)
+    def _asin(x):
+        return x.arcsin()
+
+    @impl(ops.acos)
+    def _acos(x):
+        return x.arccos()
+
+    @impl(ops.atan)
+    def _atan(x):
+        return x.arctan()
+
+    @impl(ops.sqrt)
+    def _sqrt(x):
+        return x.sqrt()
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        return x.cbrt()
+
+    @impl(ops.log10)
+    def _log10(x):
+        return x.log10()
+
+    @impl(ops.clip)
+    def _clip(x, lower, upper):
+        return x.clip(lower, upper)
+
+    @impl(ops.rand)
+    def _rand():
+        return pl.int_range(pl.len()).map_elements(
+            lambda x: random.random(), pl.Float64()
+        )

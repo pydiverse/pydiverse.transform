@@ -69,7 +69,7 @@ class MsSqlImpl(SqlImpl):
             final_select = Cache.from_ast(nd).selected_cols()
 
         # boolean / bit conversion
-        for desc in nd.iter_subtree():
+        for desc in nd.iter_subtree_postorder():
             if isinstance(desc, verbs.Verb):
                 desc.map_col_roots(
                     functools.partial(
@@ -81,7 +81,7 @@ class MsSqlImpl(SqlImpl):
                 )
 
         # workaround for correct nulls_first / nulls_last behaviour on MSSQL
-        for desc in nd.iter_subtree():
+        for desc in nd.iter_subtree_postorder():
             if isinstance(desc, verbs.Arrange):
                 desc.order_by = convert_order_list(desc.order_by)
             if isinstance(desc, verbs.Verb):
@@ -396,3 +396,13 @@ with MsSqlImpl.impl_store.impl_manager as impl:
         if not isinstance(y.type, Float):
             y = sqa.cast(y, sqa.Double)
         return x / y
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        return sqa.func.sign(x) * _pow(
+            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
+        )
+
+    @impl(ops.rand)
+    def _rand():
+        return sqa.func.RAND(sqa.text("convert(varbinary, newid())"))

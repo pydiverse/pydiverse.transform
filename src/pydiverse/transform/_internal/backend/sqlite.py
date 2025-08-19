@@ -6,6 +6,7 @@ import sqlalchemy as sqa
 from pydiverse.common import (
     Date,
     Datetime,
+    Float,
     String,
 )
 from pydiverse.transform._internal.backend.sql import SqlImpl
@@ -194,6 +195,17 @@ with SqliteImpl.impl_store.impl_manager as impl:
     @impl(ops.is_not_nan)
     def _is_not_nan(x):
         return True
+
+    @impl(ops.cbrt)
+    def _cbrt(x):
+        pow_impl = SqliteImpl.get_impl(ops.pow, (Float(), Float()))
+        return sqa.func.sign(x) * pow_impl(
+            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
+        )
+
+    @impl(ops.clip)
+    def _clip(x, lower, upper):
+        return sqa.func.max(sqa.func.min(x, upper), lower)
 
     @impl(ops.dt_day_of_week)
     def _day_of_week(x):

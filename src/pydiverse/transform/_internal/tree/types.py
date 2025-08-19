@@ -33,6 +33,7 @@ from pydiverse.common import (
     UInt64,
 )
 from pydiverse.transform._internal import errors
+from pydiverse.transform._internal.errors import DataTypeError
 from pydiverse.transform._internal.ops import signature
 
 NoneType = type(None)
@@ -177,7 +178,7 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
         if diff := next(
             (dtype for dtype in dtypes if not isinstance(dtype, List)), None
         ):
-            raise TypeError(
+            raise DataTypeError(
                 f"type `{diff.__name__}` is not compatible with `List` type"
             )
 
@@ -188,7 +189,7 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
             return copy.copy(dtypes[0])
         if all(isinstance(dtype, Enum | String) for dtype in dtypes):
             return String()
-        raise TypeError(f"incompatible types `{', '.join(dtypes)}`")
+        raise DataTypeError(f"incompatible types `{', '.join(str(d) for d in dtypes)}`")
 
     if not (
         common_ancestors := functools.reduce(
@@ -197,7 +198,7 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
             IMPLICIT_CONVS[dtypes[0]].keys(),
         )
     ):
-        raise TypeError(f"incompatible types `{', '.join(dtypes)}`")
+        raise DataTypeError(f"incompatible types `{', '.join(str(d) for d in dtypes)}`")
 
     common_ancestors: list[Dtype] = list(common_ancestors)
     return copy.copy(

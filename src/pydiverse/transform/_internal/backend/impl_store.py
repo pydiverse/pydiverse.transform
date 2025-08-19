@@ -60,6 +60,7 @@ class ImplStore:
         return lambda *args, **kwargs: best_match(
             *args,
             **{kwarg: val for kwarg, val in kwargs.items() if kwarg in impl_kwargs},
+            **({"_sig": sig} if "_sig" in impl_kwargs else {}),
         )
 
 

@@ -7,7 +7,7 @@ import polars as pl
 import pytest
 
 import pydiverse.transform as pdt
-from pydiverse.transform._internal.errors import ColumnNotFoundError
+from pydiverse.transform._internal.errors import ColumnNotFoundError, DataTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_equal
 
@@ -122,7 +122,7 @@ class TestPolarsLazyImpl:
         assert isinstance(tbl2.col3.dtype(), pdt.Float64)
 
         # test that column expression type errors are checked immediately
-        with pytest.raises(TypeError):
+        with pytest.raises(DataTypeError):
             tbl1.col1 + tbl1.col2
 
         # here, transform should not be able to resolve the type and throw an error
@@ -591,7 +591,7 @@ class TestPolarsLazyImpl:
             >> group_by(C.col2)
             >> summarize(y=C.col3_right.sum()),
             tbl3
-            >> left_join(tbl2, C.col1 == C.col1_right, suffix="_right")
+            >> left_join(tbl2, tbl3.col1 == tbl2.col1, suffix="_right")
             >> mutate(v=C.col3 + C.col2_right)
             >> group_by(C.col2)
             >> summarize(y=C.col3_right.sum()),
@@ -648,9 +648,9 @@ class TestPolarsLazyImpl:
             .sort("col1"),
         )
 
-    def test_prefix_sum(self, tbl1):
+    def test_cum_sum(self, tbl1):
         assert_equal(
-            tbl1 >> mutate(p=tbl1.col1.prefix_sum()),
+            tbl1 >> mutate(p=tbl1.col1.cum_sum(arrange=tbl1.col1)),
             df1.with_columns(p=pl.col("col1").cum_sum()),
         )
 
@@ -719,6 +719,92 @@ class TestPolarsLazyImpl:
             df1_enum.with_columns(q=pl.col("p") + "l"),
         )
 
+    def test_col_rename(self, tbl2, tbl4):
+        assert_equal(tbl4 >> rename({tbl4.col1: "s"}), df4.rename({"col1": "s"}))
+        assert_equal(
+            tbl2
+            >> left_join(tbl4, on=tbl2.col1 == tbl4.col1, suffix="_right")
+            >> rename({tbl4.col5: "col5", tbl4.col4: "col4"})
+            >> drop(tbl4.col1),
+            df2.join(df4, how="left", on="col1"),
+        )
+
+    def test_join_renaming(self, tbl2, tbl3):
+        assert_equal(
+            tbl2 >> rename({"col3": "c"}) >> left_join(tbl3, on=["col1", "col2"]),
+            df2.rename({"col3": "c"})
+            .join(df3, how="left", on=["col1", "col2"])
+            .with_columns(
+                col1_df3=pl.when(pl.col("col4").is_null())
+                .then(None)
+                .otherwise(pl.col("col1")),
+                col2_df3=pl.when(pl.col("col4").is_null())
+                .then(None)
+                .otherwise(pl.col("col2")),
+            ),
+        )
+
+    def test_eval_aligned(self, tbl4):
+        assert_equal(
+            tbl4,
+            tbl4
+            >> drop(tbl4.col1)
+            >> mutate(col1=eval_aligned(df4.get_column("col1"))),
+        )
+
+        s = pl.Series([1.2**i for i in range(df4.height)])
+        assert_equal(
+            tbl4 >> filter(tbl4.col3 <= eval_aligned(s, with_=tbl4)),
+            df4.filter(pl.col("col3") <= s),
+        )
+
+        with pytest.raises(TypeError):
+            tbl4 >> arrange(s)
+
+        # pandas series
+        s_pd = s.to_pandas()
+        assert_equal(
+            tbl4
+            >> mutate(z=eval_aligned(tbl4.col1 + s_pd))
+            >> group_by(tbl4.col3)
+            >> summarize(u=C.z.sum()),
+            df4.with_columns(z=pl.col("col1") + s)
+            .group_by("col3")
+            .agg(u=pl.col("z").sum()),
+            check_row_order=False,
+        )
+
+    def test_aligned_decorator(self, tbl3):
+        @aligned(with_="tbl")
+        def reverse_col(col: pdt.ColExpr, tbl: pdt.Table) -> pdt.ColExpr:
+            pl_col: pl.Series = col.export(Polars())
+            return pl_col.reverse()
+
+        assert_equal(
+            tbl3 >> mutate(r=reverse_col(tbl3.col1 + tbl3.col2, tbl3)),
+            df3.with_columns(r=(pl.col("col1") + pl.col("col2")).reverse()),
+        )
+
+    def test_aligned_col_export(self, tbl3):
+        s = pl.Series(list(2**i for i in range(df3.height)))
+        assert_equal(
+            eval_aligned(tbl3.col1 + s, with_=tbl3).export(Polars),
+            df3.get_column("col1") + s,
+        )
+        assert_equal(
+            eval_aligned(pdt.lit(3) * s, with_=tbl3).export(Polars),
+            s * 3,
+        )
+
+    def test_aligned_multiple_tables(self, tbl1, tbl_right):
+        assert_equal(
+            tbl1 >> mutate(z=eval_aligned(tbl1.col1 + tbl_right.b)),
+            df1.with_columns(z=pl.col("col1") + df_right.get_column("b")),
+        )
+
+    def test_rand(self, tbl4):
+        tbl4 >> mutate(r=pdt.rand()) >> export(Polars)
+
 
 class TestPrintAndRepr:
     def test_table_str(self, tbl1):
@@ -736,9 +822,9 @@ class TestPrintAndRepr:
 
     def test_col_str(self, tbl1):
         col1_str = str(tbl1.col1)
-        series = tbl1._ast.df.collect().get_column("col1")
+        col_tbl = tbl1._ast.df.select("col1").collect()
 
-        assert str(series) in col1_str
+        assert str(col_tbl).split("\n", 1)[1] in col1_str
         assert "failed" not in col1_str
 
     def test_col_html_repr(self, tbl1):
@@ -757,21 +843,10 @@ class TestPrintAndRepr:
         assert "shape: (12, 5)" in tbl3_str
 
     def test_ast_repr(self, tbl4):
-        assert tbl4.col1.ast_repr() == "df4.col1 (Int64)"
-        assert (tbl4.col1 + tbl4.col2).ast_repr() == (
-            """__add__(
-  df4.col1 (Int64),
-  df4.col2 (Int64)
-)"""
-        )
+        assert tbl4.col1.ast_repr() == "df4.col1"
+        assert (tbl4.col1 + tbl4.col2).ast_repr() == ("__add__(df4.col1, df4.col2)")
         assert (tbl4.col1 + tbl4.col2 + tbl4.col3).ast_repr() == (
-            """__add__(
-  __add__(
-    df4.col1 (Int64),
-    df4.col2 (Int64)
-  ),
-  df4.col3 (Int64)
-)"""
+            "__add__(__add__(df4.col1, df4.col2), df4.col3)"
         )
         assert (
             pdt.when(tbl4.col1 > 1)
@@ -780,32 +855,13 @@ class TestPrintAndRepr:
             .then(tbl4.col3)
             .otherwise(7)
         ).ast_repr() == (
-            """CaseWhen(
-  __gt__(
-    df4.col1 (Int64),
-    lit(1, const Int64)
-  ) -> df4.col2 (Int64),
-  __lt__(
-    df4.col1 (Int64),
-    lit(-1, const Int64)
-  ) -> df4.col3 (Int64),
-  default=lit(7, const Int64)
-)"""
+            "case_when(__gt__(df4.col1, 1) -> df4.col2, "
+            "__lt__(df4.col1, -1) -> df4.col3, default=7)"
         )
 
         assert (
-            (tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2).ast_repr()
-            == """__add__(
-  Cast(
-    df4.col1 (Int64),
-    to=Float64,
-  ),
-  __truediv__(
-    df4.col2 (Int64),
-    lit(2, const Int64)
-  )
-)"""
-        )
+            tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2
+        ).ast_repr() == "__add__(cast(df4.col1, Float64), __truediv__(df4.col2, 2))"
 
         # TODO: This is currently how `filter` is translated to the AST. We could also
         # only do this transformation during backend translation, so that there is a
@@ -817,27 +873,21 @@ class TestPrintAndRepr:
                 .then(tbl4.col2.is_not_null())
                 .otherwise((tbl4.col3 % 2) == 0),
             ).ast_repr()
-            == """max(
-  CaseWhen(
-    CaseWhen(
-      __gt__(
-        df4.col1 (Int64),
-        lit(0, const Int64)
-      ) -> is_not_null(
-        df4.col2 (Int64)
-      ),
-      default=__eq__(
-        __mod__(
-          df4.col3 (Int64),
-          lit(2, const Int64)
-        ),
-        lit(0, const Int64)
-      )
-    ) -> df4.col1 (Int64),
-  ),
-  partition_by=[
-    df4.col2 (Int64),
-    df4.col3 (Int64)
-  ]
-)"""
+            == "max(case_when(case_when(__gt__(df4.col1, 0) -> is_not_null(df4.col2), "
+            "default=__eq__(__mod__(df4.col3, 2), 0)) -> df4.col1), "
+            "partition_by=[df4.col2, df4.col3])"
         )
+
+    def test_error_source_ptr(self, tbl1, tbl2):
+        with pytest.raises(DataTypeError) as r:
+            tbl1 >> mutate(
+                z=(2 * (tbl1.col1 + C.col2) - tbl1.col1.exp()) * tbl1.col1.acos()
+            )
+        assert "AST path" in r.value.args[0]
+
+        with pytest.raises(DataTypeError) as r:
+            tbl1 >> inner_join(
+                tbl2 >> rename({c: c.name + "42" for c in tbl2}),
+                on=C.col2 == tbl2.col1,
+            )
+        assert "AST path" in r.value.args[0]

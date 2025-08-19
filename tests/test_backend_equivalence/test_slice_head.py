@@ -79,8 +79,8 @@ def test_with_join(df1, df2):
         lambda t, u: t
         >> arrange(*t)
         >> slice_head(3)
-        >> alias()
-        >> left_join(u, C.col1 == u.col1),
+        >> alias(keep_col_refs=True)
+        >> left_join(u, t.col1 == u.col1),
         check_row_order=False,
     )
 
@@ -159,6 +159,7 @@ def test_with_group_by(df3):
         lambda t: t
         >> arrange(C.col1, *list(t)[0:-1])
         >> slice_head(6, offset=1)
+        >> rename({"col2": "c"})
         >> alias()
         >> group_by(C.col1)
         >> mutate(x=C.col4.mean())
