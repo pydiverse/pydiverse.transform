@@ -65,8 +65,9 @@ with tempfile.TemporaryDirectory() as temp_dir:
 ### IBM DB2
 - Boolean columns seem to be newer and buggy feature (see https://github.com/ibmdb/python-ibmdbsa/issues/161)
 - DB2 supports inf/nan values only for DECFLOAT and this type is not supported by sqlalchemy
-- Whitespaces are handled in a strange way
+- whitespaces are handled in a strange way
 - VARCHAR(max) does not exist. VARCHAR(32672) is the maximum length. Beyond CLOB is an alternative, but limits
 supported operations. Pydiverse.transform will not prevent invalid operations before sending queries to DB2.
+- cum_sum does not follow polars semantics in that it returns the same value for all rows with the same order by key
 - list aggregation not supported for this backend
 - ordered aggregation not supported for this backend
