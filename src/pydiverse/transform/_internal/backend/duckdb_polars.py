@@ -35,7 +35,7 @@ class DuckDbPolarsImpl(TableImpl):
         )
 
         self.table = sqa.Table(
-            name or "?",
+            name or "<polars dataframe>",
             sqa.MetaData(),
             *(
                 sqa.Column(col.name, DuckDbImpl.sqa_type(col.dtype()))
