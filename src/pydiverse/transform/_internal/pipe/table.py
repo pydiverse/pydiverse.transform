@@ -303,7 +303,11 @@ def get_head_tail(tbl: Table) -> tuple[pl.DataFrame, int]:
     return pl.concat([head, tail]), height
 
 
-def backend(table: Table) -> Literal["polars", "sqlite", "postgres", "duckdb", "mssql"]:
+def backend(
+    table: Table,
+) -> Literal[
+    "polars", "polars_parquet", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
+]:
     return table._cache.backend
 
 

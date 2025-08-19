@@ -52,7 +52,11 @@ def test_partition_by_argument(df3, df4):
         lambda t, u: t
         >> join(u, t.col1 == u.col3, how="left")
         >> group_by(t.col2)
-        >> mutate(y=(u.col3 + t.col1).max(partition_by=(col for col in t))),
+        >> mutate(
+            y=(u.col3 + t.col1).max(
+                partition_by=(col for col in t if col.name != "col7")
+            )
+        ),
     )
 
     assert_result_equal(

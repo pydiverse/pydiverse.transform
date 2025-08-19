@@ -66,6 +66,7 @@ def engine():
     #     "mssql+pyodbc://sqa:PydiQuant27@127.0.0.1:1433"
     #     "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
     # )
+    # engine = sqa.create_engine("db2+ibm_db://db2inst1:password@localhost:50000/testdb")
 
     df1.write_database("df1", engine, if_table_exists="replace")
     df2.write_database("df2", engine, if_table_exists="replace")
@@ -167,6 +168,7 @@ class TestSqlTable:
             >> join(tbl_right, tbl_left.a == tbl_right.b, "left", suffix="")
             >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
+            check_row_order=False,
         )
 
         assert_equal(

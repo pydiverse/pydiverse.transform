@@ -38,6 +38,11 @@ from pydiverse.transform._internal.tree.col_expr import (
     LiteralCol,
     Order,
 )
+from pydiverse.transform._internal.util.warnings import warn
+
+from . import sqlalchemy_fixes
+
+_ = sqlalchemy_fixes
 
 
 @dataclasses.dataclass(slots=True)
@@ -88,6 +93,20 @@ class SqlImpl(TableImpl):
             from .duckdb import DuckDbImpl
 
             Impl = DuckDbImpl
+
+        elif dialect == "ibm_db_sa":
+            from .ibm_db2 import IbmDb2Impl
+
+            Impl = IbmDb2Impl
+
+        else:
+            warn(
+                f"Pydiverse transform is not tested for dialect '{dialect}'. "
+                f"Assuming Postgres compatible SQL."
+            )
+            from .postgres import PostgresImpl
+
+            Impl = PostgresImpl
 
         return super().__new__(Impl)
 
@@ -143,7 +162,7 @@ class SqlImpl(TableImpl):
         return sqa.cast(sqa.literal("nan"), sqa.Double)
 
     @classmethod
-    def default_collation(cls):
+    def default_collation(cls) -> str | None:
         return "POSIX"
 
     @classmethod
@@ -191,6 +210,10 @@ class SqlImpl(TableImpl):
                         if types.without_const(col.dtype()) == NullType()
                     },
                 )
+                # fix column names in case default case is modified by database driver
+                # (for example IBM DB2 returns lowercase columns as uppercase column
+                # names)
+                df.columns = [c.name for c in sel.columns]
                 df.name = nd.name
                 return df
 
@@ -226,7 +249,10 @@ class SqlImpl(TableImpl):
     ) -> sqa.UnaryExpression:
         order_expr = cls.compile_col_expr(order.order_by, sqa_expr)
         if types.without_const(order.order_by.dtype()) == String():
-            order_expr = order_expr.collate(cls.default_collation())
+            if cls.default_collation() is not None:
+                # SQLAlchemy does not support collations for all backends, so we
+                # only apply it if the backend supports it.
+                order_expr = order_expr.collate(cls.default_collation())
         order_expr = order_expr.desc() if order.descending else order_expr.asc()
         if order.nulls_last is not None:
             order_expr = (
@@ -767,7 +793,11 @@ with SqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.dt_millisecond)
     def _dt_millisecond(x):
-        return sqa.extract("milliseconds", x) % 1000
+        return sqa.extract("millisecond", x) % 1000
+
+    @impl(ops.dt_microsecond)
+    def _dt_microsecond(x):
+        return sqa.extract("microsecond", x) % 1_000_000
 
     @impl(ops.dt_day_of_week)
     def _day_of_week(x):
@@ -824,9 +854,19 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.shift)
     def _shift(x, by, empty_value=None):
         if by >= 0:
-            return sqa.func.LAG(x, by, empty_value, type_=x.type)
+            if empty_value is not None and not isinstance(
+                empty_value.type, sqa.types.NullType
+            ):
+                return sqa.func.LAG(x, by, empty_value, type_=x.type)
+            else:
+                return sqa.func.LAG(x, by, type_=x.type)
         if by < 0:
-            return sqa.func.LEAD(x, -by, empty_value, type_=x.type)
+            if empty_value is not None and not isinstance(
+                empty_value.type, sqa.types.NullType
+            ):
+                return sqa.func.LEAD(x, -by, empty_value, type_=x.type)
+            else:
+                return sqa.func.LEAD(x, -by, type_=x.type)
 
     @impl(ops.row_number)
     def _row_number():

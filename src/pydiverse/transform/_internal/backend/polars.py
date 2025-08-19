@@ -552,6 +552,10 @@ with PolarsImpl.impl_store.impl_manager as impl:
     def _dt_millisecond(x):
         return x.dt.millisecond().cast(pl.Int64)
 
+    @impl(ops.dt_microsecond)
+    def _dt_microsecond(x):
+        return x.dt.microsecond().cast(pl.Int64)
+
     @impl(ops.dt_day_of_week)
     def _dt_day_of_week(x):
         return x.dt.weekday().cast(pl.Int64)
