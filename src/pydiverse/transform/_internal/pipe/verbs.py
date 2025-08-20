@@ -1199,8 +1199,8 @@ def join(
 
         if (
             isinstance(expr, Col)
-            and expr._ast not in left._cache.derived_from
-            and expr._ast not in right._cache.derived_from
+            and expr._uuid not in left._cache.cols
+            and expr._uuid not in right._cache.cols
         ):
             raise ValueError(
                 f"column `{expr.ast_repr()}` used in `on` neither exists in the table "
