@@ -372,7 +372,7 @@ def build_query() -> Pipeable: ...
 
 
 @verb
-def build_query(table: Table) -> Pipeable:
+def build_query(table: Table) -> str | None:
     """
     Compiles the operations accumulated on the current table to a SQL query.
 

@@ -247,7 +247,11 @@ class Table:
         return repr(self)
 
     def __repr__(self) -> str:
-        from pydiverse.transform._internal.pipe.verbs import get_backend, name
+        from pydiverse.transform._internal.pipe.verbs import (
+            build_query,
+            get_backend,
+            name,
+        )
 
         if self >> name() is None:
             tbl_name = "Table without name "
@@ -261,8 +265,20 @@ class Table:
             res += f"shape: ({height}, {len(self)})\n"
 
         except Exception as e:
-            return res + f"export failed\n{type(e).__name__}: {str(e)}"
+            try:
+                ast = repr(self._ast)
+            except Exception:
+                ast = ""
+            return res + f"export failed\n{type(e).__name__}: {str(e)}\n{ast}"
 
+        try:
+            query = self >> build_query()
+            if query is None:
+                query = ""
+            else:
+                query = "\n\nQuery:\n" + query
+        except Exception:
+            query = ""
         return res + str(df).split("\n", 1)[1]
 
     def __dir__(self) -> list[str]:
