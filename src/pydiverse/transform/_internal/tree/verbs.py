@@ -4,7 +4,6 @@
 import copy
 import dataclasses
 import re
-import textwrap
 import uuid
 from collections.abc import Callable, Iterable
 from typing import Literal
@@ -21,25 +20,18 @@ class Verb(AstNode):
     def __post_init__(self):
         self.name = self.child.name
 
-    def ast_repr(
-        self, verb_depth: int = -1, expr_depth: int = -1, *, oneline: bool = False
-    ) -> str:
+    def _unformatted_ast_repr(
+        self, verb_depth: int = -1, expr_depth: int = -1, *, oneline: bool
+    ):
         if oneline:
             return camel_to_snake(self.__class__.__name__)
 
         nd_repr = self._ast_node_repr(expr_depth)
         return (
-            f"* {camel_to_snake(self.__class__.__name__)}\n"
-            + textwrap.indent(nd_repr, "| ")
-            + (
-                ("|\n" + self.child.ast_repr(verb_depth - 1, expr_depth))
-                if verb_depth != 0
-                else ""
-            )
-        )
-
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return ""
+            self.child._unformatted_ast_repr(verb_depth - 1, expr_depth, oneline=False)
+            if verb_depth != 0
+            else "..."
+        ) + f" >> {nd_repr}"
 
     def _clone(self) -> tuple["Verb", dict[AstNode, AstNode], dict[UUID, UUID]]:
         child, nd_map, uuid_map = self.child._clone()
@@ -88,8 +80,13 @@ class Verb(AstNode):
 class Alias(Verb):
     uuid_map: dict[UUID, UUID] | None
 
+    # TODO: currently we kinda misuse Alias for column reference transfer. Maybe it
+    # would be nice to create a separate marker node for this to distinguish it from a
+    # user-created alias.
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return "" if self.name == self.child.name else self.name + "\n"
+        return (
+            "alias(" + (f"'{self.name}'" if self.name != self.child.name else "") + ")"
+        )
 
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned, nd_map, uuid_map = Verb._clone(self)
@@ -115,7 +112,7 @@ class Select(Verb):
         self.select = [g(col) for col in self.select]
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return ", ".join(col.ast_repr() for col in self.select) + "\n"
+        return "select(" + ", ".join(col.ast_repr() for col in self.select) + ")"
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
@@ -123,7 +120,11 @@ class Rename(Verb):
     name_map: dict[str, str]
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return ",\n".join(f"{k} -> {v}" for k, v in self.name_map.items()) + "\n"
+        return (
+            "rename({"
+            + ", ".join(f"'{k}': '{v}'" for k, v in self.name_map.items())
+            + "})"
+        )
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
@@ -133,12 +134,12 @@ class Mutate(Verb):
     uuids: list[UUID]
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return (
-            ",\n".join(
-                f"{k} = {v.ast_repr(expr_depth)}"
+        return "mutate(" + (
+            ", ".join(
+                f"{k}={v.ast_repr(expr_depth)}"
                 for k, v in zip(self.names, self.values, strict=True)
             )
-            + "\n"
+            + ")"
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -165,7 +166,11 @@ class Filter(Verb):
     predicates: list[ColExpr]
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return ",\n".join(pred.ast_repr(expr_depth) for pred in self.predicates) + "\n"
+        return (
+            "filter("
+            + ", ".join(pred.ast_repr(expr_depth) for pred in self.predicates)
+            + ")"
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.predicates
@@ -181,12 +186,12 @@ class Summarize(Verb):
     uuids: list[UUID]
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return (
-            ",\n".join(
-                f"{k} = {v.ast_repr(expr_depth)}"
+        return "summarize(" + (
+            ", ".join(
+                f"{k}={v.ast_repr(expr_depth)}"
                 for k, v in zip(self.names, self.values, strict=True)
             )
-            + "\n"
+            + ")"
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -213,7 +218,11 @@ class Arrange(Verb):
     order_by: list[Order]
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return ",\n".join(ord.ast_repr(expr_depth) for ord in self.order_by) + "\n"
+        return (
+            "arrange("
+            + ", ".join(ord.ast_repr(expr_depth) for ord in self.order_by)
+            + ")"
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
@@ -231,7 +240,7 @@ class SliceHead(Verb):
     offset: int
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return f"n = {self.n}, offset = {self.offset}\n"
+        return f"slice_head(n={self.n}, offset={self.offset})"
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
@@ -240,7 +249,7 @@ class GroupBy(Verb):
     add: bool
 
     def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return ", ".join(col.ast_repr() for col in self.group_by) + "\n"
+        return "group_by(" + ", ".join(col.ast_repr() for col in self.group_by) + ")"
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
@@ -250,7 +259,9 @@ class GroupBy(Verb):
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
-class Ungroup(Verb): ...
+class Ungroup(Verb):
+    def _ast_node_repr(self, expr_depth=-1):
+        return "ungroup()"
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
@@ -260,28 +271,29 @@ class Join(Verb):
     how: Literal["inner", "left", "full"]
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
 
-    def ast_repr(
-        self, verb_depth: int = -1, expr_depth: int = -1, *, oneline: bool = False
+    def _unformatted_ast_repr(
+        self, verb_depth: int = -1, expr_depth: int = -1, *, oneline: bool
     ) -> str:
         if oneline:
             return camel_to_snake(self.__class__.__name__)
 
-        res = self._ast_node_repr(expr_depth)
-        if verb_depth == 0:
-            return "* " + textwrap.indent("| ", res)[2:]
-
-        first, rest = res.split("\n", 1)
-        res = "*   join\n|\\  " + first + "\n" + textwrap.indent(rest, "| | ")
-
-        left_repr = self.child.ast_repr(verb_depth - 1, expr_depth)
-        right_repr = self.right.ast_repr(verb_depth - 1, expr_depth)
-        return res + "| |\n" + textwrap.indent(right_repr, "| ") + "|\n" + left_repr
-
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
         return (
-            f"how = `{self.how}`\n"
-            + f"on = {self.on.ast_repr(expr_depth)}\n"
-            + f"validate = `{self.validate}`\n"
+            self.child._unformatted_ast_repr(verb_depth - 1, expr_depth, oneline=False)
+            if verb_depth != 0
+            else "..."
+        ) + (
+            ">> join("
+            + (
+                self.right._unformatted_ast_repr(
+                    verb_depth - 1, expr_depth, oneline=False
+                )
+                if verb_depth != 0
+                else self.right._unformatted_ast_repr(0, expr_depth, oneline=False)
+            )
+            + ", "
+            + f"how='{self.how}', "
+            + f"on={self.on.ast_repr(expr_depth)}, "
+            + f"validate='{self.validate}')"
         )
 
     def _clone(self) -> tuple["Join", dict[AstNode, AstNode], dict[UUID, UUID]]:
@@ -325,7 +337,9 @@ class Join(Verb):
         self.on = g(self.on)
 
 
-class SubqueryMarker(Verb): ...
+class SubqueryMarker(Verb):
+    def _ast_node_repr(self, expr_depth=-1):
+        return "subquery_marker"
 
 
 CAMEL_TO_SNAKE = re.compile(r"(?<!^)(?=[A-Z])")

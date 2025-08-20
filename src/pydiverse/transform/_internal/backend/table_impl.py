@@ -3,7 +3,6 @@
 
 import functools
 import operator
-import textwrap
 import uuid
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any
@@ -41,15 +40,15 @@ class TableImpl(AstNode):
             for name, dtype in schema.items()
         }
 
-    def ast_repr(
+    def _unformatted_ast_repr(
         self, verb_depth: int = -1, expr_depth: int = -1, oneline: bool = False
     ) -> str:
         if oneline:
             return self.__class__.__name__ + (
                 f"('{self.name}')" if self.name is not None else ""
             )
-        nd_repr = self._ast_node_repr(expr_depth)
-        return f"* {self.__class__.__name__}\n" + textwrap.indent(nd_repr, "| ")
+
+        return self._ast_node_repr(expr_depth)
 
     def __init_subclass__(cls) -> None:
         cls.impl_store = ImplStore()
