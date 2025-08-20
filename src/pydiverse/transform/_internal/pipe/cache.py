@@ -7,6 +7,7 @@ from pprint import pformat
 from typing import Literal, Optional
 from uuid import UUID
 
+from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import TableImpl
 from pydiverse.transform._internal.ops.op import Ftype
 from pydiverse.transform._internal.tree import types, verbs
@@ -28,7 +29,7 @@ class Cache:
     is_filtered: bool
 
     backend: Literal[
-        "polars", "polars_parquet", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
+        "polars", "duckdb_polars", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
     ]
 
     def __repr__(self) -> str:
@@ -297,3 +298,76 @@ class Cache:
 
     def selected_cols(self) -> list[Col]:
         return [self.cols[uid] for uid in self.uuid_to_name.keys()]
+
+
+def transfer_col_references(table, ref_source):
+    """
+    Transfers the column references from `ref_source` to `table`.
+
+    The returned table contains all selected columns of `table`, but its columns are
+    now referenced by the columns from `ref_source`. All column names selected in
+    `table` must also be present in `ref_source`.
+
+    :param table:
+        The table from which the data is taken.
+
+    :param ref_source:
+        The table from which the column references are taken.
+
+
+    Examples
+    --------
+    **Materialization without breaking the functional flow.** Say you have a function
+    `your_materialization_fn` that writes a transform table to a database and returns a
+    transform table again. Then you can define a custom verb
+
+    >>> @verb
+    ... def materialize(table) -> pdt.Table:
+    ...     new = your_materialization_fn(table)
+    ...     return pdt.transfer_col_references(new, table)
+
+    With this verb, it is possible to write
+
+    >>> t = pdt.Table(dict(a=[1, 2, 5], b=["x", "y", "z"]), name="t")
+    >>> t >> filter(t.a >= 2) >> materialize() >> mutate(z=t.a + t.b.str.len())
+    Table `t` (backend: polars)
+    shape: (2, 3)
+    ┌─────┬─────┬─────┐
+    │ a   ┆ b   ┆ z   │
+    │ --- ┆ --- ┆ --- │
+    │ i64 ┆ str ┆ i64 │
+    ╞═════╪═════╪═════╡
+    │ 2   ┆ y   ┆ 3   │
+    │ 5   ┆ z   ┆ 6   │
+    └─────┴─────┴─────┘
+
+    Without `transfer_col_references`, it would not be possible to use `t.a` and `t.b`
+    in the `mutate`. (Of course, you would normally have a SQL backend when
+    materializing, not a polars backend like in the example here.)
+    """
+    from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
+    from pydiverse.transform._internal.tree.verbs import Alias
+
+    errors.check_arg_type(Table, "transfer_col_references", "table", table)
+    errors.check_arg_type(Table, "transfer_col_references", "ref_source", ref_source)
+
+    if (
+        col := next((col for col in table if col.name not in ref_source), None)
+    ) is not None:
+        raise ValueError(
+            f"column {col.ast_repr()} of the table `{get_print_tbl_name(table)}` does "
+            "not exist in the reference source table "
+            f"`{get_print_tbl_name(ref_source)}`"
+        )
+
+    new = copy.copy(table)
+    new._ast = Alias(
+        new._ast,
+        uuid_map={
+            uid: ref_source._cache.name_to_uuid[name]
+            for uid, name in table._cache.uuid_to_name.items()
+        },
+    )
+    new._cache = table._cache.update(new._ast)
+
+    return new
