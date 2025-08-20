@@ -342,7 +342,8 @@ def transfer_col_references(table, ref_source):
     └─────┴─────┴─────┘
 
     Without `transfer_col_references`, it would not be possible to use `t.a` and `t.b`
-    in the `mutate`.
+    in the `mutate`. (Of course, you would normally have a SQL backend when
+    materializing, not a polars backend like in the example here.)
     """
     from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
     from pydiverse.transform._internal.tree.verbs import Alias

@@ -1,6 +1,6 @@
------------------------
+=======================
 Miscellaneous functions
------------------------
+=======================
 
 .. currentmodule:: pydiverse.transform
 .. autosummary::
