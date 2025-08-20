@@ -170,8 +170,25 @@ class Table:
         self._ast: AstNode = TableImpl.from_resource(resource, backend, name=name)
         self._cache = Cache.from_ast(self._ast)
 
-    def __getitem__(self, key: str) -> Col:
-        errors.check_arg_type(str, "Table.__getitem__", "key", key)
+    def __getitem__(self, key: str | Col | ColName) -> Col:
+        errors.check_arg_type(str | Col | ColName, "Table.__getitem__", "key", key)
+        if isinstance(key, ColName):
+            key = key.name
+        elif isinstance(key, Col):
+            # This functionality is useful to get the name of a column in a table via a
+            # reference of a previous table.
+            if key._uuid not in self._cache.uuid_to_name:
+                raise ColumnNotFoundError(
+                    f"column `{key.ast_repr()}` does not exist in table "
+                    f"`{get_print_tbl_name(self)}`"
+                )
+            return Col(
+                self._cache.uuid_to_name[key._uuid],
+                self._ast,
+                key._uuid,
+                key._dtype,
+                key._ftype,
+            )
         return self.__getattr__(key)
 
     def __getattr__(self, name: str) -> Col:
