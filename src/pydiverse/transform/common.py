@@ -12,6 +12,7 @@ from ._internal.backend.targets import (
     SqlAlchemy,
 )
 from ._internal.pipe.aligned import aligned, eval_aligned
+from ._internal.pipe.cache import transfer_col_references
 from ._internal.pipe.pipeable import verb
 from ._internal.pipe.verbs import (
     arrange,
@@ -62,4 +63,5 @@ __all__ = __base + [
     "Dict",
     "DictOfLists",
     "ListOfDicts",
+    "transfer_col_references",
 ]

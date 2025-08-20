@@ -2,6 +2,7 @@
 
 ## 0.5.5 (2025-MM-DD)
 - add query to __str__/__repr__ operators of Table
+- add transfer_col_references to allow materialize with keep_col_references=True
 
 ## 0.5.4 (2025-08-19)
 - support IBM DB2 dialect

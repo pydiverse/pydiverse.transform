@@ -1165,7 +1165,7 @@ def join(
 
     if intersection := left._cache.derived_from & right._cache.derived_from:
         raise ValueError(
-            f"table `{list(intersection)[0]}` occurs twice in the table "
+            f"table `{list(intersection)[0].name}` occurs twice in the table "
             "tree.\nhint: To join two tables derived from a common table, "
             "apply `>> alias()` to one of them before the join."
         )
@@ -1199,8 +1199,8 @@ def join(
 
         if (
             isinstance(expr, Col)
-            and expr._ast not in left._cache.derived_from
-            and expr._ast not in right._cache.derived_from
+            and expr._uuid not in left._cache.cols
+            and expr._uuid not in right._cache.cols
         ):
             raise ValueError(
                 f"column `{expr.ast_repr()}` used in `on` neither exists in the table "

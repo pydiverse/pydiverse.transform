@@ -6,6 +6,6 @@ List
 .. autosummary::
     :toctree: _generated/
     :nosignatures:
-    :template: short_title.rst
+    :template: accessor_method.rst
 
     list.agg
