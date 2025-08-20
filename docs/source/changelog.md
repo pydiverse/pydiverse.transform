@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.5 (2025-MM-DD)
+## 0.5.5 (2025-08-20)
 - add query to __str__/__repr__ operators of Table
 - add transfer_col_references to allow materialize with keep_col_references=True
 
