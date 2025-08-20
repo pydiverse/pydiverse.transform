@@ -29,7 +29,7 @@ class Cache:
     is_filtered: bool
 
     backend: Literal[
-        "polars", "polars_parquet", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
+        "polars", "duckdb_polars", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
     ]
 
     def __repr__(self) -> str:

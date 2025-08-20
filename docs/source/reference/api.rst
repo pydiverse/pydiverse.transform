@@ -10,6 +10,7 @@ API
     targets
     types
     aligned
+    functions
 
 
 .. currentmodule:: pydiverse.transform

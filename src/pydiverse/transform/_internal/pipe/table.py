@@ -323,13 +323,19 @@ def get_head_tail(tbl: Table) -> tuple[pl.DataFrame, int]:
 def backend(
     table: Table,
 ) -> Literal[
-    "polars", "polars_parquet", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
+    "polars", "duckdb_polars", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
 ]:
+    """
+    Returns the backend of the table as a string.
+    """
     return table._cache.backend
 
 
 def is_sql_backed(table: Table) -> bool:
-    return table._cache.backend != "polars"
+    """
+    Whether the table has a SQL backend.
+    """
+    return table._cache.backend not in ("polars", "duckdb_polars")
 
 
 def get_print_tbl_name(table: Table | AstNode) -> str:
