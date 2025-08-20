@@ -25,4 +25,11 @@ Aggregation functions take a ``partition_by`` and ``filter`` keyword argument. T
     mean
     min
     sum
+
+.. currentmodule:: pydiverse.transform.ColExpr
+.. autosummary::
+    :toctree: _generated/
+    :nosignatures:
+    :template: accessor_method.rst
+
     str.join

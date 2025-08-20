@@ -1792,7 +1792,8 @@ class StrNamespace(FnNamespace):
         Concatenates all strings in a group to a single string.
 
         :param delimiter:
-            The string to insert between the elements."""
+            The string to insert between the elements.
+        """
 
         return ColFn(
             ops.str_join,
