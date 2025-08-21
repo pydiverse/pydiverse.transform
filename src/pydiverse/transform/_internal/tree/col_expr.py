@@ -126,9 +126,9 @@ class ColExpr(Generic[T]):
         p.text(str(self) if not cycle else "...")
 
     def ast_repr(self, depth: int = -1) -> str:
-        return self._ast_repr(depth, False)
+        return self._ast_repr(depth, False, dict())
 
-    def _ast_repr(self, depth: int, needs_parens: bool):
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map):
         raise NotImplementedError()
 
     def export(self, target: Target) -> pl.Series | pd.Series:
@@ -2237,8 +2237,9 @@ class Col(ColExpr):
         self._uuid = _uuid
         super().__init__(_dtype, _ftype)
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
-        return f"{self._ast.name or '?'}.{self.name}"
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
+        table_name = table_display_name_map.get(self._ast, self._ast.name) or "?"
+        return f"{table_name}.{self.name}"
 
     def __hash__(self) -> int:
         return hash(self._uuid)
@@ -2251,7 +2252,7 @@ class ColName(ColExpr):
         self.name = name
         super().__init__(dtype, ftype)
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         return f"C.{self.name}"
 
     def __repr__(self) -> str:
@@ -2273,7 +2274,7 @@ class LiteralCol(ColExpr):
         dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
-    def _ast_repr(self, depth: int, needs_parens: bool):
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map):
         return repr(self.val)
 
 
@@ -2310,7 +2311,7 @@ class ColFn(ColExpr):
         # try to eagerly resolve the types to get a nicer stack trace on type errors
         self.dtype()
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         DUNDER_BINARY = {
             "__add__": "+",
             "__sub__": "-",
@@ -2351,12 +2352,14 @@ class ColFn(ColExpr):
         arg_parens_limit = 1 + int(self.op.name in DUNDER_BINARY)
 
         args = [
-            e._ast_repr(depth - 1, i <= arg_parens_limit)
+            e._ast_repr(depth - 1, i <= arg_parens_limit, table_display_name_map)
             for i, e in enumerate(self.args)
         ] + [
             (
                 f"{ckwarg}=["
-                + ", ".join(v._ast_repr(depth - 1, False) for v in val)
+                + ", ".join(
+                    v._ast_repr(depth - 1, False, table_display_name_map) for v in val
+                )
                 + "]"
             )
             for ckwarg, val in self.context_kwargs.items()
@@ -2503,18 +2506,20 @@ class CaseExpr(ColExpr):
         super().__init__()
         self.dtype()
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         if depth == 0:
             return "when(...).then(...)"
 
         return ".".join(
-            f"when({cond._ast_repr(depth - 1, False)})"
-            f".then({val._ast_repr(depth - 1, False)})"
+            f"when({cond._ast_repr(depth - 1, False, table_display_name_map)})"
+            f".then({val._ast_repr(depth - 1, False, table_display_name_map)})"
             for cond, val in self.cases
         ) + (
             ""
             if self.default_val is None
-            else f".otherwise({self.default_val._ast_repr(depth - 1, False)})"
+            else ".otherwise("
+            + self.default_val._ast_repr(depth - 1, False, table_display_name_map)
+            + ")"
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -2711,10 +2716,13 @@ class Cast(ColExpr):
             self._dtype = types.with_const(self._dtype)
         return self._dtype
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         if depth == 0:
             return f"(...).cast({self.target_type})"
-        return f"{self.val._ast_repr(depth - 1, True)}.cast({self.target_type})"
+        return (
+            f"{self.val._ast_repr(depth - 1, True, table_display_name_map)}"
+            + f".cast({self.target_type})"
+        )
 
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype | None:
         if self._ftype is None:
@@ -2736,7 +2744,7 @@ class Series(ColExpr):
         self._dtype = Dtype.from_polars(val.dtype)
         self._ftype = Ftype.ELEMENT_WISE
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         return f"Series('{self.val.name}')"
 
 
@@ -2763,12 +2771,14 @@ class EvalAligned(ColExpr):
     def map_children(self, g):
         self.val = g(self.val)
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+    def _ast_repr(
+        self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]
+    ) -> str:
         if depth == 0:
             return "eval_aligned(...)"
         return (
             "eval_aligned("
-            f"{self.val._ast_repr(depth - 1, False)},"
+            f"{self.val._ast_repr(depth - 1, False, table_display_name_map)},"
             f"with_={self.with_.short_name() if self.with_ else None})"
         )
 
@@ -2819,11 +2829,11 @@ class Order:
         return Order(expr, descending, nulls_last)
 
     def ast_repr(self, depth: int = -1):
-        return self._ast_repr(depth, False)
+        return self._ast_repr(depth, False, dict())
 
-    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         return (
-            self.order_by._ast_repr(depth, True)
+            self.order_by._ast_repr(depth, True, table_display_name_map)
             + (".descending()" if self.descending else "")
             + (".nulls_last()" if self.nulls_last else "")
         )
