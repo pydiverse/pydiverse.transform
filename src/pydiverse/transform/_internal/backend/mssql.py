@@ -320,6 +320,8 @@ with MsSqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.str_contains)
     def _str_contains(x, pattern, allow_regex, true_if_regex_unsupported):
+        if true_if_regex_unsupported:
+            return sqa.literal(True, literal_execute=True)
         x = x.collate(MsSqlImpl.default_collation())
         return x.contains(pattern, autoescape=True)
 
