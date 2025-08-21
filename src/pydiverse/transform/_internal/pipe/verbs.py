@@ -1454,7 +1454,7 @@ def columns(table: Table) -> list[str]:
 
 @overload
 def ast_repr(
-    verb_depth: int = -1, expr_depth: int = -1, pipe: bool = False
+    verb_depth: int = 7, expr_depth: int = 2, pipe: bool = False
 ) -> Pipeable | None: ...
 
 

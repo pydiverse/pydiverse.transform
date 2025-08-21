@@ -2329,15 +2329,20 @@ class ColFn(ColExpr):
             "__ge__": ">=",
             "__gt__": ">",
         }
-        DUNER_UNARY = {"__pos__": "+", "__neg__": "-", "__invert__": "~"}
+        DUNDER_UNARY = {"__pos__": "+", "__neg__": "-", "__invert__": "~"}
+
+        def parenthesize(s: str) -> str:
+            return f"({s})" if needs_parens else s
 
         if depth == 0:
             if op_symbol := DUNDER_BINARY.get(self.op.name):
-                res = f"... {op_symbol} ..."
-                if needs_parens:
-                    res = f"({res})"
-                return res
-            return f"{DUNER_UNARY.get(self.op.name, self.op.name)}(...)"
+                return parenthesize(f"...{op_symbol}...")
+            if op_symbol := DUNDER_UNARY.get(self.op.name):
+                return parenthesize(f"{op_symbol}(...)")
+
+            return f"(...).{self.op.name}" + (
+                "(...)" if len(self.args) > 1 or len(self.context_kwargs) > 0 else "()"
+            )
 
         arg_parens_limit = 1 + int(self.op.name in DUNDER_BINARY)
 
@@ -2353,13 +2358,11 @@ class ColFn(ColExpr):
             for ckwarg, val in self.context_kwargs.items()
         ]
         if op_symbol := DUNDER_BINARY.get(self.op.name):
-            res = f"{args[0]} {op_symbol} {args[1]}"
-            if needs_parens:
-                res = f"({res})"
-            return res
-        elif op_symbol := DUNER_UNARY.get(self.op.name):
+            assert len(args) == 2
+            return parenthesize(f"{args[0]} {op_symbol} {args[1]}")
+        elif op_symbol := DUNDER_UNARY.get(self.op.name):
             assert len(args) == 1
-            return f"{op_symbol}{args[0]}"
+            return parenthesize(f"{op_symbol}{args[0]}")
 
         return f"{args[0]}.{self.op.name}" + "(" + ", ".join(args[1:]) + ")"
 
@@ -2496,18 +2499,16 @@ class CaseExpr(ColExpr):
 
     def _ast_repr(self, depth: int, needs_parens: bool) -> str:
         if depth == 0:
-            return "case_when(...)"
-        default_val_str = ""
-        if self.default_val is not None:
-            default_val_str = f", default={self.default_val.ast_repr(depth - 1)}"
-        return (
-            "case_when("
-            + ", ".join(
-                f"{cond.ast_repr(depth - 1)} -> {val.ast_repr(depth - 1)}"
-                for cond, val in self.cases
-            )
-            + default_val_str
-            + ")"
+            return "when(...).then(...)"
+
+        return ".".join(
+            f"when({cond._ast_repr(depth - 1, False)})"
+            f".then({val._ast_repr(depth - 1, False)})"
+            for cond, val in self.cases
+        ) + (
+            ""
+            if self.default_val is None
+            else f".otherwise({self.default_val._ast_repr(depth - 1, False)})"
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -2729,7 +2730,7 @@ class Series(ColExpr):
         self._dtype = Dtype.from_polars(val.dtype)
         self._ftype = Ftype.ELEMENT_WISE
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
         return f"Series('{self.val.name}')"
 
 
@@ -2756,11 +2757,13 @@ class EvalAligned(ColExpr):
     def map_children(self, g):
         self.val = g(self.val)
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+        if depth == 0:
+            return "eval_aligned(...)"
         return (
             "eval_aligned("
-            f"with={self.with_.ast_repr(oneline=True) if self.with_ else None}, "
-            f"{self.val.ast_repr(depth)})"
+            f"{self.val._ast_repr(depth - 1, False)},"
+            f"with_={self.with_.ast_repr(oneline=True) if self.with_ else None})"
         )
 
 
@@ -2809,13 +2812,14 @@ class Order:
 
         return Order(expr, descending, nulls_last)
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def ast_repr(self, depth: int = -1):
+        return self._ast_repr(depth, False)
+
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
         return (
-            "Order("
-            f"by={self.order_by.ast_repr(depth)}, "
-            f"descending={self.descending}, "
-            f"nulls_last={self.nulls_last}"
-            ")"
+            self.order_by._ast_repr(depth, True)
+            + (".descending()" if self.descending else "")
+            + (".nulls_last()" if self.nulls_last else "")
         )
 
     def dtype(self) -> Dtype:

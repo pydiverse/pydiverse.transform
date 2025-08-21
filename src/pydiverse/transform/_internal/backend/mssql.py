@@ -136,7 +136,7 @@ def convert_order_list(order_list: list[Order]) -> list[Order]:
         # workaround if nulls_last is None (i.e. the user doesn't care)
         if ord.nulls_last is not None and (ord.nulls_last ^ ord.descending):
             new_list.append(
-                Order(
+                Order.from_col_expr(
                     CaseExpr(
                         [(ord.order_by.is_null(), LiteralCol(int(ord.nulls_last)))],
                         LiteralCol(int(not ord.nulls_last)),
