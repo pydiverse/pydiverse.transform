@@ -401,12 +401,16 @@ class ColExpr(Generic[T]):
     def abs(self: ColExpr[Float]) -> ColExpr[Float]: ...
 
     def abs(self: ColExpr) -> ColExpr:
-        """Computes the absolute value."""
+        """
+        Computes the absolute value.
+        """
 
         return ColFn(ops.abs, self)
 
     def acos(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the inverse cosine."""
+        """
+        Computes the inverse cosine.
+        """
 
         return ColFn(ops.acos, self)
 
@@ -438,7 +442,9 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Datetime]: ...
 
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Addition +"""
+        """
+        Addition +
+        """
 
         return ColFn(ops.add, self, rhs)
 
@@ -470,7 +476,9 @@ class ColExpr(Generic[T]):
     ) -> ColExpr[Datetime]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Addition +"""
+        """
+        Addition +
+        """
 
         return ColFn(ops.add, rhs, self)
 
@@ -480,7 +488,9 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
-        """Indicates whether every non-null value in a group is True."""
+        """
+        Indicates whether every non-null value in a group is True.
+        """
 
         return ColFn(ops.all, self, partition_by=partition_by, filter=filter)
 
@@ -490,7 +500,9 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr[Bool]:
-        """Indicates whether at least one value in a group is True."""
+        """
+        Indicates whether at least one value in a group is True.
+        """
 
         return ColFn(ops.any, self, partition_by=partition_by, filter=filter)
 
@@ -505,12 +517,16 @@ class ColExpr(Generic[T]):
         return ColFn(ops.ascending, self)
 
     def asin(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the inverse sine."""
+        """
+        Computes the inverse sine.
+        """
 
         return ColFn(ops.asin, self)
 
     def atan(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the inverse tangent."""
+        """
+        Computes the inverse tangent.
+        """
 
         return ColFn(ops.atan, self)
 
@@ -739,12 +755,16 @@ class ColExpr(Generic[T]):
         return ColFn(ops.bool_xor, rhs, self)
 
     def cbrt(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the cube root."""
+        """
+        Computes the cube root.
+        """
 
         return ColFn(ops.cbrt, self)
 
     def ceil(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Returns the smallest integer greater than or equal to the input."""
+        """
+        Returns the smallest integer greater than or equal to the input.
+        """
 
         return ColFn(ops.ceil, self)
 
@@ -798,7 +818,9 @@ class ColExpr(Generic[T]):
         return ColFn(ops.clip, self, lower_bound, upper_bound)
 
     def cos(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the cosine."""
+        """
+        Computes the cosine.
+        """
 
         return ColFn(ops.cos, self)
 
@@ -855,22 +877,30 @@ class ColExpr(Generic[T]):
         return ColFn(ops.descending, self)
 
     def __eq__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
-        """Equality comparison =="""
+        """
+        Equality comparison ==
+        """
 
         return ColFn(ops.equal, self, rhs)
 
     def exp(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the exponential function."""
+        """
+        Computes the exponential function.
+        """
 
         return ColFn(ops.exp, self)
 
     def fill_null(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Replaces every null by the given value."""
+        """
+        Replaces every null by the given value.
+        """
 
         return ColFn(ops.fill_null, self, rhs)
 
     def floor(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Returns the largest integer less than or equal to the input."""
+        """
+        Returns the largest integer less than or equal to the input.
+        """
 
         return ColFn(ops.floor, self)
 
@@ -977,7 +1007,9 @@ class ColExpr(Generic[T]):
     def __ge__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __ge__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Greater than or equal to comparison >="""
+        """
+        Greater than or equal to comparison >=
+        """
 
         return ColFn(ops.greater_equal, self, rhs)
 
@@ -1006,7 +1038,9 @@ class ColExpr(Generic[T]):
     def __gt__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __gt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Greater than comparison >"""
+        """
+        Greater than comparison >
+        """
 
         return ColFn(ops.greater_than, self, rhs)
 
@@ -1037,27 +1071,31 @@ class ColExpr(Generic[T]):
         return ColFn(ops.is_inf, self)
 
     def is_nan(self: ColExpr[Float]) -> ColExpr[Bool]:
-        """"""
+        """ """
 
         return ColFn(ops.is_nan, self)
 
     def is_not_inf(self: ColExpr[Float]) -> ColExpr[Bool]:
-        """"""
+        """ """
 
         return ColFn(ops.is_not_inf, self)
 
     def is_not_nan(self: ColExpr[Float]) -> ColExpr[Bool]:
-        """"""
+        """ """
 
         return ColFn(ops.is_not_nan, self)
 
     def is_not_null(self: ColExpr) -> ColExpr[Bool]:
-        """Indicates whether the value is not null."""
+        """
+        Indicates whether the value is not null.
+        """
 
         return ColFn(ops.is_not_null, self)
 
     def is_null(self: ColExpr) -> ColExpr[Bool]:
-        """Indicates whether the value is null."""
+        """
+        Indicates whether the value is null.
+        """
 
         return ColFn(ops.is_null, self)
 
@@ -1086,7 +1124,9 @@ class ColExpr(Generic[T]):
     def __le__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __le__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Less than or equal to comparison <="""
+        """
+        Less than or equal to comparison <=
+        """
 
         return ColFn(ops.less_equal, self, rhs)
 
@@ -1115,17 +1155,23 @@ class ColExpr(Generic[T]):
     def __lt__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Bool]: ...
 
     def __lt__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Less than comparison <"""
+        """
+        Less than comparison <
+        """
 
         return ColFn(ops.less_than, self, rhs)
 
     def log(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the natural logarithm."""
+        """
+        Computes the natural logarithm.
+        """
 
         return ColFn(ops.log, self)
 
     def log10(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the base-10 logarithm."""
+        """
+        Computes the base-10 logarithm.
+        """
 
         return ColFn(ops.log10, self)
 
@@ -1199,7 +1245,9 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """Computes the maximum value in each group."""
+        """
+        Computes the maximum value in each group.
+        """
 
         return ColFn(ops.max, self, partition_by=partition_by, filter=filter)
 
@@ -1225,7 +1273,9 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """Computes the average value in each group."""
+        """
+        Computes the average value in each group.
+        """
 
         return ColFn(ops.mean, self, partition_by=partition_by, filter=filter)
 
@@ -1299,7 +1349,9 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """Computes the minimum value in each group."""
+        """
+        Computes the minimum value in each group.
+        """
 
         return ColFn(ops.min, self, partition_by=partition_by, filter=filter)
 
@@ -1390,7 +1442,9 @@ class ColExpr(Generic[T]):
     def __mul__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     def __mul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Multiplication *"""
+        """
+        Multiplication *
+        """
 
         return ColFn(ops.mul, self, rhs)
 
@@ -1401,7 +1455,9 @@ class ColExpr(Generic[T]):
     def __rmul__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     def __rmul__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Multiplication *"""
+        """
+        Multiplication *
+        """
 
         return ColFn(ops.mul, rhs, self)
 
@@ -1412,12 +1468,16 @@ class ColExpr(Generic[T]):
     def __neg__(self: ColExpr[Float]) -> ColExpr[Float]: ...
 
     def __neg__(self: ColExpr) -> ColExpr:
-        """The unary - (negation) operator (__neg__)"""
+        """
+        The unary - (negation) operator (__neg__)
+        """
 
         return ColFn(ops.neg, self)
 
     def __ne__(self: ColExpr, rhs: ColExpr) -> ColExpr[Bool]:
-        """Non-equality comparison !="""
+        """
+        Non-equality comparison !=
+        """
 
         return ColFn(ops.not_equal, self, rhs)
 
@@ -1462,7 +1522,9 @@ class ColExpr(Generic[T]):
     def __pos__(self: ColExpr[Float]) -> ColExpr[Float]: ...
 
     def __pos__(self: ColExpr) -> ColExpr:
-        """The unary + operator (__pos__)"""
+        """
+        The unary + operator (__pos__)
+        """
 
         return ColFn(ops.pos, self)
 
@@ -1574,12 +1636,16 @@ class ColExpr(Generic[T]):
         )
 
     def sin(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the sine."""
+        """
+        Computes the sine.
+        """
 
         return ColFn(ops.sin, self)
 
     def sqrt(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the square root."""
+        """
+        Computes the square root.
+        """
 
         return ColFn(ops.sqrt, self)
 
@@ -1598,7 +1664,9 @@ class ColExpr(Generic[T]):
     def __sub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
 
     def __sub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Subtraction -"""
+        """
+        Subtraction -
+        """
 
         return ColFn(ops.sub, self, rhs)
 
@@ -1617,7 +1685,9 @@ class ColExpr(Generic[T]):
     def __rsub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
 
     def __rsub__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """Subtraction -"""
+        """
+        Subtraction -
+        """
 
         return ColFn(ops.sub, rhs, self)
 
@@ -1651,12 +1721,16 @@ class ColExpr(Generic[T]):
         partition_by: Col | ColName | str | Iterable[Col | ColName | str] | None = None,
         filter: ColExpr[Bool] | Iterable[ColExpr[Bool]] | None = None,
     ) -> ColExpr:
-        """Computes the sum of values in each group."""
+        """
+        Computes the sum of values in each group.
+        """
 
         return ColFn(ops.sum, self, partition_by=partition_by, filter=filter)
 
     def tan(self: ColExpr[Float]) -> ColExpr[Float]:
-        """Computes the tangent."""
+        """
+        Computes the tangent.
+        """
 
         return ColFn(ops.tan, self)
 
@@ -1667,7 +1741,9 @@ class ColExpr(Generic[T]):
     def __truediv__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     def __truediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """True division /"""
+        """
+        True division /
+        """
 
         return ColFn(ops.truediv, self, rhs)
 
@@ -1678,7 +1754,9 @@ class ColExpr(Generic[T]):
     def __rtruediv__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     def __rtruediv__(self: ColExpr, rhs: ColExpr) -> ColExpr:
-        """True division /"""
+        """
+        True division /
+        """
 
         return ColFn(ops.truediv, rhs, self)
 
@@ -1696,12 +1774,30 @@ class FnNamespace:
 @register_accessor("str")
 @dataclasses.dataclass(slots=True)
 class StrNamespace(FnNamespace):
-    def contains(self: ColExpr[String], substr: str) -> ColExpr[Bool]:
+    def contains(
+        self: ColExpr[String],
+        pattern: str,
+        allow_regex: bool = True,
+        true_if_regex_unsupported: bool = False,
+    ) -> ColExpr[Bool]:
         """
-        Whether the string contains a given substring.
+        Whether the string contains a given pattern or substring.
 
-        :param substr:
-            The substring to look for.
+        :param pattern:
+            The pattern or substring to look for.
+
+        :param allow_regex:
+            If set to `True` (the default value), `pattern` is treated as a regular
+            expression. Otherwise, `pattern` is treated as a literal string.
+
+        :param true_if_regex_unsupported:
+            If set to `True`, this function always returns `True` on backends that do
+            not support regex.
+
+        Note
+        ----
+        If the backend does not support regex, `pattern` is automatically treated as a
+        literal string, regardless of `allow_regex`.
 
         Examples
         --------
@@ -1736,7 +1832,9 @@ class StrNamespace(FnNamespace):
         └────────┴────────────┴───────┴───────┴──────┘
         """
 
-        return ColFn(ops.str_contains, self.arg, substr)
+        return ColFn(
+            ops.str_contains, self.arg, pattern, allow_regex, true_if_regex_unsupported
+        )
 
     def ends_with(self: ColExpr[String], suffix: str) -> ColExpr[Bool]:
         """
@@ -2032,12 +2130,12 @@ class StrNamespace(FnNamespace):
         return ColFn(ops.str_strip, self.arg)
 
     def to_date(self: ColExpr[String]) -> ColExpr[Date]:
-        """"""
+        """ """
 
         return ColFn(ops.str_to_date, self.arg)
 
     def to_datetime(self: ColExpr[String]) -> ColExpr[Datetime]:
-        """"""
+        """ """
 
         return ColFn(ops.str_to_datetime, self.arg)
 
@@ -2082,7 +2180,9 @@ class DtNamespace(FnNamespace):
     def day(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def day(self: ColExpr) -> ColExpr:
-        """Extracts the day component."""
+        """
+        The day component of the date or datetime.
+        """
 
         return ColFn(ops.dt_day, self.arg)
 
@@ -2117,22 +2217,30 @@ class DtNamespace(FnNamespace):
         return ColFn(ops.dt_day_of_year, self.arg)
 
     def hour(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """Extracts the hour component."""
+        """
+        The hour component of the datetime.
+        """
 
         return ColFn(ops.dt_hour, self.arg)
 
     def microsecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """Extracts the microsecond component."""
+        """
+        The microsecond component of the datetime.
+        """
 
         return ColFn(ops.dt_microsecond, self.arg)
 
     def millisecond(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """Extracts the millisecond component."""
+        """
+        The microsecond component of the datetime int-divided by 1000 (see polars).
+        """
 
         return ColFn(ops.dt_millisecond, self.arg)
 
     def minute(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """Extracts the minute component."""
+        """
+        The minute component of the datetime.
+        """
 
         return ColFn(ops.dt_minute, self.arg)
 
@@ -2143,12 +2251,16 @@ class DtNamespace(FnNamespace):
     def month(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def month(self: ColExpr) -> ColExpr:
-        """Extracts the month component."""
+        """
+        The month component of the date or datetime.
+        """
 
         return ColFn(ops.dt_month, self.arg)
 
     def second(self: ColExpr[Datetime]) -> ColExpr[Int]:
-        """Extracts the second component."""
+        """
+        The second component of the datetime.
+        """
 
         return ColFn(ops.dt_second, self.arg)
 
@@ -2159,7 +2271,9 @@ class DtNamespace(FnNamespace):
     def year(self: ColExpr[Datetime]) -> ColExpr[Int]: ...
 
     def year(self: ColExpr) -> ColExpr:
-        """Extracts the year component."""
+        """
+        The year component of the date or datetime.
+        """
 
         return ColFn(ops.dt_year, self.arg)
 
@@ -2168,32 +2282,32 @@ class DtNamespace(FnNamespace):
 @dataclasses.dataclass(slots=True)
 class DurNamespace(FnNamespace):
     def days(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
+        """ """
 
         return ColFn(ops.dur_days, self.arg)
 
     def hours(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
+        """ """
 
         return ColFn(ops.dur_hours, self.arg)
 
     def microseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
+        """ """
 
         return ColFn(ops.dur_microseconds, self.arg)
 
     def milliseconds(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
+        """ """
 
         return ColFn(ops.dur_milliseconds, self.arg)
 
     def minutes(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
+        """ """
 
         return ColFn(ops.dur_minutes, self.arg)
 
     def seconds(self: ColExpr[Duration]) -> ColExpr[Int]:
-        """"""
+        """ """
 
         return ColFn(ops.dur_seconds, self.arg)
 

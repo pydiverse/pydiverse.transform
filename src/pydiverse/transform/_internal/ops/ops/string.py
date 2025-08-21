@@ -277,13 +277,29 @@ shape: (5, 5)
 
 str_contains = Operator(
     "str.contains",
-    Signature(String(), Const(String()), return_type=Bool()),
-    param_names=["self", "substr"],
+    Signature(
+        String(), Const(String()), Const(Bool()), Const(Bool()), return_type=Bool()
+    ),
+    param_names=["self", "pattern", "allow_regex", "true_if_regex_unsupported"],
+    default_values=[..., ..., True, False],
     doc="""
-Whether the string contains a given substring.
+Whether the string contains a given pattern or substring.
 
-:param substr:
-    The substring to look for.
+:param pattern:
+    The pattern or substring to look for.
+
+:param allow_regex:
+    If set to `True` (the default value), `pattern` is treated as a regular
+    expression. Otherwise, `pattern` is treated as a literal string.
+
+:param true_if_regex_unsupported:
+    If set to `True`, this function always returns `True` on backends that do
+    not support regex.
+
+Note
+----
+If the backend does not support regex, `pattern` is automatically treated as a
+literal string, regardless of `allow_regex`.
 
 Examples
 --------
