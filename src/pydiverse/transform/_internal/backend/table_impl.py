@@ -155,15 +155,6 @@ class TableImpl(AstNode):
             ) from err
 
 
-def get_backend(nd: AstNode) -> type[TableImpl]:
-    from pydiverse.transform._internal.tree.verbs import Verb
-
-    if isinstance(nd, Verb):
-        return get_backend(nd.child)
-    assert isinstance(nd, TableImpl) and nd is not TableImpl
-    return nd.__class__
-
-
 def split_join_cond(on: ColFn) -> list[ColFn]:
     if isinstance(on, LiteralCol):
         return []

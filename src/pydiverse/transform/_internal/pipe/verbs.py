@@ -14,7 +14,6 @@ from pydiverse.common import Bool, Int64
 from pydiverse.transform._internal import errors
 from pydiverse.transform._internal.backend.table_impl import (
     TableImpl,
-    get_backend,
     split_join_cond,
 )
 from pydiverse.transform._internal.backend.targets import (
@@ -355,7 +354,7 @@ def export(
 
     # TODO: allow stuff like pdt.Int(): pl.UInt32() in schema_overrides and resolve that
     # to columns
-    SourceBackend: type[TableImpl] = get_backend(table._ast)
+    SourceBackend: type[TableImpl] = table._cache.backend
     if schema_overrides is None:
         schema_overrides = dict()
     return SourceBackend.export(
@@ -380,7 +379,7 @@ def build_query(table: Table) -> str | None:
         The SQL query as a string.
     """
 
-    return get_backend(table._ast).build_query(table._ast.clone())
+    return table._cache.backend.build_query(table._ast.clone())
 
 
 @overload
@@ -407,7 +406,7 @@ def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
     else:
         print(
             f"No query to show for table {get_print_tbl_name(table)}. "
-            f"(backend: {get_backend(table._ast).backend_name})"
+            f"(backend: {table._cache.backend.backend_name})"
         )
 
     return table if pipe else None
