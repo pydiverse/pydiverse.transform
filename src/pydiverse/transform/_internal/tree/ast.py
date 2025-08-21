@@ -23,35 +23,46 @@ class AstNode:
     def iter_subtree_preorder(self) -> Iterable["AstNode"]: ...
 
     def __repr__(self) -> str:
-        return self.ast_repr(verb_depth=7, expr_depth=2)
+        return self.short_name()
 
     def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         from pydiverse.transform._internal.backend.table_impl import TableImpl
         from pydiverse.transform._internal.tree.verbs import Alias
 
         source_tbls = set(
-            tbl
-            for tbl in self.iter_subtree_preorder()
-            if isinstance(tbl, TableImpl | Alias)
+            nd
+            for nd in self.iter_subtree_preorder()
+            if isinstance(nd, TableImpl | Alias)
         )
         table_display_name_map: dict[TableImpl, str] = dict()
         used = set()
-        for tbl in source_tbls:
-            display_name = tbl.name or "tbl"
+        for nd in source_tbls:
+            display_name = nd.name or "tbl"
             # try to achieve valid python identifier names
-            display_name.replace(" ", "_")
-            display_name.replace(".", "_")
-            display_name.replace("-", "_")
+            display_name = (
+                display_name.replace(" ", "_").replace(".", "_").replace("-", "_")
+            )
 
             if display_name not in used:
-                used.add(tbl.name)
-                table_display_name_map[tbl] = display_name
+                used.add(display_name)
+                table_display_name_map[nd] = display_name
             else:
                 cnt = 1
                 while f"{display_name}_{cnt}" in used:
                     cnt += 1
-                table_display_name_map[tbl] = f"{display_name}_{cnt}"
+                table_display_name_map[nd] = f"{display_name}_{cnt}"
                 used.add(f"{display_name}_{cnt}")
+
+        # Find the last source table / alias for every node in the AST and use the
+        # corresponding name.
+        tbls = set()
+        for nd in self.iter_subtree_preorder():
+            if isinstance(nd, Alias | TableImpl):
+                name = table_display_name_map[nd]
+                table_display_name_map.update({later_tbl: name for later_tbl in tbls})
+                tbls.clear()
+            else:
+                tbls.add(nd)
 
         unformatted = "\n".join(
             f"{display_name} = {tbl._table_def_repr()}"

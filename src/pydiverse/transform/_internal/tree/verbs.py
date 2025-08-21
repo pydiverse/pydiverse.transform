@@ -21,7 +21,7 @@ class Verb(AstNode):
         self.name = self.child.name
 
     def _unformatted_ast_repr(self, verb_depth: int, expr_depth: int, display_name_map):
-        nd_repr = self._ast_node_repr(expr_depth)
+        nd_repr = self._ast_node_repr(expr_depth, display_name_map)
         return (
             self.child._unformatted_ast_repr(
                 verb_depth - 1, expr_depth, display_name_map
@@ -86,7 +86,7 @@ class Alias(Verb):
     # TODO: currently we kinda misuse Alias for column reference transfer. Maybe it
     # would be nice to create a separate marker node for this to distinguish it from a
     # user-created alias.
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return (
             "alias(" + (f"'{self.name}'" if self.name != self.child.name else "") + ")"
         )
@@ -114,15 +114,22 @@ class Select(Verb):
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
         self.select = [g(col) for col in self.select]
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return "select(" + ", ".join(col.ast_repr() for col in self.select) + ")"
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
+        return (
+            "select("
+            + ", ".join(
+                col._ast_repr(expr_depth, False, display_name_map)
+                for col in self.select
+            )
+            + ")"
+        )
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Rename(Verb):
     name_map: dict[str, str]
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return (
             "rename({"
             + ", ".join(f"'{k}': '{v}'" for k, v in self.name_map.items())
@@ -136,10 +143,10 @@ class Mutate(Verb):
     values: list[ColExpr]
     uuids: list[UUID]
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return "mutate(" + (
             ", ".join(
-                f"{k}={v.ast_repr(expr_depth)}"
+                f"{k}={v._ast_repr(expr_depth, False, display_name_map)}"
                 for k, v in zip(self.names, self.values, strict=True)
             )
             + ")"
@@ -168,10 +175,13 @@ class Mutate(Verb):
 class Filter(Verb):
     predicates: list[ColExpr]
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return (
             "filter("
-            + ", ".join(pred.ast_repr(expr_depth) for pred in self.predicates)
+            + ", ".join(
+                pred._ast_repr(expr_depth, False, display_name_map)
+                for pred in self.predicates
+            )
             + ")"
         )
 
@@ -188,10 +198,10 @@ class Summarize(Verb):
     values: list[ColExpr]
     uuids: list[UUID]
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int, display_name_map: dict) -> str:
         return "summarize(" + (
             ", ".join(
-                f"{k}={v.ast_repr(expr_depth)}"
+                f"{k}={v._ast_repr(expr_depth, False, display_name_map)}"
                 for k, v in zip(self.names, self.values, strict=True)
             )
             + ")"
@@ -220,10 +230,13 @@ class Summarize(Verb):
 class Arrange(Verb):
     order_by: list[Order]
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return (
             "arrange("
-            + ", ".join(ord.ast_repr(expr_depth) for ord in self.order_by)
+            + ", ".join(
+                ord._ast_repr(expr_depth, False, display_name_map)
+                for ord in self.order_by
+            )
             + ")"
         )
 
@@ -242,7 +255,7 @@ class SliceHead(Verb):
     n: int
     offset: int
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return f"slice_head(n={self.n}, offset={self.offset})"
 
 
@@ -251,8 +264,15 @@ class GroupBy(Verb):
     group_by: list[Col]
     add: bool
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return "group_by(" + ", ".join(col.ast_repr() for col in self.group_by) + ")"
+    def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
+        return (
+            "group_by("
+            + ", ".join(
+                col._ast_repr(expr_depth, False, display_name_map)
+                for col in self.group_by
+            )
+            + ")"
+        )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from self.group_by
@@ -263,7 +283,7 @@ class GroupBy(Verb):
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
 class Ungroup(Verb):
-    def _ast_node_repr(self, expr_depth=-1):
+    def _ast_node_repr(self, expr_depth, display_name_map):
         return "ungroup()"
 
 
@@ -294,7 +314,7 @@ class Join(Verb):
             )
             + ", "
             + f"how='{self.how}', "
-            + f"on={self.on.ast_repr(expr_depth)}, "
+            + f"on={self.on._ast_repr(expr_depth, False, display_name_map)}, "
             + f"validate='{self.validate}')"
         )
 
@@ -340,7 +360,7 @@ class Join(Verb):
 
 
 class SubqueryMarker(Verb):
-    def _ast_node_repr(self, expr_depth=-1):
+    def _ast_node_repr(self, expr_depth, display_name_map):
         return "subquery_marker"
 
 

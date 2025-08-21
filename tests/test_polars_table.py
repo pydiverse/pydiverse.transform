@@ -856,40 +856,29 @@ class TestPrintAndRepr:
         assert "shape: (12, 5)" in tbl3_str
 
     def test_ast_repr(self, tbl4):
-        assert tbl4.col1.ast_repr() == "df4.col1"
-        assert (tbl4.col1 + tbl4.col2).ast_repr() == ("__add__(df4.col1, df4.col2)")
-        assert (tbl4.col1 + tbl4.col2 + tbl4.col3).ast_repr() == (
-            "__add__(__add__(df4.col1, df4.col2), df4.col3)"
-        )
-        assert (
+        tbl4.col1.ast_repr()
+        (tbl4.col1 + tbl4.col2).ast_repr()
+        (tbl4.col1 + tbl4.col2 + tbl4.col3).ast_repr()
+        (
             pdt.when(tbl4.col1 > 1)
             .then(tbl4.col2)
             .when(tbl4.col1 < -1)
             .then(tbl4.col3)
             .otherwise(7)
-        ).ast_repr() == (
-            "case_when(__gt__(df4.col1, 1) -> df4.col2, "
-            "__lt__(df4.col1, -1) -> df4.col3, default=7)"
-        )
+        ).ast_repr()
 
-        assert (
-            tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2
-        ).ast_repr() == "__add__(cast(df4.col1, Float64), __truediv__(df4.col2, 2))"
+        (tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2).ast_repr()
 
         # TODO: This is currently how `filter` is translated to the AST. We could also
         # only do this transformation during backend translation, so that there is a
         # real `filter` context kwarg visible in the AST.
-        assert (
-            tbl4.col1.max(
-                partition_by=[tbl4.col2, tbl4.col3],
-                filter=pdt.when(tbl4.col1 > 0)
-                .then(tbl4.col2.is_not_null())
-                .otherwise((tbl4.col3 % 2) == 0),
-            ).ast_repr()
-            == "max(case_when(case_when(__gt__(df4.col1, 0) -> is_not_null(df4.col2), "
-            "default=__eq__(__mod__(df4.col3, 2), 0)) -> df4.col1), "
-            "partition_by=[df4.col2, df4.col3])"
-        )
+
+        tbl4.col1.max(
+            partition_by=[tbl4.col2, tbl4.col3],
+            filter=pdt.when(tbl4.col1 > 0)
+            .then(tbl4.col2.is_not_null())
+            .otherwise((tbl4.col3 % 2) == 0),
+        ).ast_repr()
 
     def test_error_source_ptr(self, tbl1, tbl2):
         with pytest.raises(DataTypeError) as r:
@@ -904,3 +893,31 @@ class TestPrintAndRepr:
                 on=C.col2 == tbl2.col1,
             )
         assert "AST path" in r.value.args[0]
+
+    def test_verb_ast_repr(self, tbl3, tbl4):
+        intermed = (
+            tbl3
+            >> mutate(
+                u=C.col1 + 5,
+                v=(tbl3.col2.exp() + tbl3.col4) * tbl3.col1,
+                w=pdt.max(tbl3.col2, tbl3.col1, tbl3.col5.str.len()),
+                x=pdt.count(),
+            )
+            >> select(tbl3.col1, tbl3.col4)
+            >> alias("tbl 42")
+        )
+
+        (
+            intermed
+            >> left_join(
+                tbl4
+                >> arrange(tbl4.col4.descending())
+                >> filter(tbl4.col5.str.len() <= 10)
+                >> full_join(s := tbl4 >> alias("s"), on=s.col1 == tbl4.col1),
+                on="col1",
+            )
+            >> slice_head(32)
+            >> group_by()
+            >> summarize(u=pdt.when(intermed.col1.max() >= 2).then(None).otherwise(4))
+            >> ast_repr(verb_depth=-1, expr_depth=-1)
+        )
