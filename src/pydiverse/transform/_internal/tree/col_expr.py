@@ -2339,6 +2339,10 @@ class ColFn(ColExpr):
                 return parenthesize(f"...{op_symbol}...")
             if op_symbol := DUNDER_UNARY.get(self.op.name):
                 return parenthesize(f"{op_symbol}(...)")
+            if not self.op.generate_expr_method:
+                # This is for the functions defined in the `functions.py` module, which
+                # are called like pdt.<fn name>(...)
+                return f"{self.op.name}(...)"
 
             return f"(...).{self.op.name}" + (
                 "(...)" if len(self.args) > 1 or len(self.context_kwargs) > 0 else "()"
@@ -2360,9 +2364,11 @@ class ColFn(ColExpr):
         if op_symbol := DUNDER_BINARY.get(self.op.name):
             assert len(args) == 2
             return parenthesize(f"{args[0]} {op_symbol} {args[1]}")
-        elif op_symbol := DUNDER_UNARY.get(self.op.name):
+        if op_symbol := DUNDER_UNARY.get(self.op.name):
             assert len(args) == 1
             return parenthesize(f"{op_symbol}{args[0]}")
+        if not self.op.generate_expr_method:
+            return f"{self.op.name}" + "(" + ", ".join(args) + ")"
 
         return f"{args[0]}.{self.op.name}" + "(" + ", ".join(args[1:]) + ")"
 
