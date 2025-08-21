@@ -1,8 +1,9 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
+import itertools
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from uuid import UUID
 
 
@@ -27,13 +28,33 @@ class AstNode:
 
     def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         from pydiverse.transform._internal.backend.table_impl import TableImpl
-        from pydiverse.transform._internal.tree.verbs import Alias
+        from pydiverse.transform._internal.tree.col_expr import Col
+        from pydiverse.transform._internal.tree.verbs import Alias, Verb
+
+        def next_nd(root: AstNode, cond: Callable[["AstNode"], bool]):
+            for nd in root.iter_subtree_preorder():
+                if cond(nd):
+                    return nd
 
         source_tbls = set(
             nd
             for nd in self.iter_subtree_preorder()
             if isinstance(nd, TableImpl | Alias)
         )
+        # Add required ASTs from aligned columns (they need not be in the subtree of
+        # `self`)
+        source_tbls |= set(
+            next_nd(col._ast, lambda x: isinstance(x, Alias | TableImpl))
+            for col in itertools.chain(
+                *(
+                    nd.iter_col_nodes()
+                    for nd in self.iter_subtree_preorder()
+                    if isinstance(nd, Verb)
+                )
+            )
+            if isinstance(col, Col)
+        )
+
         table_display_name_map: dict[TableImpl, str] = dict()
         used = set()
         for nd in source_tbls:
@@ -55,14 +76,17 @@ class AstNode:
 
         # Find the last source table / alias for every node in the AST and use the
         # corresponding name.
-        tbls = set()
-        for nd in self.iter_subtree_preorder():
-            if isinstance(nd, Alias | TableImpl):
-                name = table_display_name_map[nd]
-                table_display_name_map.update({later_tbl: name for later_tbl in tbls})
-                tbls.clear()
-            else:
-                tbls.add(nd)
+        for nd in self.iter_subtree_postorder():
+            table_display_name_map[nd] = table_display_name_map[
+                next_nd(nd, lambda x: x in table_display_name_map)
+            ]
+
+            if isinstance(nd, Verb):
+                for col in nd.iter_col_nodes():
+                    if isinstance(col, Col):
+                        table_display_name_map[col._ast] = table_display_name_map[
+                            next_nd(col._ast, lambda x: x in table_display_name_map)
+                        ]
 
         unformatted = "\n".join(
             f"{display_name} = {tbl._table_def_repr()}"

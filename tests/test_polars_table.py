@@ -921,3 +921,30 @@ class TestPrintAndRepr:
             >> summarize(u=pdt.when(intermed.col1.max() >= 2).then(None).otherwise(4))
             >> ast_repr(verb_depth=-1, expr_depth=-1)
         )
+
+        series = pl.Series([2**i for i in range(12)])
+
+        assert (
+            "tbl__1729.j"
+            in (
+                tbl3
+                >> mutate(
+                    u=C.col1 + 5,
+                    v=(tbl3.col2.exp() + tbl3.col4) * tbl3.col1,
+                    w=pdt.max(tbl3.col2, tbl3.col1, tbl3.col5.str.len()),
+                    x=pdt.count(),
+                    y=eval_aligned(
+                        (
+                            tbl3
+                            >> mutate(j=42)
+                            >> alias("tbl. 1729")
+                            >> filter(C.col2 > 0)
+                        ).j
+                        + tbl3.col1
+                    ),
+                    z=eval_aligned(series),
+                )
+                >> select(tbl3.col1, tbl3.col4)
+                >> left_join(tbl4, on="col1")
+            )._ast.ast_repr()
+        )
