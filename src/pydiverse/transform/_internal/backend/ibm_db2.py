@@ -99,3 +99,9 @@ with IbmDb2Impl.impl_store.impl_manager as impl:
     @impl(ops.rand)
     def _rand():
         return sqa.func.RANDOM(1729)
+
+    @impl(ops.str_contains)
+    def _str_contains(x, pattern, allow_regex, true_if_regex_unsupported):
+        if not allow_regex:
+            return x.contains(pattern, autoescape=True)
+        return sqa.func.REGEXP_LIKE(x, pattern).cast(sqa.Boolean())
