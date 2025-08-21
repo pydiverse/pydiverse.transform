@@ -133,10 +133,8 @@ class SqlImpl(TableImpl):
             {col.name: self.pdt_type(col.type) for col in self.table.columns},
         )
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return (
-            self.__class__.__name__ + f"('{self.name}', engine = {repr(self.engine)})"
-        )
+    def _table_def_repr(self) -> str:
+        return f"Table('{self.name}', SqlAlchemy({self.engine.url}))"
 
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]

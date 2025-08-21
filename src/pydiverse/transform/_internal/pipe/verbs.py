@@ -39,7 +39,7 @@ from pydiverse.transform._internal.pipe.pipeable import (
     modify_ast,
     verb,
 )
-from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
+from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
@@ -406,8 +406,8 @@ def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
         print(query)
     else:
         print(
-            f"No query to show for table {get_print_tbl_name(table)}. "
-            f"(backend: {get_backend(table._ast).backend_name})"
+            f"No query to show for table {table._ast.short_name()}. "
+            f"(backend: {table._cache.backend})"
         )
 
     return table if pipe else None
@@ -449,7 +449,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
         if isinstance(col, ColName | str) and col not in table:
             raise ColumnNotFoundError(
                 f"column `{col.ast_repr()}` does not exist in table "
-                f"`{get_print_tbl_name(table)}`"
+                f"`{table._ast.short_name()}`"
             )
         elif col not in table and col._uuid in table._cache.cols:
             raise ColumnNotFoundError(
@@ -601,7 +601,7 @@ def rename(table: Table, name_map: dict[str | Col | ColName, str]) -> Pipeable:
     if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(
             f"no column with name `{next(iter(d))}` in table "
-            f"`{get_print_tbl_name(table)}`"
+            f"`{table._ast.short_name()}`"
         )
 
     if d := (set(table._cache.name_to_uuid).difference(name_map)) & set(
@@ -1159,9 +1159,9 @@ def join(
         raise TypeError("cannot join two tables with different backends")
 
     if left._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{get_print_tbl_name(left)}`")
+        raise ValueError(f"cannot join grouped table `{left._ast.short_name()}`")
     elif right._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{get_print_tbl_name(right)}`")
+        raise ValueError(f"cannot join grouped table `{right._ast.short_name()}`")
 
     if intersection := left._cache.derived_from & right._cache.derived_from:
         raise ValueError(
@@ -1204,9 +1204,9 @@ def join(
         ):
             raise ValueError(
                 f"column `{expr.ast_repr()}` used in `on` neither exists in the table "
-                f"`{get_print_tbl_name(left)}` nor in the table "
-                f"`{get_print_tbl_name(right)}`. The source table "
-                f"`{get_print_tbl_name(expr._ast)}` of the column must be an "
+                f"`{left._ast.short_name()}` nor in the table "
+                f"`{right._ast.short_name()}`. The source table "
+                f"`{expr._ast.short_name()}` of the column must be an "
                 "ancestor of one of the two input tables."
             )
 

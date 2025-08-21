@@ -56,8 +56,8 @@ class PolarsImpl(TableImpl):
             },
         )
 
-    def _ast_node_repr(self, expr_depth: int = -1) -> str:
-        return f"PolarsImpl('{self.name}')"
+    def _table_def_repr(self) -> str:
+        return f"Table(df, Polars(), name='{self.name}')"
 
     @staticmethod
     def build_query(nd: AstNode) -> None:

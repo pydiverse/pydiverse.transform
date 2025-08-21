@@ -41,14 +41,20 @@ class TableImpl(AstNode):
         }
 
     def _unformatted_ast_repr(
-        self, verb_depth: int = -1, expr_depth: int = -1, oneline: bool = False
+        self, verb_depth: int, expr_depth: int, display_name_map
     ) -> str:
-        if oneline:
-            return self.__class__.__name__ + (
-                f"('{self.name}')" if self.name is not None else ""
-            )
+        return self._ast_node_repr(expr_depth, display_name_map)
 
-        return self._ast_node_repr(expr_depth)
+    def _ast_node_repr(self, expr_depth, display_name_map):
+        return display_name_map[self]
+
+    def _table_def_repr(self) -> str:
+        raise NotImplementedError()
+
+    def short_name(self):
+        return (
+            "?" if self.name is None else self.name
+        ) + f" (source table, backend: '{self.backend_name}')"
 
     def __init_subclass__(cls) -> None:
         cls.impl_store = ImplStore()

@@ -20,15 +20,12 @@ class Verb(AstNode):
     def __post_init__(self):
         self.name = self.child.name
 
-    def _unformatted_ast_repr(
-        self, verb_depth: int = -1, expr_depth: int = -1, *, oneline: bool
-    ):
-        if oneline:
-            return camel_to_snake(self.__class__.__name__)
-
+    def _unformatted_ast_repr(self, verb_depth: int, expr_depth: int, display_name_map):
         nd_repr = self._ast_node_repr(expr_depth)
         return (
-            self.child._unformatted_ast_repr(verb_depth - 1, expr_depth, oneline=False)
+            self.child._unformatted_ast_repr(
+                verb_depth - 1, expr_depth, display_name_map
+            )
             if verb_depth != 0
             else "..."
         ) + f" >> {nd_repr}"
@@ -54,6 +51,12 @@ class Verb(AstNode):
         nd_map[self] = cloned
 
         return cloned, nd_map, uuid_map
+
+    def short_name(self):
+        last_verb = self if not isinstance(self, SubqueryMarker) else self.child
+        return (
+            "?" if self.name is None else self.name
+        ) + f" (last verb: {camel_to_snake(last_verb.__class__.__name__)})"
 
     def iter_subtree_postorder(self) -> Iterable[AstNode]:
         yield from self.child.iter_subtree_postorder()
@@ -272,23 +275,22 @@ class Join(Verb):
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
 
     def _unformatted_ast_repr(
-        self, verb_depth: int = -1, expr_depth: int = -1, *, oneline: bool
+        self, verb_depth: int, expr_depth: int, display_name_map
     ) -> str:
-        if oneline:
-            return camel_to_snake(self.__class__.__name__)
-
         return (
-            self.child._unformatted_ast_repr(verb_depth - 1, expr_depth, oneline=False)
+            self.child._unformatted_ast_repr(
+                verb_depth - 1, expr_depth, display_name_map
+            )
             if verb_depth != 0
             else "..."
         ) + (
             ">> join("
             + (
                 self.right._unformatted_ast_repr(
-                    verb_depth - 1, expr_depth, oneline=False
+                    verb_depth - 1, expr_depth, display_name_map
                 )
                 if verb_depth != 0
-                else self.right._unformatted_ast_repr(0, expr_depth, oneline=False)
+                else self.right._unformatted_ast_repr(0, expr_depth, display_name_map)
             )
             + ", "
             + f"how='{self.how}', "

@@ -2769,7 +2769,7 @@ class EvalAligned(ColExpr):
         return (
             "eval_aligned("
             f"{self.val._ast_repr(depth - 1, False)},"
-            f"with_={self.with_.ast_repr(oneline=True) if self.with_ else None})"
+            f"with_={self.with_.short_name() if self.with_ else None})"
         )
 
 
