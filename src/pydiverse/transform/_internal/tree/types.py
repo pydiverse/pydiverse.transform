@@ -96,13 +96,16 @@ def with_const(dtype: Dtype) -> Dtype:
 
 
 def converts_to(source: Dtype, target: Dtype) -> bool:
+    if is_const(target):
+        return is_const(source) and converts_to(
+            without_const(source), without_const(target)
+        )
+    source = without_const(source)
     if isinstance(source, List):
         return isinstance(target, List) and converts_to(source.inner, target.inner)
     if isinstance(source, Enum):
         return target == source or target == String()
-    return (not is_const(target) or is_const(source)) and (
-        without_const(target) in IMPLICIT_CONVS[without_const(source)]
-    )
+    return target in IMPLICIT_CONVS[source]
 
 
 def to_python(dtype: Dtype):
@@ -294,11 +297,15 @@ for start_type in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
 
 
 def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
+    if is_const(target):
+        assert is_const(dtype)
+        return conversion_cost(without_const(dtype), without_const(target))
+    dtype = without_const(dtype)
     if isinstance(dtype, List):
         return conversion_cost(dtype.inner, target.inner)
     if isinstance(dtype, Enum):
         return (0, 0) if dtype == target else (0, 1)
-    return IMPLICIT_CONVS[without_const(dtype)][without_const(target)]
+    return IMPLICIT_CONVS[dtype][target]
 
 
 NUMERIC = (Int(), Float())

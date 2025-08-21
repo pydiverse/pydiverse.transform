@@ -17,6 +17,7 @@ from ._internal.pipe.pipeable import verb
 from ._internal.pipe.verbs import (
     arrange,
     ast_repr,
+    columns,
     cross_join,
     drop,
     full_join,
@@ -41,6 +42,7 @@ __all__ = __base + [
     "eval_aligned",
     "arrange",
     "ast_repr",
+    "columns",
     "drop",
     "group_by",
     "name",

@@ -697,6 +697,13 @@ class TestPolarsLazyImpl:
     def test_name(self, tbl3):
         assert tbl3 >> name() == "df3"
 
+    def test_columns(self, tbl3):
+        assert tbl3 >> columns() == [col.name for col in tbl3]
+        tbl3_different_col_order = tbl3 >> mutate(col3=tbl3.col3)
+        assert tbl3_different_col_order >> columns() == [
+            col.name for col in tbl3_different_col_order
+        ]
+
     def test_name_alias(self, tbl2):
         assert tbl2 >> alias("tbl") >> name() == "tbl"
 
@@ -718,6 +725,12 @@ class TestPolarsLazyImpl:
             tbl1_enum >> mutate(q=C.p + "l"),
             df1_enum.with_columns(q=pl.col("p") + "l"),
         )
+
+    def test_enum_isin(self, tbl1):
+        tbl1 >> mutate(
+            p=tbl1.col2.cast(pdt.Enum("a", "b", "c", "d")).is_in("a", "b", "c", "d")
+        )
+        tbl1 >> mutate(q="a") >> mutate(p=C.q.cast(pdt.Enum("a")).is_in("a"))
 
     def test_col_rename(self, tbl2, tbl4):
         assert_equal(tbl4 >> rename({tbl4.col1: "s"}), df4.rename({"col1": "s"}))
