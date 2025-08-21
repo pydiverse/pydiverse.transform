@@ -125,10 +125,15 @@ class ColExpr(Generic[T]):
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
+    # User exposed ast_repr function
     def ast_repr(self, depth: int = -1) -> str:
         return self._ast_repr(depth, False, dict())
 
-    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map):
+    # Does the recursive calls and allows to alter the displayed names of the tables
+    # of columns (this is necessary for the verb ast_repr).
+    def _ast_repr(
+        self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]
+    ):
         raise NotImplementedError()
 
     def export(self, target: Target) -> pl.Series | pd.Series:

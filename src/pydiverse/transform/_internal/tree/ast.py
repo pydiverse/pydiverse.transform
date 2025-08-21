@@ -26,6 +26,7 @@ class AstNode:
     def __repr__(self) -> str:
         return self.short_name()
 
+    # Formatted, almost source code like representation of the AST.
     def ast_repr(self, verb_depth: int = -1, expr_depth: int = -1) -> str:
         from pydiverse.transform._internal.backend.table_impl import TableImpl
         from pydiverse.transform._internal.tree.col_expr import Col
@@ -113,8 +114,10 @@ class AstNode:
     def short_name(self) -> str:
         raise NotImplementedError()
 
+    # Recursive, builds up the verb chain.
     def _unformatted_ast_repr(self, verb_depth: int, expr_depth: int, display_name_map):
         raise NotImplementedError()
 
+    # Just the verb call of a single verb, without `>>`.
     def _ast_node_repr(self, expr_depth: int, display_name_map):
         raise NotImplementedError()
