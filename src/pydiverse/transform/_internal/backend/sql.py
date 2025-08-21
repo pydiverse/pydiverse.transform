@@ -134,7 +134,7 @@ class SqlImpl(TableImpl):
         )
 
     def _table_def_repr(self) -> str:
-        return f"Table('{self.name}', SqlAlchemy({self.engine.url}))"
+        return f"Table('{self.name}', SqlAlchemy('{self.engine.url}'))"
 
     def col_names(self) -> list[str]:
         return [col.name for col in self.table.columns]
