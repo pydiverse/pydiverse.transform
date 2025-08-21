@@ -39,7 +39,9 @@ dt_second = DatetimeExtract("dt.second", doc="The second component of the dateti
 
 dt_millisecond = DatetimeExtract(
     "dt.millisecond",
-    doc="The microsecond component of the datetime int-divided by 1000 (see polars).",
+    doc="""
+The microsecond component of the datetime int-divided by 1000 (see polars).
+""",
 )
 
 dt_microsecond = DatetimeExtract(

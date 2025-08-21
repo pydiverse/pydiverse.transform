@@ -143,7 +143,7 @@ def generate_overloads(
         generate_fn_decl(
             op, op.signatures[0], name=name, specialize_generic=not has_overloads
         )
-        + f'    """{op.doc}"""\n\n'
+        + f'    """\n{op.doc.strip()}\n"""\n\n'
         + generate_fn_body(
             op,
             op.signatures[0],

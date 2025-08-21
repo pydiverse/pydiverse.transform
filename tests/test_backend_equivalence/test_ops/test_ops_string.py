@@ -186,8 +186,22 @@ def test_contains(df_strings):
         >> mutate(
             x=C.col1.str.contains(" ") | C.col1.str.contains("Foo"),
             y=C.col2.str.contains("st_") | C.col2.str.contains("bar"),
-            percent=C.col1.str.contains("%"),
+            percent=C.col1.str.contains("%", allow_regex=False),
             underscore=C.col2.str.contains("_"),
+        ),
+    )
+
+
+@skip_backends("sqlite", "mssql")
+def test_contains_regex(df_strings):
+    assert_result_equal(
+        df_strings,
+        lambda t: t
+        >> mutate(
+            x=t.col1.str.contains("."),
+            y=(t.col2 + t.c).str.contains("[^abc]"),
+            z=t.e.str.contains(""),
+            h=t.e.str.contains("A.", allow_regex=False),
         ),
     )
 

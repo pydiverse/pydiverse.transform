@@ -249,7 +249,6 @@ class Table:
     def __repr__(self) -> str:
         from pydiverse.transform._internal.pipe.verbs import (
             build_query,
-            get_backend,
             name,
         )
 
@@ -258,7 +257,7 @@ class Table:
         else:
             tbl_name = f"Table `{self >> name()}` "
 
-        res = tbl_name + f"(backend: {get_backend(self._ast).backend_name})\n"
+        res = tbl_name + f"(backend: {self._cache.backend.backend_name})\n"
 
         try:
             df, height = get_head_tail(self)
@@ -285,7 +284,7 @@ class Table:
         return [name for name in self._cache.name_to_uuid.keys()]
 
     def _repr_html_(self) -> str:
-        from pydiverse.transform._internal.pipe.verbs import get_backend, name
+        from pydiverse.transform._internal.pipe.verbs import name
 
         if self >> name() is None:
             tbl_name = "Table without name "
@@ -294,7 +293,7 @@ class Table:
 
         html = (
             tbl_name
-            + f"(backend: <code>{get_backend(self._ast).backend_name}</code>)</br>"
+            + f"(backend: <code>{self._cache.backend.backend_name}</code>)</br>"
         )
         try:
             # We use polars' _repr_html_ on the first and last few rows of the table and

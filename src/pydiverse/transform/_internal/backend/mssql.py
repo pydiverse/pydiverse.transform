@@ -319,9 +319,11 @@ with MsSqlImpl.impl_store.impl_manager as impl:
         return x.endswith(y, autoescape=True)
 
     @impl(ops.str_contains)
-    def _contains(x, y):
+    def _str_contains(x, pattern, allow_regex, true_if_regex_unsupported):
+        if true_if_regex_unsupported:
+            return sqa.literal(True, literal_execute=True)
         x = x.collate(MsSqlImpl.default_collation())
-        return x.contains(y, autoescape=True)
+        return x.contains(pattern, autoescape=True)
 
     @impl(ops.str_slice)
     def _str_slice(x, offset, length):

@@ -222,3 +222,9 @@ with PostgresImpl.impl_store.impl_manager as impl:
     @impl(ops.dt_day_of_week)
     def _day_of_week(x):
         return (sqa.extract("dow", x) + 6) % sqa.literal_column("7") + 1
+
+    @impl(ops.str_contains)
+    def _str_contains(x, pattern, allow_regex, true_if_regex_unsupported):
+        if not allow_regex:
+            return x.contains(pattern, autoescape=True)
+        return x.op("~")(pattern)

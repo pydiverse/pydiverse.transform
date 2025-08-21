@@ -4,7 +4,7 @@
 import copy
 import dataclasses
 from pprint import pformat
-from typing import Literal, Optional
+from typing import Optional
 from uuid import UUID
 
 from pydiverse.transform._internal import errors
@@ -28,9 +28,7 @@ class Cache:
     group_by: set[UUID]
     is_filtered: bool
 
-    backend: Literal[
-        "polars", "duckdb_polars", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
-    ]
+    backend: type[TableImpl]
 
     def __repr__(self) -> str:
         return (
@@ -91,7 +89,7 @@ class Cache:
             limit=0,
             group_by=set(),
             is_filtered=False,
-            backend=node.backend_name,
+            backend=type(node),
         )
 
     def update(
@@ -217,7 +215,7 @@ class Cache:
     # subquery. (so `self` is the old cache and `node` the new AST).
     # Either returns a reason for the subquery or None.
     def requires_subquery(self, node: verbs.Verb) -> str | None:
-        if self.backend == "polars":
+        if self.backend.backend_name == "polars":
             return None
 
         if (
