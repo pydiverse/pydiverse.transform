@@ -1441,6 +1441,18 @@ def name(table: Table) -> str | None:
 
 
 @overload
+def columns() -> list[str]: ...
+
+
+@verb
+def columns(table: Table) -> list[str]:
+    """
+    Returns the column names of the table.
+    """
+    return list(table._cache.name_to_uuid.keys())
+
+
+@overload
 def ast_repr(
     verb_depth: int = -1, expr_depth: int = -1, pipe: bool = False
 ) -> Pipeable | None: ...

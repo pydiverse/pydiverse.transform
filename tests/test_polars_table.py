@@ -697,6 +697,13 @@ class TestPolarsLazyImpl:
     def test_name(self, tbl3):
         assert tbl3 >> name() == "df3"
 
+    def test_columns(self, tbl3):
+        assert tbl3 >> columns() == [col.name for col in tbl3]
+        tbl3_different_col_order = tbl3 >> mutate(col3=tbl3.col3)
+        assert tbl3_different_col_order >> columns() == [
+            col.name for col in tbl3_different_col_order
+        ]
+
     def test_name_alias(self, tbl2):
         assert tbl2 >> alias("tbl") >> name() == "tbl"
 
