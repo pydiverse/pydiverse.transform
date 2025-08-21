@@ -3020,4 +3020,4 @@ def get_ast_path_str(tree_root: ColExpr, error_source: UUID | ColExpr) -> str:
         if any(nd is path[-1] for nd in node.iter_children()):
             path.append(node)
 
-    return "  --->  ".join(nd.ast_repr(depth=0) for nd in reversed(path))
+    return "  --->  ".join(nd.ast_repr(depth=1) for nd in reversed(path))
