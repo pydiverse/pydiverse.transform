@@ -2712,7 +2712,7 @@ class Cast(ColExpr):
                         "the expression."
                     )
 
-                raise TypeError(
+                raise DataTypeError(
                     f"cannot cast type {self.val.dtype()} to {self.target_type}.{hint}",
                     source=self._fn_id,
                 )
