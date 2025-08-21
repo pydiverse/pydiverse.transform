@@ -125,7 +125,11 @@ class ColExpr(Generic[T]):
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
-    def ast_repr(self, depth: int = -1) -> str: ...
+    def ast_repr(self, depth: int = -1) -> str:
+        return self._ast_repr(depth, False)
+
+    def _ast_repr(self, depth: int, needs_parens: bool):
+        raise NotImplementedError()
 
     def export(self, target: Target) -> pl.Series | pd.Series:
         """
@@ -2233,7 +2237,7 @@ class Col(ColExpr):
         self._uuid = _uuid
         super().__init__(_dtype, _ftype)
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
         return f"{self._ast.name or '?'}.{self.name}"
 
     def __hash__(self) -> int:
@@ -2247,7 +2251,7 @@ class ColName(ColExpr):
         self.name = name
         super().__init__(dtype, ftype)
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
         return f"C.{self.name}"
 
     def __repr__(self) -> str:
@@ -2269,7 +2273,7 @@ class LiteralCol(ColExpr):
         dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
-    def ast_repr(self, depth: int = -1):
+    def _ast_repr(self, depth: int, needs_parens: bool):
         return repr(self.val)
 
 
@@ -2306,14 +2310,58 @@ class ColFn(ColExpr):
         # try to eagerly resolve the types to get a nicer stack trace on type errors
         self.dtype()
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
+        DUNDER_BINARY = {
+            "__add__": "+",
+            "__sub__": "-",
+            "__mul__": "*",
+            "__truediv__": "/",
+            "__floordiv__": "//",
+            "__mod__": "%",
+            "__pow__": "**",
+            "__and__": "&",
+            "__or__": "|",
+            "__xor__": "^",
+            "__eq__": "==",
+            "__ne__": "!=",
+            "__le__": "<=",
+            "__lt__": "<",
+            "__ge__": ">=",
+            "__gt__": ">",
+        }
+        DUNER_UNARY = {"__pos__": "+", "__neg__": "-", "__invert__": "~"}
+
         if depth == 0:
-            return f"{self.op.name}(...)"
-        args = [e.ast_repr(depth - 1) for e in self.args] + [
-            (f"{ckwarg}=[" + ", ".join(v.ast_repr(depth - 1) for v in val) + "]")
+            if op_symbol := DUNDER_BINARY.get(self.op.name):
+                res = f"... {op_symbol} ..."
+                if needs_parens:
+                    res = f"({res})"
+                return res
+            return f"{DUNER_UNARY.get(self.op.name, self.op.name)}(...)"
+
+        arg_parens_limit = 1 + int(self.op.name in DUNDER_BINARY)
+
+        args = [
+            e._ast_repr(depth - 1, i <= arg_parens_limit)
+            for i, e in enumerate(self.args)
+        ] + [
+            (
+                f"{ckwarg}=["
+                + ", ".join(v._ast_repr(depth - 1, False) for v in val)
+                + "]"
+            )
             for ckwarg, val in self.context_kwargs.items()
         ]
-        return self.op.name + "(" + ", ".join(args) + ")"
+        if op_symbol := DUNDER_BINARY.get(self.op.name):
+            res = f"{args[0]} {op_symbol} {args[1]}"
+            if needs_parens:
+                res = f"({res})"
+            return res
+        elif op_symbol := DUNER_UNARY.get(self.op.name):
+            assert len(args) == 1
+            return f"{op_symbol}{args[0]}"
+
+        return f"{args[0]}.{self.op.name}" + "(" + ", ".join(args[1:]) + ")"
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -2446,7 +2494,7 @@ class CaseExpr(ColExpr):
         super().__init__()
         self.dtype()
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
         if depth == 0:
             return "case_when(...)"
         default_val_str = ""
@@ -2656,10 +2704,10 @@ class Cast(ColExpr):
             self._dtype = types.with_const(self._dtype)
         return self._dtype
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool) -> str:
         if depth == 0:
-            return "cast(...)"
-        return f"cast({self.val.ast_repr(depth - 1)}, {self.target_type})"
+            return f"(...).cast({self.target_type})"
+        return f"{self.val._ast_repr(depth - 1, True)}.cast({self.target_type})"
 
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype | None:
         if self._ftype is None:
