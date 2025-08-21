@@ -4,7 +4,7 @@
 import sqlalchemy as sqa
 from sqlalchemy import Cast
 
-from pydiverse.common import Decimal, Float, String
+from pydiverse.common import Decimal, Float
 from pydiverse.transform._internal.backend.sql import SqlImpl
 from pydiverse.transform._internal.ops import ops
 
@@ -105,5 +105,8 @@ with IbmDb2Impl.impl_store.impl_manager as impl:
         if not allow_regex:
             return x.contains(pattern, autoescape=True)
         if pattern == "":
-            return IbmDb2Impl.get_impl(ops.is_not_null, (String(),))(x)
+            return sqa.case(
+                (x.is_(sqa.null()), sqa.null()),
+                else_=sqa.literal(True, literal_execute=True),
+            )
         return sqa.func.REGEXP_LIKE(x, pattern).cast(sqa.Boolean())
