@@ -6,6 +6,7 @@
 - ColExpr repr is much more intuitive
 - fixed handling of const Enum (mutate(enum_col="value"))
 - added columns verb to simplify [c.name for c in tbl]
+- compatible with pydiverse.common 0.3.12
 
 ## 0.5.5 (2025-08-20)
 - don't suffix all joined columns if only the key columns overlap
