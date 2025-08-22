@@ -103,8 +103,28 @@ def converts_to(source: Dtype, target: Dtype) -> bool:
     source = without_const(source)
     if isinstance(source, List):
         return isinstance(target, List) and converts_to(source.inner, target.inner)
-    if isinstance(source, Enum):
-        return target == source or target == String()
+    if isinstance(source, Enum | String):
+        return (
+            target == source
+            or target == String()
+            or (
+                type(target) is String
+                and source.max_length is not None
+                and target.max_length > source.max_length
+            )
+        )
+    if isinstance(source, Decimal):
+        return (
+            target == source
+            or target in FLOAT_SUBTYPES
+            or target == Float()
+            or target == Decimal()
+            or (
+                isinstance(target, Decimal)
+                and target.scale >= source.scale
+                and (target.precision - target.scale >= source.precision - source.scale)
+            )
+        )
     return target in IMPLICIT_CONVS[source]
 
 
@@ -117,7 +137,7 @@ def to_python(dtype: Dtype):
         return float
     elif isinstance(dtype, List):
         return list
-    elif isinstance(dtype, Enum):
+    elif isinstance(dtype, Enum | String):
         return str
 
     return {
@@ -187,11 +207,21 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
 
         return List(lca_type([dtype.inner for dtype in dtypes]))
 
-    if any(isinstance(dtype, Enum) for dtype in dtypes):
+    if any(isinstance(dtype, Enum | String) for dtype in dtypes):
         if all(dtype == dtypes[0] for dtype in dtypes):
             return copy.copy(dtypes[0])
         if all(isinstance(dtype, Enum | String) for dtype in dtypes):
             return String()
+        raise DataTypeError(f"incompatible types `{', '.join(str(d) for d in dtypes)}`")
+
+    if any(isinstance(dtype, Decimal) for dtype in dtypes):
+        if all(dtype == dtypes[0] for dtype in dtypes):
+            return copy.copy(dtypes[0])
+        if all(isinstance(dtype, Decimal) for dtype in dtypes):
+            precision_diff = max(dtype.precision - dtype.scale for dtype in dtypes)
+            scale = max(dtype.scale for dtype in dtypes)
+            precision = precision_diff + scale
+            return Decimal(precision, scale)
         raise DataTypeError(f"incompatible types `{', '.join(str(d) for d in dtypes)}`")
 
     if not (
@@ -253,8 +283,12 @@ def is_subtype(dtype: Dtype) -> bool:
 def implicit_conversions(dtype: Dtype) -> list[Dtype]:
     if isinstance(dtype, List):
         return [List(inner) for inner in implicit_conversions(dtype.inner)]
-    if isinstance(dtype, Enum):
-        return [dtype, String()]
+    if isinstance(dtype, Enum | String):
+        return [String()] + ([dtype] if dtype.max_length is not None else [])
+    if isinstance(dtype, Decimal):
+        return (
+            list(FLOAT_SUBTYPES) + [Float()] + ([dtype] if dtype != Decimal() else [])
+        )
     return list(IMPLICIT_CONVS[dtype].keys())
 
 
@@ -303,8 +337,14 @@ def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
     dtype = without_const(dtype)
     if isinstance(dtype, List):
         return conversion_cost(dtype.inner, target.inner)
-    if isinstance(dtype, Enum):
-        return (0, 0) if dtype == target else (0, 1)
+    if isinstance(dtype, Enum | String | Decimal):
+        return (
+            (0, 0)
+            if dtype == target
+            else (0, 1)
+            if type(dtype) is type(target)
+            else (0, 2)
+        )
     return IMPLICIT_CONVS[dtype][target]
 
 

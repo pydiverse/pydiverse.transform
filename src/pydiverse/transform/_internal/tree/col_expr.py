@@ -23,6 +23,7 @@ from pydiverse.common import (
     Bool,
     Date,
     Datetime,
+    Decimal,
     Dtype,
     Duration,
     Enum,
@@ -2798,6 +2799,10 @@ class Cast(ColExpr):
         }
 
         source = types.without_const(source)
+        if isinstance(source, String):
+            source = String()  # drop max_length
+        elif isinstance(source, Decimal):
+            source = Decimal()  # standardize precision/scale
 
         if isinstance(source, String) and isinstance(target, Enum):
             return True

@@ -5,11 +5,14 @@ import datetime as dt
 
 import polars as pl
 import pytest
+import structlog
 
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.errors import ColumnNotFoundError, DataTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_equal
+
+logger = structlog.get_logger(__name__)
 
 df1 = pl.DataFrame(
     {
@@ -845,6 +848,7 @@ class TestPrintAndRepr:
 
     def test_expr_str(self, tbl1):
         expr_str = str(tbl1.col1 * 2)
+        logger.info(expr_str)
         assert "failed" not in expr_str
 
     def test_expr_html_repr(self, tbl1):
@@ -907,7 +911,7 @@ class TestPrintAndRepr:
             >> alias("tbl 42")
         )
 
-        (
+        ast_str = (
             intermed
             >> left_join(
                 tbl4
@@ -924,27 +928,23 @@ class TestPrintAndRepr:
 
         series = pl.Series([2**i for i in range(12)])
 
-        assert (
-            "tbl__1729.j"
-            in (
-                tbl3
-                >> mutate(
-                    u=C.col1 + 5,
-                    v=(tbl3.col2.exp() + tbl3.col4) * tbl3.col1,
-                    w=pdt.max(tbl3.col2, tbl3.col1, tbl3.col5.str.len()),
-                    x=pdt.count(),
-                    y=eval_aligned(
-                        (
-                            tbl3
-                            >> mutate(j=42)
-                            >> alias("tbl. 1729")
-                            >> filter(C.col2 > 0)
-                        ).j
-                        + tbl3.col1
-                    ),
-                    z=eval_aligned(series),
-                )
-                >> select(tbl3.col1, tbl3.col4)
-                >> left_join(tbl4, on="col1")
-            )._ast.ast_repr()
-        )
+        ast_str = (
+            tbl3
+            >> mutate(
+                u=C.col1 + 5,
+                v=(tbl3.col2.exp() + tbl3.col4) * tbl3.col1,
+                w=pdt.max(tbl3.col2, tbl3.col1, tbl3.col5.str.len()),
+                x=pdt.count(),
+                y=eval_aligned(
+                    (tbl3 >> mutate(j=42) >> alias("tbl. 1729") >> filter(C.col2 > 0)).j
+                    + tbl3.col1
+                ),
+                z=eval_aligned(series),
+            )
+            >> select(tbl3.col1, tbl3.col4)
+            >> left_join(tbl4, on="col1")
+        )._ast.ast_repr()
+
+        logger.info(f"AST:\n{ast_str}")
+
+        assert "tbl__1729.j" in ast_str

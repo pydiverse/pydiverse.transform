@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import itertools
-import subprocess
 from collections.abc import Callable, Iterable
 from uuid import UUID
+
+from pydiverse.transform._internal.util.warnings import warn
 
 
 class AstNode:
@@ -99,17 +100,13 @@ class AstNode:
             + ")"
         )
         try:
-            proc = subprocess.run(
-                ["ruff", "format", "-"],  # '-' tells Ruff to read from stdin
-                input=unformatted.encode(),
-                capture_output=True,
-                check=True,
-            )
-        except subprocess.CalledProcessError as e:
-            print(unformatted)
-            print(e.stderr.decode())
-            raise e
-        return proc.stdout.decode()
+            import black
+
+            formatted = black.format_str(unformatted, mode=black.Mode(line_length=120))
+            return formatted
+        except Exception:
+            warn("Could not format AST representation with `black`.")
+            return unformatted
 
     def short_name(self) -> str:
         raise NotImplementedError()
