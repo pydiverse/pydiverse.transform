@@ -2,7 +2,7 @@
 
 ## 0.5.6 (2025-08-22)
 - improved regex behavior in .str.contains()
-- AST repr is printing user friendly syntax (python-like ruff formatted)
+- AST repr is printing user friendly syntax (python-like black formatted)
 - ColExpr repr is much more intuitive
 - fixed handling of const Enum (mutate(enum_col="value"))
 - added columns verb to simplify [c.name for c in tbl]
