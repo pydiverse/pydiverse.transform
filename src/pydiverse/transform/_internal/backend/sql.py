@@ -764,10 +764,6 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _str_ends_with(x, y):
         return x.endswith(y, autoescape=True)
 
-    @impl(ops.str_contains)
-    def _str_contains(x, y):
-        return x.contains(y, autoescape=True)
-
     @impl(ops.str_slice)
     def _str_slice(x, offset, length):
         # SQL has 1-indexed strings but we do it 0-indexed

@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.5.5 (2025-08-20)
+- don't suffix all joined columns if only the key columns overlap
 - add query to __str__/__repr__ operators of Table
 - add transfer_col_references to allow materialize with keep_col_references=True
 

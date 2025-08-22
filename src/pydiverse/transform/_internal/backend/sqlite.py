@@ -125,7 +125,9 @@ with SqliteImpl.impl_store.impl_manager as impl:
         return x.endswith(y, autoescape=True)
 
     @impl(ops.str_contains)
-    def _str_contains(x, y):
+    def _str_contains(x, y, allow_regex, true_if_regex_unsupported):
+        if true_if_regex_unsupported:
+            return sqa.literal(True, literal_execute=True)
         warn_non_standard(
             "SQLite: contains is case-insensitive by default. "
             "Use the 'case_sensitive_like' pragma to change this behaviour. "

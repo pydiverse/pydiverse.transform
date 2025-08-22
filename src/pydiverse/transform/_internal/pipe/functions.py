@@ -174,13 +174,13 @@ def dense_rank(
 
 
 def all(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
-    """"""
+    """ """
 
     return ColFn(ops.horizontal_all, arg, *args)
 
 
 def any(arg: ColExpr[Bool], *args: ColExpr[Bool]) -> ColExpr[Bool]:
-    """"""
+    """ """
 
     return ColFn(ops.horizontal_any, arg, *args)
 
@@ -332,13 +332,15 @@ def sum(arg: ColExpr[Duration], *args: ColExpr[Duration]) -> ColExpr[Duration]: 
 
 
 def sum(arg: ColExpr, *args: ColExpr) -> ColExpr:
-    """"""
+    """ """
 
     return ColFn(ops.horizontal_sum, arg, *args)
 
 
 def rand() -> ColExpr[Float]:
-    """Generates a column of random floating point number between 0 and 1."""
+    """
+    Generates a column of random floating point number between 0 and 1.
+    """
 
     return ColFn(ops.rand)
 
