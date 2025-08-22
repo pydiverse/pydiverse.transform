@@ -1491,52 +1491,30 @@ def ast_repr(
     ...     >> slice_head(32)
     ...     >> ast_repr()
     ... )
-    * slice_head
-    | n = 32, offset = 0
-    |
-    *   join
-    |\  how = `left`
-    | | on = __eq__(tbl1.a, tbl2.a)
-    | | validate = `m:m`
-    | |
-    | * rename
-    | | a -> a_tbl2
-    | |
-    | *   join
-    | |\  how = `full`
-    | | | on = __eq__(tbl2.c, s.c)
-    | | | validate = `m:m`
-    | | |
-    | | * rename
-    | | | a -> a_s,
-    | | | c -> c_s
-    | | |
-    | | * alias
-    | | | s
-    | | |
-    | | * PolarsImpl
-    | | | name = 'tbl2',
-    | | | df = <LazyFrame at 0x16CCE8080>
-    | |
-    | * filter
-    | | __le__(str.len(tbl2.c), 10)
-    | |
-    | * arrange
-    | | Order(by=tbl2.a, descending=False, nulls_last=None)
-    | |
-    | * PolarsImpl
-    | | name = 'tbl2',
-    | | df = <LazyFrame at 0x16CCE8080>
-    |
-    * select
-    | tbl1.a
-    |
-    * mutate
-    | u = __add__(tbl1.a, 5)
-    |
-    * PolarsImpl
-    | name = 'tbl1',
-    | df = <LazyFrame at 0x16BD74860>
+    tbl2 = Table(df, Polars(), name="tbl2")
+    tbl1 = Table(df, Polars(), name="tbl1")
+
+    (
+        tbl1
+        >> mutate(u=tbl1.a + 5)
+        >> select(tbl1.a)
+        >> join(
+            tbl2
+            >> arrange(tbl2.a)
+            >> filter(tbl2.c.str.len() <= 10)
+            >> join(
+                tbl2 >> alias("s") >> rename({"a": "a_s", "c": "c_s"}),
+                how="full",
+                on=tbl2.c == s.c,
+                validate="m:m",
+            )
+            >> rename({"a": "a_tbl2"}),
+            how="left",
+            on=tbl1.a == tbl2.a,
+            validate="m:m",
+        )
+        >> slice_head(n=32, offset=0)
+    )
     """
 
     print(table._ast.ast_repr(verb_depth, expr_depth), end="")
