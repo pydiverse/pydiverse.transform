@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.6 (2025-08-22)
+- improved regex behavior in .str.contains()
+- AST repr is printing user friendly syntax (python-like ruff formatted)
+- ColExpr repr is much more intuitive
+- fixed handling of const Enum (mutate(enum_col="value"))
+- added columns verb to simplify [c.name for c in tbl]
+
 ## 0.5.5 (2025-08-20)
 - don't suffix all joined columns if only the key columns overlap
 - add query to __str__/__repr__ operators of Table

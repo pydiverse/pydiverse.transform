@@ -608,6 +608,7 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.str_contains)
     def _str_contains(x, y, allow_regex, true_if_regex_unsupported):
+        _ = true_if_regex_unsupported
         return x.str.contains(y, literal=not pl.select(allow_regex).item())
 
     @impl(ops.str_starts_with)

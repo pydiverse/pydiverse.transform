@@ -1,7 +1,10 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
+import logging
 
 import pytest
+
+from pydiverse.common.util.structlog import setup_logging
 
 # Setup
 
@@ -37,3 +40,6 @@ def pytest_collection_modifyitems(config: pytest.Config, items):
                     for kw in item.keywords
                 ):
                     item.add_marker(skip)
+
+
+setup_logging(log_level=logging.INFO)

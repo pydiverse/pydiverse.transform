@@ -5,11 +5,14 @@ import datetime as dt
 
 import polars as pl
 import pytest
+import structlog
 
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.errors import ColumnNotFoundError, DataTypeError
 from pydiverse.transform.extended import *
 from tests.util import assert_equal
+
+logger = structlog.get_logger(__name__)
 
 df1 = pl.DataFrame(
     {
@@ -845,6 +848,7 @@ class TestPrintAndRepr:
 
     def test_expr_str(self, tbl1):
         expr_str = str(tbl1.col1 * 2)
+        logger.info(expr_str)
         assert "failed" not in expr_str
 
     def test_expr_html_repr(self, tbl1):
