@@ -125,7 +125,16 @@ class ColExpr(Generic[T]):
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
 
-    def ast_repr(self, depth: int = -1) -> str: ...
+    # User exposed ast_repr function
+    def ast_repr(self, depth: int = -1) -> str:
+        return self._ast_repr(depth, False, dict())
+
+    # Does the recursive calls and allows to alter the displayed names of the tables
+    # of columns (this is necessary for the verb ast_repr).
+    def _ast_repr(
+        self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]
+    ):
+        raise NotImplementedError()
 
     def export(self, target: Target) -> pl.Series | pd.Series:
         """
@@ -2347,8 +2356,9 @@ class Col(ColExpr):
         self._uuid = _uuid
         super().__init__(_dtype, _ftype)
 
-    def ast_repr(self, depth: int = -1) -> str:
-        return f"{self._ast.name or '?'}.{self.name}"
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
+        table_name = table_display_name_map.get(self._ast, self._ast.name) or "?"
+        return f"{table_name}.{self.name}"
 
     def __hash__(self) -> int:
         return hash(self._uuid)
@@ -2361,7 +2371,7 @@ class ColName(ColExpr):
         self.name = name
         super().__init__(dtype, ftype)
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         return f"C.{self.name}"
 
     def __repr__(self) -> str:
@@ -2383,7 +2393,7 @@ class LiteralCol(ColExpr):
         dtype = types.with_const(dtype)
         super().__init__(dtype, Ftype.ELEMENT_WISE)
 
-    def ast_repr(self, depth: int = -1):
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map):
         return repr(self.val)
 
 
@@ -2420,14 +2430,69 @@ class ColFn(ColExpr):
         # try to eagerly resolve the types to get a nicer stack trace on type errors
         self.dtype()
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
+        DUNDER_BINARY = {
+            "__add__": "+",
+            "__sub__": "-",
+            "__mul__": "*",
+            "__truediv__": "/",
+            "__floordiv__": "//",
+            "__mod__": "%",
+            "__pow__": "**",
+            "__and__": "&",
+            "__or__": "|",
+            "__xor__": "^",
+            "__eq__": "==",
+            "__ne__": "!=",
+            "__le__": "<=",
+            "__lt__": "<",
+            "__ge__": ">=",
+            "__gt__": ">",
+        }
+        DUNDER_UNARY = {"__pos__": "+", "__neg__": "-", "__invert__": "~"}
+
+        def parenthesize(s: str) -> str:
+            return f"({s})" if needs_parens else s
+
         if depth == 0:
-            return f"{self.op.name}(...)"
-        args = [e.ast_repr(depth - 1) for e in self.args] + [
-            (f"{ckwarg}=[" + ", ".join(v.ast_repr(depth - 1) for v in val) + "]")
+            if op_symbol := DUNDER_BINARY.get(self.op.name):
+                return parenthesize(f"...{op_symbol}...")
+            if op_symbol := DUNDER_UNARY.get(self.op.name):
+                return parenthesize(f"{op_symbol}(...)")
+            if not self.op.generate_expr_method:
+                # This is for the functions defined in the `functions.py` module, which
+                # are called like pdt.<fn name>(...)
+                return f"{self.op.name}(...)"
+
+            return f"(...).{self.op.name}" + (
+                "(...)" if len(self.args) > 1 or len(self.context_kwargs) > 0 else "()"
+            )
+
+        arg_parens_limit = 1 + int(self.op.name in DUNDER_BINARY)
+
+        args = [
+            e._ast_repr(depth - 1, i <= arg_parens_limit, table_display_name_map)
+            for i, e in enumerate(self.args)
+        ] + [
+            (
+                f"{ckwarg}=["
+                + ", ".join(
+                    v._ast_repr(depth - 1, False, table_display_name_map) for v in val
+                )
+                + "]"
+            )
             for ckwarg, val in self.context_kwargs.items()
         ]
-        return self.op.name + "(" + ", ".join(args) + ")"
+        if op_symbol := DUNDER_BINARY.get(self.op.name):
+            assert len(args) == 2
+            return parenthesize(f"{args[0]} {op_symbol} {args[1]}")
+        if op_symbol := DUNDER_UNARY.get(self.op.name):
+            assert len(args) == 1
+            return parenthesize(f"{op_symbol}{args[0]}")
+        if not self.op.generate_expr_method:
+            return f"{self.op.name}" + "(" + ", ".join(args) + ")"
+
+        return f"{args[0]}.{self.op.name}" + "(" + ", ".join(args[1:]) + ")"
 
     def iter_children(self) -> Iterable[ColExpr]:
         yield from itertools.chain(self.args, *self.context_kwargs.values())
@@ -2560,19 +2625,19 @@ class CaseExpr(ColExpr):
         super().__init__()
         self.dtype()
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         if depth == 0:
-            return "case_when(...)"
-        default_val_str = ""
-        if self.default_val is not None:
-            default_val_str = f", default={self.default_val.ast_repr(depth - 1)}"
-        return (
-            "case_when("
-            + ", ".join(
-                f"{cond.ast_repr(depth - 1)} -> {val.ast_repr(depth - 1)}"
-                for cond, val in self.cases
-            )
-            + default_val_str
+            return "when(...).then(...)"
+
+        return ".".join(
+            f"when({cond._ast_repr(depth - 1, False, table_display_name_map)})"
+            f".then({val._ast_repr(depth - 1, False, table_display_name_map)})"
+            for cond, val in self.cases
+        ) + (
+            ""
+            if self.default_val is None
+            else ".otherwise("
+            + self.default_val._ast_repr(depth - 1, False, table_display_name_map)
             + ")"
         )
 
@@ -2761,7 +2826,7 @@ class Cast(ColExpr):
                         "the expression."
                     )
 
-                raise TypeError(
+                raise DataTypeError(
                     f"cannot cast type {self.val.dtype()} to {self.target_type}.{hint}",
                     source=self._fn_id,
                 )
@@ -2770,10 +2835,13 @@ class Cast(ColExpr):
             self._dtype = types.with_const(self._dtype)
         return self._dtype
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         if depth == 0:
-            return "cast(...)"
-        return f"cast({self.val.ast_repr(depth - 1)}, {self.target_type})"
+            return f"(...).cast({self.target_type})"
+        return (
+            f"{self.val._ast_repr(depth - 1, True, table_display_name_map)}"
+            + f".cast({self.target_type})"
+        )
 
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype | None:
         if self._ftype is None:
@@ -2795,7 +2863,7 @@ class Series(ColExpr):
         self._dtype = Dtype.from_polars(val.dtype)
         self._ftype = Ftype.ELEMENT_WISE
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         return f"Series('{self.val.name}')"
 
 
@@ -2822,11 +2890,15 @@ class EvalAligned(ColExpr):
     def map_children(self, g):
         self.val = g(self.val)
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def _ast_repr(
+        self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]
+    ) -> str:
+        if depth == 0:
+            return "eval_aligned(...)"
         return (
             "eval_aligned("
-            f"with={self.with_.ast_repr(oneline=True) if self.with_ else None}, "
-            f"{self.val.ast_repr(depth)})"
+            f"{self.val._ast_repr(depth - 1, False, table_display_name_map)},"
+            f"with_={self.with_.short_name() if self.with_ else None})"
         )
 
 
@@ -2875,13 +2947,14 @@ class Order:
 
         return Order(expr, descending, nulls_last)
 
-    def ast_repr(self, depth: int = -1) -> str:
+    def ast_repr(self, depth: int = -1):
+        return self._ast_repr(depth, False, dict())
+
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         return (
-            "Order("
-            f"by={self.order_by.ast_repr(depth)}, "
-            f"descending={self.descending}, "
-            f"nulls_last={self.nulls_last}"
-            ")"
+            self.order_by._ast_repr(depth, True, table_display_name_map)
+            + (".descending()" if self.descending else "")
+            + (".nulls_last()" if self.nulls_last else "")
         )
 
     def dtype(self) -> Dtype:
@@ -3061,4 +3134,4 @@ def get_ast_path_str(tree_root: ColExpr, error_source: UUID | ColExpr) -> str:
         if any(nd is path[-1] for nd in node.iter_children()):
             path.append(node)
 
-    return "  --->  ".join(nd.ast_repr(depth=0) for nd in reversed(path))
+    return "  --->  ".join(nd.ast_repr(depth=1) for nd in reversed(path))

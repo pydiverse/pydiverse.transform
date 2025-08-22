@@ -180,7 +180,7 @@ class Table:
             if key._uuid not in self._cache.uuid_to_name:
                 raise ColumnNotFoundError(
                     f"column `{key.ast_repr()}` does not exist in table "
-                    f"`{get_print_tbl_name(self)}`"
+                    f"`{self._ast.short_name()}`"
                 )
             return Col(
                 self._cache.uuid_to_name[key._uuid],
@@ -197,7 +197,7 @@ class Table:
             raise AttributeError
         if name not in self._cache.name_to_uuid:
             raise ColumnNotFoundError(
-                f"column `{name}` does not exist in table `{get_print_tbl_name(self)}`"
+                f"column `{name}` does not exist in table `{self._ast.short_name()}`"
             )
         col = self._cache.cols[self._cache.name_to_uuid[name]]
         return Col(name, self._ast, col._uuid, col._dtype, col._ftype)
@@ -351,11 +351,3 @@ def is_sql_backed(table: Table) -> bool:
     Whether the table has a SQL backend.
     """
     return table._cache.backend not in ("polars", "duckdb_polars")
-
-
-def get_print_tbl_name(table: Table | AstNode) -> str:
-    if isinstance(table, Table):
-        table = table._ast
-    if (nm := table.name) is None:
-        return table.__class__.__name__ + "(...)"
-    return nm

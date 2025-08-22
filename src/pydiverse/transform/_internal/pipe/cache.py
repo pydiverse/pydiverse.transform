@@ -49,7 +49,7 @@ class Cache:
             + ",\n"
             + f"  partition_by={self.partition_by}\n"
             + "  derived_from={"
-            + f"{', '.join(d.ast_repr(oneline=True) for d in self.derived_from)}"
+            + f"{', '.join(d.short_name() for d in self.derived_from)}"
             + "},\n"
             + "  cols={"
             + f"""{
@@ -343,7 +343,7 @@ def transfer_col_references(table, ref_source):
     in the `mutate`. (Of course, you would normally have a SQL backend when
     materializing, not a polars backend like in the example here.)
     """
-    from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
+    from pydiverse.transform._internal.pipe.table import Table
     from pydiverse.transform._internal.tree.verbs import Alias
 
     errors.check_arg_type(Table, "transfer_col_references", "table", table)
@@ -353,9 +353,9 @@ def transfer_col_references(table, ref_source):
         col := next((col for col in table if col.name not in ref_source), None)
     ) is not None:
         raise ValueError(
-            f"column {col.ast_repr()} of the table `{get_print_tbl_name(table)}` does "
+            f"column {col.ast_repr()} of the table `{table._ast.short_name()}` does "
             "not exist in the reference source table "
-            f"`{get_print_tbl_name(ref_source)}`"
+            f"`{ref_source._ast.short_name()}`"
         )
 
     new = copy.copy(table)

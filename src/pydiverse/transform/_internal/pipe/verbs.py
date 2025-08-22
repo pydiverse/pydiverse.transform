@@ -38,7 +38,7 @@ from pydiverse.transform._internal.pipe.pipeable import (
     modify_ast,
     verb,
 )
-from pydiverse.transform._internal.pipe.table import Table, get_print_tbl_name
+from pydiverse.transform._internal.pipe.table import Table
 from pydiverse.transform._internal.tree import types
 from pydiverse.transform._internal.tree.col_expr import (
     Col,
@@ -405,7 +405,7 @@ def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
         print(query)
     else:
         print(
-            f"No query to show for table {get_print_tbl_name(table)}. "
+            f"No query to show for table {table._ast.short_name()}. "
             f"(backend: {table._cache.backend.backend_name})"
         )
 
@@ -448,7 +448,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
         if isinstance(col, ColName | str) and col not in table:
             raise ColumnNotFoundError(
                 f"column `{col.ast_repr()}` does not exist in table "
-                f"`{get_print_tbl_name(table)}`"
+                f"`{table._ast.short_name()}`"
             )
         elif col not in table and col._uuid in table._cache.cols:
             raise ColumnNotFoundError(
@@ -600,7 +600,7 @@ def rename(table: Table, name_map: dict[str | Col | ColName, str]) -> Pipeable:
     if d := set(name_map).difference(table._cache.name_to_uuid):
         raise ValueError(
             f"no column with name `{next(iter(d))}` in table "
-            f"`{get_print_tbl_name(table)}`"
+            f"`{table._ast.short_name()}`"
         )
 
     if d := (set(table._cache.name_to_uuid).difference(name_map)) & set(
@@ -1158,9 +1158,9 @@ def join(
         raise TypeError("cannot join two tables with different backends")
 
     if left._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{get_print_tbl_name(left)}`")
+        raise ValueError(f"cannot join grouped table `{left._ast.short_name()}`")
     elif right._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{get_print_tbl_name(right)}`")
+        raise ValueError(f"cannot join grouped table `{right._ast.short_name()}`")
 
     if intersection := left._cache.derived_from & right._cache.derived_from:
         raise ValueError(
@@ -1203,9 +1203,9 @@ def join(
         ):
             raise ValueError(
                 f"column `{expr.ast_repr()}` used in `on` neither exists in the table "
-                f"`{get_print_tbl_name(left)}` nor in the table "
-                f"`{get_print_tbl_name(right)}`. The source table "
-                f"`{get_print_tbl_name(expr._ast)}` of the column must be an "
+                f"`{left._ast.short_name()}` nor in the table "
+                f"`{right._ast.short_name()}`. The source table "
+                f"`{expr._ast.short_name()}` of the column must be an "
                 "ancestor of one of the two input tables."
             )
 
@@ -1453,7 +1453,7 @@ def columns(table: Table) -> list[str]:
 
 @overload
 def ast_repr(
-    verb_depth: int = -1, expr_depth: int = -1, pipe: bool = False
+    verb_depth: int = 7, expr_depth: int = 2, pipe: bool = False
 ) -> Pipeable | None: ...
 
 
@@ -1491,52 +1491,30 @@ def ast_repr(
     ...     >> slice_head(32)
     ...     >> ast_repr()
     ... )
-    * slice_head
-    | n = 32, offset = 0
-    |
-    *   join
-    |\  how = `left`
-    | | on = __eq__(tbl1.a, tbl2.a)
-    | | validate = `m:m`
-    | |
-    | * rename
-    | | a -> a_tbl2
-    | |
-    | *   join
-    | |\  how = `full`
-    | | | on = __eq__(tbl2.c, s.c)
-    | | | validate = `m:m`
-    | | |
-    | | * rename
-    | | | a -> a_s,
-    | | | c -> c_s
-    | | |
-    | | * alias
-    | | | s
-    | | |
-    | | * PolarsImpl
-    | | | name = 'tbl2',
-    | | | df = <LazyFrame at 0x16CCE8080>
-    | |
-    | * filter
-    | | __le__(str.len(tbl2.c), 10)
-    | |
-    | * arrange
-    | | Order(by=tbl2.a, descending=False, nulls_last=None)
-    | |
-    | * PolarsImpl
-    | | name = 'tbl2',
-    | | df = <LazyFrame at 0x16CCE8080>
-    |
-    * select
-    | tbl1.a
-    |
-    * mutate
-    | u = __add__(tbl1.a, 5)
-    |
-    * PolarsImpl
-    | name = 'tbl1',
-    | df = <LazyFrame at 0x16BD74860>
+    tbl2 = Table(df, Polars(), name="tbl2")
+    tbl1 = Table(df, Polars(), name="tbl1")
+
+    (
+        tbl1
+        >> mutate(u=tbl1.a + 5)
+        >> select(tbl1.a)
+        >> join(
+            tbl2
+            >> arrange(tbl2.a)
+            >> filter(tbl2.c.str.len() <= 10)
+            >> join(
+                tbl2 >> alias("s") >> rename({"a": "a_s", "c": "c_s"}),
+                how="full",
+                on=tbl2.c == s.c,
+                validate="m:m",
+            )
+            >> rename({"a": "a_tbl2"}),
+            how="left",
+            on=tbl1.a == tbl2.a,
+            validate="m:m",
+        )
+        >> slice_head(n=32, offset=0)
+    )
     """
 
     print(table._ast.ast_repr(verb_depth, expr_depth), end="")
