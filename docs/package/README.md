@@ -4,14 +4,33 @@
 
 Pipe based dataframe manipulation library that can also transform data on SQL databases
 
-This is an early stage version 0.x which lacks documentation. Please contact
-https://github.com/orgs/pydiverse/teams/code-owners if you like to become an early adopter
-or to contribute early stage usage examples.
+This is an early stage version 0.x, however, it is already used in real projects. We are happy to receive your
+feedback as [issues](https://github.com/pydiverse/pydiverse.transform/issues) on the GitHub repo. Feel free to also
+comment on existing issues to extend them to your needs or to add solution ideas.
 
 ## Usage
 
 pydiverse.transform can either be installed via pypi with `pip install pydiverse-transform` or via conda-forge
-with `conda install pydiverse-transform -c conda-forge`.
+with `conda install pydiverse-transform -c conda-forge`. Our recommendation would be
+to use [pixi](https://pixi.sh/latest/) which is also based on conda-forge:
+
+```bash
+mkdir my_project
+pixi init
+pixi add pydiverse-transform
+```
+
+With pixi, you run python like this:
+
+```bash
+pixi run python -c 'import pydiverse.transform'
+```
+
+or this:
+
+```bash
+pixi run python my_script.py
+```
 
 ## Example
 
