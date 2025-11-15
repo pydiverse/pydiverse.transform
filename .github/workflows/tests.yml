@@ -52,6 +52,7 @@ jobs:
           - py311
           - py312
           - py313
+          - py314
     uses: ./.github/workflows/test.yml
     with:
       os: ${{ matrix.os }}
@@ -71,6 +72,7 @@ jobs:
           - py311
           - py312
           - py313
+          - py314
     uses: ./.github/workflows/test.yml
     with:
       os: ${{ matrix.os }}
@@ -91,6 +93,7 @@ jobs:
           - py311
           - py312
           - py313
+          - py314
     uses: ./.github/workflows/test.yml
     with:
       os: ${{ matrix.os }}
