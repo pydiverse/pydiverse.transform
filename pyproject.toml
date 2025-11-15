@@ -1,6 +1,6 @@
 [project]
 name = "pydiverse-transform"
-version = "0.6.0"
+version = "0.6.1"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
   { name = "QuantCo, Inc." },
@@ -26,10 +26,10 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Topic :: Software Development",
 ]
-requires-python = ">=3.10.18,<3.14"
+requires-python = ">=3.10.18,<3.15"
 dependencies = [
   "pandas >=2.3.0,<3",
-  "pyarrow >=20.0.0,<22",
+  "pyarrow >=20.0.0,<23",
   "polars >=1.30.0,<2",
   "pydiverse-common >=0.4.0,<0.5",
   "sqlalchemy >=2.0.41,<3",
