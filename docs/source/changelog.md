@@ -2,6 +2,7 @@
 
 ## 0.6.1 (2025-11-15)
 - support python 3.14
+- support pyarrow 22
 
 ## 0.6.0 (2025-10-03)
 - bump dependency to pydiverse.common 0.4.0 (switch structlog config to stdlib logging)
