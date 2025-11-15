@@ -26,7 +26,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Topic :: Software Development",
 ]
-requires-python = ">=3.10.18,<3.15"
+requires-python = ">=3.10.18,<3.15.0a0"
 dependencies = [
   "pandas >=2.3.0,<3",
   "pyarrow >=20.0.0,<23",

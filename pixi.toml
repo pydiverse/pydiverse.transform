@@ -4,7 +4,7 @@ name = "pydiverse.transform"
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64", "linux-aarch64"]
 
 [dependencies]
-python = ">=3.10.18,<3.15"
+python = ">=3.10.18,<3.15.0a0"
 pandas = ">=2.3.0,<3"
 pyarrow = ">=20.0.0,<23"
 polars = ">=1.30.0,<2"
