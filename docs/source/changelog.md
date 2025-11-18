@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.2 (202Y-MM-DD)
+- drop support for python 3.10
+
 ## 0.6.1 (2025-11-15)
 - support python 3.14
 - support pyarrow 22
