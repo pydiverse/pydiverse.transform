@@ -48,7 +48,6 @@ jobs:
         os:
           - ubuntu-latest
         environment:
-          - py310
           - py311
           - py312
           - py313
@@ -68,7 +67,6 @@ jobs:
         os:
           - ubuntu-latest
         environment:
-          - py310
           - py311
           - py312
           - py313
@@ -89,7 +87,6 @@ jobs:
         os:
           - ubuntu-latest
         environment:
-          - py310
           - py311
           - py312
           - py313
