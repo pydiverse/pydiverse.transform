@@ -17,7 +17,6 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: SQL",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -26,7 +25,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Topic :: Software Development",
 ]
-requires-python = ">=3.10.18,<3.15.0a0"
+requires-python = ">=3.11.14,<3.15.0a0"
 dependencies = [
   "pandas >=2.3.0,<3",
   "pyarrow >=20.0.0,<23",
