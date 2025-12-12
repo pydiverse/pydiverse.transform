@@ -343,11 +343,11 @@ def backend(
     """
     Returns the backend of the table as a string.
     """
-    return table._cache.backend
+    return table._cache.backend.backend_name
 
 
 def is_sql_backed(table: Table) -> bool:
     """
     Whether the table has a SQL backend.
     """
-    return table._cache.backend not in ("polars", "duckdb_polars")
+    return table._cache.backend.backend_name not in ("polars", "duckdb_polars")

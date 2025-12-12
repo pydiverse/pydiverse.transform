@@ -1,6 +1,6 @@
 [project]
 name = "pydiverse-transform"
-version = "0.6.1"
+version = "0.6.2"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
   { name = "QuantCo, Inc." },
