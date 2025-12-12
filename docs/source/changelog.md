@@ -2,7 +2,7 @@
 
 ## 0.6.2 (202Y-MM-DD)
 - drop support for python 3.10
-- fix Table.is_sql_backend() and Table.backend()
+- fix is_sql_backend(Table) and backend(Table)
 
 ## 0.6.1 (2025-11-15)
 - support python 3.14

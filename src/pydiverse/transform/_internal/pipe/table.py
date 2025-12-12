@@ -350,4 +350,4 @@ def is_sql_backed(table: Table) -> bool:
     """
     Whether the table has a SQL backend.
     """
-    return table._cache.backend.backend_name not in ("polars", "duckdb_polars")
+    return not backend(table).endswith("polars")
