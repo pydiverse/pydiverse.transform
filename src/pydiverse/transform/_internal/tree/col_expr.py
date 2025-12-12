@@ -2379,17 +2379,13 @@ class ColName(ColExpr):
         return self.ast_repr()
 
     def __hash__(self) -> int:
+        """
+        Allow C.xxx expressions as dictionary keys.
+
+        Attention: don't implement __eq__. This is reserved for building expressions
+        with columns
+        """
         return hash(self.name)
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ColName):
-            return NotImplemented
-        return self.name == other.name
-
-    def __lt__(self, other: object) -> bool:
-        if not isinstance(other, ColName):
-            return NotImplemented
-        return self.name < other.name
 
 
 class LiteralCol(ColExpr):

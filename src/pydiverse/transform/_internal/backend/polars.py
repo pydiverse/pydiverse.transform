@@ -296,7 +296,10 @@ def compile_ast(
 
     if isinstance(nd, verbs.Mutate | verbs.Summarize | verbs.Rename):
         if isinstance(nd, verbs.Rename):
-            names_to_consider = None  # take it from name_in_df
+            selected = set(select)
+            names_to_consider = {
+                col for uuid, col in name_in_df.items() if uuid not in selected
+            }  # take it from name_in_df
             new_names = set(nd.name_map.values())
         else:
             nd_names_set = set(nd.names)
