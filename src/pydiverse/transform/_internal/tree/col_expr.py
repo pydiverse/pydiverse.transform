@@ -2378,6 +2378,19 @@ class ColName(ColExpr):
     def __repr__(self) -> str:
         return self.ast_repr()
 
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ColName):
+            return NotImplemented
+        return self.name == other.name
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ColName):
+            return NotImplemented
+        return self.name < other.name
+
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any, dtype: Dtype | None = None):
