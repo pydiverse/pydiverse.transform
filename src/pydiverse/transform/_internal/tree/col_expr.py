@@ -2378,6 +2378,15 @@ class ColName(ColExpr):
     def __repr__(self) -> str:
         return self.ast_repr()
 
+    def __hash__(self) -> int:
+        """
+        Allow C.xxx expressions as dictionary keys.
+
+        Attention: don't implement __eq__. This is reserved for building expressions
+        with columns
+        """
+        return hash(self.name)
+
 
 class LiteralCol(ColExpr):
     def __init__(self, val: Any, dtype: Dtype | None = None):

@@ -294,22 +294,31 @@ def compile_ast(
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
 
-    if isinstance(nd, verbs.Mutate | verbs.Summarize):
-        nd_names_set = set(nd.names)
-        # we need to do this before name_in_df is changed
-        select = [
-            uid
-            for uid in (select if isinstance(nd, verbs.Mutate) else partition_by)
-            if name_in_df[uid] not in nd_names_set
-        ] + nd.uuids
+    if isinstance(nd, verbs.Mutate | verbs.Summarize | verbs.Rename):
+        if isinstance(nd, verbs.Rename):
+            selected = set(select)
+            names_to_consider = {
+                col for uuid, col in name_in_df.items() if uuid not in selected
+            }  # take it from name_in_df
+            new_names = set(nd.name_map.values())
+        else:
+            nd_names_set = set(nd.names)
+            # we need to do this before name_in_df is changed
+            select = [
+                uid
+                for uid in (select if isinstance(nd, verbs.Mutate) else partition_by)
+                if name_in_df[uid] not in nd_names_set
+            ] + nd.uuids
 
-        names_to_consider = (
-            set(name_in_df[uid] for uid in partition_by)
-            if isinstance(nd, verbs.Summarize)
-            else set(name_in_df.values())
-        )
+            names_to_consider = (
+                set(name_in_df[uid] for uid in partition_by)
+                if isinstance(nd, verbs.Summarize)
+                else set(name_in_df.values())
+            )
+            new_names = set(name for name in nd.names if name in names_to_consider)
+
         df, name_in_df = rename_overwritten_cols(
-            set(name for name in nd.names if name in names_to_consider),
+            new_names,
             df,
             name_in_df,
             names_to_consider=names_to_consider,

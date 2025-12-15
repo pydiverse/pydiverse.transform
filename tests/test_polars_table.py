@@ -760,6 +760,77 @@ class TestPolarsLazyImpl:
             ),
         )
 
+    def test_collision_renaming(self, tbl2, tbl3):
+        with pytest.raises(
+            ValueError, match="rename would cause duplicate column name `col3`"
+        ):
+            _ = (
+                tbl2
+                >> mutate(c=tbl2.col3)
+                >> inner_join(
+                    tbl3 >> select(),
+                    (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2),
+                )
+                >> rename({"c": "col3"}),
+                df2.join(df3, how="inner", on=["col1", "col2"]).select(
+                    "col1", "col2", "col3"
+                ),
+            )
+
+    def test_hidden_collision_renaming0(self, tbl2, tbl3):
+        assert_equal(
+            tbl2
+            >> rename({"col3": "c"})
+            >> inner_join(
+                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
+            )
+            >> rename({"c": "col3"}),
+            df2.join(df3, how="inner", on=["col1", "col2"]).select(
+                "col1", "col2", "col3"
+            ),
+        )
+
+    def test_hidden_collision_renaming1(self, tbl2, tbl3):
+        assert_equal(
+            tbl2
+            >> rename({"col3": "c"})
+            >> collect()
+            >> inner_join(
+                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
+            )
+            >> rename({C.c: "col3"}),
+            df2.join(df3, how="inner", on=["col1", "col2"]).select(
+                "col1", "col2", "col3"
+            ),
+        )
+
+    def test_hidden_collision_renaming2(self, tbl2, tbl3):
+        assert_equal(
+            tbl2
+            >> rename({"col3": "c"})
+            >> inner_join(
+                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
+            )
+            >> mutate(col3=C.c),
+            df2.join(df3, how="inner", on=["col1", "col2"])
+            .select("col1", "col2", "col3")
+            .with_columns(c=pl.col("col3")),
+        )
+
+    def test_hidden_collision_renaming3(self, tbl2, tbl3):
+        assert_equal(
+            tbl2
+            >> rename({"col3": "c"})
+            >> collect()
+            >> inner_join(
+                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
+            )
+            >> mutate(col3=C.c),
+            df2.join(df3, how="inner", on=["col1", "col2"])
+            .select("col1", "col2", "col3")
+            .with_columns(c=pl.col("col3")),
+        )
+
     def test_eval_aligned(self, tbl4):
         assert_equal(
             tbl4,
