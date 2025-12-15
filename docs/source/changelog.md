@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.2 (202Y-MM-DD)
+## 0.6.2 (2025-12-15)
 - drop support for python 3.10
 - fix is_sql_backend(Table) and backend(Table)
 - fix renaming a column to an existing hidden column
