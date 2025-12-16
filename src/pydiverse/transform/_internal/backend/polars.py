@@ -441,6 +441,51 @@ def compile_ast(
 
         select += right_select
 
+    elif isinstance(nd, verbs.Union):
+        assert len(partition_by) == 0
+
+        right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
+
+        # For union, both dataframes must have the same columns in the same order
+        # Polars requires columns to be in the same order
+        left_col_names = [name_in_df[uid] for uid in select]
+        right_col_names = [right_name_in_df[uid] for uid in right_select]
+
+        if left_col_names != right_col_names:
+            # Reorder right dataframe columns to match left order
+            # Map right column names to left column order
+            right_col_map = {name: idx for idx, name in enumerate(right_col_names)}
+            reordered_right_cols = []
+            for name in left_col_names:
+                if name not in right_col_map:
+                    raise ValueError(f"union requires matching column names: '{name}' not found in right table")
+                reordered_right_cols.append(right_col_names[right_col_map[name]])
+            right_df = right_df.select(reordered_right_cols)
+
+        # Use pl.union if available (Polars >= 1.35), otherwise use pl.concat
+        # pl.union is faster than pl.concat for union operations
+        # distinct=True means UNION (remove duplicates), distinct=False means UNION ALL (keep duplicates)
+        try:
+            # Try to use pl.union (available in Polars >= 1.35)
+            # pl.union takes a list of DataFrames/LazyFrames and has a distinct parameter
+            if nd.distinct:
+                # For UNION (distinct), use union with distinct=True
+                df = pl.union([df, right_df], distinct=True)
+            else:
+                # For UNION ALL (not distinct), use union without distinct
+                df = pl.union([df, right_df])
+        except (AttributeError, TypeError):
+            # Fall back to pl.concat for older Polars versions (< 1.35)
+            if nd.distinct:
+                # For UNION (distinct), we need to deduplicate
+                # Polars doesn't have a direct UNION without ALL, so we concat and then distinct
+                df = pl.concat([df, right_df]).unique()
+            else:
+                # For UNION ALL (not distinct), just concat
+                df = pl.concat([df, right_df])
+
+        # name_in_df and select remain the same (from left table)
+
     elif isinstance(nd, PolarsImpl):
         df = nd.df
         name_in_df = {col._uuid: col.name for col in nd.cols.values()}

@@ -501,6 +501,73 @@ class SqlImpl(TableImpl):
             assert not right_query.partition_by
             assert not right_query.group_by
 
+        elif isinstance(nd, verbs.Union):
+            # Get right cache to access column information
+            from pydiverse.transform._internal.pipe.cache import Cache
+
+            right_cache = Cache.from_ast(nd.right)
+
+            # For UNION, both queries must select the same columns in the same order
+            # Check if we need to reorder columns in the right query
+            left_select = query.select
+            left_col_names = [sqa_expr[uid].name for uid in left_select]
+
+            # Get right column names in current order
+            right_col_uuids = list(right_cache.name_to_uuid.values())
+            right_col_names = [right_cache.uuid_to_name[uid] for uid in right_col_uuids]
+
+            # If column order doesn't match, wrap right AST with a Select to reorder
+            right_ast = nd.right
+            if left_col_names != right_col_names:
+                # Create a Select verb that reorders columns to match left order
+
+                # Get Col objects from right cache in the order of left columns
+                reordered_cols = []
+                for name in left_col_names:
+                    if name not in right_cache.name_to_uuid:
+                        raise ValueError(f"union requires matching column names: '{name}' not found in right table")
+                    uid = right_cache.name_to_uuid[name]
+                    col = right_cache.cols[uid]
+                    reordered_cols.append(col)
+
+                # Wrap right AST with Select to reorder columns
+                right_ast = verbs.Select(nd.right, reordered_cols)
+
+            # Compile the (possibly modified) right AST
+            right_table, right_query, right_sqa_expr = cls.compile_ast(right_ast, needed_cols)
+
+            # Build left and right select statements
+            left_sel = cls.compile_query(table, query, sqa_expr)
+            right_sel = cls.compile_query(right_table, right_query, right_sqa_expr)
+
+            # If either side is a subquery, get the original CompoundSelect
+            # to allow calling sa.union/union_all again
+            if isinstance(left_sel, sqa.sql.selectable.Subquery):
+                left_sel = left_sel.original
+            if isinstance(right_sel, sqa.sql.selectable.Subquery):
+                right_sel = right_sel.original
+
+            # Use UNION or UNION ALL
+            # distinct=True means UNION (remove duplicates), distinct=False means UNION ALL (keep duplicates)
+            if nd.distinct:
+                union_query = sqa.union(left_sel, right_sel)
+            else:
+                union_query = sqa.union_all(left_sel, right_sel)
+
+            # Create a subquery from the union
+            table = union_query.subquery()
+
+            # Update sqa_expr to point to the union result columns
+            # Use left column names
+            sqa_expr = {uid: sqa.label(sqa_expr[uid].name, table.columns[sqa_expr[uid].name]) for uid in left_select}
+
+            # Create a new query with the union result
+            # Only keep the select columns, reset all other query state
+            query = Query(select=left_select)
+
+            assert not right_query.partition_by
+            assert not right_query.group_by
+
         elif isinstance(nd, TableImpl):
             table = nd.table
             query = Query(select=[col._uuid for col in nd.cols.values()])

@@ -72,7 +72,7 @@ class Cache:
     @staticmethod
     def from_ast(node: AstNode) -> "Cache":
         if isinstance(node, verbs.Verb):
-            if isinstance(node, verbs.Join):
+            if isinstance(node, verbs.Join | verbs.Union):
                 return Cache.from_ast(node.child).update(node, right_cache=Cache.from_ast(node.right))
             else:
                 return Cache.from_ast(node.child).update(node)
@@ -171,6 +171,21 @@ class Cache:
             res.limit = 0
             res.group_by = set()
 
+        elif isinstance(node, verbs.Union):
+            assert right_cache is not None
+
+            # For union, visible columns must match (validated in verb function)
+            # Hidden columns: are removed (we don't keep names for them and it is unlike they match in uuid)
+            res.cols = {uid: col for uid, col in self.cols.items() if uid in self.uuid_to_name}
+            # Visible columns should match, so we keep left table's name_to_uuid
+            # (right table's visible columns are the same by validation)
+            res.name_to_uuid = self.name_to_uuid.copy()
+            res.uuid_to_name = self.uuid_to_name.copy()
+
+            res.derived_from = self.derived_from | right_cache.derived_from
+            res.limit = 0
+            res.group_by = set()
+
         elif isinstance(node, verbs.SubqueryMarker):
             res.cols = {
                 uid: Col(
@@ -201,7 +216,7 @@ class Cache:
         if (
             isinstance(
                 node,
-                verbs.Filter | verbs.Summarize | verbs.Arrange | verbs.GroupBy | verbs.Join,
+                verbs.Filter | verbs.Summarize | verbs.Arrange | verbs.GroupBy | verbs.Join | verbs.Union,
             )
             and self.limit != 0
         ):
@@ -256,6 +271,13 @@ class Cache:
 
             if self.is_filtered and node.how == "full":
                 return "full join with a filtered table"
+
+        if isinstance(node, verbs.Union):
+            if self.group_by:
+                return "union with a grouped table"
+
+            if any(self.cols[uid].ftype() == Ftype.WINDOW for uid in self.uuid_to_name.keys()):
+                return "union with a table containing window function expression"
 
         return None
 

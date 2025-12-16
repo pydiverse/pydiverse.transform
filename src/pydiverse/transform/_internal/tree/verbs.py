@@ -302,6 +302,54 @@ class Join(Verb):
         self.on = g(self.on)
 
 
+@dataclasses.dataclass(eq=False, slots=True, repr=False)
+class Union(Verb):
+    right: AstNode
+    distinct: bool
+
+    def _unformatted_ast_repr(self, verb_depth: int, expr_depth: int, display_name_map) -> str:
+        return (
+            self.child._unformatted_ast_repr(verb_depth - 1, expr_depth, display_name_map) if verb_depth != 0 else "..."
+        ) + (
+            ">> union("
+            + (
+                self.right._unformatted_ast_repr(verb_depth - 1, expr_depth, display_name_map)
+                if verb_depth != 0
+                else self.right._unformatted_ast_repr(0, expr_depth, display_name_map)
+            )
+            + f", distinct={self.distinct})"
+        )
+
+    def _clone(self) -> tuple["Union", dict[AstNode, AstNode], dict[UUID, UUID]]:
+        child, nd_map, uuid_map = self.child._clone()
+        right_child, right_nd_map, right_uuid_map = self.right._clone()
+        nd_map.update(right_nd_map)
+        uuid_map.update(right_uuid_map)
+
+        cloned = copy.copy(self)
+        cloned.child = child
+        cloned.right = right_child
+
+        nd_map[self] = cloned
+        return cloned, nd_map, uuid_map
+
+    def iter_subtree_postorder(self) -> Iterable[AstNode]:
+        yield from self.child.iter_subtree_postorder()
+        yield from self.right.iter_subtree_postorder()
+        yield self
+
+    def iter_subtree_preorder(self):
+        yield self
+        yield from self.child.iter_subtree_preorder()
+        yield from self.right.iter_subtree_preorder()
+
+    def iter_col_roots(self) -> Iterable[ColExpr]:
+        return iter(())
+
+    def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
+        pass
+
+
 class SubqueryMarker(Verb):
     def _ast_node_repr(self, expr_depth, display_name_map):
         return "subquery_marker"

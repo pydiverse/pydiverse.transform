@@ -64,6 +64,7 @@ from pydiverse.transform._internal.tree.verbs import (
     SliceHead,
     Summarize,
     Ungroup,
+    Union,
 )
 
 __all__ = [
@@ -79,6 +80,7 @@ __all__ = [
     "left_join",
     "inner_join",
     "full_join",
+    "union",
     "filter",
     "arrange",
     "group_by",
@@ -1333,6 +1335,166 @@ def cross_join(
     """
 
     return left >> join(right, how="inner", on=[], suffix=suffix)
+
+
+@overload
+def union(
+    right: Table,
+    *,
+    distinct: bool = False,
+) -> Pipeable: ...
+
+
+@overload
+def union(
+    left: Table,
+    right: Table,
+    *,
+    distinct: bool = False,
+) -> Pipeable: ...
+
+
+def _union_impl(
+    left: Table,
+    right: Table,
+    *,
+    distinct: bool = False,
+) -> Pipeable:
+    """
+    Unions two tables by stacking rows vertically.
+
+    The left table in the union comes through the pipe `>>` operator from the
+    left.
+
+    :param right:
+        The right table to union with.
+
+    :param distinct:
+        If ``True``, performs UNION (removes duplicates). If ``False``,
+        performs UNION ALL (keeps duplicates).
+
+    Note
+    ----
+    Both tables must have the same number of columns with compatible types.
+    Column names must match between the two tables.
+
+    Examples
+    --------
+    >>> t1 = pdt.Table({"a": [1, 2, 3], "b": [4, 5, 6]}, name="t1")
+    >>> t2 = pdt.Table({"a": [7, 8], "b": [9, 10]}, name="t2")
+    >>> t1 >> union(t2) >> show()
+    shape: (5, 2)
+    ┌─────┬─────┐
+    │ a   ┆ b   │
+    │ --- ┆ --- │
+    │ i64 ┆ i64 │
+    ╞═════╪═════╡
+    │ 1   ┆ 4   │
+    │ 2   ┆ 5   │
+    │ 3   ┆ 6   │
+    │ 7   ┆ 9   │
+    │ 8   ┆ 10  │
+    └─────┴─────┘
+    """
+    errors.check_arg_type(Table, "union", "right", right)
+
+    if left._cache.backend != right._cache.backend:
+        raise TypeError("cannot union two tables with different backends")
+
+    if left._cache.partition_by:
+        raise ValueError(f"cannot union grouped table `{left._ast.short_name()}`")
+    elif right._cache.partition_by:
+        raise ValueError(f"cannot union grouped table `{right._ast.short_name()}`")
+
+    # Check that both tables have the same columns
+    left_cols = set(left._cache.name_to_uuid.keys())
+    right_cols = set(right._cache.name_to_uuid.keys())
+
+    if left_cols != right_cols:
+        missing_left = right_cols - left_cols
+        missing_right = left_cols - right_cols
+        error_msg = "tables must have the same columns for union"
+        if missing_left:
+            error_msg += f"\n  columns in right but not in left: {sorted(missing_left)}"
+        if missing_right:
+            error_msg += f"\n  columns in left but not in right: {sorted(missing_right)}"
+        raise ValueError(error_msg)
+
+    # Check column type compatibility using lca_type
+    from pydiverse.transform._internal.tree.types import lca_type
+
+    for col_name in left_cols:
+        left_col = left._cache.cols[left._cache.name_to_uuid[col_name]]
+        right_col = right._cache.cols[right._cache.name_to_uuid[col_name]]
+        left_dtype = left_col.dtype()
+        right_dtype = right_col.dtype()
+
+        # Check if types are compatible by trying to find a common ancestor
+        try:
+            lca_type([left_dtype, right_dtype])
+        except DataTypeError as e:
+            raise TypeError(
+                f"column '{col_name}' has incompatible types: left has {left_dtype}, right has {right_dtype}"
+            ) from e
+
+    new = copy.copy(left)
+    new._ast = Union(left._ast, right._ast, distinct)
+
+    new, left = check_subquery(new, left)
+    new, right = check_subquery(new, right, is_right=True)
+
+    new._cache = left._cache.update(new._ast, right_cache=right._cache)
+
+    return new
+
+
+@verb
+def union(
+    left: Table,
+    right: Table,
+    *,
+    distinct: bool = False,
+) -> Pipeable:
+    """
+    Unions two tables by stacking rows vertically.
+
+    The left table in the union comes through the pipe `>>` operator from the
+    left.
+
+    :param right:
+        The right table to union with.
+
+    :param distinct:
+        If ``True``, performs UNION (removes duplicates). If ``False``,
+        performs UNION ALL (keeps duplicates).
+
+    Note
+    ----
+    Both tables must have the same number of columns with compatible types.
+    Column names must match between the two tables.
+
+    Examples
+    --------
+    >>> t1 = pdt.Table({"a": [1, 2, 3], "b": [4, 5, 6]}, name="t1")
+    >>> t2 = pdt.Table({"a": [7, 8], "b": [9, 10]}, name="t2")
+    >>> t1 >> union(t2) >> show()
+    shape: (5, 2)
+    ┌─────┬─────┐
+    │ a   ┆ b   │
+    │ --- ┆ --- │
+    │ i64 ┆ i64 │
+    ╞═════╪═════╡
+    │ 1   ┆ 4   │
+    │ 2   ┆ 5   │
+    │ 3   ┆ 6   │
+    │ 7   ┆ 9   │
+    │ 8   ┆ 10  │
+    └─────┴─────┘
+
+    You can also call it directly:
+    >>> union(t1, t2) >> show()
+    """
+    return _union_impl(left, right, distinct=distinct)
 
 
 @overload
