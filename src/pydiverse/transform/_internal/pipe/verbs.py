@@ -95,9 +95,7 @@ def alias(new_name: str | None = None, *, keep_col_refs: bool = False) -> Pipeab
 
 @verb
 @modify_ast
-def alias(
-    table: Table, new_name: str | None = None, *, keep_col_refs: bool = False
-) -> Pipeable:
+def alias(table: Table, new_name: str | None = None, *, keep_col_refs: bool = False) -> Pipeable:
     """
     Changes the name of the current table and allows subqueries in SQL.
 
@@ -153,9 +151,7 @@ def alias(
     new = copy.copy(table)
     new._ast = Alias(
         new._ast,
-        uuid_map={uid: uuid.uuid1() for uid in table._cache.cols.keys()}
-        if not keep_col_refs
-        else None,
+        uuid_map={uid: uuid.uuid1() for uid in table._cache.cols.keys()} if not keep_col_refs else None,
     )
     new._ast.name = new_name
 
@@ -163,9 +159,7 @@ def alias(
 
 
 @overload
-def collect(
-    target: Target | None = None, *, keep_col_refs: bool = True
-) -> Pipeable: ...
+def collect(target: Target | None = None, *, keep_col_refs: bool = True) -> Pipeable: ...
 
 
 @verb
@@ -215,9 +209,7 @@ def collect(
     │ 4   ┆ --   r ┆ 10  │
     └─────┴────────┴─────┘
     """
-    errors.check_arg_type(
-        Target | type(Target) | type(None), "collect", "target", target
-    )
+    errors.check_arg_type(Target | type(Target) | type(None), "collect", "target", target)
 
     if target is None:
         target = Polars()
@@ -245,17 +237,13 @@ def collect(
         )
     )
     new._cache.derived_from = table._cache.derived_from | {new._ast}
-    new._cache.partition_by = [
-        preprocess_arg(col, new) for col in table._cache.partition_by
-    ]
+    new._cache.partition_by = [preprocess_arg(col, new) for col in table._cache.partition_by]
 
     return new
 
 
 @overload
-def export(
-    target: Target, *, schema_overrides: dict[str, Any] | None = None
-) -> Pipeable: ...
+def export(target: Target, *, schema_overrides: dict[str, Any] | None = None) -> Pipeable: ...
 
 
 @verb
@@ -326,24 +314,17 @@ def export(
     if isinstance(target, Scalar):
         if len(table) != 1:
             raise TypeError(
-                "to export a table to a scalar, it must have exactly one column, but "
-                f"found {len(table)} columns"
+                f"to export a table to a scalar, it must have exactly one column, but found {len(table)} columns"
             )
         df: pl.DataFrame = table >> export(Polars())
         if df.height != 1:
-            raise TypeError(
-                "to export a table to a scalar, it must have exactly one row, but "
-                f"found {df.height} rows"
-            )
+            raise TypeError(f"to export a table to a scalar, it must have exactly one row, but found {df.height} rows")
         return df.item()
 
     elif isinstance(target, Dict):
         df: pl.DataFrame = table >> export(Polars())
         if df.height != 1:
-            raise TypeError(
-                "cannot export a table with more than one row to `Dict`, "
-                f"found {df.height} rows"
-            )
+            raise TypeError(f"cannot export a table with more than one row to `Dict`, found {df.height} rows")
         return df.to_dicts()[0]
 
     elif isinstance(target, DictOfLists):
@@ -360,9 +341,7 @@ def export(
     return SourceBackend.export(
         table._ast.clone(),
         target,
-        schema_overrides={
-            table[col_name]._uuid: dtype for col_name, dtype in schema_overrides.items()
-        },
+        schema_overrides={table[col_name]._uuid: dtype for col_name, dtype in schema_overrides.items()},
     )
 
 
@@ -404,10 +383,7 @@ def show_query(table: Table, pipe: bool = False) -> Pipeable | None:
     if query := table >> build_query():
         print(query)
     else:
-        print(
-            f"No query to show for table {table._ast.short_name()}. "
-            f"(backend: {table._cache.backend.backend_name})"
-        )
+        print(f"No query to show for table {table._ast.short_name()}. (backend: {table._cache.backend.backend_name})")
 
     return table if pipe else None
 
@@ -446,10 +422,7 @@ def select(table: Table, *cols: Col | ColName | str) -> Pipeable:
 
     for col in cols:
         if isinstance(col, ColName | str) and col not in table:
-            raise ColumnNotFoundError(
-                f"column `{col.ast_repr()}` does not exist in table "
-                f"`{table._ast.short_name()}`"
-            )
+            raise ColumnNotFoundError(f"column `{col.ast_repr()}` does not exist in table `{table._ast.short_name()}`")
         elif col not in table and col._uuid in table._cache.cols:
             raise ColumnNotFoundError(
                 f"cannot select hidden column `{col.ast_repr()}` again\n"
@@ -498,11 +471,7 @@ def drop(table: Table, *cols: Col | ColName | str) -> Pipeable:
 
     dropped_uuids = {preprocess_arg(col, table)._uuid for col in cols}
     return table >> select(
-        *(
-            name
-            for name, uid in table._cache.name_to_uuid.items()
-            if uid not in dropped_uuids
-        ),
+        *(name for name, uid in table._cache.name_to_uuid.items() if uid not in dropped_uuids),
     )
 
 
@@ -578,8 +547,7 @@ def rename(table: Table, name_map: dict[str | Col | ColName, str]) -> Pipeable:
     for v in name_map.values():
         if not isinstance(v, str):
             raise TypeError(
-                "values in the `name_map` of `rename` must have type `str`, found "
-                f"`{v.__class__.__name__}` instead"
+                f"values in the `name_map` of `rename` must have type `str`, found `{v.__class__.__name__}` instead"
             )
     for k in name_map.keys():
         if not isinstance(k, str | Col | ColName):
@@ -588,24 +556,13 @@ def rename(table: Table, name_map: dict[str | Col | ColName, str]) -> Pipeable:
                 f"ColName`, found `{k.__class__.__name__}` instead"
             )
 
-    name_map = {
-        (preprocess_arg(k, table) if isinstance(k, ColName | Col) else k): v
-        for k, v in name_map.items()
-    }
-    name_map = {
-        (table._cache.uuid_to_name[k._uuid] if isinstance(k, Col) else k): v
-        for k, v in name_map.items()
-    }
+    name_map = {(preprocess_arg(k, table) if isinstance(k, ColName | Col) else k): v for k, v in name_map.items()}
+    name_map = {(table._cache.uuid_to_name[k._uuid] if isinstance(k, Col) else k): v for k, v in name_map.items()}
 
     if d := set(name_map).difference(table._cache.name_to_uuid):
-        raise ValueError(
-            f"no column with name `{next(iter(d))}` in table "
-            f"`{table._ast.short_name()}`"
-        )
+        raise ValueError(f"no column with name `{next(iter(d))}` in table `{table._ast.short_name()}`")
 
-    if d := (set(table._cache.name_to_uuid).difference(name_map)) & set(
-        name_map.values()
-    ):
+    if d := (set(table._cache.name_to_uuid).difference(name_map)) & set(name_map.values()):
         raise ValueError(f"rename would cause duplicate column name `{next(iter(d))}`")
 
     new = copy.copy(table)
@@ -793,8 +750,7 @@ def arrange(table: Table, by: ColExpr, *more_by: ColExpr) -> Pipeable:
             preprocessed.append(preprocess_arg(Order.from_col_expr(ord), table))
         except ErrorWithSource as e:
             raise type(e)(
-                e.args[0]
-                + f"\noccurred in {i}-{ordinal_suffix(i)} `arrange` argument\n"
+                e.args[0] + f"\noccurred in {i}-{ordinal_suffix(i)} `arrange` argument\n"
                 f"AST path to error source: {get_ast_path_str(ord, e.source)}"
             ) from e
 
@@ -965,31 +921,18 @@ def summarize(table: Table, **kwargs: ColExpr) -> Pipeable:
     partition_by = set(table._cache.partition_by)
 
     if len(kwargs) == 0 and len(partition_by) == 0:
-        raise ValueError(
-            "summarize without preceding group_by needs at least one column to "
-            "summarize"
-        )
+        raise ValueError("summarize without preceding group_by needs at least one column to summarize")
 
     def check_summarize_col_expr(expr: ColExpr, agg_fn_above: bool):
-        if (
-            isinstance(expr, Col)
-            and expr._uuid not in partition_by
-            and not agg_fn_above
-        ):
+        if isinstance(expr, Col) and expr._uuid not in partition_by and not agg_fn_above:
             raise FunctionTypeError(
-                f"column `{expr.ast_repr()}` is neither aggregated nor part of the "
-                "grouping columns"
+                f"column `{expr.ast_repr()}` is neither aggregated nor part of the grouping columns"
             )
 
         elif isinstance(expr, ColFn):
             if expr.op.ftype == Ftype.WINDOW:
-                raise FunctionTypeError(
-                    f"forbidden window function `{expr.op.name}` in `summarize`"
-                )
-            elif (
-                expr.op.ftype == Ftype.AGGREGATE
-                and "partition_by" not in expr.context_kwargs
-            ):
+                raise FunctionTypeError(f"forbidden window function `{expr.op.name}` in `summarize`")
+            elif expr.op.ftype == Ftype.AGGREGATE and "partition_by" not in expr.context_kwargs:
                 agg_fn_above = True
 
         for child in expr.iter_children():
@@ -1150,9 +1093,7 @@ def join(
     errors.check_arg_type(ColExpr | list | str, "join", "on", on)
     errors.check_arg_type(str | None, "join", "suffix", suffix)
     errors.check_literal_type(["inner", "left", "full"], "join", "how", how)
-    errors.check_literal_type(
-        ["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate
-    )
+    errors.check_literal_type(["1:1", "1:m", "m:1", "m:m"], "join", "validate", validate)
 
     if left._cache.backend != right._cache.backend:
         raise TypeError("cannot join two tables with different backends")
@@ -1190,17 +1131,10 @@ def join(
                     )
                 return left[expr.name]
             if expr not in right:
-                raise ValueError(
-                    f"no column with name `{expr.name}` found in the left or right "
-                    "table"
-                )
+                raise ValueError(f"no column with name `{expr.name}` found in the left or right table")
             return right[expr.name]
 
-        if (
-            isinstance(expr, Col)
-            and expr._uuid not in left._cache.cols
-            and expr._uuid not in right._cache.cols
-        ):
+        if isinstance(expr, Col) and expr._uuid not in left._cache.cols and expr._uuid not in right._cache.cols:
             raise ValueError(
                 f"column `{expr.ast_repr()}` used in `on` neither exists in the table "
                 f"`{left._ast.short_name()}` nor in the table "
@@ -1259,18 +1193,14 @@ def join(
             suffix += f"_{cnt}"
 
         on_uuids = set(
-            col._uuid
-            for col in itertools.chain(*(pred.iter_subtree_preorder() for pred in on))
-            if isinstance(col, Col)
+            col._uuid for col in itertools.chain(*(pred.iter_subtree_preorder() for pred in on)) if isinstance(col, Col)
         )
         right_on_names = set(col.name for col in right if col._uuid in on_uuids)
 
         if not (right_names - right_on_names) & left_names:
             # If nothing except join columns clashes, we only rename the clashing
             # columns on the right.
-            right >>= rename(
-                {col: col.name + suffix for col in right if col.name in left_names}
-            )
+            right >>= rename({col: col.name + suffix for col in right if col.name in left_names})
 
         else:
             right >>= rename({col: col.name + suffix for col in right})
@@ -1452,15 +1382,11 @@ def columns(table: Table) -> list[str]:
 
 
 @overload
-def ast_repr(
-    verb_depth: int = 7, expr_depth: int = 2, pipe: bool = False
-) -> Pipeable | None: ...
+def ast_repr(verb_depth: int = 7, expr_depth: int = 2, pipe: bool = False) -> Pipeable | None: ...
 
 
 @verb
-def ast_repr(
-    table: Table, verb_depth: int = 7, expr_depth: int = 2, *, pipe: bool = False
-) -> Pipeable | None:
+def ast_repr(table: Table, verb_depth: int = 7, expr_depth: int = 2, *, pipe: bool = False) -> Pipeable | None:
     r"""
     Prints the AST of the table to stdout.
 
@@ -1526,15 +1452,8 @@ def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) ->
     assert isinstance(arg, ColExpr | Order)
 
     def _preprocess_expr(expr: ColExpr, eval_aligned: bool = False):
-        if (
-            isinstance(expr, Col)
-            and expr._uuid not in table._cache.cols
-            and not eval_aligned
-        ):
-            raise ColumnNotFoundError(
-                f"column `{expr.ast_repr()}` does not exist in table "
-                f"`{table._ast.name}`"
-            )
+        if isinstance(expr, Col) and expr._uuid not in table._cache.cols and not eval_aligned:
+            raise ColumnNotFoundError(f"column `{expr.ast_repr()}` does not exist in table `{table._ast.name}`")
 
         if not eval_aligned and isinstance(expr, Series):
             raise TypeError(
@@ -1549,9 +1468,7 @@ def preprocess_arg(arg: ColExpr, table: Table, *, agg_is_window: bool = True) ->
             and "partition_by" not in expr.context_kwargs
             and (expr.op.ftype in (Ftype.WINDOW, Ftype.AGGREGATE))
         ):
-            expr.context_kwargs["partition_by"] = [
-                table._cache.cols[uid] for uid in table._cache.partition_by
-            ]
+            expr.context_kwargs["partition_by"] = [table._cache.cols[uid] for uid in table._cache.partition_by]
 
         if isinstance(expr, ColName):
             return table[expr.name]

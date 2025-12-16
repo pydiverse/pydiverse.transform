@@ -119,9 +119,7 @@ class ColExpr(Generic[T]):
         if isinstance(self, Col):
             return tbl_repr.replace("Table", "Column", 1)
 
-        return re.sub(
-            r"Table <code>.*<code> \(backend: .+<code>\)</br>", "", tbl_repr, count=1
-        )
+        return re.sub(r"Table <code>.*<code> \(backend: .+<code>\)</br>", "", tbl_repr, count=1)
 
     def _repr_pretty_(self, p, cycle):
         p.text(str(self) if not cycle else "...")
@@ -132,9 +130,7 @@ class ColExpr(Generic[T]):
 
     # Does the recursive calls and allows to alter the displayed names of the tables
     # of columns (this is necessary for the verb ast_repr).
-    def _ast_repr(
-        self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]
-    ):
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]):
         raise NotImplementedError()
 
     def export(self, target: Target) -> pl.Series | pd.Series:
@@ -237,9 +233,7 @@ class ColExpr(Generic[T]):
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype:
         return self._ftype
 
-    def map(
-        self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr | None = None
-    ) -> CaseExpr:
+    def map(self, mapping: dict[tuple | ColExpr, ColExpr], *, default: ColExpr | None = None) -> CaseExpr:
         """
         Replaces given values by other expressions.
 
@@ -379,8 +373,7 @@ class ColExpr(Generic[T]):
         errors.check_arg_type(bool, "ColExpr.cast", "strict", strict)
         if type(target_type) is type and not issubclass(target_type, Dtype):
             TypeError(
-                "argument for parameter `target_type` of `ColExpr.cast` must be an"
-                "instance or subclass of pdt.Dtype"
+                "argument for parameter `target_type` of `ColExpr.cast` must be aninstance or subclass of pdt.Dtype"
             )
         return Cast(self, target_type, strict=strict)
 
@@ -437,19 +430,13 @@ class ColExpr(Generic[T]):
     def __add__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Int]: ...
 
     @overload
-    def __add__(
-        self: ColExpr[Duration], rhs: ColExpr[Duration]
-    ) -> ColExpr[Duration]: ...
+    def __add__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Duration]: ...
 
     @overload
-    def __add__(
-        self: ColExpr[Datetime], rhs: ColExpr[Duration]
-    ) -> ColExpr[Datetime]: ...
+    def __add__(self: ColExpr[Datetime], rhs: ColExpr[Duration]) -> ColExpr[Datetime]: ...
 
     @overload
-    def __add__(
-        self: ColExpr[Duration], rhs: ColExpr[Datetime]
-    ) -> ColExpr[Datetime]: ...
+    def __add__(self: ColExpr[Duration], rhs: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
 
     def __add__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """
@@ -471,19 +458,13 @@ class ColExpr(Generic[T]):
     def __radd__(self: ColExpr[Bool], rhs: ColExpr[Bool]) -> ColExpr[Int]: ...
 
     @overload
-    def __radd__(
-        self: ColExpr[Duration], rhs: ColExpr[Duration]
-    ) -> ColExpr[Duration]: ...
+    def __radd__(self: ColExpr[Duration], rhs: ColExpr[Duration]) -> ColExpr[Duration]: ...
 
     @overload
-    def __radd__(
-        self: ColExpr[Datetime], rhs: ColExpr[Duration]
-    ) -> ColExpr[Datetime]: ...
+    def __radd__(self: ColExpr[Datetime], rhs: ColExpr[Duration]) -> ColExpr[Datetime]: ...
 
     @overload
-    def __radd__(
-        self: ColExpr[Duration], rhs: ColExpr[Datetime]
-    ) -> ColExpr[Datetime]: ...
+    def __radd__(self: ColExpr[Duration], rhs: ColExpr[Datetime]) -> ColExpr[Datetime]: ...
 
     def __radd__(self: ColExpr, rhs: ColExpr) -> ColExpr:
         """
@@ -779,44 +760,28 @@ class ColExpr(Generic[T]):
         return ColFn(ops.ceil, self)
 
     @overload
-    def clip(
-        self: ColExpr[Int], lower_bound: int, upper_bound: int
-    ) -> ColExpr[Int]: ...
+    def clip(self: ColExpr[Int], lower_bound: int, upper_bound: int) -> ColExpr[Int]: ...
 
     @overload
-    def clip(
-        self: ColExpr[Float], lower_bound: float, upper_bound: float
-    ) -> ColExpr[Float]: ...
+    def clip(self: ColExpr[Float], lower_bound: float, upper_bound: float) -> ColExpr[Float]: ...
 
     @overload
-    def clip(
-        self: ColExpr[String], lower_bound: str, upper_bound: str
-    ) -> ColExpr[String]: ...
+    def clip(self: ColExpr[String], lower_bound: str, upper_bound: str) -> ColExpr[String]: ...
 
     @overload
-    def clip(
-        self: ColExpr[Datetime], lower_bound: datetime, upper_bound: datetime
-    ) -> ColExpr[Datetime]: ...
+    def clip(self: ColExpr[Datetime], lower_bound: datetime, upper_bound: datetime) -> ColExpr[Datetime]: ...
 
     @overload
-    def clip(
-        self: ColExpr[Time], lower_bound: time, upper_bound: time
-    ) -> ColExpr[Time]: ...
+    def clip(self: ColExpr[Time], lower_bound: time, upper_bound: time) -> ColExpr[Time]: ...
 
     @overload
-    def clip(
-        self: ColExpr[Duration], lower_bound: timedelta, upper_bound: timedelta
-    ) -> ColExpr[Duration]: ...
+    def clip(self: ColExpr[Duration], lower_bound: timedelta, upper_bound: timedelta) -> ColExpr[Duration]: ...
 
     @overload
-    def clip(
-        self: ColExpr[Date], lower_bound: date, upper_bound: date
-    ) -> ColExpr[Date]: ...
+    def clip(self: ColExpr[Date], lower_bound: date, upper_bound: date) -> ColExpr[Date]: ...
 
     @overload
-    def clip(
-        self: ColExpr[Bool], lower_bound: bool, upper_bound: bool
-    ) -> ColExpr[Bool]: ...
+    def clip(self: ColExpr[Bool], lower_bound: bool, upper_bound: bool) -> ColExpr[Bool]: ...
 
     def clip(self: ColExpr, lower_bound: int, upper_bound: int) -> ColExpr:
         """
@@ -1641,9 +1606,7 @@ class ColExpr(Generic[T]):
         └──────┴───────┴─────┴───────┘
         """
 
-        return ColFn(
-            ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange
-        )
+        return ColFn(ops.shift, self, n, fill_value, partition_by=partition_by, arrange=arrange)
 
     def sin(self: ColExpr[Float]) -> ColExpr[Float]:
         """
@@ -1666,9 +1629,7 @@ class ColExpr(Generic[T]):
     def __sub__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     @overload
-    def __sub__(
-        self: ColExpr[Datetime], rhs: ColExpr[Datetime]
-    ) -> ColExpr[Duration]: ...
+    def __sub__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     @overload
     def __sub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
@@ -1687,9 +1648,7 @@ class ColExpr(Generic[T]):
     def __rsub__(self: ColExpr[Float], rhs: ColExpr[Float]) -> ColExpr[Float]: ...
 
     @overload
-    def __rsub__(
-        self: ColExpr[Datetime], rhs: ColExpr[Datetime]
-    ) -> ColExpr[Duration]: ...
+    def __rsub__(self: ColExpr[Datetime], rhs: ColExpr[Datetime]) -> ColExpr[Duration]: ...
 
     @overload
     def __rsub__(self: ColExpr[Date], rhs: ColExpr[Date]) -> ColExpr[Duration]: ...
@@ -1842,9 +1801,7 @@ class StrNamespace(FnNamespace):
         └────────┴────────────┴───────┴───────┴──────┘
         """
 
-        return ColFn(
-            ops.str_contains, self.arg, pattern, allow_regex, true_if_regex_unsupported
-        )
+        return ColFn(ops.str_contains, self.arg, pattern, allow_regex, true_if_regex_unsupported)
 
     def ends_with(self: ColExpr[String], suffix: str) -> ColExpr[Bool]:
         """
@@ -1974,9 +1931,7 @@ class StrNamespace(FnNamespace):
 
         return ColFn(ops.str_lower, self.arg)
 
-    def replace_all(
-        self: ColExpr[String], substr: str, replacement: str
-    ) -> ColExpr[String]:
+    def replace_all(self: ColExpr[String], substr: str, replacement: str) -> ColExpr[String]:
         """
         Replaces all occurrences of a given substring by a different string.
 
@@ -2021,9 +1976,7 @@ class StrNamespace(FnNamespace):
 
         return ColFn(ops.str_replace_all, self.arg, substr, replacement)
 
-    def slice(
-        self: ColExpr[String], offset: ColExpr[Int], n: ColExpr[Int]
-    ) -> ColExpr[String]:
+    def slice(self: ColExpr[String], offset: ColExpr[Int], n: ColExpr[Int]) -> ColExpr[String]:
         """
         Returns a substring of the input string.
 
@@ -2349,9 +2302,7 @@ class ListNamespace(FnNamespace):
 
 
 class Col(ColExpr):
-    def __init__(
-        self, name: str, _ast: AstNode, _uuid: UUID, _dtype: Dtype, _ftype: Ftype
-    ):
+    def __init__(self, name: str, _ast: AstNode, _uuid: UUID, _dtype: Dtype, _ftype: Ftype):
         self.name = name
         self._ast = _ast
         self._uuid = _uuid
@@ -2366,9 +2317,7 @@ class Col(ColExpr):
 
 
 class ColName(ColExpr):
-    def __init__(
-        self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None
-    ):
+    def __init__(self, name: str, dtype: Dtype | None = None, ftype: Ftype | None = None):
         self.name = name
         super().__init__(dtype, ftype)
 
@@ -2411,9 +2360,7 @@ class ColFn(ColExpr):
     def __init__(self, op: Operator, *args: ColExpr, **kwargs: list[ColExpr | Order]):
         self.op = op
         # While building the expression tree, we have to allow markers.
-        self.args: list[ColExpr] = [
-            wrap_literals(arg, allow_markers=True) for arg in args
-        ]
+        self.args: list[ColExpr] = [wrap_literals(arg, allow_markers=True) for arg in args]
         self.context_kwargs = clean_kwargs(**kwargs)
 
         # An id to recognize the expression also after copying / preprocessing. Useful
@@ -2474,23 +2421,14 @@ class ColFn(ColExpr):
                 # are called like pdt.<fn name>(...)
                 return f"{self.op.name}(...)"
 
-            return f"(...).{self.op.name}" + (
-                "(...)" if len(self.args) > 1 or len(self.context_kwargs) > 0 else "()"
-            )
+            return f"(...).{self.op.name}" + ("(...)" if len(self.args) > 1 or len(self.context_kwargs) > 0 else "()")
 
         arg_parens_limit = 1 + int(self.op.name in DUNDER_BINARY)
 
         args = [
-            e._ast_repr(depth - 1, i <= arg_parens_limit, table_display_name_map)
-            for i, e in enumerate(self.args)
+            e._ast_repr(depth - 1, i <= arg_parens_limit, table_display_name_map) for i, e in enumerate(self.args)
         ] + [
-            (
-                f"{ckwarg}=["
-                + ", ".join(
-                    v._ast_repr(depth - 1, False, table_display_name_map) for v in val
-                )
-                + "]"
-            )
+            (f"{ckwarg}=[" + ", ".join(v._ast_repr(depth - 1, False, table_display_name_map) for v in val) + "]")
             for ckwarg, val in self.context_kwargs.items()
         ]
         if op_symbol := DUNDER_BINARY.get(self.op.name):
@@ -2509,18 +2447,14 @@ class ColFn(ColExpr):
 
     def map_children(self, g: Callable[[ColExpr], ColExpr]):
         self.args = [g(arg) for arg in self.args]
-        self.context_kwargs = {
-            key: [g(val) for val in arr] for key, arr in self.context_kwargs.items()
-        }
+        self.context_kwargs = {key: [g(val) for val in arr] for key, arr in self.context_kwargs.items()}
 
     def dtype(self) -> Dtype:
         if self._dtype is not None:
             return self._dtype
 
         arg_dtypes = [arg.dtype() for arg in self.args]
-        context_kwarg_dtypes = [
-            elem.dtype() for elem in itertools.chain(*self.context_kwargs.values())
-        ]
+        context_kwarg_dtypes = [elem.dtype() for elem in itertools.chain(*self.context_kwargs.values())]
 
         # we don't need the context_kwargs' types but we need to make sure type checks
         # are run on them
@@ -2536,8 +2470,7 @@ class ColFn(ColExpr):
             )
 
         if self.op.ftype == Ftype.ELEMENT_WISE and all(
-            types.is_const(argt)
-            for argt in itertools.chain(arg_dtypes, context_kwarg_dtypes)
+            types.is_const(argt) for argt in itertools.chain(arg_dtypes, context_kwarg_dtypes)
         ):
             self._dtype = Const(self._dtype)
 
@@ -2564,11 +2497,7 @@ class ColFn(ColExpr):
         if None in ftypes:
             return None
 
-        actual_ftype = (
-            Ftype.WINDOW
-            if self.op.ftype == Ftype.AGGREGATE and agg_is_window
-            else self.op.ftype
-        )
+        actual_ftype = Ftype.WINDOW if self.op.ftype == Ftype.AGGREGATE and agg_is_window else self.op.ftype
 
         if actual_ftype == Ftype.ELEMENT_WISE:
             if Ftype.WINDOW in ftypes:
@@ -2586,9 +2515,7 @@ class ColFn(ColExpr):
                 if (
                     node is not self
                     and isinstance(node, ColFn)
-                    and (
-                        (desc_ftype := node.op.ftype) in (Ftype.AGGREGATE, Ftype.WINDOW)
-                    )
+                    and ((desc_ftype := node.op.ftype) in (Ftype.AGGREGATE, Ftype.WINDOW))
                 ):
                     assert isinstance(self, ColFn)
                     ftype_string = {
@@ -2646,9 +2573,7 @@ class CaseExpr(ColExpr):
         ) + (
             ""
             if self.default_val is None
-            else ".otherwise("
-            + self.default_val._ast_repr(depth - 1, False, table_display_name_map)
-            + ")"
+            else ".otherwise(" + self.default_val._ast_repr(depth - 1, False, table_display_name_map) + ")"
         )
 
     def iter_children(self) -> Iterable[ColExpr]:
@@ -2665,13 +2590,9 @@ class CaseExpr(ColExpr):
             return self._dtype
 
         for cond, _ in self.cases:
-            if (
-                cond.dtype() is not None
-                and not types.without_const(cond.dtype()) == types.Bool()
-            ):
+            if cond.dtype() is not None and not types.without_const(cond.dtype()) == types.Bool():
                 raise DataTypeError(
-                    f"argument `{cond.ast_repr()}` for `when` must be of boolean "
-                    f"type, but has type `{cond.dtype()}`",
+                    f"argument `{cond.ast_repr()}` for `when` must be of boolean type, but has type `{cond.dtype()}`",
                     source=self._fn_id,
                 )
 
@@ -2693,10 +2614,7 @@ class CaseExpr(ColExpr):
 
         if all(
             (
-                *(
-                    types.is_const(cond.dtype()) and types.is_const(val.dtype())
-                    for cond, val in self.cases
-                ),
+                *(types.is_const(cond.dtype()) and types.is_const(val.dtype()) for cond, val in self.cases),
                 self.default_val is None or types.is_const(self.default_val.dtype()),
             )
         ):
@@ -2711,9 +2629,7 @@ class CaseExpr(ColExpr):
         val_ftypes = set()
         # TODO: does it actually matter if we add stuff that is const? it should be
         # elemwise anyway...
-        if self.default_val is not None and not types.is_const(
-            self.default_val.dtype()
-        ):
+        if self.default_val is not None and not types.is_const(self.default_val.dtype()):
             val_ftypes.add(self.default_val.ftype(agg_is_window=agg_is_window))
 
         for cond, val in self.cases:
@@ -2732,9 +2648,7 @@ class CaseExpr(ColExpr):
             self._ftype = Ftype.WINDOW
         else:
             raise FunctionTypeError(
-                "incompatible function types found in case statement: , ".join(
-                    val_ftypes
-                ),
+                "incompatible function types found in case statement: , ".join(val_ftypes),
                 source=self._fn_id,
             )
 
@@ -2745,13 +2659,8 @@ class CaseExpr(ColExpr):
             raise TypeError("cannot call `when` on a closed case expression after")
 
         condition = wrap_literals(condition)
-        if condition.dtype() is not None and not isinstance(
-            condition.dtype(), types.Bool
-        ):
-            raise DataTypeError(
-                "argument for `when` must be of boolean type, but has type "
-                f"`{condition.dtype()}`"
-            )
+        if condition.dtype() is not None and not isinstance(condition.dtype(), types.Bool):
+            raise DataTypeError(f"argument for `when` must be of boolean type, but has type `{condition.dtype()}`")
 
         return WhenClause(self.cases, wrap_literals(condition))
 
@@ -2796,12 +2705,8 @@ class Cast(ColExpr):
             *(
                 (t, u)
                 for t, u in itertools.chain(
-                    itertools.product(
-                        (Int(), *INT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
-                    ),
-                    itertools.product(
-                        (Float(), *FLOAT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)
-                    ),
+                    itertools.product((Int(), *INT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)),
+                    itertools.product((Float(), *FLOAT_SUBTYPES), (*FLOAT_SUBTYPES, *INT_SUBTYPES)),
                 )
             ),
             *((Bool(), t) for t in itertools.chain(FLOAT_SUBTYPES, INT_SUBTYPES)),
@@ -2828,9 +2733,7 @@ class Cast(ColExpr):
         if not types.converts_to(self.val.dtype(), self.target_type):
             if not Cast.is_valid_cast(self.val.dtype(), self.target_type):
                 hint = ""
-                if types.without_const(
-                    self.val.dtype()
-                ) == String() and self.target_type in (
+                if types.without_const(self.val.dtype()) == String() and self.target_type in (
                     Datetime(),
                     Date(),
                 ):
@@ -2852,10 +2755,7 @@ class Cast(ColExpr):
     def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map) -> str:
         if depth == 0:
             return f"(...).cast({self.target_type})"
-        return (
-            f"{self.val._ast_repr(depth - 1, True, table_display_name_map)}"
-            + f".cast({self.target_type})"
-        )
+        return f"{self.val._ast_repr(depth - 1, True, table_display_name_map)}" + f".cast({self.target_type})"
 
     def ftype(self, *, agg_is_window: bool | None = None) -> Ftype | None:
         if self._ftype is None:
@@ -2904,9 +2804,7 @@ class EvalAligned(ColExpr):
     def map_children(self, g):
         self.val = g(self.val)
 
-    def _ast_repr(
-        self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]
-    ) -> str:
+    def _ast_repr(self, depth: int, needs_parens: bool, table_display_name_map: dict[AstNode, str]) -> str:
         if depth == 0:
             return "eval_aligned(...)"
         return (
@@ -3002,13 +2900,7 @@ def wrap_literals(expr: Any, *, allow_markers=False) -> Any:
             or (
                 # markers can only be at the top of an expression tree
                 not isinstance(expr.op, Marker)
-                and (
-                    marker_args := [
-                        arg
-                        for arg in expr.args
-                        if isinstance(arg, ColFn) and isinstance(arg.op, Marker)
-                    ]
-                )
+                and (marker_args := [arg for arg in expr.args if isinstance(arg, ColFn) and isinstance(arg.op, Marker)])
             )
         ):
             marker = expr.op if isinstance(expr.op, Marker) else marker_args[0].op
@@ -3030,21 +2922,14 @@ def wrap_literals(expr: Any, *, allow_markers=False) -> Any:
 
 def clean_kwargs(**kwargs) -> dict[str, list[ColExpr]]:
     kwargs = {
-        key: [val]
-        if not isinstance(val, Iterable) or isinstance(val, str)
-        else list(val)
+        key: [val] if not isinstance(val, Iterable) or isinstance(val, str) else list(val)
         for key, val in kwargs.items()
         if val is not None
     }
     if (partition_by := kwargs.get("partition_by")) is not None:
-        kwargs["partition_by"] = [
-            ColName(col) if isinstance(col, str) else col for col in partition_by
-        ]
+        kwargs["partition_by"] = [ColName(col) if isinstance(col, str) else col for col in partition_by]
     if (arrange := kwargs.get("arrange")) is not None:
-        kwargs["arrange"] = [
-            Order.from_col_expr(ColName(ord) if isinstance(ord, str) else ord)
-            for ord in arrange
-        ]
+        kwargs["arrange"] = [Order.from_col_expr(ColName(ord) if isinstance(ord, str) else ord) for ord in arrange]
     return {key: [wrap_literals(val) for val in arr] for key, arr in kwargs.items()}
 
 
@@ -3073,9 +2958,7 @@ def get_expr_as_table(expr: ColExpr):
 
     get_cols(expr)
 
-    aligned_nodes = [
-        ea for ea in expr.iter_subtree_postorder() if isinstance(ea, EvalAligned)
-    ]
+    aligned_nodes = [ea for ea in expr.iter_subtree_postorder() if isinstance(ea, EvalAligned)]
 
     # We need one column whose AST is an ancestor of all other columns' ASTs.
     # The following could be done in linear time.
@@ -3090,16 +2973,12 @@ def get_expr_as_table(expr: ColExpr):
     if ancestor_index is None:
         c, d = next(
             (c, d)
-            for (i, c), (j, d) in itertools.product(
-                enumerate(cols + aligned_nodes), enumerate(cols + aligned_nodes)
-            )
+            for (i, c), (j, d) in itertools.product(enumerate(cols + aligned_nodes), enumerate(cols + aligned_nodes))
             if roots[i] not in subtrees[j] and roots[j] not in subtrees[i]
         )
 
         def text_repr(x: Col | EvalAligned):
-            return (
-                "the column " if isinstance(x, Col) else "the `with_` argument of "
-            ) + f"`{x.ast_repr(depth=1)}`"
+            return ("the column " if isinstance(x, Col) else "the `with_` argument of ") + f"`{x.ast_repr(depth=1)}`"
 
         raise ValueError(
             "cannot export column expression since no common ancestor table "
@@ -3117,8 +2996,7 @@ def get_expr_as_table(expr: ColExpr):
     for col in expr.iter_subtree_postorder():
         if isinstance(col, ColName) and col not in tbl:
             raise ValueError(
-                f"column expression cannot be exported since the C-column `{col}` is "
-                "not contained in the table"
+                f"column expression cannot be exported since the C-column `{col}` is not contained in the table"
             )
 
     col_name = expr.ast_repr(depth=0)
@@ -3139,9 +3017,7 @@ def get_ast_path_str(tree_root: ColExpr, error_source: UUID | ColExpr) -> str:
         preorder_traversal.append(node)
         # We have to do this marker magic for usage in verbs since the id of the node
         # may have changed since the exception was thrown.
-        if (
-            is_uuid and hasattr(node, "_fn_id") and node._fn_id == error_source
-        ) or error_source is node:
+        if (is_uuid and hasattr(node, "_fn_id") and node._fn_id == error_source) or error_source is node:
             break
     path = [preorder_traversal[-1]]
     for node in reversed(preorder_traversal):

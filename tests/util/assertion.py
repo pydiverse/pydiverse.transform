@@ -21,9 +21,7 @@ def assert_equal(left, right, check_dtypes=False, check_row_order=True):
         return
 
     left_df = left >> export(Polars(lazy=False)) if isinstance(left, Table) else left
-    right_df = (
-        right >> export(Polars(lazy=False)) if isinstance(right, Table) else right
-    )
+    right_df = right >> export(Polars(lazy=False)) if isinstance(right, Table) else right
 
     try:
         assert_frame_equal(
@@ -98,13 +96,8 @@ def assert_result_equal(
             # TODO: after a join, cols containing only null values get type Null on
             # SQLite and Postgres. maybe we can fix this but for now we just ignore them
             assert dfx.columns == dfy.columns
-            null_cols = set(dfx.select(pl.col(pl.Null)).columns) | set(
-                dfy.select(pl.col(pl.Null)).columns
-            )
-            assert all(
-                all(d.get_column(col).is_null().all() for col in null_cols)
-                for d in (dfx, dfy)
-            )
+            null_cols = set(dfx.select(pl.col(pl.Null)).columns) | set(dfy.select(pl.col(pl.Null)).columns)
+            assert all(all(d.get_column(col).is_null().all() for col in null_cols) for d in (dfx, dfy))
             dfy = dfy.select(pl.all().exclude(null_cols))
             dfx = dfx.select(pl.all().exclude(null_cols))
 
@@ -119,10 +112,7 @@ def assert_result_equal(
                 if isinstance(exception, type):
                     exception = (exception,)
                 if not isinstance(e, exception):
-                    raise Exception(
-                        f"Raised the wrong type of exception: {type(e)} instead of"
-                        f" {exception}."
-                    ) from e
+                    raise Exception(f"Raised the wrong type of exception: {type(e)} instead of {exception}.") from e
             # TODO: Replace with logger
             print(f"An exception was thrown:\n{e}")
             return
@@ -130,9 +120,7 @@ def assert_result_equal(
             raise e
 
     try:
-        assert_frame_equal(
-            dfx, dfy, check_row_order=check_row_order, check_exact=False, atol=1e-6
-        )
+        assert_frame_equal(dfx, dfy, check_row_order=check_row_order, check_exact=False, atol=1e-6)
     except Exception as e:
         if xfail_warnings and did_raise_warning:
             pytest.xfail(warnings_summary)

@@ -59,18 +59,9 @@ class Query:
 
 class SqlImpl(TableImpl):
     def __new__(cls, *args, **kwargs) -> "SqlImpl":
-        engine: str | sqa.Engine = (
-            inspect.signature(cls.__init__)
-            .bind(None, *args, **kwargs)
-            .arguments["conf"]
-            .engine
-        )
+        engine: str | sqa.Engine = inspect.signature(cls.__init__).bind(None, *args, **kwargs).arguments["conf"].engine
 
-        dialect = (
-            engine.dialect.name
-            if isinstance(engine, sqa.Engine)
-            else sqa.make_url(engine).get_dialect().name
-        )
+        dialect = engine.dialect.name if isinstance(engine, sqa.Engine) else sqa.make_url(engine).get_dialect().name
 
         # We don't want to import any SQL impls we don't use, so the mapping
         # name -> impl class is defined here.
@@ -100,10 +91,7 @@ class SqlImpl(TableImpl):
             Impl = IbmDb2Impl
 
         else:
-            warn(
-                f"Pydiverse transform is not tested for dialect '{dialect}'. "
-                f"Assuming Postgres compatible SQL."
-            )
+            warn(f"Pydiverse transform is not tested for dialect '{dialect}'. Assuming Postgres compatible SQL.")
             from .postgres import PostgresImpl
 
             Impl = PostgresImpl
@@ -113,15 +101,9 @@ class SqlImpl(TableImpl):
     def __init__(self, table: str | sqa.Table, conf: SqlAlchemy, name: str | None):
         assert type(self) is not SqlImpl
 
-        self.engine = (
-            conf.engine
-            if isinstance(conf.engine, sqa.Engine)
-            else sqa.create_engine(conf.engine)
-        )
+        self.engine = conf.engine if isinstance(conf.engine, sqa.Engine) else sqa.create_engine(conf.engine)
         if isinstance(table, str):
-            self.table = sqa.Table(
-                table, sqa.MetaData(), schema=conf.schema, autoload_with=self.engine
-            )
+            self.table = sqa.Table(table, sqa.MetaData(), schema=conf.schema, autoload_with=self.engine)
         else:
             self.table = table
 
@@ -147,10 +129,7 @@ class SqlImpl(TableImpl):
         return (
             cloned,
             {self: cloned},
-            {
-                self.cols[name]._uuid: cloned.cols[name]._uuid
-                for name in self.cols.keys()
-            },
+            {self.cols[name]._uuid: cloned.cols[name]._uuid for name in self.cols.keys()},
         )
 
     @classmethod
@@ -166,15 +145,11 @@ class SqlImpl(TableImpl):
         return "POSIX"
 
     @classmethod
-    def build_select(
-        cls, nd: AstNode, *, final_select: list[Col] | None = None
-    ) -> sqa.Select:
+    def build_select(cls, nd: AstNode, *, final_select: list[Col] | None = None) -> sqa.Select:
         if final_select is None:
             final_select = Cache.from_ast(nd).selected_cols()
         create_aliases(nd, {})
-        nd, query, sqa_expr = cls.compile_ast(
-            nd, {col._uuid: 1 for col in final_select}
-        )
+        nd, query, sqa_expr = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
         return cls.compile_query(nd, query, sqa_expr)
 
     @classmethod
@@ -197,16 +172,12 @@ class SqlImpl(TableImpl):
                     connection=conn,
                     schema_overrides={
                         sql_col.name: schema_overrides[col._uuid]
-                        for sql_col, col in zip(
-                            sel.columns.values(), final_select, strict=True
-                        )
+                        for sql_col, col in zip(sel.columns.values(), final_select, strict=True)
                         if col._uuid in schema_overrides
                     }
                     | {
                         sql_col.name: NullType().to_polars()
-                        for sql_col, col in zip(
-                            sel.columns.values(), final_select, strict=True
-                        )
+                        for sql_col, col in zip(sel.columns.values(), final_select, strict=True)
                         if types.without_const(col.dtype()) == NullType()
                     },
                 )
@@ -238,15 +209,11 @@ class SqlImpl(TableImpl):
             # Often, floats are incorrectly converted to decimals
             # TODO: ensure in tests that the dtype not only match after export to
             # polars, but also really in the backend
-            return sqa.cast(
-                sqa.literal(lit.val, literal_execute=True), cls.sqa_type(lit.dtype())
-            )
+            return sqa.cast(sqa.literal(lit.val, literal_execute=True), cls.sqa_type(lit.dtype()))
         return sqa.literal(lit.val, cls.sqa_type(lit.dtype()), literal_execute=True)
 
     @classmethod
-    def compile_order(
-        cls, order: Order, sqa_expr: dict[str, sqa.Label]
-    ) -> sqa.UnaryExpression:
+    def compile_order(cls, order: Order, sqa_expr: dict[str, sqa.Label]) -> sqa.UnaryExpression:
         order_expr = cls.compile_col_expr(order.order_by, sqa_expr)
         if types.without_const(order.order_by.dtype()) == String():
             if cls.default_collation() is not None:
@@ -255,32 +222,22 @@ class SqlImpl(TableImpl):
                 order_expr = order_expr.collate(cls.default_collation())
         order_expr = order_expr.desc() if order.descending else order_expr.asc()
         if order.nulls_last is not None:
-            order_expr = (
-                order_expr.nulls_last()
-                if order.nulls_last
-                else order_expr.nulls_first()
-            )
+            order_expr = order_expr.nulls_last() if order.nulls_last else order_expr.nulls_first()
         return order_expr
 
     @classmethod
-    def compile_cast(
-        cls, cast: Cast, sqa_expr: dict[str, sqa.Label]
-    ) -> sqa.Case | sqa.TryCast:
+    def compile_cast(cls, cast: Cast, sqa_expr: dict[str, sqa.Label]) -> sqa.Case | sqa.TryCast:
         return cls.cast_compiled(cast, cls.compile_col_expr(cast.val, sqa_expr))
 
     @classmethod
-    def cast_compiled(
-        cls, cast: Cast, compiled_expr: sqa.ColumnElement
-    ) -> sqa.Cast | sqa.TryCast:
+    def cast_compiled(cls, cast: Cast, compiled_expr: sqa.ColumnElement) -> sqa.Cast | sqa.TryCast:
         if cast.strict:
             return sqa.cast(compiled_expr, cls.sqa_type(cast.target_type))
         else:
             return sqa.try_cast(compiled_expr, cls.sqa_type(cast.target_type))
 
     @classmethod
-    def fix_fn_types(
-        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
-    ) -> sqa.ColumnElement:
+    def fix_fn_types(cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement) -> sqa.ColumnElement:
         return val
 
     @classmethod
@@ -298,9 +255,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(expr, ColFn):
             args: list[sqa.ColumnElement] = [
-                cls.compile_col_expr(
-                    arg, sqa_expr, compile_literals=not types.is_const(param)
-                )
+                cls.compile_col_expr(arg, sqa_expr, compile_literals=not types.is_const(param))
                 for arg, param in zip(
                     expr.args,
                     expr.op.trie.best_match(tuple(arg.dtype() for arg in expr.args))[0],
@@ -319,9 +274,7 @@ class SqlImpl(TableImpl):
 
             arrange = expr.context_kwargs.get("arrange")
             if arrange:
-                order_by = dedup_order_by(
-                    cls.compile_order(order, sqa_expr) for order in arrange
-                )
+                order_by = dedup_order_by(cls.compile_order(order, sqa_expr) for order in arrange)
             else:
                 order_by = None
 
@@ -332,9 +285,7 @@ class SqlImpl(TableImpl):
                 # some backends need to do preprocessing and some postprocessing here,
                 # so we just give them full control by passing the responsibility of
                 # calling the `impl`.
-                value = cls.compile_ordered_aggregation(
-                    *args, order_by=order_by, impl=impl
-                )
+                value = cls.compile_ordered_aggregation(*args, order_by=order_by, impl=impl)
 
             else:
                 value: sqa.FunctionElement = impl(*args)
@@ -342,17 +293,11 @@ class SqlImpl(TableImpl):
                 if expr.op == ops.cum_sum and cls.dialect_order_append_rand():
                     order_by += [cls.get_impl(ops.rand, [])()]
 
-                if (
-                    partition_by is not None
-                    or order_by is not None
-                    and expr.ftype() == Ftype.WINDOW
-                ):
+                if partition_by is not None or order_by is not None and expr.ftype() == Ftype.WINDOW:
                     value = sqa.over(
                         value,
                         partition_by=partition_by,
-                        order_by=sqa.sql.expression.ClauseList(*order_by)
-                        if order_by
-                        else None,
+                        order_by=sqa.sql.expression.ClauseList(*order_by) if order_by else None,
                     )
 
             return cls.fix_fn_types(expr, value, *args)
@@ -366,11 +311,7 @@ class SqlImpl(TableImpl):
                     )
                     for cond, val in expr.cases
                 ),
-                else_=(
-                    cls.compile_col_expr(expr.default_val, sqa_expr)
-                    if expr.default_val is not None
-                    else None
-                ),
+                else_=(cls.compile_col_expr(expr.default_val, sqa_expr) if expr.default_val is not None else None),
             )
 
             if not cls.pdt_type(res.type).is_subtype(expr.dtype()):
@@ -395,23 +336,17 @@ class SqlImpl(TableImpl):
         raise AssertionError
 
     @classmethod
-    def compile_query(
-        cls, table: sqa.Table, query: Query, sqa_expr: dict[UUID, sqa.ColumnElement]
-    ) -> sqa.sql.Select:
+    def compile_query(cls, table: sqa.Table, query: Query, sqa_expr: dict[UUID, sqa.ColumnElement]) -> sqa.sql.Select:
         sel = table.select().select_from(table)
 
         if query.where:
-            sel = sel.where(
-                *(cls.compile_col_expr(pred, sqa_expr) for pred in query.where)
-            )
+            sel = sel.where(*(cls.compile_col_expr(pred, sqa_expr) for pred in query.where))
 
         if query.group_by:
             sel = sel.group_by(*(sqa_expr[uid] for uid in query.group_by))
 
         if query.having:
-            sel = sel.having(
-                *(cls.compile_col_expr(pred, sqa_expr) for pred in query.having)
-            )
+            sel = sel.having(*(cls.compile_col_expr(pred, sqa_expr) for pred in query.having))
 
         if query.limit is not None:
             sel = sel.limit(query.limit)
@@ -419,20 +354,14 @@ class SqlImpl(TableImpl):
                 sel = sel.offset(query.offset)
 
         if query.order_by:
-            sel = sel.order_by(
-                *dedup_order_by(
-                    cls.compile_order(ord, sqa_expr) for ord in query.order_by
-                )
-            )
+            sel = sel.order_by(*dedup_order_by(cls.compile_order(ord, sqa_expr) for ord in query.order_by))
 
         sel = sel.with_only_columns(*(sqa_expr[uid] for uid in query.select))
 
         return sel
 
     @classmethod
-    def compile_ast(
-        cls, nd: AstNode, needed_cols: dict[UUID, int]
-    ) -> tuple[sqa.Table, Query, dict[UUID, sqa.Label]]:
+    def compile_ast(cls, nd: AstNode, needed_cols: dict[UUID, int]) -> tuple[sqa.Table, Query, dict[UUID, sqa.Label]]:
         if isinstance(nd, verbs.Verb):
             # store a counter in `needed_cols how often each UUID is referenced by
             # ancestors. This allows to only select necessary columns in a subquery.
@@ -447,9 +376,7 @@ class SqlImpl(TableImpl):
             table, query, sqa_expr = cls.compile_ast(nd.child, needed_cols)
 
         if isinstance(nd, verbs.Mutate | verbs.Summarize):
-            query.select = [
-                uid for uid in query.select if sqa_expr[uid].name not in set(nd.names)
-            ]
+            query.select = [uid for uid in query.select if sqa_expr[uid].name not in set(nd.names)]
 
         if isinstance(nd, verbs.SubqueryMarker):
             if needed_cols.keys().isdisjoint(sqa_expr.keys()):
@@ -480,9 +407,7 @@ class SqlImpl(TableImpl):
 
             table = cls.compile_query(table, query, sqa_expr).subquery()
             sqa_expr = {
-                uid: sqa.label(
-                    name_in_subquery[uid], table.columns.get(name_in_subquery[uid])
-                )
+                uid: sqa.label(name_in_subquery[uid], table.columns.get(name_in_subquery[uid]))
                 for uid in needed_cols.keys()
                 if uid in sqa_expr
             }
@@ -497,11 +422,7 @@ class SqlImpl(TableImpl):
 
         elif isinstance(nd, verbs.Rename):
             sqa_expr = {
-                uid: (
-                    sqa.label(nd.name_map[lb.name], lb)
-                    if lb.name in nd.name_map
-                    else lb
-                )
+                uid: (sqa.label(nd.name_map[lb.name], lb) if lb.name in nd.name_map else lb)
                 for uid, lb in sqa_expr.items()
             }
 
@@ -526,11 +447,7 @@ class SqlImpl(TableImpl):
                 uid: sqa.label(name, cls.compile_col_expr(val, sqa_expr))
                 for name, uid, val in zip(nd.names, nd.uuids, nd.values, strict=True)
             }
-            query.group_by.extend(
-                col._uuid
-                for col in query.partition_by
-                if not types.is_const(col.dtype())
-            )
+            query.group_by.extend(col._uuid for col in query.partition_by if not types.is_const(col.dtype()))
             query.select = [col._uuid for col in query.partition_by] + nd.uuids
             query.partition_by = []
             query.order_by.clear()
@@ -554,9 +471,7 @@ class SqlImpl(TableImpl):
             query.partition_by.clear()
 
         elif isinstance(nd, verbs.Join):
-            right_table, right_query, right_sqa_expr = cls.compile_ast(
-                nd.right, needed_cols
-            )
+            right_table, right_query, right_sqa_expr = cls.compile_ast(nd.right, needed_cols)
             sqa_expr.update(right_sqa_expr)
 
             compiled_on = cls.compile_col_expr(nd.on, sqa_expr)
@@ -568,10 +483,7 @@ class SqlImpl(TableImpl):
                     operator.and_,
                     (
                         compiled_on,
-                        *(
-                            cls.compile_col_expr(pred, right_sqa_expr)
-                            for pred in right_query.where
-                        ),
+                        *(cls.compile_col_expr(pred, right_sqa_expr) for pred in right_query.where),
                     ),
                 )
             elif nd.how == "full":
@@ -856,16 +768,12 @@ with SqlImpl.impl_store.impl_manager as impl:
     @impl(ops.shift)
     def _shift(x, by, empty_value=None):
         if by >= 0:
-            if empty_value is not None and not isinstance(
-                empty_value.type, sqa.types.NullType
-            ):
+            if empty_value is not None and not isinstance(empty_value.type, sqa.types.NullType):
                 return sqa.func.LAG(x, by, empty_value, type_=x.type)
             else:
                 return sqa.func.LAG(x, by, type_=x.type)
         if by < 0:
-            if empty_value is not None and not isinstance(
-                empty_value.type, sqa.types.NullType
-            ):
+            if empty_value is not None and not isinstance(empty_value.type, sqa.types.NullType):
                 return sqa.func.LEAD(x, -by, empty_value, type_=x.type)
             else:
                 return sqa.func.LEAD(x, -by, type_=x.type)
@@ -966,9 +874,7 @@ with SqlImpl.impl_store.impl_manager as impl:
     def _clip(x, lower, upper, *, _Impl: SqlImpl, _sig: Sequence[Dtype]):
         return sqa.case(
             (x.is_(sqa.null()), sqa.null()),
-            else_=_Impl.get_impl(ops.horizontal_max, _sig)(
-                _Impl.get_impl(ops.horizontal_min, _sig)(x, upper), lower
-            ),
+            else_=_Impl.get_impl(ops.horizontal_max, _sig)(_Impl.get_impl(ops.horizontal_min, _sig)(x, upper), lower),
         )
 
     @impl(ops.cum_sum)

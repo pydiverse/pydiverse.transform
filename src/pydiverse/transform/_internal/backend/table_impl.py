@@ -35,14 +35,9 @@ class TableImpl(AstNode):
 
     def __init__(self, name: str | None, schema: dict[str, Dtype]):
         self.name = name
-        self.cols = {
-            name: Col(name, self, uuid.uuid1(), dtype, Ftype.ELEMENT_WISE)
-            for name, dtype in schema.items()
-        }
+        self.cols = {name: Col(name, self, uuid.uuid1(), dtype, Ftype.ELEMENT_WISE) for name, dtype in schema.items()}
 
-    def _unformatted_ast_repr(
-        self, verb_depth: int, expr_depth: int, display_name_map
-    ) -> str:
+    def _unformatted_ast_repr(self, verb_depth: int, expr_depth: int, display_name_map) -> str:
         return self._ast_node_repr(expr_depth, display_name_map)
 
     def _ast_node_repr(self, expr_depth, display_name_map):
@@ -52,9 +47,7 @@ class TableImpl(AstNode):
         raise NotImplementedError()
 
     def short_name(self):
-        return (
-            "?" if self.name is None else self.name
-        ) + f" (source table, backend: '{self.backend_name}')"
+        return ("?" if self.name is None else self.name) + f" (source table, backend: '{self.backend_name}')"
 
     def __init_subclass__(cls) -> None:
         cls.impl_store = ImplStore()
@@ -77,16 +70,12 @@ class TableImpl(AstNode):
             res = resource
 
         elif isinstance(resource, dict):
-            return TableImpl.from_resource(
-                pl.DataFrame(resource), backend, name=name, uuids=uuids
-            )
+            return TableImpl.from_resource(pl.DataFrame(resource), backend, name=name, uuids=uuids)
 
         elif pd is not None and isinstance(resource, pd.DataFrame):
             # copy pandas dataframe to polars
             # TODO: try zero-copy for arrow backed pandas
-            return TableImpl.from_resource(
-                pl.DataFrame(resource), backend, name=name, uuids=uuids
-            )
+            return TableImpl.from_resource(pl.DataFrame(resource), backend, name=name, uuids=uuids)
 
         elif isinstance(resource, pl.DataFrame | pl.LazyFrame):
             if name is None:
@@ -155,8 +144,7 @@ class TableImpl(AstNode):
             return cls.__bases__[0].get_impl(op, sig)
         except NotSupportedError as err:
             raise NotSupportedError(
-                f"operation `{op.name}` is not supported by the backend "
-                f"`{cls.__name__.lower()[:-4]}`"
+                f"operation `{op.name}` is not supported by the backend `{cls.__name__.lower()[:-4]}`"
             ) from err
 
 

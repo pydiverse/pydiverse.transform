@@ -5,13 +5,9 @@ from pydiverse.transform._internal.ops.op import Operator
 from pydiverse.transform._internal.ops.signature import Signature
 from pydiverse.transform._internal.tree.types import COMPARABLE, Bool, Const, S
 
-equal = Operator(
-    "__eq__", Signature(S, S, return_type=Bool()), doc="Equality comparison =="
-)
+equal = Operator("__eq__", Signature(S, S, return_type=Bool()), doc="Equality comparison ==")
 
-not_equal = Operator(
-    "__ne__", Signature(S, S, return_type=Bool()), doc="Non-equality comparison !="
-)
+not_equal = Operator("__ne__", Signature(S, S, return_type=Bool()), doc="Non-equality comparison !=")
 
 
 less_than = Operator(

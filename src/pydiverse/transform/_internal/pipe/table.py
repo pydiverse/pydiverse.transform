@@ -179,8 +179,7 @@ class Table:
             # reference of a previous table.
             if key._uuid not in self._cache.uuid_to_name:
                 raise ColumnNotFoundError(
-                    f"column `{key.ast_repr()}` does not exist in table "
-                    f"`{self._ast.short_name()}`"
+                    f"column `{key.ast_repr()}` does not exist in table `{self._ast.short_name()}`"
                 )
             return Col(
                 self._cache.uuid_to_name[key._uuid],
@@ -196,9 +195,7 @@ class Table:
             # for hasattr to work correctly on dunder methods
             raise AttributeError
         if name not in self._cache.name_to_uuid:
-            raise ColumnNotFoundError(
-                f"column `{name}` does not exist in table `{self._ast.short_name()}`"
-            )
+            raise ColumnNotFoundError(f"column `{name}` does not exist in table `{self._ast.short_name()}`")
         col = self._cache.cols[self._cache.name_to_uuid[name]]
         return Col(name, self._ast, col._uuid, col._dtype, col._ftype)
 
@@ -291,10 +288,7 @@ class Table:
         else:
             tbl_name = f"Table <code>{self >> name()}</code> "
 
-        html = (
-            tbl_name
-            + f"(backend: <code>{self._cache.backend.backend_name}</code>)</br>"
-        )
+        html = tbl_name + f"(backend: <code>{self._cache.backend.backend_name}</code>)</br>"
         try:
             # We use polars' _repr_html_ on the first and last few rows of the table and
             # fix the `shape` afterwards.
@@ -306,10 +300,7 @@ class Table:
             num_rows_end = df_html.find(",", num_rows_begin)
 
         except Exception as e:
-            return html + (
-                "</br><pre>export failed\n"
-                f"{escape(e.__class__.__name__)}: {escape(str(e))}</pre>"
-            )
+            return html + (f"</br><pre>export failed\n{escape(e.__class__.__name__)}: {escape(str(e))}</pre>")
 
         return f"{df_html[: num_rows_begin + 8]}{height}{df_html[num_rows_end:]}"
 
@@ -328,18 +319,14 @@ def get_head_tail(tbl: Table) -> tuple[pl.DataFrame, int]:
     # Only export the first and last few rows.
     head: pl.DataFrame = tbl >> slice_head(head_tail_len) >> export(pdt.Polars)
     tail: pl.DataFrame = (
-        tbl
-        >> slice_head(head_tail_len, offset=max(head_tail_len, height - head_tail_len))
-        >> export(pdt.Polars)
+        tbl >> slice_head(head_tail_len, offset=max(head_tail_len, height - head_tail_len)) >> export(pdt.Polars)
     )
     return pl.concat([head, tail]), height
 
 
 def backend(
     table: Table,
-) -> Literal[
-    "polars", "duckdb_polars", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"
-]:
+) -> Literal["polars", "duckdb_polars", "sqlite", "postgres", "duckdb", "mssql", "ibm_db2"]:
     """
     Returns the backend of the table as a string.
     """

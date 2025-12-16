@@ -31,9 +31,7 @@ class Signature:
 class SignatureTrie:
     @dataclasses.dataclass(slots=True)
     class Node:
-        children: dict[Dtype, "SignatureTrie.Node"] = dataclasses.field(
-            default_factory=dict
-        )
+        children: dict[Dtype, "SignatureTrie.Node"] = dataclasses.field(default_factory=dict)
         data: Any = None
 
         def insert(
@@ -56,20 +54,14 @@ class SignatureTrie:
 
             if sig[0] not in self.children:
                 self.children[sig[0]] = SignatureTrie.Node()
-            self.children[sig[0]].insert(
-                sig[1:], data, last_is_vararg, last_type=sig[0]
-            )
+            self.children[sig[0]].insert(sig[1:], data, last_is_vararg, last_type=sig[0])
 
-        def all_matches(
-            self, sig: Sequence[Dtype], tyvars: dict[str, Dtype]
-        ) -> list[tuple[list[Dtype], Any]]:
+        def all_matches(self, sig: Sequence[Dtype], tyvars: dict[str, Dtype]) -> list[tuple[list[Dtype], Any]]:
             if len(sig) == 0:
                 return [
                     (
                         [],
-                        self.data
-                        if not isinstance(self.data, Tyvar)
-                        else tyvars[self.data.name],
+                        self.data if not isinstance(self.data, Tyvar) else tyvars[self.data.name],
                     )
                 ]
 
@@ -78,29 +70,22 @@ class SignatureTrie:
             for dtype, child in self.children.items():
                 base_type = types.without_const(dtype)
                 match_dtype = (
-                    tyvars[base_type.name]
-                    if isinstance(base_type, Tyvar) and base_type.name in tyvars
-                    else dtype
+                    tyvars[base_type.name] if isinstance(base_type, Tyvar) and base_type.name in tyvars else dtype
                 )
                 if isinstance(types.without_const(match_dtype), Tyvar):
                     assert tyvar is None
                     tyvar = dtype
                 elif types.converts_to(sig[0], match_dtype):
                     matches.extend(
-                        ([match_dtype] + match_sig, data)
-                        for match_sig, data in child.all_matches(sig[1:], tyvars)
+                        ([match_dtype] + match_sig, data) for match_sig, data in child.all_matches(sig[1:], tyvars)
                     )
 
             # When the current node is a type var, try every type we can convert to.
             if tyvar is not None:
                 already_matched = {types.without_const(m[0][0]) for m in matches}
                 for dtype in types.implicit_conversions(types.without_const(sig[0])):
-                    match_dtype = (
-                        types.with_const(dtype) if types.is_const(tyvar) else dtype
-                    )
-                    if dtype not in already_matched and types.converts_to(
-                        sig[0], match_dtype
-                    ):
+                    match_dtype = types.with_const(dtype) if types.is_const(tyvar) else dtype
+                    if dtype not in already_matched and types.converts_to(sig[0], match_dtype):
                         matches.extend(
                             ([match_dtype] + match_sig, data)
                             for match_sig, data in self.children[tyvar].all_matches(
@@ -121,15 +106,11 @@ class SignatureTrie:
         if len(all_matches) == 0:
             return None
 
-        return all_matches[
-            best_signature_match(sig, [match[0] for match in all_matches])
-        ]
+        return all_matches[best_signature_match(sig, [match[0] for match in all_matches])]
 
 
 # returns the index of the signature in `candidates` that matches best
-def best_signature_match(
-    sig: Sequence[Dtype], candidates: Sequence[Sequence[Dtype]]
-) -> int:
+def best_signature_match(sig: Sequence[Dtype], candidates: Sequence[Sequence[Dtype]]) -> int:
     assert len(candidates) > 0
 
     best_index = 0
@@ -140,9 +121,7 @@ def best_signature_match(
             best_index = i + 1
             best_distance = this_distance
 
-    assert (
-        sum(int(best_distance == sig_distance(sig, match)) for match in candidates) == 1
-    )
+    assert sum(int(best_distance == sig_distance(sig, match)) for match in candidates) == 1
     return best_index
 
 

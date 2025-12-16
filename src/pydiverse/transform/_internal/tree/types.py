@@ -97,9 +97,7 @@ def with_const(dtype: Dtype) -> Dtype:
 
 def converts_to(source: Dtype, target: Dtype) -> bool:
     if is_const(target):
-        return is_const(source) and converts_to(
-            without_const(source), without_const(target)
-        )
+        return is_const(source) and converts_to(without_const(source), without_const(target))
     source = without_const(source)
     if isinstance(source, List):
         return isinstance(target, List) and converts_to(source.inner, target.inner)
@@ -107,11 +105,7 @@ def converts_to(source: Dtype, target: Dtype) -> bool:
         return (
             target == source
             or target == String()
-            or (
-                type(target) is String
-                and source.max_length is not None
-                and target.max_length > source.max_length
-            )
+            or (type(target) is String and source.max_length is not None and target.max_length > source.max_length)
         )
     if isinstance(source, Decimal):
         return (
@@ -198,12 +192,8 @@ def lca_type(dtypes: list[Dtype]) -> Dtype:
 
     # reduce to simple types
     if isinstance(dtypes[0], List):
-        if diff := next(
-            (dtype for dtype in dtypes if not isinstance(dtype, List)), None
-        ):
-            raise DataTypeError(
-                f"type `{diff.__name__}` is not compatible with `List` type"
-            )
+        if diff := next((dtype for dtype in dtypes if not isinstance(dtype, List)), None):
+            raise DataTypeError(f"type `{diff.__name__}` is not compatible with `List` type")
 
         return List(lca_type([dtype.inner for dtype in dtypes]))
 
@@ -286,22 +276,14 @@ def implicit_conversions(dtype: Dtype) -> list[Dtype]:
     if isinstance(dtype, Enum | String):
         return [String()] + ([dtype] if dtype.max_length is not None else [])
     if isinstance(dtype, Decimal):
-        return (
-            list(FLOAT_SUBTYPES) + [Float()] + ([dtype] if dtype != Decimal() else [])
-        )
+        return list(FLOAT_SUBTYPES) + [Float()] + ([dtype] if dtype != Decimal() else [])
     return list(IMPLICIT_CONVS[dtype].keys())
 
 
 IMPLICIT_CONVS: dict[Dtype, dict[Dtype, tuple[int, int]]] = {
     Int(): {Float(): (1, 0), Decimal(): (2, 0), Int(): (0, 0)},
-    **{
-        int_subtype: {Int(): (0, 1), int_subtype: (0, 0)}
-        for int_subtype in INT_SUBTYPES
-    },
-    **{
-        float_subtype: {Float(): (0, 1), float_subtype: (0, 0)}
-        for float_subtype in FLOAT_SUBTYPES
-    },
+    **{int_subtype: {Int(): (0, 1), int_subtype: (0, 0)} for int_subtype in INT_SUBTYPES},
+    **{float_subtype: {Float(): (0, 1), float_subtype: (0, 0)} for float_subtype in FLOAT_SUBTYPES},
     Float(): {Float(): (0, 0)},
     String(): {String(): (0, 0)},
     Decimal(): {Decimal(): (0, 0), Float(): (0, 1)},
@@ -322,9 +304,7 @@ for start_type in (*INT_SUBTYPES, *FLOAT_SUBTYPES):
     for intermediate_type, cost1 in IMPLICIT_CONVS[start_type].items():
         if intermediate_type in IMPLICIT_CONVS:
             for target_type, cost2 in IMPLICIT_CONVS[intermediate_type].items():
-                added_edges[target_type] = tuple(
-                    sum(z) for z in zip(cost1, cost2, strict=True)
-                )
+                added_edges[target_type] = tuple(sum(z) for z in zip(cost1, cost2, strict=True))
     if start_type not in IMPLICIT_CONVS:
         IMPLICIT_CONVS[start_type] = added_edges
     IMPLICIT_CONVS[start_type] |= added_edges
@@ -338,13 +318,7 @@ def conversion_cost(dtype: Dtype, target: Dtype) -> tuple[int, int]:
     if isinstance(dtype, List):
         return conversion_cost(dtype.inner, target.inner)
     if isinstance(dtype, Enum | String | Decimal):
-        return (
-            (0, 0)
-            if dtype == target
-            else (0, 1)
-            if type(dtype) is type(target)
-            else (0, 2)
-        )
+        return (0, 0) if dtype == target else (0, 1) if type(dtype) is type(target) else (0, 2)
     return IMPLICIT_CONVS[dtype][target]
 
 

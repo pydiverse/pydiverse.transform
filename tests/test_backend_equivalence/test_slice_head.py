@@ -12,25 +12,13 @@ def test_simple(df3):
     assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(10))
     assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(100))
 
-    assert_result_equal(
-        df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(1, offset=8)
-    )
-    assert_result_equal(
-        df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(10, offset=8)
-    )
-    assert_result_equal(
-        df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(100, offset=8)
-    )
+    assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(1, offset=8))
+    assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(10, offset=8))
+    assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(100, offset=8))
 
-    assert_result_equal(
-        df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(1, offset=100)
-    )
-    assert_result_equal(
-        df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(10, offset=100)
-    )
-    assert_result_equal(
-        df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(100, offset=100)
-    )
+    assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(1, offset=100))
+    assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(10, offset=100))
+    assert_result_equal(df3, lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(100, offset=100))
 
 
 def test_chained(df3):
@@ -76,18 +64,13 @@ def test_with_mutate(df3):
 def test_with_join(df1, df2):
     assert_result_equal(
         (df1, df2),
-        lambda t, u: t
-        >> arrange(*t)
-        >> slice_head(3)
-        >> alias(keep_col_refs=True)
-        >> left_join(u, t.col1 == u.col1),
+        lambda t, u: t >> arrange(*t) >> slice_head(3) >> alias(keep_col_refs=True) >> left_join(u, t.col1 == u.col1),
         check_row_order=False,
     )
 
     assert_result_equal(
         (df1, df2),
-        lambda t, u: t
-        >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1),
+        lambda t, u: t >> left_join(u >> arrange(*t) >> slice_head(2, offset=1), t.col1 == u.col1),
         check_row_order=False,
         exception=ColumnNotFoundError,
         may_throw=True,
@@ -97,19 +80,12 @@ def test_with_join(df1, df2):
 def test_with_filter(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> filter(t.col4 % 2 == 0)
-        >> arrange(*list(t)[0:-1])
-        >> slice_head(4, offset=2),
+        lambda t: t >> filter(t.col4 % 2 == 0) >> arrange(*list(t)[0:-1]) >> slice_head(4, offset=2),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> arrange(*list(t)[0:-1])
-        >> slice_head(4, offset=2)
-        >> alias()
-        >> filter(C.col1 == 1),
+        lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(4, offset=2) >> alias() >> filter(C.col1 == 1),
     )
 
     assert_result_equal(
@@ -126,10 +102,7 @@ def test_with_filter(df3):
 def test_with_arrange(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=t.col4 - (t.col1 * t.col2))
-        >> arrange(C.x, *list(t)[0:-1])
-        >> slice_head(4, offset=2),
+        lambda t: t >> mutate(x=t.col4 - (t.col1 * t.col2)) >> arrange(C.x, *list(t)[0:-1]) >> slice_head(4, offset=2),
     )
 
     assert_result_equal(
@@ -146,12 +119,7 @@ def test_with_arrange(df3):
 def test_with_group_by(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> arrange(*list(t)[0:-1])
-        >> slice_head(1)
-        >> alias()
-        >> group_by(C.col1)
-        >> mutate(x=pdt.count()),
+        lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(1) >> alias() >> group_by(C.col1) >> mutate(x=pdt.count()),
     )
 
     assert_result_equal(
@@ -181,18 +149,10 @@ def test_with_group_by(df3):
 def test_with_summarize(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> arrange(*list(t)[0:-1])
-        >> slice_head(4)
-        >> alias()
-        >> summarize(count=pdt.count()),
+        lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(4) >> alias() >> summarize(count=pdt.count()),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> arrange(*list(t)[0:-1])
-        >> slice_head(4)
-        >> alias()
-        >> summarize(c3_mean=C.col3.mean()),
+        lambda t: t >> arrange(*list(t)[0:-1]) >> slice_head(4) >> alias() >> summarize(c3_mean=C.col3.mean()),
     )

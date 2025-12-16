@@ -44,9 +44,7 @@ class DuckDbImpl(SqlImpl):
     @classmethod
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         if cast.val.dtype().is_float() and cast.target_type.is_int():
-            return cls.cast_compiled(
-                cast, sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col))
-            )
+            return cls.cast_compiled(cast, sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)))
 
         return super().compile_cast(cast, sqa_col)
 
@@ -57,9 +55,7 @@ class DuckDbImpl(SqlImpl):
         return super().compile_lit(lit)
 
     @classmethod
-    def fix_fn_types(
-        cls, fn: sql.ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
-    ) -> sqa.ColumnElement:
+    def fix_fn_types(cls, fn: sql.ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement) -> sqa.ColumnElement:
         if fn.op in (ops.sum, ops.cum_sum):
             return sqa.cast(val, type_=args[0].type)
         return val

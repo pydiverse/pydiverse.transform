@@ -182,9 +182,7 @@ class TestPolarsLazyImpl:
 
     def test_join(self, tbl_left, tbl_right):
         assert_equal(
-            tbl_left
-            >> join(tbl_right, tbl_left.a == tbl_right.b, "left")
-            >> select(tbl_left.a, tbl_right.b),
+            tbl_left >> join(tbl_right, tbl_left.a == tbl_right.b, "left") >> select(tbl_left.a, tbl_right.b),
             pl.DataFrame({"a": [1, 2, 2, 3, 4], "b": [1, 2, 2, None, None]}),
             check_row_order=False,
         )
@@ -222,12 +220,8 @@ class TestPolarsLazyImpl:
 
         assert_equal(
             tbl_right
-            >> inner_join(
-                tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b
-            )
-            >> inner_join(
-                tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b
-            ),
+            >> inner_join(tbl_right2 := tbl_right >> alias(), tbl_right.b == tbl_right2.b)
+            >> inner_join(tbl_right3 := tbl_right >> alias(), tbl_right.b == tbl_right3.b),
             df_right.join(df_right, "b", suffix="_df_right", coalesce=False).join(
                 df_right, "b", suffix="_df_right_1", coalesce=False
             ),
@@ -336,18 +330,13 @@ class TestPolarsLazyImpl:
             >> group_by(tbl3.col1)
             >> group_by(tbl3.col2, add=True)
             >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
-            tbl3
-            >> group_by(tbl3.col1, tbl3.col2)
-            >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
+            tbl3 >> group_by(tbl3.col1, tbl3.col2) >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
 
         # Ungroup doesn't change the result
         assert_equal(
-            tbl3
-            >> group_by(tbl3.col1)
-            >> summarize(mean4=tbl3.col4.mean())
-            >> ungroup(),
+            tbl3 >> group_by(tbl3.col1) >> summarize(mean4=tbl3.col4.mean()) >> ungroup(),
             tbl3 >> group_by(tbl3.col1) >> summarize(mean4=tbl3.col4.mean()),
             check_row_order=False,
         )
@@ -387,34 +376,18 @@ class TestPolarsLazyImpl:
         )
 
         assert_equal(
-            (
-                tbl3
-                >> group_by(C.col2)
-                >> mutate(x=row_number(arrange=[-C.col4]))
-                >> select(C.x)
-            ),
+            (tbl3 >> group_by(C.col2) >> mutate(x=row_number(arrange=[-C.col4])) >> select(C.x)),
             pl.DataFrame({"x": [6, 5, 6, 5, 4, 3, 4, 3, 2, 1, 2, 1]}),
         )
 
         # group_by and partition_by should lead to the same result
         assert_equal(
-            (
-                tbl3
-                >> group_by(C.col2)
-                >> mutate(x=row_number(arrange=[-C.col4]))
-                >> select(C.x)
-            ),
-            (
-                tbl3
-                >> mutate(x=row_number(arrange=[-C.col4], partition_by=[C.col2]))
-                >> select(C.x)
-            ),
+            (tbl3 >> group_by(C.col2) >> mutate(x=row_number(arrange=[-C.col4])) >> select(C.x)),
+            (tbl3 >> mutate(x=row_number(arrange=[-C.col4], partition_by=[C.col2])) >> select(C.x)),
         )
 
         assert_equal(
-            tbl3
-            >> mutate(x=tbl3.col1.shift(1, arrange=tbl3.col4))
-            >> inner_join(tbl4, on="col1"),
+            tbl3 >> mutate(x=tbl3.col1.shift(1, arrange=tbl3.col4)) >> inner_join(tbl4, on="col1"),
             df3.sort(pl.col("col4"))
             .with_columns(x=pl.col("col1").shift(1))
             .join(df4, on="col1", suffix="_df4", coalesce=False),
@@ -451,13 +424,7 @@ class TestPolarsLazyImpl:
             (
                 tbl3
                 >> mutate(
-                    col1=when(C.col1 == 0)
-                    .then(1)
-                    .when(C.col1 == 1)
-                    .then(2)
-                    .when(C.col1 == 2)
-                    .then(3)
-                    .otherwise(-1)
+                    col1=when(C.col1 == 0).then(1).when(C.col1 == 1).then(2).when(C.col1 == 2).then(3).otherwise(-1)
                 )
                 >> select(C.col1)
             ),
@@ -467,13 +434,7 @@ class TestPolarsLazyImpl:
         assert_equal(
             (
                 tbl3
-                >> mutate(
-                    x=when(C.col1 == C.col2)
-                    .then(1)
-                    .when(C.col1 == C.col3)
-                    .then(2)
-                    .otherwise(C.col4)
-                )
+                >> mutate(x=when(C.col1 == C.col2).then(1).when(C.col1 == C.col3).then(2).otherwise(C.col4))
                 >> select(C.x)
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),
@@ -490,23 +451,14 @@ class TestPolarsLazyImpl:
         )
 
         assert_equal(
-            tbl1
-            >> mutate(a=tbl1.col1 * 2)
-            >> mutate(b=C.a * 2, a=tbl1.col1)
-            >> select(C.b),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> mutate(b=C.a * 2, a=tbl1.col1) >> select(C.b),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
         # Join
         assert_equal(
-            tbl1
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == tbl2.col1, "left")
-            >> select(C.a, *tbl2),
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_df2"),
+            tbl1 >> mutate(a=tbl1.col1) >> join(tbl2, C.a == tbl2.col1, "left") >> select(C.a, *tbl2),
+            tbl1 >> select() >> mutate(a=tbl1.col1) >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_df2"),
         )
 
         # Filter
@@ -548,10 +500,7 @@ class TestPolarsLazyImpl:
         )
         assert_equal(
             tbl4 >> mutate(u=tbl4.col3.fill_null(tbl4.col2)),
-            tbl4
-            >> mutate(
-                u=pdt.when(tbl4.col3.is_null()).then(tbl4.col2).otherwise(tbl4.col3)
-            ),
+            tbl4 >> mutate(u=pdt.when(tbl4.col3.is_null()).then(tbl4.col2).otherwise(tbl4.col3)),
         )
 
     def test_datetime(self, tbl_dt):
@@ -560,36 +509,25 @@ class TestPolarsLazyImpl:
             >> mutate(
                 u=(tbl_dt.dt1 - tbl_dt.dt2),
                 v=tbl_dt.d1 - tbl_dt.d1,
-                w=(tbl_dt.d1.cast(pdt.Datetime) - tbl_dt.dt2)
-                + tbl_dt.dur1
-                + dt.timedelta(days=1),
+                w=(tbl_dt.d1.cast(pdt.Datetime) - tbl_dt.dt2) + tbl_dt.dur1 + dt.timedelta(days=1),
             ),
             df_dt.with_columns(
                 (pl.col("dt1") - pl.col("dt2")).alias("u"),
                 pl.duration().alias("v"),
-                (
-                    (pl.col("d1") - pl.col("dt2"))
-                    + pl.col("dur1")
-                    + pl.lit(dt.timedelta(days=1))
-                ).alias("w"),
+                ((pl.col("d1") - pl.col("dt2")) + pl.col("dur1") + pl.lit(dt.timedelta(days=1))).alias("w"),
             ),
         )
 
     def test_duckdb_execution(self, tbl2, tbl3):
         assert_equal(
-            tbl3
-            >> mutate(u=tbl3.col1 * 2)
-            >> collect(DuckDb())
-            >> mutate(v=tbl3.col3 + C.u),
+            tbl3 >> mutate(u=tbl3.col1 * 2) >> collect(DuckDb()) >> mutate(v=tbl3.col3 + C.u),
             tbl3 >> mutate(u=tbl3.col1 * 2) >> mutate(v=C.col3 + C.u),
         )
 
         assert_equal(
             tbl3
             >> collect(DuckDb())
-            >> left_join(
-                tbl2 >> collect(DuckDb()), tbl3.col1 == tbl2.col1, suffix="_right"
-            )
+            >> left_join(tbl2 >> collect(DuckDb()), tbl3.col1 == tbl2.col1, suffix="_right")
             >> mutate(v=tbl3.col3 + tbl2.col2)
             >> group_by(C.col2)
             >> summarize(y=C.col3_right.sum()),
@@ -614,9 +552,7 @@ class TestPolarsLazyImpl:
             ((t.u + C.col2).exp() - t.v).export(Polars()),
         )
 
-        e = t >> inner_join(
-            tbl1, tbl1.col1.cast(pdt.Float64()) <= tbl2.col1 + tbl2.col3
-        )
+        e = t >> inner_join(tbl1, tbl1.col1.cast(pdt.Float64()) <= tbl2.col1 + tbl2.col3)
         e_ex = e >> export(Polars(lazy=False))
 
         assert_equal(
@@ -642,13 +578,8 @@ class TestPolarsLazyImpl:
         )
 
         assert_equal(
-            tbl3
-            >> group_by(tbl3.col1)
-            >> summarize(x=tbl3.col3.list.agg(arrange="col4"))
-            >> arrange(tbl3.col1),
-            df3.group_by(pl.col("col1"))
-            .agg(x=pl.col("col3").sort_by("col4"))
-            .sort("col1"),
+            tbl3 >> group_by(tbl3.col1) >> summarize(x=tbl3.col3.list.agg(arrange="col4")) >> arrange(tbl3.col1),
+            df3.group_by(pl.col("col1")).agg(x=pl.col("col3").sort_by("col4")).sort("col1"),
         )
 
     def test_cum_sum(self, tbl1):
@@ -681,15 +612,17 @@ class TestPolarsLazyImpl:
 
     def test_dict_of_lists_export(self):
         assert (pdt.Table({"a": 1}) >> export(pdt.DictOfLists)) == {"a": [1]}
-        assert (
-            pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.DictOfLists)
-        ) == {"a": [1, 2], "b": [True, False]}
+        assert (pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.DictOfLists)) == {
+            "a": [1, 2],
+            "b": [True, False],
+        }
 
     def test_list_of_dicts_export(self):
         assert (pdt.Table({"a": 1}) >> export(pdt.ListOfDicts)) == [{"a": 1}]
-        assert (
-            pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.ListOfDicts)
-        ) == [{"a": 1, "b": True}, {"a": 2, "b": False}]
+        assert (pdt.Table({"a": [1, 2], "b": [True, False]}) >> export(pdt.ListOfDicts)) == [
+            {"a": 1, "b": True},
+            {"a": 2, "b": False},
+        ]
 
     def test_uses_table(self, tbl2, tbl3):
         assert tbl2.col1.uses_table(tbl2)
@@ -703,26 +636,18 @@ class TestPolarsLazyImpl:
     def test_columns(self, tbl3):
         assert tbl3 >> columns() == [col.name for col in tbl3]
         tbl3_different_col_order = tbl3 >> mutate(col3=tbl3.col3)
-        assert tbl3_different_col_order >> columns() == [
-            col.name for col in tbl3_different_col_order
-        ]
+        assert tbl3_different_col_order >> columns() == [col.name for col in tbl3_different_col_order]
 
     def test_name_alias(self, tbl2):
         assert tbl2 >> alias("tbl") >> name() == "tbl"
 
     def test_enum(self, tbl1):
         tbl1_enum = tbl1 >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "c", "d")))
-        df1_enum = df1.with_columns(
-            p=pl.col("col2").cast(pl.Enum(["a", "b", "c", "d"]))
-        )
+        df1_enum = df1.with_columns(p=pl.col("col2").cast(pl.Enum(["a", "b", "c", "d"])))
         assert_equal(tbl1_enum, df1_enum)
 
         with pytest.raises(pl.exceptions.InvalidOperationError):
-            (
-                tbl1
-                >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "d")))
-                >> export(Polars)
-            )
+            (tbl1 >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "d"))) >> export(Polars))
 
         assert_equal(
             tbl1_enum >> mutate(q=C.p + "l"),
@@ -730,9 +655,7 @@ class TestPolarsLazyImpl:
         )
 
     def test_enum_isin(self, tbl1):
-        tbl1 >> mutate(
-            p=tbl1.col2.cast(pdt.Enum("a", "b", "c", "d")).is_in("a", "b", "c", "d")
-        )
+        tbl1 >> mutate(p=tbl1.col2.cast(pdt.Enum("a", "b", "c", "d")).is_in("a", "b", "c", "d"))
         tbl1 >> mutate(q="a") >> mutate(p=C.q.cast(pdt.Enum("a")).is_in("a"))
 
     def test_col_rename(self, tbl2, tbl4):
@@ -751,19 +674,13 @@ class TestPolarsLazyImpl:
             df2.rename({"col3": "c"})
             .join(df3, how="left", on=["col1", "col2"])
             .with_columns(
-                col1_df3=pl.when(pl.col("col4").is_null())
-                .then(None)
-                .otherwise(pl.col("col1")),
-                col2_df3=pl.when(pl.col("col4").is_null())
-                .then(None)
-                .otherwise(pl.col("col2")),
+                col1_df3=pl.when(pl.col("col4").is_null()).then(None).otherwise(pl.col("col1")),
+                col2_df3=pl.when(pl.col("col4").is_null()).then(None).otherwise(pl.col("col2")),
             ),
         )
 
     def test_collision_renaming(self, tbl2, tbl3):
-        with pytest.raises(
-            ValueError, match="rename would cause duplicate column name `col3`"
-        ):
+        with pytest.raises(ValueError, match="rename would cause duplicate column name `col3`"):
             _ = (
                 tbl2
                 >> mutate(c=tbl2.col3)
@@ -772,22 +689,16 @@ class TestPolarsLazyImpl:
                     (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2),
                 )
                 >> rename({"c": "col3"}),
-                df2.join(df3, how="inner", on=["col1", "col2"]).select(
-                    "col1", "col2", "col3"
-                ),
+                df2.join(df3, how="inner", on=["col1", "col2"]).select("col1", "col2", "col3"),
             )
 
     def test_hidden_collision_renaming0(self, tbl2, tbl3):
         assert_equal(
             tbl2
             >> rename({"col3": "c"})
-            >> inner_join(
-                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
-            )
+            >> inner_join(tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2))
             >> rename({"c": "col3"}),
-            df2.join(df3, how="inner", on=["col1", "col2"]).select(
-                "col1", "col2", "col3"
-            ),
+            df2.join(df3, how="inner", on=["col1", "col2"]).select("col1", "col2", "col3"),
         )
 
     def test_hidden_collision_renaming1(self, tbl2, tbl3):
@@ -795,22 +706,16 @@ class TestPolarsLazyImpl:
             tbl2
             >> rename({"col3": "c"})
             >> collect()
-            >> inner_join(
-                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
-            )
+            >> inner_join(tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2))
             >> rename({C.c: "col3"}),
-            df2.join(df3, how="inner", on=["col1", "col2"]).select(
-                "col1", "col2", "col3"
-            ),
+            df2.join(df3, how="inner", on=["col1", "col2"]).select("col1", "col2", "col3"),
         )
 
     def test_hidden_collision_renaming2(self, tbl2, tbl3):
         assert_equal(
             tbl2
             >> rename({"col3": "c"})
-            >> inner_join(
-                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
-            )
+            >> inner_join(tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2))
             >> mutate(col3=C.c),
             df2.join(df3, how="inner", on=["col1", "col2"])
             .select("col1", "col2", "col3")
@@ -822,9 +727,7 @@ class TestPolarsLazyImpl:
             tbl2
             >> rename({"col3": "c"})
             >> collect()
-            >> inner_join(
-                tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2)
-            )
+            >> inner_join(tbl3 >> select(), (tbl2.col1 == tbl3.col1) & (tbl2.col2 == tbl3.col2))
             >> mutate(col3=C.c),
             df2.join(df3, how="inner", on=["col1", "col2"])
             .select("col1", "col2", "col3")
@@ -834,9 +737,7 @@ class TestPolarsLazyImpl:
     def test_eval_aligned(self, tbl4):
         assert_equal(
             tbl4,
-            tbl4
-            >> drop(tbl4.col1)
-            >> mutate(col1=eval_aligned(df4.get_column("col1"))),
+            tbl4 >> drop(tbl4.col1) >> mutate(col1=eval_aligned(df4.get_column("col1"))),
         )
 
         s = pl.Series([1.2**i for i in range(df4.height)])
@@ -851,13 +752,8 @@ class TestPolarsLazyImpl:
         # pandas series
         s_pd = s.to_pandas()
         assert_equal(
-            tbl4
-            >> mutate(z=eval_aligned(tbl4.col1 + s_pd))
-            >> group_by(tbl4.col3)
-            >> summarize(u=C.z.sum()),
-            df4.with_columns(z=pl.col("col1") + s)
-            .group_by("col3")
-            .agg(u=pl.col("z").sum()),
+            tbl4 >> mutate(z=eval_aligned(tbl4.col1 + s_pd)) >> group_by(tbl4.col3) >> summarize(u=C.z.sum()),
+            df4.with_columns(z=pl.col("col1") + s).group_by("col3").agg(u=pl.col("z").sum()),
             check_row_order=False,
         )
 
@@ -934,13 +830,7 @@ class TestPrintAndRepr:
         tbl4.col1.ast_repr()
         (tbl4.col1 + tbl4.col2).ast_repr()
         (tbl4.col1 + tbl4.col2 + tbl4.col3).ast_repr()
-        (
-            pdt.when(tbl4.col1 > 1)
-            .then(tbl4.col2)
-            .when(tbl4.col1 < -1)
-            .then(tbl4.col3)
-            .otherwise(7)
-        ).ast_repr()
+        (pdt.when(tbl4.col1 > 1).then(tbl4.col2).when(tbl4.col1 < -1).then(tbl4.col3).otherwise(7)).ast_repr()
 
         (tbl4.col1.cast(pdt.Float64) + tbl4.col2 / 2).ast_repr()
 
@@ -950,16 +840,12 @@ class TestPrintAndRepr:
 
         tbl4.col1.max(
             partition_by=[tbl4.col2, tbl4.col3],
-            filter=pdt.when(tbl4.col1 > 0)
-            .then(tbl4.col2.is_not_null())
-            .otherwise((tbl4.col3 % 2) == 0),
+            filter=pdt.when(tbl4.col1 > 0).then(tbl4.col2.is_not_null()).otherwise((tbl4.col3 % 2) == 0),
         ).ast_repr()
 
     def test_error_source_ptr(self, tbl1, tbl2):
         with pytest.raises(DataTypeError) as r:
-            tbl1 >> mutate(
-                z=(2 * (tbl1.col1 + C.col2) - tbl1.col1.exp()) * tbl1.col1.acos()
-            )
+            tbl1 >> mutate(z=(2 * (tbl1.col1 + C.col2) - tbl1.col1.exp()) * tbl1.col1.acos())
         assert "AST path" in r.value.args[0]
 
         with pytest.raises(DataTypeError) as r:
@@ -1006,10 +892,7 @@ class TestPrintAndRepr:
                 v=(tbl3.col2.exp() + tbl3.col4) * tbl3.col1,
                 w=pdt.max(tbl3.col2, tbl3.col1, tbl3.col5.str.len()),
                 x=pdt.count(),
-                y=eval_aligned(
-                    (tbl3 >> mutate(j=42) >> alias("tbl. 1729") >> filter(C.col2 > 0)).j
-                    + tbl3.col1
-                ),
+                y=eval_aligned((tbl3 >> mutate(j=42) >> alias("tbl. 1729") >> filter(C.col2 > 0)).j + tbl3.col1),
                 z=eval_aligned(series),
             )
             >> select(tbl3.col1, tbl3.col4)

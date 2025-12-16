@@ -28,19 +28,13 @@ class DuckDbPolarsImpl(TableImpl):
 
         super().__init__(
             name,
-            {
-                name: Dtype.from_polars(dtype)
-                for name, dtype in df.collect_schema().items()
-            },
+            {name: Dtype.from_polars(dtype) for name, dtype in df.collect_schema().items()},
         )
 
         self.table = sqa.Table(
             name or "<polars dataframe>",
             sqa.MetaData(),
-            *(
-                sqa.Column(col.name, DuckDbImpl.sqa_type(col.dtype()))
-                for col in self.cols.values()
-            ),
+            *(sqa.Column(col.name, DuckDbImpl.sqa_type(col.dtype())) for col in self.cols.values()),
         )
 
     def _table_def_repr(self) -> str:
@@ -81,8 +75,5 @@ class DuckDbPolarsImpl(TableImpl):
         return (
             cloned,
             {self: cloned},
-            {
-                self.cols[name]._uuid: cloned.cols[name]._uuid
-                for name in self.cols.keys()
-            },
+            {self.cols[name]._uuid: cloned.cols[name]._uuid for name in self.cols.keys()},
         )

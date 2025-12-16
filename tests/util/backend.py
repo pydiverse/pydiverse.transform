@@ -64,20 +64,14 @@ def sql_table(
         if dtype in dtypes_map and col not in sql_dtypes:
             sql_dtypes[col] = dtypes_map[dtype]
 
-    df.write_database(
-        name, engine, if_table_exists="replace", engine_options={"dtype": sql_dtypes}
-    )
+    df.write_database(name, engine, if_table_exists="replace", engine_options={"dtype": sql_dtypes})
     if fix_sql_dtypes is not None and len(fix_sql_dtypes) > 0:
         # this is a hack to fix sql types after creation of the table
         # the main reason for this is that ibm_db_sa renders sqa.boolean as SMALLINT
         # (https://github.com/ibmdb/python-ibmdbsa/issues/161)
         with engine.connect() as conn:
             for col, dtype in fix_sql_dtypes.items():
-                conn.execute(
-                    sqa.text(
-                        f"ALTER TABLE {name} ALTER COLUMN {col} {dialect_infix} {dtype}"
-                    )
-                )
+                conn.execute(sqa.text(f"ALTER TABLE {name} ALTER COLUMN {col} {dialect_infix} {dtype}"))
             conn.execute(sqa.text(f"call sysproc.admin_cmd('REORG TABLE {name}')"))
             conn.commit()
     return Table(name, SqlAlchemy(engine))
@@ -113,12 +107,7 @@ def duckdb_parquet_table(df: pl.DataFrame, name: str):
 
     with engine.connect() as conn:
         conn.execute(sqa.text(f"DROP VIEW IF EXISTS {name}"))
-        conn.execute(
-            sqa.text(
-                f"CREATE VIEW {name} AS SELECT * FROM "
-                f"read_parquet('{path / f'{name}.parquet'}')"
-            )
-        )
+        conn.execute(sqa.text(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{path / f'{name}.parquet'}')"))
         conn.commit()
 
     return Table(name, SqlAlchemy(engine))
@@ -135,10 +124,7 @@ def postgres_table(df: pl.DataFrame, name: str):
 def mssql_table(df: pl.DataFrame, name: str):
     from sqlalchemy.dialects.mssql import DATETIME2
 
-    url = (
-        "mssql+pyodbc://sa:PydiQuant27@127.0.0.1:1433"
-        "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    )
+    url = "mssql+pyodbc://sa:PydiQuant27@127.0.0.1:1433/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
     return sql_table(df, name, url, dtypes_map={pl.Datetime(): DATETIME2()})
 
 

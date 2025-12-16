@@ -74,9 +74,7 @@ class MsSqlImpl(SqlImpl):
                 desc.map_col_roots(
                     functools.partial(
                         convert_bool_bit,
-                        desired_return_type="bool"
-                        if isinstance(desc, verbs.Filter | verbs.Join)
-                        else "bit",
+                        desired_return_type="bool" if isinstance(desc, verbs.Filter | verbs.Join) else "bit",
                     )
                 )
 
@@ -86,15 +84,11 @@ class MsSqlImpl(SqlImpl):
                 desc.order_by = convert_order_list(desc.order_by)
             if isinstance(desc, verbs.Verb):
                 for node in desc.iter_col_nodes():
-                    if isinstance(node, ColFn) and (
-                        arrange := node.context_kwargs.get("arrange")
-                    ):
+                    if isinstance(node, ColFn) and (arrange := node.context_kwargs.get("arrange")):
                         node.context_kwargs["arrange"] = convert_order_list(arrange)
 
         sql.create_aliases(nd, {})
-        table, query, sqa_expr = cls.compile_ast(
-            nd, {col._uuid: 1 for col in final_select}
-        )
+        table, query, sqa_expr = cls.compile_ast(nd, {col._uuid: 1 for col in final_select})
 
         # mssql complains about OFFSET if there is no ORDER BY
         if query.offset and not query.order_by:
@@ -103,19 +97,12 @@ class MsSqlImpl(SqlImpl):
         return cls.compile_query(table, query, sqa_expr)
 
     @classmethod
-    def compile_ordered_aggregation(
-        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
-    ):
+    def compile_ordered_aggregation(cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl):
         return impl(*args).within_group(*order_by)
 
     @classmethod
-    def fix_fn_types(
-        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
-    ) -> sqa.ColumnElement:
-        if (
-            fn.op in (ops.any, ops.all, ops.min, ops.max)
-            and types.without_const(fn.dtype()) == Bool()
-        ):
+    def fix_fn_types(cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement) -> sqa.ColumnElement:
+        if fn.op in (ops.any, ops.all, ops.min, ops.max) and types.without_const(fn.dtype()) == Bool():
             return val.cast(BIT)
 
         return val
@@ -189,8 +176,7 @@ def convert_bool_bit(
         result = copy.copy(expr)
         result.args = list(convert_bool_bit(arg, desired_arg_type) for arg in expr.args)
         result.context_kwargs = {
-            key: [convert_bool_bit(val, "bit") for val in arr]
-            for key, arr in expr.context_kwargs.items()
+            key: [convert_bool_bit(val, "bit") for val in arr] for key, arr in expr.context_kwargs.items()
         }
 
         return_type = (
@@ -222,23 +208,14 @@ def convert_bool_bit(
     elif isinstance(expr, CaseExpr):
         return_type = "bit"
         result = copy.copy(expr)
-        result.cases = [
-            (convert_bool_bit(cond, "bool"), convert_bool_bit(val, "bit"))
-            for cond, val in expr.cases
-        ]
-        result.default_val = (
-            None
-            if expr.default_val is None
-            else convert_bool_bit(expr.default_val, "bit")
-        )
+        result.cases = [(convert_bool_bit(cond, "bool"), convert_bool_bit(val, "bit")) for cond, val in expr.cases]
+        result.default_val = None if expr.default_val is None else convert_bool_bit(expr.default_val, "bit")
 
     elif isinstance(expr, LiteralCol):
         return_type = "bit"
 
     elif isinstance(expr, Cast):
-        return Cast(
-            convert_bool_bit(expr.val, "bit"), expr.target_type, strict=expr.strict
-        )
+        return Cast(convert_bool_bit(expr.val, "bit"), expr.target_type, strict=expr.strict)
 
     if types.without_const(expr.dtype()) == Bool():
         if desired_return_type == "bool" and return_type == "bit":
@@ -257,46 +234,38 @@ with MsSqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.equal, String(), String())
     def _eq(x, y):
-        return (sqa.func.LENGTH(x + "a") == sqa.func.LENGTH(y + "a")) & (
-            x.collate("Latin1_General_bin") == y
-        )
+        return (sqa.func.LENGTH(x + "a") == sqa.func.LENGTH(y + "a")) & (x.collate("Latin1_General_bin") == y)
 
     @impl(ops.not_equal, String(), String())
     def _ne(x, y):
-        return (sqa.func.LENGTH(x + "a") != sqa.func.LENGTH(y + "a")) | (
-            x.collate("Latin1_General_bin") != y
-        )
+        return (sqa.func.LENGTH(x + "a") != sqa.func.LENGTH(y + "a")) | (x.collate("Latin1_General_bin") != y)
 
     @impl(ops.less_than, String(), String())
     def _lt(x, y):
         y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
         return (x.collate("Latin1_General_bin") < y_) | (
-            (sqa.func.LENGTH(x + "a") < sqa.func.LENGTH(y + "a"))
-            & (x.collate("Latin1_General_bin") == y_)
+            (sqa.func.LENGTH(x + "a") < sqa.func.LENGTH(y + "a")) & (x.collate("Latin1_General_bin") == y_)
         )
 
     @impl(ops.less_equal, String(), String())
     def _le(x, y):
         y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
         return (x.collate("Latin1_General_bin") < y_) | (
-            (sqa.func.LENGTH(x + "a") <= sqa.func.LENGTH(y + "a"))
-            & (x.collate("Latin1_General_bin") == y_)
+            (sqa.func.LENGTH(x + "a") <= sqa.func.LENGTH(y + "a")) & (x.collate("Latin1_General_bin") == y_)
         )
 
     @impl(ops.greater_than, String(), String())
     def _gt(x, y):
         y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
         return (x.collate("Latin1_General_bin") > y_) | (
-            (sqa.func.LENGTH(x + "a") > sqa.func.LENGTH(y + "a"))
-            & (x.collate("Latin1_General_bin") == y_)
+            (sqa.func.LENGTH(x + "a") > sqa.func.LENGTH(y + "a")) & (x.collate("Latin1_General_bin") == y_)
         )
 
     @impl(ops.greater_equal, String(), String())
     def _ge(x, y):
         y_ = sqa.func.SUBSTRING(y, 1, sqa.func.LENGTH(x + "a") - 1)
         return (x.collate("Latin1_General_bin") > y_) | (
-            (sqa.func.LENGTH(x + "a") >= sqa.func.LENGTH(y + "a"))
-            & (x.collate("Latin1_General_bin") == y_)
+            (sqa.func.LENGTH(x + "a") >= sqa.func.LENGTH(y + "a")) & (x.collate("Latin1_General_bin") == y_)
         )
 
     @impl(ops.str_len)
@@ -401,9 +370,7 @@ with MsSqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.cbrt)
     def _cbrt(x):
-        return sqa.func.sign(x) * _pow(
-            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
-        )
+        return sqa.func.sign(x) * _pow(sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double))
 
     @impl(ops.rand)
     def _rand():

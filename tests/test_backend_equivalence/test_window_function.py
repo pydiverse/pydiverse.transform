@@ -17,16 +17,12 @@ def test_simple_ungrouped(df3):
 def test_simple_grouped(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1)
-        >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+        lambda t: t >> group_by(t.col1) >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1, t.col2)
-        >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
+        lambda t: t >> group_by(t.col1, t.col2) >> mutate(min=t.col4.min(), max=t.col4.max(), mean=t.col4.mean()),
     )
 
 
@@ -41,9 +37,7 @@ def test_partition_by_argument(df3, df4):
                 arrange=[t.col5.descending().nulls_last(), t.col4.nulls_first()],
                 partition_by=[t.col2],
             ),
-            x=pdt.row_number(
-                arrange=[t.col4.nulls_last()], partition_by=[t.col1, t.col2]
-            ),
+            x=pdt.row_number(arrange=[t.col4.nulls_last()], partition_by=[t.col1, t.col2]),
         ),
     )
 
@@ -52,11 +46,7 @@ def test_partition_by_argument(df3, df4):
         lambda t, u: t
         >> join(u, t.col1 == u.col3, how="left")
         >> group_by(t.col2)
-        >> mutate(
-            y=(u.col3 + t.col1).max(
-                partition_by=(col for col in t if col.name != "col7")
-            )
-        ),
+        >> mutate(y=(u.col3 + t.col1).max(partition_by=(col for col in t if col.name != "col7"))),
     )
 
     assert_result_equal(
@@ -73,18 +63,12 @@ def test_partition_by_argument(df3, df4):
 def test_chained(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1)
-        >> mutate(min=t.col4.min())
-        >> mutate(max=t.col4.max(), mean=t.col4.mean()),
+        lambda t: t >> group_by(t.col1) >> mutate(min=t.col4.min()) >> mutate(max=t.col4.max(), mean=t.col4.mean()),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1)
-        >> mutate(min=t.col4.min(), max=t.col4.max())
-        >> mutate(span=C.max - C.min),
+        lambda t: t >> group_by(t.col1) >> mutate(min=t.col4.min(), max=t.col4.max()) >> mutate(span=C.max - C.min),
     )
 
 
@@ -101,11 +85,7 @@ def test_nested(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=C.col4.max())
-        >> mutate(y=C.x.min() * 1)
-        >> mutate(z=C.y.mean())
-        >> mutate(w=C.x / C.y),
+        lambda t: t >> mutate(x=C.col4.max()) >> mutate(y=C.x.min() * 1) >> mutate(z=C.y.mean()) >> mutate(w=C.x / C.y),
         may_throw=True,
         exception=SubqueryError,
     )
@@ -121,22 +101,14 @@ def test_nested(df3):
 def test_filter(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1, t.col2)
-        >> mutate(mean3=t.col3.mean())
-        >> alias()
-        >> filter(C.mean3 <= 2.0),
+        lambda t: t >> group_by(t.col1, t.col2) >> mutate(mean3=t.col3.mean()) >> alias() >> filter(C.mean3 <= 2.0),
     )
 
 
 def test_filter_argument(df3, df4):
-    assert_result_equal(
-        df4, lambda t: t >> mutate(u=t.col2.mean(filter=~t.col2.is_null()))
-    )
+    assert_result_equal(df4, lambda t: t >> mutate(u=t.col2.mean(filter=~t.col2.is_null())))
 
-    assert_result_equal(
-        df4, lambda t: t >> mutate(u=t.col2.mean(filter=~(t.col4 % 3 == 0)))
-    )
+    assert_result_equal(df4, lambda t: t >> mutate(u=t.col2.mean(filter=~(t.col4 % 3 == 0))))
 
     assert_result_equal(df3, lambda t: t >> mutate(u=t.col4.sum(partition_by=t.col2)))
 
@@ -149,27 +121,18 @@ def test_filter_argument(df3, df4):
         ),
     )
 
-    assert_result_equal(
-        df4, lambda t: t >> mutate(u=t.col3.min(filter=t.col3.is_null()))
-    )
+    assert_result_equal(df4, lambda t: t >> mutate(u=t.col3.min(filter=t.col3.is_null())))
 
 
 def test_arrange(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1, t.col2)
-        >> mutate(mean3=t.col3.mean())
-        >> arrange(C.mean3),
+        lambda t: t >> group_by(t.col1, t.col2) >> mutate(mean3=t.col3.mean()) >> arrange(C.mean3),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> arrange(-t.col4)
-        >> group_by(t.col1, t.col2)
-        >> mutate(mean3=t.col3.mean())
-        >> arrange(C.mean3),
+        lambda t: t >> arrange(-t.col4) >> group_by(t.col1, t.col2) >> mutate(mean3=t.col3.mean()) >> arrange(C.mean3),
     )
 
 
@@ -213,18 +176,12 @@ def test_arrange_argument(df3):
     # Grouped
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1)
-        >> mutate(x=C.col4.shift(1, arrange=C.col3.nulls_last()))
-        >> select(C.x),
+        lambda t: t >> group_by(t.col1) >> mutate(x=C.col4.shift(1, arrange=C.col3.nulls_last())) >> select(C.x),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col2)
-        >> mutate(x=pdt.row_number(arrange=C.col4.descending()))
-        >> select(C.x),
+        lambda t: t >> group_by(t.col2) >> mutate(x=pdt.row_number(arrange=C.col4.descending())) >> select(C.x),
     )
 
     # Ungrouped
@@ -331,9 +288,7 @@ def test_op_row_number(df4):
         >> group_by(t.col1)
         >> mutate(
             row_number1=pdt.row_number(arrange=[C.col4.descending().nulls_last()]),
-            row_number2=pdt.row_number(
-                arrange=[C.col2.nulls_last(), C.col3.nulls_first(), t.col4.nulls_last()]
-            ),
+            row_number2=pdt.row_number(arrange=[C.col2.nulls_last(), C.col3.nulls_first(), t.col4.nulls_last()]),
         ),
     )
 
@@ -342,9 +297,7 @@ def test_op_row_number(df4):
         lambda t: t
         >> mutate(
             u=pdt.row_number(arrange=[C.col4.descending().nulls_last()]),
-            v=pdt.row_number(
-                arrange=[t.col3.descending().nulls_first(), t.col4.nulls_first()]
-            ),
+            v=pdt.row_number(arrange=[t.col3.descending().nulls_first(), t.col4.nulls_first()]),
         ),
     )
 
@@ -387,9 +340,7 @@ def test_op_dense_rank(df3):
 
 
 def test_partition_by_const_col(df3):
-    assert_result_equal(
-        df3, lambda t: t >> mutate(x=0) >> mutate(y=t.col3.sum(partition_by=C.x))
-    )
+    assert_result_equal(df3, lambda t: t >> mutate(x=0) >> mutate(y=t.col3.sum(partition_by=C.x)))
 
 
 def test_cum_sum(df4):

@@ -28,9 +28,7 @@ def test_alias_named(df3):
 
 def test_alias_mutate(df3):
     def run(post_op):
-        assert_result_equal(
-            df3, lambda t: t >> mutate(x=t.col1) >> alias("a") >> post_op
-        )
+        assert_result_equal(df3, lambda t: t >> mutate(x=t.col1) >> alias("a") >> post_op)
 
     for post_op in [
         mutate(),
@@ -46,10 +44,7 @@ def test_alias_window(df3):
     def run(post_op):
         assert_result_equal(
             df3,
-            lambda t: t
-            >> mutate(x=t.col1.count(partition_by=t.col2))
-            >> alias("a")
-            >> post_op,
+            lambda t: t >> mutate(x=t.col1.count(partition_by=t.col2)) >> alias("a") >> post_op,
         )
 
     for post_op in [
@@ -70,11 +65,7 @@ def test_alias_summarize(df3):
     def run(post_op):
         assert_result_equal(
             df3,
-            lambda t: t
-            >> group_by(t.col1, t.col2)
-            >> summarize(x=t.col1.count())
-            >> alias("a")
-            >> post_op,
+            lambda t: t >> group_by(t.col1, t.col2) >> summarize(x=t.col1.count()) >> alias("a") >> post_op,
         )
 
     for post_op in [

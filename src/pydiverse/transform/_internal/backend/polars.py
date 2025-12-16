@@ -50,10 +50,7 @@ class PolarsImpl(TableImpl):
         )
         super().__init__(
             name,
-            {
-                name: Dtype.from_polars(pl_type)
-                for name, pl_type in df.collect_schema().items()
-            },
+            {name: Dtype.from_polars(pl_type) for name, pl_type in df.collect_schema().items()},
         )
 
     def _table_def_repr(self) -> str:
@@ -90,10 +87,7 @@ class PolarsImpl(TableImpl):
         return (
             cloned,
             {self: cloned},
-            {
-                self.cols[name]._uuid: cloned.cols[name]._uuid
-                for name in self.cols.keys()
-            },
+            {self.cols[name]._uuid: cloned.cols[name]._uuid for name in self.cols.keys()},
         )
 
 
@@ -119,9 +113,7 @@ def merge_desc_nulls_last(
     return merged
 
 
-def compile_order(
-    order: Order, name_in_df: dict[UUID, str]
-) -> tuple[pl.Expr, bool, bool | None]:
+def compile_order(order: Order, name_in_df: dict[UUID, str]) -> tuple[pl.Expr, bool, bool | None]:
     return (
         compile_col_expr(order.order_by, name_in_df),
         order.descending,
@@ -141,15 +133,10 @@ def compile_col_expr(
 
     elif isinstance(expr, ColFn):
         impl = PolarsImpl.get_impl(expr.op, tuple(arg.dtype() for arg in expr.args))
-        args: list[pl.Expr] = [
-            compile_col_expr(arg, name_in_df, op_kwargs=op_kwargs) for arg in expr.args
-        ]
+        args: list[pl.Expr] = [compile_col_expr(arg, name_in_df, op_kwargs=op_kwargs) for arg in expr.args]
 
         if (partition_by := expr.context_kwargs.get("partition_by")) is not None:
-            partition_by = [
-                compile_col_expr(pb, name_in_df, op_kwargs=op_kwargs)
-                for pb in partition_by
-            ]
+            partition_by = [compile_col_expr(pb, name_in_df, op_kwargs=op_kwargs) for pb in partition_by]
 
         arrange = expr.context_kwargs.get("arrange")
         if arrange:
@@ -221,13 +208,11 @@ def compile_col_expr(
         assert len(expr.cases) >= 1
         compiled = pl  # to initialize the when/then-chain
         for cond, val in expr.cases:
-            compiled = compiled.when(
-                compile_col_expr(cond, name_in_df, op_kwargs=op_kwargs)
-            ).then(compile_col_expr(val, name_in_df, op_kwargs=op_kwargs))
-        if expr.default_val is not None:
-            compiled = compiled.otherwise(
-                compile_col_expr(expr.default_val, name_in_df, op_kwargs=op_kwargs)
+            compiled = compiled.when(compile_col_expr(cond, name_in_df, op_kwargs=op_kwargs)).then(
+                compile_col_expr(val, name_in_df, op_kwargs=op_kwargs)
             )
+        if expr.default_val is not None:
+            compiled = compiled.otherwise(compile_col_expr(expr.default_val, name_in_df, op_kwargs=op_kwargs))
         return compiled
 
     elif isinstance(expr, LiteralCol):
@@ -239,18 +224,15 @@ def compile_col_expr(
         )
 
     elif isinstance(expr, Cast):
-        if (
-            expr.target_type.is_int() or expr.target_type.is_float()
-        ) and types.without_const(expr.val.dtype()) == String():
+        if (expr.target_type.is_int() or expr.target_type.is_float()) and types.without_const(
+            expr.val.dtype()
+        ) == String():
             expr.val = expr.val.str.strip()
 
         compiled = compile_col_expr(expr.val, name_in_df, op_kwargs=op_kwargs)
         compiled = compiled.cast(expr.target_type.to_polars(), strict=expr.strict)
 
-        if (
-            types.without_const(expr.val.dtype()).is_float()
-            and expr.target_type == String()
-        ):
+        if types.without_const(expr.val.dtype()).is_float() and expr.target_type == String():
             compiled = compiled.replace("NaN", "nan")
 
         return compiled
@@ -276,13 +258,8 @@ def rename_overwritten_cols(
     overwritten = names_to_consider.intersection(new_names)
 
     if overwritten:
-        name_map = {
-            name: f"{name}:{str(hex(uuid.uuid1().int))[2:]}" for name in overwritten
-        }
-        name_in_df = {
-            uid: (name_map[name] if name in name_map else name)
-            for uid, name in name_in_df.items()
-        }
+        name_map = {name: f"{name}:{str(hex(uuid.uuid1().int))[2:]}" for name in overwritten}
+        name_in_df = {uid: (name_map[name] if name in name_map else name) for uid, name in name_in_df.items()}
         df = df.rename(name_map)
 
     return df, name_in_df
@@ -329,22 +306,14 @@ def compile_ast(
 
     elif isinstance(nd, verbs.Rename):
         df = df.rename(nd.name_map)
-        name_in_df = {
-            uid: (nd.name_map[name] if name in nd.name_map else name)
-            for uid, name in name_in_df.items()
-        }
+        name_in_df = {uid: (nd.name_map[name] if name in nd.name_map else name) for uid, name in name_in_df.items()}
 
     elif isinstance(nd, verbs.Mutate):
         df = df.with_columns(
-            **{
-                name: compile_col_expr(value, name_in_df)
-                for name, value in zip(nd.names, nd.values, strict=True)
-            }
+            **{name: compile_col_expr(value, name_in_df) for name, value in zip(nd.names, nd.values, strict=True)}
         )
 
-        name_in_df.update(
-            {uid: name for uid, name in zip(nd.uuids, nd.names, strict=True)}
-        )
+        name_in_df.update({uid: name for uid, name in zip(nd.uuids, nd.names, strict=True)})
 
     elif isinstance(nd, verbs.Filter):
         if nd.predicates:
@@ -369,17 +338,13 @@ def compile_ast(
                 return True
             if isinstance(expr, ColFn) and expr.op.ftype == Ftype.AGGREGATE:
                 return False
-            return any(
-                has_path_to_leaf_without_agg(child) for child in expr.iter_children()
-            )
+            return any(has_path_to_leaf_without_agg(child) for child in expr.iter_children())
 
         aggregations = {}
         for name, val in zip(nd.names, nd.values, strict=True):
             # For some aggregations, a different polars function must be used if there
             # is not grouping. (In this case, `df.select` is called.)
-            compiled = compile_col_expr(
-                val, name_in_df, op_kwargs={"_empty_group_by": len(partition_by) == 0}
-            )
+            compiled = compile_col_expr(val, name_in_df, op_kwargs={"_empty_group_by": len(partition_by) == 0})
             if has_path_to_leaf_without_agg(val):
                 compiled = compiled.first()
             aggregations[name] = compiled
@@ -393,12 +358,8 @@ def compile_ast(
 
         # we have to remove the columns here for the join hidden column rename to work
         # correctly (otherwise it would try to rename hidden columns that do not exist)
-        name_in_df = {
-            name: uuid for name, uuid in name_in_df.items() if name in partition_by
-        }
-        name_in_df.update(
-            {uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)}
-        )
+        name_in_df = {name: uuid for name, uuid in name_in_df.items() if name in partition_by}
+        name_in_df.update({uid: name for name, uid in zip(nd.names, nd.uuids, strict=True)})
         partition_by = []
 
     elif isinstance(nd, verbs.SliceHead):
@@ -427,9 +388,7 @@ def compile_ast(
         right_df, right_name_in_df = rename_overwritten_cols(
             set(name_in_df[uid] for uid in select), right_df, right_name_in_df
         )
-        df, name_in_df = rename_overwritten_cols(
-            set(right_name_in_df[uid] for uid in right_select), df, name_in_df
-        )
+        df, name_in_df = rename_overwritten_cols(set(right_name_in_df[uid] for uid in right_select), df, name_in_df)
 
         # hidden columns
         right_df, right_name_in_df = rename_overwritten_cols(
@@ -442,9 +401,7 @@ def compile_ast(
         name_in_df.update(right_name_in_df)
 
         eq_predicates = [pred for pred in predicates if pred.op == ops.equal]
-        left_on, right_on = get_left_right_on(
-            eq_predicates, name_in_df, right_name_in_df
-        )
+        left_on, right_on = get_left_right_on(eq_predicates, name_in_df, right_name_in_df)
 
         # If there are only equality predicates, use normal join. Else use join_where
         if len(eq_predicates) == len(predicates):
@@ -465,9 +422,7 @@ def compile_ast(
         else:
             assert nd.how != "full"
             if nd.how == "left":
-                df = df.with_columns(
-                    __INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64)
-                )
+                df = df.with_columns(__INDEX__=pl.int_range(0, pl.len(), dtype=pl.Int64))
 
             joined = df.join_where(
                 right_df,
@@ -791,6 +746,4 @@ with PolarsImpl.impl_store.impl_manager as impl:
 
     @impl(ops.rand)
     def _rand():
-        return pl.int_range(pl.len()).map_elements(
-            lambda x: random.random(), pl.Float64()
-        )
+        return pl.int_range(pl.len()).map_elements(lambda x: random.random(), pl.Float64())

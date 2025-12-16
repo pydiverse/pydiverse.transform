@@ -44,9 +44,7 @@ The microsecond component of the datetime int-divided by 1000 (see polars).
 """,
 )
 
-dt_microsecond = DatetimeExtract(
-    "dt.microsecond", doc="The microsecond component of the datetime."
-)
+dt_microsecond = DatetimeExtract("dt.microsecond", doc="The microsecond component of the datetime.")
 
 dt_day_of_week = DateExtract(
     "dt.day_of_week",

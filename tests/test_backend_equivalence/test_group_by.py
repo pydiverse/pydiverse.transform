@@ -44,9 +44,7 @@ def test_mutate(df3, df4):
                 partition_by=[t.col1],
             ),
             p=t.col1 * u.col4,
-            y=pdt.rank(
-                arrange=[(t.col1 * u.col4).nulls_last().nulls_first().nulls_last()]
-            ),
+            y=pdt.rank(arrange=[(t.col1 * u.col4).nulls_last().nulls_first().nulls_last()]),
         ),
     )
 
@@ -71,10 +69,7 @@ def test_ungrouped_join(df1, df3, how):
     # After ungrouping joining should work again
     assert_result_equal(
         (df1, df3),
-        lambda t, u: t
-        >> group_by(t.col1)
-        >> ungroup()
-        >> join(u, t.col1 == u.col1, how=how),
+        lambda t, u: t >> group_by(t.col1) >> ungroup() >> join(u, t.col1 == u.col1, how=how),
         check_row_order=False,
     )
 
@@ -84,9 +79,7 @@ def test_filter(df3):
 
 
 def test_arrange(df3):
-    assert_result_equal(
-        df3, lambda t: t >> group_by(t.col1) >> arrange(t.col1, -t.col3)
-    )
+    assert_result_equal(df3, lambda t: t >> group_by(t.col1) >> arrange(t.col1, -t.col3))
 
     assert_result_equal(df3, lambda t: t >> group_by(t.col1) >> arrange(-t.col4))
 
@@ -94,17 +87,12 @@ def test_arrange(df3):
 def test_group_by_bool_col(df4):
     assert_result_equal(
         df4,
-        lambda t: t
-        >> mutate(x=t.col1 <= t.col2)
-        >> group_by(C.x)
-        >> mutate(y=C.col4.mean()),
+        lambda t: t >> mutate(x=t.col1 <= t.col2) >> group_by(C.x) >> mutate(y=C.col4.mean()),
     )
 
 
 def test_group_by_scalar(df3):
-    assert_result_equal(
-        df3, lambda t: t >> mutate(x=0) >> group_by(C.x) >> summarize(y=t.col1.sum())
-    )
+    assert_result_equal(df3, lambda t: t >> mutate(x=0) >> group_by(C.x) >> summarize(y=t.col1.sum()))
 
     assert_result_equal(
         df3,

@@ -23,11 +23,7 @@ class Verb(AstNode):
     def _unformatted_ast_repr(self, verb_depth: int, expr_depth: int, display_name_map):
         nd_repr = self._ast_node_repr(expr_depth, display_name_map)
         return (
-            self.child._unformatted_ast_repr(
-                verb_depth - 1, expr_depth, display_name_map
-            )
-            if verb_depth != 0
-            else "..."
+            self.child._unformatted_ast_repr(verb_depth - 1, expr_depth, display_name_map) if verb_depth != 0 else "..."
         ) + f" >> {nd_repr}"
 
     def _clone(self) -> tuple["Verb", dict[AstNode, AstNode], dict[UUID, UUID]]:
@@ -87,18 +83,14 @@ class Alias(Verb):
     # would be nice to create a separate marker node for this to distinguish it from a
     # user-created alias.
     def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
-        return (
-            "alias(" + (f"'{self.name}'" if self.name != self.child.name else "") + ")"
-        )
+        return "alias(" + (f"'{self.name}'" if self.name != self.child.name else "") + ")"
 
     def _clone(self) -> tuple[Verb, dict[AstNode, AstNode], dict[UUID, UUID]]:
         cloned, nd_map, uuid_map = Verb._clone(self)
         if self.uuid_map is not None:  # happens if and only if keep_col_refs=False
             assert set(self.uuid_map.keys()).issubset(uuid_map.keys())
             uuid_map = {
-                self.uuid_map[old_uid]: new_uid
-                for old_uid, new_uid in uuid_map.items()
-                if old_uid in self.uuid_map
+                self.uuid_map[old_uid]: new_uid for old_uid, new_uid in uuid_map.items() if old_uid in self.uuid_map
             }
             cloned.uuid_map = None
         return cloned, nd_map, uuid_map
@@ -115,14 +107,7 @@ class Select(Verb):
         self.select = [g(col) for col in self.select]
 
     def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
-        return (
-            "select("
-            + ", ".join(
-                col._ast_repr(expr_depth, False, display_name_map)
-                for col in self.select
-            )
-            + ")"
-        )
+        return "select(" + ", ".join(col._ast_repr(expr_depth, False, display_name_map) for col in self.select) + ")"
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
@@ -130,11 +115,7 @@ class Rename(Verb):
     name_map: dict[str, str]
 
     def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
-        return (
-            "rename({"
-            + ", ".join(f"'{k}': '{v}'" for k, v in self.name_map.items())
-            + "})"
-        )
+        return "rename({" + ", ".join(f"'{k}': '{v}'" for k, v in self.name_map.items()) + "})"
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
@@ -162,12 +143,7 @@ class Mutate(Verb):
         cloned, nd_map, uuid_map = Verb._clone(self)
         assert isinstance(cloned, Mutate)
         cloned.uuids = [uuid.uuid1() for _ in self.names]
-        uuid_map.update(
-            {
-                old_uid: new_uid
-                for old_uid, new_uid in zip(self.uuids, cloned.uuids, strict=True)
-            }
-        )
+        uuid_map.update({old_uid: new_uid for old_uid, new_uid in zip(self.uuids, cloned.uuids, strict=True)})
         return cloned, nd_map, uuid_map
 
 
@@ -177,12 +153,7 @@ class Filter(Verb):
 
     def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return (
-            "filter("
-            + ", ".join(
-                pred._ast_repr(expr_depth, False, display_name_map)
-                for pred in self.predicates
-            )
-            + ")"
+            "filter(" + ", ".join(pred._ast_repr(expr_depth, False, display_name_map) for pred in self.predicates) + ")"
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -217,12 +188,7 @@ class Summarize(Verb):
         cloned, nd_map, uuid_map = Verb._clone(self)
         assert isinstance(cloned, Summarize)
         cloned.uuids = [uuid.uuid1() for _ in self.names]
-        uuid_map.update(
-            {
-                old_uid: new_uid
-                for old_uid, new_uid in zip(self.uuids, cloned.uuids, strict=True)
-            }
-        )
+        uuid_map.update({old_uid: new_uid for old_uid, new_uid in zip(self.uuids, cloned.uuids, strict=True)})
         return cloned, nd_map, uuid_map
 
 
@@ -231,23 +197,13 @@ class Arrange(Verb):
     order_by: list[Order]
 
     def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
-        return (
-            "arrange("
-            + ", ".join(
-                ord._ast_repr(expr_depth, False, display_name_map)
-                for ord in self.order_by
-            )
-            + ")"
-        )
+        return "arrange(" + ", ".join(ord._ast_repr(expr_depth, False, display_name_map) for ord in self.order_by) + ")"
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
         yield from (ord.order_by for ord in self.order_by)
 
     def map_col_roots(self, g: Callable[[ColExpr], ColExpr]):
-        self.order_by = [
-            Order(g(ord.order_by), ord.descending, ord.nulls_last)
-            for ord in self.order_by
-        ]
+        self.order_by = [Order(g(ord.order_by), ord.descending, ord.nulls_last) for ord in self.order_by]
 
 
 @dataclasses.dataclass(eq=False, slots=True, repr=False)
@@ -266,12 +222,7 @@ class GroupBy(Verb):
 
     def _ast_node_repr(self, expr_depth: int, display_name_map) -> str:
         return (
-            "group_by("
-            + ", ".join(
-                col._ast_repr(expr_depth, False, display_name_map)
-                for col in self.group_by
-            )
-            + ")"
+            "group_by(" + ", ".join(col._ast_repr(expr_depth, False, display_name_map) for col in self.group_by) + ")"
         )
 
     def iter_col_roots(self) -> Iterable[ColExpr]:
@@ -294,21 +245,13 @@ class Join(Verb):
     how: Literal["inner", "left", "full"]
     validate: Literal["1:1", "1:m", "m:1", "m:m"]
 
-    def _unformatted_ast_repr(
-        self, verb_depth: int, expr_depth: int, display_name_map
-    ) -> str:
+    def _unformatted_ast_repr(self, verb_depth: int, expr_depth: int, display_name_map) -> str:
         return (
-            self.child._unformatted_ast_repr(
-                verb_depth - 1, expr_depth, display_name_map
-            )
-            if verb_depth != 0
-            else "..."
+            self.child._unformatted_ast_repr(verb_depth - 1, expr_depth, display_name_map) if verb_depth != 0 else "..."
         ) + (
             ">> join("
             + (
-                self.right._unformatted_ast_repr(
-                    verb_depth - 1, expr_depth, display_name_map
-                )
+                self.right._unformatted_ast_repr(verb_depth - 1, expr_depth, display_name_map)
                 if verb_depth != 0
                 else self.right._unformatted_ast_repr(0, expr_depth, display_name_map)
             )

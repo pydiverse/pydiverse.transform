@@ -31,11 +31,7 @@ RNG_FNS = {
     pdt.Float(): rng.standard_normal,
     pdt.Int(): partial(rng.integers, -(1 << 13), 1 << 13),
     pdt.Bool(): partial(rng.integers, 0, 1, dtype=bool),
-    pdt.String(): (
-        lambda rows: np.array(
-            ["".join(random.choices(letters, k=rng.poisson(10))) for _ in range(rows)]
-        )
-    ),
+    pdt.String(): (lambda rows: np.array(["".join(random.choices(letters, k=rng.poisson(10))) for _ in range(rows)])),
 }
 
 
@@ -45,45 +41,29 @@ def gen_table(rows: int, types: dict[pdt.Dtype, int]) -> pl.DataFrame:
     for ty, fn in RNG_FNS.items():
         if ty in types:
             d = d.with_columns(
-                **{
-                    f"{ty.__class__.__name__.lower()} #{i + 1}": pl.lit(fn(rows))
-                    for i in range(types[ty])
-                }
+                **{f"{ty.__class__.__name__.lower()} #{i + 1}": pl.lit(fn(rows)) for i in range(types[ty])}
             )
 
     return d
 
 
-ops_with_return_type: dict[pdt.Dtype, list[tuple[Operator, Signature]]] = {
-    ty: [] for ty in ALL_TYPES
-}
+ops_with_return_type: dict[pdt.Dtype, list[tuple[Operator, Signature]]] = {ty: [] for ty in ALL_TYPES}
 
 for op in ops.__dict__.values():
-    if (
-        not isinstance(op, Operator)
-        or op.ftype != Ftype.ELEMENT_WISE
-        or isinstance(op, Marker)
-    ):
+    if not isinstance(op, Operator) or op.ftype != Ftype.ELEMENT_WISE or isinstance(op, Marker):
         continue
     for sig in op.signatures:
-        if not all(
-            t in (*ALL_TYPES, Tyvar("T")) for t in (*sig.types, sig.return_type)
-        ):
+        if not all(t in (*ALL_TYPES, Tyvar("T")) for t in (*sig.types, sig.return_type)):
             continue
 
-        if isinstance(sig.return_type, Tyvar) or any(
-            isinstance(param, Tyvar) for param in sig.types
-        ):
+        if isinstance(sig.return_type, Tyvar) or any(isinstance(param, Tyvar) for param in sig.types):
             for ty in ALL_TYPES:
                 rtype = ty if isinstance(sig.return_type, Tyvar) else sig.return_type
                 ops_with_return_type[rtype].append(
                     (
                         op,
                         Signature(
-                            *(
-                                ty if isinstance(param, Tyvar) else param
-                                for param in sig.types
-                            ),
+                            *(ty if isinstance(param, Tyvar) else param for param in sig.types),
                             return_type=rtype,
                         ),
                     )
@@ -92,9 +72,7 @@ for op in ops.__dict__.values():
             ops_with_return_type[sig.return_type].append((op, sig))
 
 
-def gen_expr(
-    dtype: pdt.Dtype, cols: dict[pdt.Dtype, list[str]], q: float = 0.0
-) -> pdt.ColExpr:
+def gen_expr(dtype: pdt.Dtype, cols: dict[pdt.Dtype, list[str]], q: float = 0.0) -> pdt.ColExpr:
     if dtype.const:
         return RNG_FNS[dtype.without_const()](1).item()
 
@@ -114,9 +92,7 @@ def gen_expr(
     if sig.is_vararg:
         nargs = int(rng.normal(2.5, 1 / 1.5))
         for _ in range(nargs):
-            args.append(
-                gen_expr(sig.types[-1], cols, q + rng.exponential(1 / MEAN_HEIGHT))
-            )
+            args.append(gen_expr(sig.types[-1], cols, q + rng.exponential(1 / MEAN_HEIGHT)))
 
     return ColFn(op, *args)
 
@@ -132,16 +108,10 @@ df = gen_table(rows, {dtype: NUM_COLS_PER_TYPE for dtype in ALL_TYPES})
 
 
 tables = {backend: fn(df, "t") for backend, fn in BACKEND_TABLES.items()}
-cols = {
-    dtype: [col.name for col in tables["polars"] if col.dtype() <= dtype]
-    for dtype in ALL_TYPES
-}
+cols = {dtype: [col.name for col in tables["polars"] if col.dtype() <= dtype] for dtype in ALL_TYPES}
 
 for _ in range(it):
     expr = gen_expr(rng.choice(ALL_TYPES), cols)
-    results = {
-        backend: table >> mutate(y=expr) >> select(C.y) >> export(Polars())
-        for backend, table in tables.items()
-    }
+    results = {backend: table >> mutate(y=expr) >> select(C.y) >> export(Polars()) for backend, table in tables.items()}
     for _backend, res in results:
         assert_frame_equal(results["polars"], res)
