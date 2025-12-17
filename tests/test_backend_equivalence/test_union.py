@@ -255,6 +255,8 @@ def test_union_different_column_order4(df3, df4):
     # The backend should reorder right table columns to match left order
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t >> select(t.col1, t.col2) >> union(u >> rename({u.col1: "col2", u.col2: "col1"})),
+        lambda t, u: t
+        >> select(t.col1, t.col2)
+        >> union(u >> select(u.col1, u.col2) >> rename({u.col1: "col2", u.col2: "col1"})),
         check_row_order=False,
     )
