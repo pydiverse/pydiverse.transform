@@ -215,7 +215,7 @@ def test_union_empty_tables():
     assert result.columns == ["a", "b"]
 
 
-def test_union_different_column_order(df3, df4):
+def test_union_different_column_order1(df3, df4):
     """Test union when columns are in different order (should reorder automatically)."""
     # Columns in different order should still work - union should handle reordering
     # Note: This tests that the backend correctly reorders columns to match
@@ -225,12 +225,36 @@ def test_union_different_column_order(df3, df4):
         check_row_order=False,
     )
 
+
+def test_union_different_column_order2(df3, df4):
     # Test that union handles column reordering correctly
-    # The backend should reorder right table columns to match left order
+    # The backend should reorder right table columns to match left order (by column name)
     assert_result_equal(
         (df3, df4),
         lambda t, u: t
         >> select(t.col1, t.col2)
         >> union(u >> select(u.col2, u.col1)),  # different order - should be reordered
+        check_row_order=False,
+    )
+
+
+def test_union_different_column_order3(df3, df4):
+    # Test that union handles column reordering correctly
+    # The backend should not reorder right table columns since order matches based on name
+    assert_result_equal(
+        (df3, df4),
+        lambda t, u: t
+        >> select(t.col1, t.col2)
+        >> union(u >> select(u.col2, u.col1) >> rename({u.col1: "col2", u.col2: "col1"})),
+        check_row_order=False,
+    )
+
+
+def test_union_different_column_order4(df3, df4):
+    # Test that union handles column reordering correctly
+    # The backend should reorder right table columns to match left order
+    assert_result_equal(
+        (df3, df4),
+        lambda t, u: t >> select(t.col1, t.col2) >> union(u >> rename({u.col1: "col2", u.col2: "col1"})),
         check_row_order=False,
     )

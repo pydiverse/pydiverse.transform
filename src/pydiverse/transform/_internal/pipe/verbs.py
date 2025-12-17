@@ -1351,7 +1351,7 @@ def union(
     right: Table,
     *,
     distinct: bool = False,
-) -> Pipeable: ...
+) -> Table: ...
 
 
 def _union_impl(
@@ -1359,7 +1359,7 @@ def _union_impl(
     right: Table,
     *,
     distinct: bool = False,
-) -> Pipeable:
+) -> Table:
     """
     Unions two tables by stacking rows vertically.
 
@@ -1448,13 +1448,12 @@ def _union_impl(
     return new
 
 
-@verb
 def union(
-    left: Table,
-    right: Table,
+    left_or_right: Table,
+    right: Table | None = None,
     *,
     distinct: bool = False,
-) -> Pipeable:
+) -> Table | Pipeable:
     """
     Unions two tables by stacking rows vertically.
 
@@ -1494,7 +1493,18 @@ def union(
     You can also call it directly:
     >>> union(t1, t2) >> show()
     """
-    return _union_impl(left, right, distinct=distinct)
+    # If called with two arguments directly (union(tbl1, tbl2)), return Table directly
+    if right is not None:
+        return _union_impl(left_or_right, right, distinct=distinct)  # returns Table
+
+    # If called with one argument (union(tbl2)), behave like a verb for pipe syntax
+    # Create a verb wrapper that will be called by the pipe operator
+    # Note: left_or_right is the right table in this branch (since right is None)
+    @verb
+    def _union_verb(left_table: Table, right_table: Table, distinct: bool) -> Table:
+        return _union_impl(left_table, right_table, distinct=distinct)
+
+    return _union_verb(left_or_right, distinct=distinct)  # returns Pipeable
 
 
 @overload

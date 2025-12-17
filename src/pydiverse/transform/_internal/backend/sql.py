@@ -502,24 +502,22 @@ class SqlImpl(TableImpl):
             assert not right_query.group_by
 
         elif isinstance(nd, verbs.Union):
-            # Get right cache to access column information
-            from pydiverse.transform._internal.pipe.cache import Cache
-
-            right_cache = Cache.from_ast(nd.right)
-
             # For UNION, both queries must select the same columns in the same order
-            # Check if we need to reorder columns in the right query
+            # First compile the right AST to get right_query.select (which contains only selected/visible columns)
+            right_table, right_query, right_sqa_expr = cls.compile_ast(nd.right, needed_cols)
+
+            # Get column names from both sides
             left_select = query.select
             left_col_names = [sqa_expr[uid].name for uid in left_select]
-
-            # Get right column names in current order
-            right_col_uuids = list(right_cache.name_to_uuid.values())
-            right_col_names = [right_cache.uuid_to_name[uid] for uid in right_col_uuids]
+            right_select = right_query.select
+            right_col_names = [right_sqa_expr[uid].name for uid in right_select]
 
             # If column order doesn't match, wrap right AST with a Select to reorder
-            right_ast = nd.right
             if left_col_names != right_col_names:
-                # Create a Select verb that reorders columns to match left order
+                # Get right cache to access Col objects for reordering
+                from pydiverse.transform._internal.pipe.cache import Cache
+
+                right_cache = Cache.from_ast(nd.right)
 
                 # Get Col objects from right cache in the order of left columns
                 reordered_cols = []
@@ -530,11 +528,9 @@ class SqlImpl(TableImpl):
                     col = right_cache.cols[uid]
                     reordered_cols.append(col)
 
-                # Wrap right AST with Select to reorder columns
+                # Wrap right AST with Select to reorder columns and recompile
                 right_ast = verbs.Select(nd.right, reordered_cols)
-
-            # Compile the (possibly modified) right AST
-            right_table, right_query, right_sqa_expr = cls.compile_ast(right_ast, needed_cols)
+                right_table, right_query, right_sqa_expr = cls.compile_ast(right_ast, needed_cols)
 
             # Build left and right select statements
             left_sel = cls.compile_query(table, query, sqa_expr)
@@ -553,6 +549,8 @@ class SqlImpl(TableImpl):
                 union_query = sqa.union(left_sel, right_sel)
             else:
                 union_query = sqa.union_all(left_sel, right_sel)
+
+            print(str(union_query))
 
             # Create a subquery from the union
             table = union_query.subquery()

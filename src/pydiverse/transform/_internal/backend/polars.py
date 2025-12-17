@@ -446,21 +446,13 @@ def compile_ast(
 
         right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
 
-        # For union, both dataframes must have the same columns in the same order
-        # Polars requires columns to be in the same order
+        # Drop all hidden columns from both dataframes before union
+        # Note: The union verb already validates that visible column names match between tables,
+        # so we can use left_col_names for both dataframes. This also ensures columns are in the
+        # same order, which Polars requires for union operations.
         left_col_names = [name_in_df[uid] for uid in select]
-        right_col_names = [right_name_in_df[uid] for uid in right_select]
-
-        if left_col_names != right_col_names:
-            # Reorder right dataframe columns to match left order
-            # Map right column names to left column order
-            right_col_map = {name: idx for idx, name in enumerate(right_col_names)}
-            reordered_right_cols = []
-            for name in left_col_names:
-                if name not in right_col_map:
-                    raise ValueError(f"union requires matching column names: '{name}' not found in right table")
-                reordered_right_cols.append(right_col_names[right_col_map[name]])
-            right_df = right_df.select(reordered_right_cols)
+        df = df.select(*left_col_names)
+        right_df = right_df.select(*left_col_names)
 
         # Use pl.union if available (Polars >= 1.35), otherwise use pl.concat
         # pl.union is faster than pl.concat for union operations
