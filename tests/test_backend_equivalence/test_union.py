@@ -43,6 +43,7 @@ def test_union_all(df3, df4):
     )
 
 
+@skip_backends("ibm_db2")
 def test_union_distinct(df3, df4):
     """Test UNION (removing duplicates)."""
     # Test pipe syntax with distinct=True (default, removes duplicates)
@@ -56,6 +57,23 @@ def test_union_distinct(df3, df4):
     assert_result_equal(
         (df3, df4),
         lambda t, u: union(t, u, distinct=True),
+        check_row_order=False,
+    )
+
+
+def test_union_distinct2(df3, df4):
+    """Test UNION (removing duplicates)."""
+    # Test pipe syntax with distinct=True (default, removes duplicates)
+    assert_result_equal(
+        (df3, df4),
+        lambda t, u: t >> drop(t.col7) >> union(u >> drop(u.col7), distinct=True),
+        check_row_order=False,
+    )
+
+    # Test direct call syntax with distinct=True (default, removes duplicates)
+    assert_result_equal(
+        (df3, df4),
+        lambda t, u: union(t >> drop(t.col7), u >> drop(u.col7), distinct=True),
         check_row_order=False,
     )
 
