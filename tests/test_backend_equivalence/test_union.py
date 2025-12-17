@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import pytest
+from fixtures.backend import skip_backends
 
 import pydiverse.transform as pdt
 from pydiverse.transform.extended import *
@@ -143,6 +144,7 @@ def test_union_chained(df3, df4):
     )
 
 
+@skip_backends("sqlite")  # sqlite only supports UNION for trivial queries
 def test_union_after_operations(df3, df4):
     """Test union after other operations like filter and arrange."""
     assert_result_equal(

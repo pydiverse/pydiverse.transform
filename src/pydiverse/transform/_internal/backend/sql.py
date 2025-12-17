@@ -550,8 +550,6 @@ class SqlImpl(TableImpl):
             else:
                 union_query = sqa.union_all(left_sel, right_sel)
 
-            print(str(union_query))
-
             # Create a subquery from the union
             table = union_query.subquery()
 
