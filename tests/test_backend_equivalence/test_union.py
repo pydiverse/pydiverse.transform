@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import pytest
-from fixtures.backend import skip_backends
 
 import pydiverse.transform as pdt
 from pydiverse.transform.extended import *
+from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 

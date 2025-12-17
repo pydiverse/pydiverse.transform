@@ -30,3 +30,4 @@ Verbs
     slice_head
     summarize
     ungroup
+    union
