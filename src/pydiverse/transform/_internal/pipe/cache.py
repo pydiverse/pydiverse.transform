@@ -72,10 +72,8 @@ class Cache:
     @staticmethod
     def from_ast(node: AstNode) -> "Cache":
         if isinstance(node, verbs.Verb):
-            if isinstance(node, verbs.Join):
-                return Cache.from_ast(node.child).update(
-                    node, right_cache=Cache.from_ast(node.right)
-                )
+            if isinstance(node, verbs.Join | verbs.Union):
+                return Cache.from_ast(node.child).update(node, right_cache=Cache.from_ast(node.right))
             else:
                 return Cache.from_ast(node.child).update(node)
 
@@ -92,9 +90,7 @@ class Cache:
             backend=type(node),
         )
 
-    def update(
-        self, node: verbs.Verb, *, right_cache: Optional["Cache"] = None
-    ) -> "Cache":
+    def update(self, node: verbs.Verb, *, right_cache: Optional["Cache"] = None) -> "Cache":
         """
         Returns a new cache for `node`, assuming `self` is the cache of `node.child`.
         Does not modify `self`.
@@ -104,14 +100,10 @@ class Cache:
 
         if isinstance(node, verbs.Alias):
             if node.uuid_map is not None:
-                res.name_to_uuid = {
-                    name: node.uuid_map[uid] for name, uid in self.name_to_uuid.items()
-                }
+                res.name_to_uuid = {name: node.uuid_map[uid] for name, uid in self.name_to_uuid.items()}
                 res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
                 res.cols = {
-                    node.uuid_map[uid]: Col(
-                        col.name, node, node.uuid_map[uid], col._dtype, col._ftype
-                    )
+                    node.uuid_map[uid]: Col(col.name, node, node.uuid_map[uid], col._dtype, col._ftype)
                     for uid, col in self.cols.items()
                 }
                 res.partition_by = [node.uuid_map[uid] for uid in self.partition_by]
@@ -119,11 +111,7 @@ class Cache:
 
         elif isinstance(node, verbs.Select):
             selected_uuids = set(col._uuid for col in node.select)
-            res.uuid_to_name = {
-                uid: name
-                for uid, name in self.uuid_to_name.items()
-                if uid in selected_uuids
-            }
+            res.uuid_to_name = {uid: name for uid, name in self.uuid_to_name.items() if uid in selected_uuids}
             res.name_to_uuid = {name: uid for uid, name in res.uuid_to_name.items()}
 
         elif isinstance(node, verbs.Rename):
@@ -136,13 +124,9 @@ class Cache:
         elif isinstance(node, verbs.Mutate):
             res.cols = self.cols | {
                 uid: Col(name, node, uid, val.dtype(), val.ftype(agg_is_window=True))
-                for name, val, uid in zip(
-                    node.names, node.values, node.uuids, strict=True
-                )
+                for name, val, uid in zip(node.names, node.values, node.uuids, strict=True)
             }
-            res.name_to_uuid = self.name_to_uuid | {
-                name: uid for name, uid in zip(node.names, node.uuids, strict=True)
-            }
+            res.name_to_uuid = self.name_to_uuid | {name: uid for name, uid in zip(node.names, node.uuids, strict=True)}
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
 
         elif isinstance(node, verbs.Filter):
@@ -157,18 +141,14 @@ class Cache:
             res.partition_by = []
 
         elif isinstance(node, verbs.Summarize):
-            overwritten = {
-                col_name for col_name in node.names if col_name in self.name_to_uuid
-            }
+            overwritten = {col_name for col_name in node.names if col_name in self.name_to_uuid}
             cols = {
                 self.uuid_to_name[uid]: self.cols[uid]
                 for uid in self.partition_by
                 if self.uuid_to_name[uid] not in overwritten
             } | {
                 name: Col(name, node, uid, val.dtype(), val.ftype())
-                for name, val, uid in zip(
-                    node.names, node.values, node.uuids, strict=True
-                )
+                for name, val, uid in zip(node.names, node.values, node.uuids, strict=True)
             }
 
             res.cols = {col._uuid: col for _, col in cols.items()}
@@ -186,6 +166,21 @@ class Cache:
             res.cols = self.cols | right_cache.cols
             res.name_to_uuid = self.name_to_uuid | right_cache.name_to_uuid
             res.uuid_to_name = {uid: name for name, uid in res.name_to_uuid.items()}
+
+            res.derived_from = self.derived_from | right_cache.derived_from
+            res.limit = 0
+            res.group_by = set()
+
+        elif isinstance(node, verbs.Union):
+            assert right_cache is not None
+
+            # For union, visible columns must match (validated in verb function)
+            # Hidden columns: are removed (we don't keep names for them and it is unlike they match in uuid)
+            res.cols = {uid: col for uid, col in self.cols.items() if uid in self.uuid_to_name}
+            # Visible columns should match, so we keep left table's name_to_uuid
+            # (right table's visible columns are the same by validation)
+            res.name_to_uuid = self.name_to_uuid.copy()
+            res.uuid_to_name = self.uuid_to_name.copy()
 
             res.derived_from = self.derived_from | right_cache.derived_from
             res.limit = 0
@@ -221,11 +216,7 @@ class Cache:
         if (
             isinstance(
                 node,
-                verbs.Filter
-                | verbs.Summarize
-                | verbs.Arrange
-                | verbs.GroupBy
-                | verbs.Join,
+                verbs.Filter | verbs.Summarize | verbs.Arrange | verbs.GroupBy | verbs.Join | verbs.Union,
             )
             and self.limit != 0
         ):
@@ -238,16 +229,12 @@ class Cache:
                 if isinstance(col, Col)
             )
             for fn in node.iter_col_nodes()
-            if (
-                isinstance(fn, ColFn) and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW)
-            )
+            if (isinstance(fn, ColFn) and fn.op.ftype in (Ftype.AGGREGATE, Ftype.WINDOW))
         ):
             return "nested window / aggregation functions in `mutate`"
 
         if isinstance(node, verbs.Filter) and any(
-            col.ftype(agg_is_window=True) == Ftype.WINDOW
-            for col in node.iter_col_nodes()
-            if isinstance(col, Col)
+            col.ftype(agg_is_window=True) == Ftype.WINDOW for col in node.iter_col_nodes() if isinstance(col, Col)
         ):
             return "window function in `filter`"
 
@@ -267,19 +254,12 @@ class Cache:
             if self.group_by:
                 return "join with a grouped table"
 
-            if (
-                node.how == "full"
-                or (node.child not in self.derived_from and node.how == "left")
-            ) and any(
-                types.is_const(self.cols[uid].dtype())
-                for uid in self.uuid_to_name.keys()
+            if (node.how == "full" or (node.child not in self.derived_from and node.how == "left")) and any(
+                types.is_const(self.cols[uid].dtype()) for uid in self.uuid_to_name.keys()
             ):
                 return "left / full join with a table containing a constant column"
 
-            if any(
-                self.cols[uid].ftype() == Ftype.WINDOW
-                for uid in self.uuid_to_name.keys()
-            ):
+            if any(self.cols[uid].ftype() == Ftype.WINDOW for uid in self.uuid_to_name.keys()):
                 return "join with a table containing window function expression"
 
             if any(
@@ -291,6 +271,13 @@ class Cache:
 
             if self.is_filtered and node.how == "full":
                 return "full join with a filtered table"
+
+        if isinstance(node, verbs.Union):
+            if self.group_by:
+                return "union with a grouped table"
+
+            if any(self.cols[uid].ftype() == Ftype.WINDOW for uid in self.uuid_to_name.keys()):
+                return "union with a table containing window function expression"
 
         return None
 
@@ -349,9 +336,7 @@ def transfer_col_references(table, ref_source):
     errors.check_arg_type(Table, "transfer_col_references", "table", table)
     errors.check_arg_type(Table, "transfer_col_references", "ref_source", ref_source)
 
-    if (
-        col := next((col for col in table if col.name not in ref_source), None)
-    ) is not None:
+    if (col := next((col for col in table if col.name not in ref_source), None)) is not None:
         raise ValueError(
             f"column {col.ast_repr()} of the table `{table._ast.short_name()}` does "
             "not exist in the reference source table "
@@ -361,10 +346,7 @@ def transfer_col_references(table, ref_source):
     new = copy.copy(table)
     new._ast = Alias(
         new._ast,
-        uuid_map={
-            uid: ref_source._cache.name_to_uuid[name]
-            for uid, name in table._cache.uuid_to_name.items()
-        },
+        uuid_map={uid: ref_source._cache.name_to_uuid[name] for uid, name in table._cache.uuid_to_name.items()},
     )
     new._cache = table._cache.update(new._ast)
 

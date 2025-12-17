@@ -10,42 +10,26 @@ from tests.util import assert_result_equal
 
 
 def test_eq(df_datetime):
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 == datetime(1970, 1, 1))
-    )
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 == datetime(2004, 12, 31))
-    )
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 == datetime(1970, 1, 1)))
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 == datetime(2004, 12, 31)))
     assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 == C.col2))
 
 
 def test_nq(df_datetime):
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 != datetime(1970, 1, 1))
-    )
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 != datetime(2004, 12, 31))
-    )
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 != datetime(1970, 1, 1)))
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 != datetime(2004, 12, 31)))
     assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 != C.col2))
 
 
 def test_lt(df_datetime):
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 < datetime(1970, 1, 1))
-    )
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 < datetime(2004, 12, 31))
-    )
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 < datetime(1970, 1, 1)))
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 < datetime(2004, 12, 31)))
     assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 < C.col2))
 
 
 def test_gt(df_datetime):
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 > datetime(1970, 1, 1))
-    )
-    assert_result_equal(
-        df_datetime, lambda t: t >> filter(C.col1 > datetime(2004, 12, 31))
-    )
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 > datetime(1970, 1, 1)))
+    assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 > datetime(2004, 12, 31)))
     assert_result_equal(df_datetime, lambda t: t >> filter(C.col1 > C.col2))
 
 

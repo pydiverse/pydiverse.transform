@@ -53,9 +53,7 @@ def aligned(fn=None, *, with_: str | None = None):
     def decorator(fn):
         signature = inspect.signature(fn)
         if with_ is not None and with_ not in signature.parameters:
-            raise ValueError(
-                f"function `{fn.__name__}` has no argument named `{with_}`"
-            )
+            raise ValueError(f"function `{fn.__name__}` has no argument named `{with_}`")
 
         @wraps(fn)
         def wrapper(*args, **kwargs):
@@ -76,9 +74,7 @@ def aligned(fn=None, *, with_: str | None = None):
     return decorator
 
 
-def eval_aligned(
-    val: ColExpr | pl.Series | pd.Series, with_: Table | Col | None = None
-) -> EvalAligned:
+def eval_aligned(val: ColExpr | pl.Series | pd.Series, with_: Table | Col | None = None) -> EvalAligned:
     """
     Allows to evaluate a column expression containing columns from different tables and
     to use polars / pandas Series in column expressions.

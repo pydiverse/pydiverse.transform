@@ -17,9 +17,7 @@ def test_exp(df_num):
 
 
 def test_log(df_num):
-    assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: pdt.max(1e-16, c).log() for c in t})
-    )
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: pdt.max(1e-16, c).log() for c in t}))
 
 
 def test_abs(df_num):
@@ -47,16 +45,14 @@ def test_round(df_num):
 def test_add(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(**{f"add_{c.name}_{d.name}": c + d for d in t for c in t}),
+        lambda t: t >> mutate(**{f"add_{c.name}_{d.name}": c + d for d in t for c in t}),
     )
 
 
 def test_sub(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(**{f"sub_{c.name}_{d.name}": c - d for d in t for c in t}),
+        lambda t: t >> mutate(**{f"sub_{c.name}_{d.name}": c - d for d in t for c in t}),
     )
 
 
@@ -70,8 +66,7 @@ def test_neg(df_num):
 def test_mul(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(**{f"mul_{c.name}_{d.name}": c * d for d in t for c in t}),
+        lambda t: t >> mutate(**{f"mul_{c.name}_{d.name}": c * d for d in t for c in t}),
     )
 
 
@@ -79,21 +74,15 @@ def test_div(df_num):
     assert_result_equal(
         df_num,
         lambda t: t
-        >> mutate(
-            **{c.name: pdt.when(c.abs() < 1e-50).then(1e-50).otherwise(c) for c in t}
-        )
-        >> (
-            lambda s: mutate(**{f"div_{c.name}_{d.name}": c / d for d in s for c in s})
-        ),
+        >> mutate(**{c.name: pdt.when(c.abs() < 1e-50).then(1e-50).otherwise(c) for c in t})
+        >> (lambda s: mutate(**{f"div_{c.name}_{d.name}": c / d for d in s for c in s})),
     )
 
 
 def test_decimal(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(f=t.f.cast(pdt.Decimal), g=t.g.cast(pdt.Decimal))
-        >> mutate(u=C.f + C.g, z=C.f * C.g),
+        lambda t: t >> mutate(f=t.f.cast(pdt.Decimal), g=t.g.cast(pdt.Decimal)) >> mutate(u=C.f + C.g, z=C.f * C.g),
     )
 
 
@@ -186,9 +175,7 @@ def test_is_nan(df_num):
 
 
 def test_int_pow(df_int):
-    assert_result_equal(
-        df_int, lambda t: t >> mutate(u=pdt.min(t.a, 10) ** pdt.min(t.b.abs(), 5))
-    )
+    assert_result_equal(df_int, lambda t: t >> mutate(u=pdt.min(t.a, 10) ** pdt.min(t.b.abs(), 5)))
 
 
 def test_sin(df_num):
@@ -200,21 +187,15 @@ def test_cos(df_num):
 
 
 def test_tan(df_num):
-    assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.atan().tan() for c in t})
-    )
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.atan().tan() for c in t}))
 
 
 def test_asin(df_num):
-    assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.sin().asin() for c in t})
-    )
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.sin().asin() for c in t}))
 
 
 def test_acos(df_num):
-    assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.cos().acos() for c in t})
-    )
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.cos().acos() for c in t}))
 
 
 def test_atan(df_num):
@@ -222,9 +203,7 @@ def test_atan(df_num):
 
 
 def test_sqrt(df_num):
-    assert_result_equal(
-        df_num, lambda t: t >> mutate(**{c.name: c.abs().sqrt() for c in t})
-    )
+    assert_result_equal(df_num, lambda t: t >> mutate(**{c.name: c.abs().sqrt() for c in t}))
 
 
 def test_cbrt(df_num):

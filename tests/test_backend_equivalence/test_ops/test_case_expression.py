@@ -15,21 +15,14 @@ from tests.util import assert_result_equal
 def test_mutate_case_ewise(df4):
     assert_result_equal(
         df4,
-        lambda t: t
-        >> mutate(
-            x=C.col1.map({0: 1, (1, 2): 2}), y=C.col1.map({0: 0, 1: None}, default=10.4)
-        ),
+        lambda t: t >> mutate(x=C.col1.map({0: 1, (1, 2): 2}), y=C.col1.map({0: 0, 1: None}, default=10.4)),
     )
 
     assert_result_equal(
         df4,
         lambda t: t
         >> mutate(
-            x=pdt.when(C.col1 == C.col2)
-            .then(1)
-            .when(C.col2 == C.col3)
-            .then(2)
-            .otherwise(C.col1 + C.col2),
+            x=pdt.when(C.col1 == C.col2).then(1).when(C.col2 == C.col3).then(2).otherwise(C.col1 + C.col2),
         ),
     )
 
@@ -65,17 +58,11 @@ def test_mutate_case_window(df4):
         df4,
         lambda t: t
         >> mutate(
-            u=C.col1.shift(
-                1, 1729, arrange=[t.col3.descending().nulls_last(), t.col4.nulls_last()]
-            ),
+            u=C.col1.shift(1, 1729, arrange=[t.col3.descending().nulls_last(), t.col4.nulls_last()]),
             x=C.col1.shift(1, 0, arrange=[C.col4.nulls_first()]).map(
                 {
-                    1: C.col2.shift(
-                        1, -1, arrange=[C.col2.nulls_last(), C.col4.nulls_first()]
-                    ),
-                    2: C.col3.shift(
-                        2, -2, arrange=[C.col3.nulls_last(), C.col4.nulls_last()]
-                    ),
+                    1: C.col2.shift(1, -1, arrange=[C.col2.nulls_last(), C.col4.nulls_first()]),
+                    2: C.col3.shift(2, -2, arrange=[C.col3.nulls_last(), C.col4.nulls_last()]),
                 }
             ),
         ),
@@ -114,11 +101,7 @@ def test_summarize_case(df4):
                     2: 2,
                 }
             ),
-            y=pdt.when(C.col2.max() > 2)
-            .then(1)
-            .when(C.col2.max() < 2)
-            .then(C.col2.min())
-            .otherwise(C.col3.mean()),
+            y=pdt.when(C.col2.max() > 2).then(1).when(C.col2.max() < 2).then(C.col2.min()).otherwise(C.col3.mean()),
         ),
     )
 
@@ -156,9 +139,6 @@ def test_invalid_ftype(df1):
 
     assert_result_equal(
         df1,
-        lambda t: t
-        >> summarize(
-            x=pdt.when(pdt.rank(arrange=[C.col1]) == 1).then(1).otherwise(None)
-        ),
+        lambda t: t >> summarize(x=pdt.when(pdt.rank(arrange=[C.col1]) == 1).then(1).otherwise(None)),
         exception=FunctionTypeError,
     )

@@ -263,17 +263,12 @@ class TestSqlTable:
             >> group_by(tbl3.col1)
             >> group_by(tbl3.col2, add=True)
             >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
-            tbl3
-            >> group_by(tbl3.col1, tbl3.col2)
-            >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
+            tbl3 >> group_by(tbl3.col1, tbl3.col2) >> summarize(mean3=tbl3.col3.mean(), mean4=tbl3.col4.mean()),
         )
 
         # Ungroup doesn't change the result
         assert_equal(
-            tbl3
-            >> group_by(tbl3.col1)
-            >> summarize(mean4=tbl3.col4.mean())
-            >> ungroup(),
+            tbl3 >> group_by(tbl3.col1) >> summarize(mean4=tbl3.col4.mean()) >> ungroup(),
             tbl3 >> group_by(tbl3.col1) >> summarize(mean4=tbl3.col4.mean()),
         )
 
@@ -293,11 +288,7 @@ class TestSqlTable:
         assert_equal(a, b)
 
         # Self Join
-        self_join = (
-            tbl2
-            >> join(x, tbl2.col1 == x.col1, "left", suffix="42")
-            >> alias("self_join")
-        )
+        self_join = tbl2 >> join(x, tbl2.col1 == x.col1, "left", suffix="42") >> alias("self_join")
 
         self_join_expected = df2.join(
             df2,
@@ -321,23 +312,14 @@ class TestSqlTable:
         )
 
         assert_equal(
-            tbl1
-            >> mutate(a=tbl1.col1 * 2)
-            >> mutate(b=C.a * 2, a=tbl1.col1)
-            >> select(C.b),
+            tbl1 >> mutate(a=tbl1.col1 * 2) >> mutate(b=C.a * 2, a=tbl1.col1) >> select(C.b),
             tbl1 >> select() >> mutate(b=tbl1.col1 * 4),
         )
 
         # Join
         assert_equal(
-            tbl1
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, C.a == tbl2.col1, "left")
-            >> select(C.a, *tbl2),
-            tbl1
-            >> select()
-            >> mutate(a=tbl1.col1)
-            >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_df2"),
+            tbl1 >> mutate(a=tbl1.col1) >> join(tbl2, C.a == tbl2.col1, "left") >> select(C.a, *tbl2),
+            tbl1 >> select() >> mutate(a=tbl1.col1) >> join(tbl2, tbl1.col1 == tbl2.col1, "left", suffix="_df2"),
         )
 
         # Filter
@@ -358,9 +340,7 @@ class TestSqlTable:
             tbl2 >> summarize(count=tbl2.col1.count()),
         )
 
-        assert_equal(
-            tbl2 >> summarize(count=count()), pl.DataFrame({"count": [len(df2)]})
-        )
+        assert_equal(tbl2 >> summarize(count=count()), pl.DataFrame({"count": [len(df2)]}))
 
     def test_null_comparison(self, tbl4):
         assert_equal(
@@ -378,13 +358,7 @@ class TestSqlTable:
             (
                 tbl3
                 >> mutate(
-                    col1=when(C.col1 == 0)
-                    .then(1)
-                    .when(C.col1 == 1)
-                    .then(2)
-                    .when(C.col1 == 2)
-                    .then(3)
-                    .otherwise(-1)
+                    col1=when(C.col1 == 0).then(1).when(C.col1 == 1).then(2).when(C.col1 == 2).then(3).otherwise(-1)
                 )
                 >> select(C.col1)
             ),
@@ -394,13 +368,7 @@ class TestSqlTable:
         assert_equal(
             (
                 tbl3
-                >> mutate(
-                    x=when(C.col1 == C.col2)
-                    .then(1)
-                    .when(C.col1 == C.col3)
-                    .then(2)
-                    .otherwise(C.col4)
-                )
+                >> mutate(x=when(C.col1 == C.col2).then(1).when(C.col1 == C.col3).then(2).otherwise(C.col4))
                 >> select(C.x)
             ),
             pl.DataFrame({"x": [1, 1, 2, 3, 4, 2, 1, 1, 8, 9, 2, 11]}),

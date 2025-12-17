@@ -32,6 +32,7 @@ from ._internal.pipe.verbs import (
     slice_head,
     summarize,
     ungroup,
+    union,
 )
 from .base import *  # noqa: F403
 from .base import __all__ as __base
@@ -51,6 +52,7 @@ __all__ = __base + [
     "left_join",
     "full_join",
     "cross_join",
+    "union",
     "mutate",
     "rename",
     "select",

@@ -89,13 +89,9 @@ log10 = Operator(
 
 sin = Operator("sin", Signature(Float(), return_type=Float()), doc="Computes the sine.")
 
-cos = Operator(
-    "cos", Signature(Float(), return_type=Float()), doc="Computes the cosine."
-)
+cos = Operator("cos", Signature(Float(), return_type=Float()), doc="Computes the cosine.")
 
-tan = Operator(
-    "tan", Signature(Float(), return_type=Float()), doc="Computes the tangent."
-)
+tan = Operator("tan", Signature(Float(), return_type=Float()), doc="Computes the tangent.")
 
 asin = Operator(
     "asin",
@@ -116,13 +112,9 @@ atan = Operator(
 )
 
 
-sqrt = Operator(
-    "sqrt", Signature(Float(), return_type=Float()), doc="Computes the square root."
-)
+sqrt = Operator("sqrt", Signature(Float(), return_type=Float()), doc="Computes the square root.")
 
-cbrt = Operator(
-    "cbrt", Signature(Float(), return_type=Float()), doc="Computes the cube root."
-)
+cbrt = Operator("cbrt", Signature(Float(), return_type=Float()), doc="Computes the cube root.")
 
 
 is_inf = Operator(

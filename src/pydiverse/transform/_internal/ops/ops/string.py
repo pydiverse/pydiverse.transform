@@ -277,9 +277,7 @@ shape: (5, 5)
 
 str_contains = Operator(
     "str.contains",
-    Signature(
-        String(), Const(String()), Const(Bool()), Const(Bool()), return_type=Bool()
-    ),
+    Signature(String(), Const(String()), Const(Bool()), Const(Bool()), return_type=Bool()),
     param_names=["self", "pattern", "allow_regex", "true_if_regex_unsupported"],
     default_values=[..., ..., True, False],
     doc="""
@@ -382,8 +380,6 @@ shape: (5, 4)
 """,
 )
 
-str_to_datetime = Operator(
-    "str.to_datetime", Signature(String(), return_type=Datetime())
-)
+str_to_datetime = Operator("str.to_datetime", Signature(String(), return_type=Datetime()))
 
 str_to_date = Operator("str.to_date", Signature(String(), return_type=Date()))

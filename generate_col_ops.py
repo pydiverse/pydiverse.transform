@@ -38,9 +38,7 @@ def add_vararg_star(formatted_args: str) -> str:
 
 
 def type_annotation(dtype: Dtype, specialize_generic: bool) -> str:
-    if (not specialize_generic and not types.is_const(dtype)) or isinstance(
-        types.without_const(dtype), Tyvar
-    ):
+    if (not specialize_generic and not types.is_const(dtype)) or isinstance(types.without_const(dtype), Tyvar):
         return "ColExpr"
     if types.is_const(dtype):
         python_type = types.to_python(dtype)
@@ -48,26 +46,18 @@ def type_annotation(dtype: Dtype, specialize_generic: bool) -> str:
     return f"ColExpr[{dtype.__class__.__name__}]"
 
 
-def generate_fn_decl(
-    op: Operator, sig: Signature, *, name=None, specialize_generic: bool = True
-) -> str:
+def generate_fn_decl(op: Operator, sig: Signature, *, name=None, specialize_generic: bool = True) -> str:
     if name is None:
         name = op.name
 
-    defaults: Iterable = (
-        op.default_values
-        if op.default_values is not None
-        else (... for _ in op.param_names)
-    )
+    defaults: Iterable = op.default_values if op.default_values is not None else (... for _ in op.param_names)
 
     annotated_args = ", ".join(
         name
         + ": "
         + type_annotation(dtype, specialize_generic)
         + (f" = {repr(default_val)}" if default_val is not ... else "")
-        for dtype, name, default_val in zip(
-            sig.types, op.param_names, defaults, strict=True
-        )
+        for dtype, name, default_val in zip(sig.types, op.param_names, defaults, strict=True)
     )
     if sig.is_vararg:
         annotated_args = add_vararg_star(annotated_args)
@@ -80,8 +70,7 @@ def generate_fn_decl(
         }
 
         annotated_kwargs = "".join(
-            f", {kwarg.name}: {context_kwarg_annotation[kwarg.name]}"
-            + f"{'' if kwarg.required else ' | None = None'}"
+            f", {kwarg.name}: {context_kwarg_annotation[kwarg.name]}" + f"{'' if kwarg.required else ' | None = None'}"
             for kwarg in op.context_kwargs
         )
 
@@ -93,8 +82,7 @@ def generate_fn_decl(
         annotated_kwargs = ""
 
     return (
-        f"def {name}({annotated_args}{annotated_kwargs}) "
-        f"-> {type_annotation(sig.return_type, specialize_generic)}:\n"
+        f"def {name}({annotated_args}{annotated_kwargs}) -> {type_annotation(sig.return_type, specialize_generic)}:\n"
     )
 
 
@@ -126,9 +114,7 @@ def generate_fn_body(
     return f"    return ColFn(ops.{op_var_name}{args}{kwargs})\n\n"
 
 
-def generate_overloads(
-    op: Operator, *, name: str | None = None, rversion: bool = False, op_var_name: str
-):
+def generate_overloads(op: Operator, *, name: str | None = None, rversion: bool = False, op_var_name: str):
     res = ""
     in_namespace = "." in op.name
     if name is None:
@@ -140,9 +126,7 @@ def generate_overloads(
             res += "@overload\n" + generate_fn_decl(op, sig, name=name) + "    ...\n\n"
 
     res += (
-        generate_fn_decl(
-            op, op.signatures[0], name=name, specialize_generic=not has_overloads
-        )
+        generate_fn_decl(op, op.signatures[0], name=name, specialize_generic=not has_overloads)
         + f'    """\n{op.doc.strip()}\n"""\n\n'
         + generate_fn_body(
             op,
@@ -177,13 +161,8 @@ with open(COL_EXPR_PATH, "r+") as file:
             "    # --- generated code starts here, do not delete this comment ---"
         ):
             in_generated_section = True
-            new_file_contents += (
-                "    # --- generated code starts here, do not delete this "
-                "comment ---\n\n"
-            )
-        elif in_generated_section and line.startswith(
-            "# --- generated code ends here, do not delete this comment ---"
-        ):
+            new_file_contents += "    # --- generated code starts here, do not delete this comment ---\n\n"
+        elif in_generated_section and line.startswith("# --- generated code ends here, do not delete this comment ---"):
             for op_var_name in sorted(ops.__dict__):
                 op = ops.__dict__[op_var_name]
                 if not isinstance(op, Operator) or not op.generate_expr_method:
@@ -208,11 +187,7 @@ with open(COL_EXPR_PATH, "r+") as file:
             for name in NAMESPACES:
                 new_file_contents += f"    {name} : {name.title()}Namespace\n"
 
-            new_file_contents += (
-                "@dataclasses.dataclass(slots=True)\n"
-                "class FnNamespace:\n"
-                "    arg: ColExpr\n"
-            )
+            new_file_contents += "@dataclasses.dataclass(slots=True)\nclass FnNamespace:\n    arg: ColExpr\n"
 
             for name in NAMESPACES:
                 new_file_contents += namespace_contents[name]
@@ -234,9 +209,7 @@ with open(FNS_PATH, "r+") as file:
 
     for line in file:
         new_file_contents += line
-        if line.startswith(
-            "# --- from here the code is generated, do not delete this comment ---"
-        ):
+        if line.startswith("# --- from here the code is generated, do not delete this comment ---"):
             new_file_contents += "\n"
             for op_var_name in sorted(ops.__dict__):
                 op = ops.__dict__[op_var_name]
@@ -265,11 +238,7 @@ with open(API_DOCS_PATH, "r+") as file:
 
             new_file_contents += "\n   ".join(
                 sorted(
-                    [
-                        op.name
-                        for op in ops.__dict__.values()
-                        if isinstance(op, Operator) and op.generate_expr_method
-                    ]
+                    [op.name for op in ops.__dict__.values() if isinstance(op, Operator) and op.generate_expr_method]
                     + ["rank", "dense_rank", "map", "cast"]
                 )
             )

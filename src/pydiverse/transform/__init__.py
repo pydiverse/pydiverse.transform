@@ -13,8 +13,5 @@ from .types import __all__ as __types
 from .version import __version__
 
 __all__ = (
-    ["__version__", "Table", "ColExpr", "Col", "verb", "backend", "is_sql_backed"]
-    + __extended
-    + __types
-    + __errors
+    ["__version__", "Table", "ColExpr", "Col", "verb", "backend", "is_sql_backed"] + __extended + __types + __errors
 )

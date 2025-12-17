@@ -42,30 +42,22 @@ with IbmDb2Impl.impl_store.impl_manager as impl:
     @impl(ops.horizontal_min)
     def _horizontal_min(*x):
         if len(x) == 1:
-            return sqa.func.LEAST(
-                x[0], x[0]
-            )  # DB2 does not support LEAST with a single argument
+            return sqa.func.LEAST(x[0], x[0])  # DB2 does not support LEAST with a single argument
         else:
             # the generated query will look extremely ugly but LEAST should be non-NULL
             # if any of the arguments is non-NULL
             any_non_null = sqa.func.COALESCE(*x)
-            return sqa.func.LEAST(
-                *[sqa.func.COALESCE(element, any_non_null) for element in x]
-            )
+            return sqa.func.LEAST(*[sqa.func.COALESCE(element, any_non_null) for element in x])
 
     @impl(ops.horizontal_max)
     def _horizontal_max(*x):
         if len(x) == 1:
-            return sqa.func.GREATEST(
-                x[0], x[0]
-            )  # DB2 does not support LEAST with a single argument
+            return sqa.func.GREATEST(x[0], x[0])  # DB2 does not support LEAST with a single argument
         else:
             # the generated query will look extremely ugly but LEAST should be non-NULL
             # if any of the arguments is non-NULL
             any_non_null = sqa.func.COALESCE(*x)
-            return sqa.func.GREATEST(
-                *[sqa.func.COALESCE(element, any_non_null) for element in x]
-            )
+            return sqa.func.GREATEST(*[sqa.func.COALESCE(element, any_non_null) for element in x])
 
     @impl(ops.dt_second)
     def _dt_second(x):
@@ -92,9 +84,7 @@ with IbmDb2Impl.impl_store.impl_manager as impl:
     @impl(ops.cbrt)
     def _cbrt(x):
         pow_impl = IbmDb2Impl.get_impl(ops.pow, (Float(), Float()))
-        return sqa.func.sign(x) * pow_impl(
-            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
-        )
+        return sqa.func.sign(x) * pow_impl(sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double))
 
     @impl(ops.rand)
     def _rand():

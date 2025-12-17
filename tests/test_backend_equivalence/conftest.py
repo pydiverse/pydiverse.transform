@@ -272,9 +272,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
     backends = {k: i for i, k in enumerate(backends)}
 
     backend_combinations = [
-        (reference_backend, backend)
-        for reference_backend in reference_backends
-        for backend in backends
+        (reference_backend, backend) for reference_backend in reference_backends for backend in backends
     ]
 
     params = []

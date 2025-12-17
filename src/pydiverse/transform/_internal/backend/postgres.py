@@ -18,9 +18,7 @@ class PostgresImpl(SqlImpl):
     def compile_cast(cls, cast: Cast, sqa_col: dict[str, sqa.Label]) -> Cast:
         if types.without_const(cast.val.dtype()).is_float():
             if cast.target_type.is_int():
-                return cls.cast_compiled(
-                    cast, sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col))
-                )
+                return cls.cast_compiled(cast, sqa.func.trunc(cls.compile_col_expr(cast.val, sqa_col)))
 
             if cast.target_type == String():
                 compiled = super().compile_cast(cast, sqa_col)
@@ -31,10 +29,7 @@ class PostgresImpl(SqlImpl):
                     else_=compiled,
                 )
 
-        if (
-            types.without_const(cast.val.dtype()) == Bool()
-            and cast.target_type == Int64()
-        ):
+        if types.without_const(cast.val.dtype()) == Bool() and cast.target_type == Int64():
             # postgres does not like casts bool -> bigint, so we go via int
             return cls.compile_cast(Cast(cast.val, Int32()).cast(Int64()), sqa_col)
 
@@ -50,9 +45,7 @@ class PostgresImpl(SqlImpl):
                     (
                         sqa.func.pg_input_is_valid(
                             compiled_expr,
-                            str(cls.sqa_type(cast.target_type))
-                            .lower()
-                            .replace(" ", ""),
+                            str(cls.sqa_type(cast.target_type)).lower().replace(" ", ""),
                         ),
                         compiled_expr,
                     ),
@@ -110,9 +103,7 @@ class PostgresImpl(SqlImpl):
         return super().sqa_type(pdt_type)
 
     @classmethod
-    def fix_fn_types(
-        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
-    ) -> sqa.ColumnElement:
+    def fix_fn_types(cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement) -> sqa.ColumnElement:
         if isinstance(fn.op, ops.DatetimeExtract | ops.DateExtract):
             return sqa.cast(val, sqa.BigInteger)
         elif fn.op in (ops.sum, ops.cum_sum):
@@ -155,9 +146,7 @@ with PostgresImpl.impl_store.impl_manager as impl:
         if isinstance(x.type, sqa.Float):
             # Postgres doesn't support rounding of doubles to specific precision
             # -> Must first cast to numeric
-            return sqa.func.ROUND(
-                sqa.cast(x, sqa.Numeric), decimals, type_=sqa.Numeric
-            ).cast(x.type)
+            return sqa.func.ROUND(sqa.cast(x, sqa.Numeric), decimals, type_=sqa.Numeric).cast(x.type)
 
         return sqa.func.ROUND(x, decimals, type_=x.type)
 
@@ -171,10 +160,7 @@ with PostgresImpl.impl_store.impl_manager as impl:
 
     @impl(ops.dt_microsecond)
     def _dt_microsecond(x):
-        return (
-            sqa.func.FLOOR(sqa.extract("microsecond", x), type_=sqa.Integer())
-            % 1_000_000
-        )
+        return sqa.func.FLOOR(sqa.extract("microsecond", x), type_=sqa.Integer()) % 1_000_000
 
     @impl(ops.horizontal_max, String(), String(), ...)
     def _horizontal_max(*x):

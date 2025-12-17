@@ -64,11 +64,7 @@ def check_arg_type(
 ):
     if not isinstance(arg, expected_type):
         type_args = typing.get_args(expected_type)
-        expected_type_str = (
-            expected_type.__name__
-            if not type_args
-            else " | ".join(t.__name__ for t in type_args)
-        )
+        expected_type_str = expected_type.__name__ if not type_args else " | ".join(t.__name__ for t in type_args)
         raise TypeError(
             f"argument for parameter `{param_name}` of `{fn}` must have type "
             f"`{expected_type_str}`, found `{type(arg).__name__}` instead"
@@ -79,14 +75,9 @@ def check_vararg_type(expected_type: type, fn: str, *args: Any):
     for arg in args:
         if not isinstance(arg, expected_type):
             type_args = typing.get_args(expected_type)
-            expected_type_str = (
-                expected_type.__name__
-                if not type_args
-                else " | ".join(t.__name__ for t in type_args)
-            )
+            expected_type_str = expected_type.__name__ if not type_args else " | ".join(t.__name__ for t in type_args)
             raise TypeError(
-                f"varargs to `{fn}` must have type `{expected_type_str}`, found "
-                f"`{type(arg).__name__}` instead"
+                f"varargs to `{fn}` must have type `{expected_type_str}`, found `{type(arg).__name__}` instead"
             )
 
 

@@ -21,14 +21,10 @@ def test_simple(df3):
 
 def test_chained(df3):
     assert_result_equal(df3, lambda t: t >> rename({"col1": "X"}) >> rename({"X": "Y"}))
-    assert_result_equal(
-        df3, lambda t: t >> rename({"col1": "X"}) >> rename({"X": "col1"})
-    )
+    assert_result_equal(df3, lambda t: t >> rename({"col1": "X"}) >> rename({"X": "col1"}))
     assert_result_equal(
         df3,
-        lambda t: t
-        >> rename({"col1": "1", "col2": "2"})
-        >> rename({"1": "col1", "2": "col2"}),
+        lambda t: t >> rename({"col1": "1", "col2": "2"}) >> rename({"1": "col1", "2": "col2"}),
     )
 
 

@@ -1,6 +1,6 @@
 [project]
 name = "pydiverse-transform"
-version = "0.6.2"
+version = "0.6.3"
 description = "Pipe based dataframe manipulation library that can also transform data on SQL databases"
 authors = [
   { name = "QuantCo, Inc." },
@@ -42,6 +42,8 @@ packages = ["src/pydiverse"]
 target-version = "py311"
 extend-exclude = ["docs/*"]
 fix = true
+# 88 leads to worse comments
+line-length = 120
 
 [tool.ruff.lint]
 select = ["F", "E", "UP", "W", "I001", "I002", "B", "A"]

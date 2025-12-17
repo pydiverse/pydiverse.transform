@@ -38,21 +38,13 @@ class AstNode:
                 if cond(nd):
                     return nd
 
-        source_tbls = set(
-            nd
-            for nd in self.iter_subtree_preorder()
-            if isinstance(nd, TableImpl | Alias)
-        )
+        source_tbls = set(nd for nd in self.iter_subtree_preorder() if isinstance(nd, TableImpl | Alias))
         # Add required ASTs from aligned columns (they need not be in the subtree of
         # `self`)
         source_tbls |= set(
             next_nd(col._ast, lambda x: isinstance(x, Alias | TableImpl))
             for col in itertools.chain(
-                *(
-                    nd.iter_col_nodes()
-                    for nd in self.iter_subtree_preorder()
-                    if isinstance(nd, Verb)
-                )
+                *(nd.iter_col_nodes() for nd in self.iter_subtree_preorder() if isinstance(nd, Verb))
             )
             if isinstance(col, Col)
         )
@@ -62,9 +54,7 @@ class AstNode:
         for nd in source_tbls:
             display_name = nd.name or "tbl"
             # try to achieve valid python identifier names
-            display_name = (
-                display_name.replace(" ", "_").replace(".", "_").replace("-", "_")
-            )
+            display_name = display_name.replace(" ", "_").replace(".", "_").replace("-", "_")
 
             if display_name not in used:
                 used.add(display_name)
@@ -79,9 +69,7 @@ class AstNode:
         # Find the last source table / alias for every node in the AST and use the
         # corresponding name.
         for nd in self.iter_subtree_postorder():
-            table_display_name_map[nd] = table_display_name_map[
-                next_nd(nd, lambda x: x in table_display_name_map)
-            ]
+            table_display_name_map[nd] = table_display_name_map[next_nd(nd, lambda x: x in table_display_name_map)]
 
             if isinstance(nd, Verb):
                 for col in nd.iter_col_nodes():
@@ -94,11 +82,7 @@ class AstNode:
             f"{display_name} = {tbl._table_def_repr()}"
             for tbl, display_name in table_display_name_map.items()
             if isinstance(tbl, TableImpl)
-        ) + (
-            "\n\n("
-            + self._unformatted_ast_repr(verb_depth, expr_depth, table_display_name_map)
-            + ")"
-        )
+        ) + ("\n\n(" + self._unformatted_ast_repr(verb_depth, expr_depth, table_display_name_map) + ")")
         try:
             import black
 

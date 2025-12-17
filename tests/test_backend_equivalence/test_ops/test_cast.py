@@ -55,9 +55,7 @@ def test_datetime_to_date(df_datetime):
 
 
 def test_int_to_string(df_int):
-    assert_result_equal(
-        df_int, lambda t: t >> mutate(**{c.name: c.cast(pdt.String()) for c in t})
-    )
+    assert_result_equal(df_int, lambda t: t >> mutate(**{c.name: c.cast(pdt.String()) for c in t}))
 
 
 def test_float_to_string(df_num):

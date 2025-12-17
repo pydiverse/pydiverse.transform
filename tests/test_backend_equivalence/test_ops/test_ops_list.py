@@ -10,10 +10,7 @@ from tests.util.assertion import assert_result_equal
 def test_list_agg(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col3)
-        >> summarize(s=t.col2.list.agg())
-        >> arrange(C.s),
+        lambda t: t >> group_by(t.col3) >> summarize(s=t.col2.list.agg()) >> arrange(C.s),
         check_row_order=True,
     )
 
@@ -34,7 +31,6 @@ def test_list_agg(df3):
 def test_list_agg_no_grouping(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> summarize(h=t.col5.list.agg(arrange=[t.col1, t.col4.descending()])),
+        lambda t: t >> summarize(h=t.col5.list.agg(arrange=[t.col1, t.col4.descending()])),
         check_row_order=True,
     )

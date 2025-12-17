@@ -16,8 +16,7 @@ def test_eq(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == "foo"))
     assert_result_equal(
         df_strings,
-        lambda t: t
-        >> filter(C.col1.str.replace_all(" ", "") == C.col2.str.replace_all(" ", "")),
+        lambda t: t >> filter(C.col1.str.replace_all(" ", "") == C.col2.str.replace_all(" ", "")),
     )
 
 
@@ -31,8 +30,7 @@ def test_nq(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 != "foo"))
     assert_result_equal(
         df_strings,
-        lambda t: t
-        >> filter(C.col1.str.replace_all(" ", "") != C.col2.str.replace_all(" ", "")),
+        lambda t: t >> filter(C.col1.str.replace_all(" ", "") != C.col2.str.replace_all(" ", "")),
     )
 
 
@@ -52,8 +50,7 @@ def test_gt(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 > "E"))
     assert_result_equal(
         df_strings,
-        lambda t: t
-        >> filter(C.col1.str.replace_all(" ", "") > C.col2.str.replace_all(" ", "")),
+        lambda t: t >> filter(C.col1.str.replace_all(" ", "") > C.col2.str.replace_all(" ", "")),
     )
 
 
@@ -77,22 +74,18 @@ def test_le(df_strings):
         lambda t: t
         >> mutate(
             col1_le_c=C.col1 <= C.c,
-            col1_le_col2=t.col1.str.replace_all(" ", "")
-            <= t.col2.str.replace_all(" ", ""),
+            col1_le_col2=t.col1.str.replace_all(" ", "") <= t.col2.str.replace_all(" ", ""),
             d_le_c=t.d <= t.c,
         ),
     )
     assert_result_equal(
         df_strings,
-        lambda t: t
-        >> filter(C.col1.str.replace_all(" ", "") <= C.col2.str.replace_all(" ", "")),
+        lambda t: t >> filter(C.col1.str.replace_all(" ", "") <= C.col2.str.replace_all(" ", "")),
     )
 
 
 def test_ge(df_strings):
-    assert_result_equal(
-        df_strings, lambda t: t >> mutate(col1_ge_col2=C.col1 >= C.col2)
-    )
+    assert_result_equal(df_strings, lambda t: t >> mutate(col1_ge_col2=C.col1 >= C.col2))
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 >= C.col2))
 
 
@@ -228,9 +221,7 @@ def test_slice(df_strings):
             v=t.col2.str.replace_all(" ", "")
             .str.slice(t.col1.str.len() % (t.col2.str.len() + 1), 42)
             .str.replace_all(" ", ""),
-            w=t.col1.str.replace_all(" ", "")
-            .str.slice(2, t.col1.str.len())
-            .str.replace_all(" ", ""),
+            w=t.col1.str.replace_all(" ", "").str.slice(2, t.col1.str.len()).str.replace_all(" ", ""),
         ),
     )
 
@@ -241,9 +232,7 @@ def test_str_join(df_strings):
         df_strings,
         lambda t: t
         >> group_by(t.e)
-        >> summarize(
-            con=t.c.str.join(", ", arrange=[t.d.nulls_first(), t.c.nulls_last()])
-        ),
+        >> summarize(con=t.c.str.join(", ", arrange=[t.d.nulls_first(), t.c.nulls_last()])),
     )
 
     assert_result_equal(
@@ -269,8 +258,7 @@ def test_str_arrange(df_strings):
     def bind(col):
         assert_result_equal(
             df_strings,
-            lambda t: t
-            >> arrange(t[col].str.replace_all(" ", "").nulls_last(), t.c.nulls_last()),
+            lambda t: t >> arrange(t[col].str.replace_all(" ", "").nulls_last(), t.c.nulls_last()),
             check_row_order=True,
         )
 

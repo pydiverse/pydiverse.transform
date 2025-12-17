@@ -50,9 +50,7 @@ def test_join(df1, df2, how):
         df1,
         lambda t: t
         >> left_join(
-            r := t
-            >> left_join(s := t >> alias("s"), on=t.col1 == s.col1)
-            >> alias("r"),
+            r := t >> left_join(s := t >> alias("s"), on=t.col1 == s.col1) >> alias("r"),
             on=t.col1 == r.col1,
         ),
     )
@@ -99,8 +97,7 @@ def test_join_and_select(df1, df2, how):
 
     assert_result_equal(
         (df1, df2),
-        lambda t, u: t
-        >> join(u >> select(), (t.col1 == u.col1) & (u.col2 == t.col1), how=how),
+        lambda t, u: t >> join(u >> select(), (t.col1 == u.col1) & (u.col2 == t.col1), how=how),
         check_row_order=False,
     )
 
@@ -189,27 +186,18 @@ def test_ineq_join(df3, df4, df_strings):
         ),
     )
 
-    assert_result_equal(
-        (df3, df4), lambda s, t: s >> inner_join(t, on=["col1", s.col2 <= t.col2])
-    )
+    assert_result_equal((df3, df4), lambda s, t: s >> inner_join(t, on=["col1", s.col2 <= t.col2]))
 
 
 def test_join_summarize(df3, df4):
     assert_result_equal(
         (df3, df4),
-        lambda t3, t4: t3
-        >> group_by(t3.col2)
-        >> summarize(j=t3.col4.sum())
-        >> alias()
-        >> inner_join(t4, on="col2"),
+        lambda t3, t4: t3 >> group_by(t3.col2) >> summarize(j=t3.col4.sum()) >> alias() >> inner_join(t4, on="col2"),
     )
 
     assert_result_equal(
         (df3, df4),
-        lambda t3, t4: t4
-        >> left_join(
-            t3 >> group_by(t3.col2) >> summarize(j=t3.col4.sum()) >> alias(), on="col2"
-        ),
+        lambda t3, t4: t4 >> left_join(t3 >> group_by(t3.col2) >> summarize(j=t3.col4.sum()) >> alias(), on="col2"),
     )
 
     assert_result_equal(
@@ -224,10 +212,7 @@ def test_join_summarize(df3, df4):
 def test_join_window(df3, df4):
     assert_result_equal(
         (df3, df4),
-        lambda t3, t4: t3
-        >> mutate(y=t3.col1.dense_rank())
-        >> alias()
-        >> inner_join(t4, on=C.y == t4.col1),
+        lambda t3, t4: t3 >> mutate(y=t3.col1.dense_rank()) >> alias() >> inner_join(t4, on=C.y == t4.col1),
     )
 
     assert_result_equal(
@@ -253,9 +238,7 @@ def test_join_where(df2, df3, df4):
 
     assert_result_equal(
         (df3, df4),
-        lambda t3, t4: t3
-        >> filter(t3.col4 != -1729)
-        >> left_join(t4 >> filter(t4.col3 > 0), on=t3.col2 == t4.col2),
+        lambda t3, t4: t3 >> filter(t3.col4 != -1729) >> left_join(t4 >> filter(t4.col3 > 0), on=t3.col2 == t4.col2),
     )
 
     assert_result_equal(
@@ -278,10 +261,7 @@ def test_join_const_col(df3, df4):
 
     assert_result_equal(
         (df3, df4),
-        lambda s, t: s
-        >> mutate(z=2)
-        >> alias()
-        >> full_join(t >> mutate(j=True) >> alias(), on="col2"),
+        lambda s, t: s >> mutate(z=2) >> alias() >> full_join(t >> mutate(j=True) >> alias(), on="col2"),
     )
 
     assert_result_equal(

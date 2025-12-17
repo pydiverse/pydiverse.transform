@@ -64,21 +64,13 @@ class SqliteImpl(SqlImpl):
         return sqa.cast(compiled_expr, cls.sqa_type(cast.target_type))
 
     @classmethod
-    def fix_fn_types(
-        cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement
-    ) -> sqa.ColumnElement:
-        if (
-            fn.op
-            in (ops.horizontal_min, ops.horizontal_max, ops.mean, ops.min, ops.max)
-            and fn.dtype().is_float()
-        ):
+    def fix_fn_types(cls, fn: ColFn, val: sqa.ColumnElement, *args: sqa.ColumnElement) -> sqa.ColumnElement:
+        if fn.op in (ops.horizontal_min, ops.horizontal_max, ops.mean, ops.min, ops.max) and fn.dtype().is_float():
             return sqa.cast(val, sqa.Double)
         return val
 
     @classmethod
-    def compile_ordered_aggregation(
-        cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl
-    ):
+    def compile_ordered_aggregation(cls, *args: sqa.ColumnElement, order_by: list[sqa.UnaryExpression], impl):
         from sqlalchemy.dialects import postgresql
         from sqlalchemy.dialects.postgresql import aggregate_order_by
 
@@ -201,9 +193,7 @@ with SqliteImpl.impl_store.impl_manager as impl:
     @impl(ops.cbrt)
     def _cbrt(x):
         pow_impl = SqliteImpl.get_impl(ops.pow, (Float(), Float()))
-        return sqa.func.sign(x) * pow_impl(
-            sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double)
-        )
+        return sqa.func.sign(x) * pow_impl(sqa.func.abs(x), sqa.literal(1 / 3, type_=sqa.Double))
 
     @impl(ops.clip)
     def _clip(x, lower, upper):

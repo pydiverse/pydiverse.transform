@@ -12,9 +12,7 @@ from tests.util import assert_result_equal
 
 
 def test_noop(df2):
-    assert_result_equal(
-        df2, lambda t: t >> mutate(col1=t.col1, col2=t.col2, col3=t.col3)
-    )
+    assert_result_equal(df2, lambda t: t >> mutate(col1=t.col1, col2=t.col2, col3=t.col3))
 
 
 def test_multiply(df1):
@@ -27,9 +25,7 @@ def test_reorder(df2):
 
     assert_result_equal(
         df2,
-        lambda t: t
-        >> mutate(col1=t.col2, col2=t.col1)
-        >> mutate(col1=t.col2, col2=C.col3, col3=C.col2),
+        lambda t: t >> mutate(col1=t.col2, col2=t.col1) >> mutate(col1=t.col2, col2=C.col3, col3=C.col2),
     )
 
 
@@ -65,9 +61,7 @@ def test_none(df4):
 def test_mutate_bool_expr(df4):
     assert_result_equal(
         df4,
-        lambda t: t
-        >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= C.col4)
-        >> mutate(xAndY=C.x & C.y),
+        lambda t: t >> mutate(x=t.col1 <= t.col2, y=(t.col3 * 4) >= C.col4) >> mutate(xAndY=C.x & C.y),
     )
 
 

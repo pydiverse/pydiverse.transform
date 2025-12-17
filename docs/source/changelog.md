@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.3 (2025-12-17)
+- implement `tbl1 >> union(tbl2)` and `union(tbl1,tbl2)`
+
 ## 0.6.2 (2025-12-15)
 - drop support for python 3.10
 - fix is_sql_backend(Table) and backend(Table)
