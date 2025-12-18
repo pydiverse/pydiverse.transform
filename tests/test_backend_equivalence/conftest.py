@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 import polars as pl
 import pytest
+from util.filelock import lock
 
 from tests.fixtures.backend import BACKEND_MARKS, flatten
 from tests.util.backend import BACKEND_TABLES
@@ -310,16 +311,23 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
     return metafunc.parametrize(param_names, params, indirect=True)
 
 
+@pytest.fixture(scope="session")
+def locked():
+    with lock("/tmp/transform/lock"):
+        yield True
+
+
 def generate_df_fixtures():
     def gen_fixture(table_name):
         @pytest.fixture(scope="function")
-        def table_fixture(request):
+        def table_fixture(request, locked):
+            _ = locked
             df = dataframes[table_name]
             name = table_name
 
             table_x = BACKEND_TABLES[request.param[0]](df, name)
             table_y = BACKEND_TABLES[request.param[1]](df, name)
-            return table_x, table_y
+            yield table_x, table_y
 
         return table_fixture
 

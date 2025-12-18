@@ -4,6 +4,7 @@
 import polars as pl
 import pytest
 import sqlalchemy as sqa
+from util.filelock import lock
 
 import pydiverse.transform as pdt
 from pydiverse.transform.extended import *
@@ -60,21 +61,23 @@ df_right = pl.DataFrame(
 
 @pytest.fixture
 def engine():
-    engine = sqa.create_engine("sqlite:///:memory:")
-    # engine = sqa.create_engine("postgresql://sqa:Pydiverse23@127.0.0.1:6543")
-    # engine = sqa.create_engine(
-    #     "mssql+pyodbc://sqa:PydiQuant27@127.0.0.1:1433"
-    #     "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
-    # )
-    # engine = sqa.create_engine("db2+ibm_db://db2inst1:password@localhost:50000/testdb")
+    file = "/tmp/transform/test_pdt.sqlite"
+    with lock(file):
+        engine = sqa.create_engine("sqlite:///" + file)
+        # engine = sqa.create_engine("postgresql://sqa:Pydiverse23@127.0.0.1:6543")
+        # engine = sqa.create_engine(
+        #     "mssql+pyodbc://sqa:PydiQuant27@127.0.0.1:1433"
+        #     "/master?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no"
+        # )
+        # engine = sqa.create_engine("db2+ibm_db://db2inst1:password@localhost:50000/testdb")
 
-    df1.write_database("df1", engine, if_table_exists="replace")
-    df2.write_database("df2", engine, if_table_exists="replace")
-    df3.write_database("df3", engine, if_table_exists="replace")
-    df4.write_database("df4", engine, if_table_exists="replace")
-    df_left.write_database("df_left", engine, if_table_exists="replace")
-    df_right.write_database("df_right", engine, if_table_exists="replace")
-    return engine
+        df1.write_database("df1", engine, if_table_exists="replace")
+        df2.write_database("df2", engine, if_table_exists="replace")
+        df3.write_database("df3", engine, if_table_exists="replace")
+        df4.write_database("df4", engine, if_table_exists="replace")
+        df_left.write_database("df_left", engine, if_table_exists="replace")
+        df_right.write_database("df_right", engine, if_table_exists="replace")
+        yield engine
 
 
 @pytest.fixture

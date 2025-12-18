@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import pytest
+from util.filelock import lock
 
 import pydiverse.transform as pdt
 from pydiverse.transform.extended import *
@@ -189,13 +190,15 @@ def test_union_error_different_backends():
 
     # Create tables with different backends
     polars_tbl = pdt.Table(pl.DataFrame({"a": [1, 2]}))
-    engine = sqa.create_engine("sqlite:///:memory:")
-    pl.DataFrame({"a": [1, 2]}).write_database("test", engine, if_table_exists="replace")
-    sql_tbl = pdt.Table("test", pdt.SqlAlchemy(engine))
+    file = "/tmp/transform/test2.sqlite"
+    with lock(file):
+        engine = sqa.create_engine("sqlite:///" + file)
+        pl.DataFrame({"a": [1, 2]}).write_database("test", engine, if_table_exists="replace")
+        sql_tbl = pdt.Table("test", pdt.SqlAlchemy(engine))
 
-    # Should raise TypeError
-    with pytest.raises(TypeError, match="cannot union two tables with different backends"):
-        polars_tbl >> union(sql_tbl)
+        # Should raise TypeError
+        with pytest.raises(TypeError, match="cannot union two tables with different backends"):
+            polars_tbl >> union(sql_tbl)
 
 
 def test_union_error_grouped_table(df3, df4):

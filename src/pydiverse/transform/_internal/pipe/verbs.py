@@ -1458,7 +1458,7 @@ def union(
     │ 8   ┆ 10  │
     └─────┴─────┘
 
-    You can also call it directly:
+    You can also call it in this form:
     >>> union(t1, t2) >> show()
     """
     # If called with two arguments directly (union(tbl1, tbl2)), return Table directly
