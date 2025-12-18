@@ -258,23 +258,22 @@ class ColExpr(Generic[T]):
         >>> t = pdt.Table(
         ...     {
         ...         "a": [4, 3, -35, 24, 105],
-        ...         "b": [4, 4, 0, -23, 42],
         ...     }
         ... )
-        >>> t >> mutate(c=t.a.is_in(t.b, 24)) >> show()
-        Table <unnamed>, backend: PolarsImpl
-        shape: (5, 3)
-        ┌─────┬─────┬───────┐
-        │ a   ┆ b   ┆ c     │
-        │ --- ┆ --- ┆ ---   │
-        │ i64 ┆ i64 ┆ bool  │
-        ╞═════╪═════╪═══════╡
-        │ 4   ┆ 4   ┆ true  │
-        │ 3   ┆ 4   ┆ false │
-        │ -35 ┆ 0   ┆ false │
-        │ 24  ┆ -23 ┆ true  │
-        │ 105 ┆ 42  ┆ false │
-        └─────┴─────┴───────┘
+        >>> t >> mutate(map=t.a.map({4:True,3:True,-35:False,105:False}, default=pdt.lit(None))) >> show()
+        Table without name (backend: polars)
+        shape: (5, 2)
+        ┌─────┬───────┐
+        │ a   ┆ map   │
+        │ --- ┆ ---   │
+        │ i64 ┆ bool  │
+        ╞═════╪═══════╡
+        │ 4   ┆ true  │
+        │ 3   ┆ true  │
+        │ -35 ┆ false │
+        │ 24  ┆ null  │
+        │ 105 ┆ false │
+        └─────┴───────┘
         """
         return CaseExpr(
             (
