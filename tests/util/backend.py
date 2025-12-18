@@ -79,12 +79,12 @@ def sql_table(
 
 @_cached_table
 def sqlite_table(df: pl.DataFrame, name: str):
-    return sql_table(df, name, "sqlite:///:memory:")
+    return sql_table(df, name, "sqlite:////tmp/transform/test.sqlite")
 
 
 @_cached_table
 def duckdb_table(df: pl.DataFrame, name: str):
-    return sql_table(df, name, "duckdb:///:memory:")
+    return sql_table(df, name, "duckdb:////tmp/transform/test.duckdb")
 
 
 @_cached_table
@@ -96,7 +96,9 @@ def duckdb_parquet_table(df: pl.DataFrame, name: str):
     if "duckdb_parquet" in _sql_engine_cache:
         engine = _sql_engine_cache["duckdb_parquet"]
     else:
-        engine = sqa.create_engine("duckdb:///:memory:")
+        file = "/tmp/transform/test_parquet.duckdb"
+        Path(file).parent.mkdir(parents=True, exist_ok=True)
+        engine = sqa.create_engine("duckdb:///" + file)
     _sql_engine_cache["duckdb_parquet"] = engine
     path = Path(tempfile.gettempdir()) / "pdtransform" / "tests"
     file = path / f"{name}.parquet"

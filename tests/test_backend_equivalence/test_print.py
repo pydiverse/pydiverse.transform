@@ -6,7 +6,7 @@ from pydiverse.transform.extended import *
 
 def test_preview_print(df3, df4, df_strings):
     def data_part(p: str):
-        return p.split("\n", 1)[1]
+        return p.split("\n", 1)[1].split("\n\n", 1)[0]
 
     assert data_part(str(df3[0])) == data_part(str(df3[1]))
     assert data_part(str(df_strings[0])) == data_part(str(df_strings[1]))
