@@ -281,7 +281,7 @@ class ColExpr(Generic[T]):
                     self.is_in(
                         *(
                             (wrap_literals(elem) for elem in key)
-                            if isinstance(key, Iterable)
+                            if isinstance(key, Iterable) and not isinstance(key, str)
                             else (wrap_literals(key),)
                         ),
                     ),

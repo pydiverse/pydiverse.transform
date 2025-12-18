@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.4 (2025-12-18)
+- fix col.map() Null-type handling and string operations
+
 ## 0.6.3 (2025-12-17)
 - implement `tbl1 >> union(tbl2)` and `union(tbl1,tbl2)`
 

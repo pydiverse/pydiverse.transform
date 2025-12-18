@@ -5,11 +5,44 @@ import pydiverse.transform as pdt
 from pydiverse.transform import C
 from pydiverse.transform._internal.errors import DataTypeError, FunctionTypeError
 from pydiverse.transform._internal.pipe.verbs import (
+    export,
     group_by,
     mutate,
+    select,
     summarize,
 )
 from tests.util import assert_result_equal
+
+
+def test_map(df4):
+    assert_result_equal(
+        df4,
+        lambda t: t
+        >> mutate(
+            x1=t.col4.map({(4, 5, 6): -1}),
+            x2=t.col1.map({0: 0, 1: None}),
+            x3=t.col5.map({("a", "b", "c"): "abc"}).map({"abc": "abcd"}),
+            x4=t.col4.map({(4, 5, 6): "minus one"}, default="default"),
+            x5=t.col1.map({0: "zero", 1: None}, default="default"),
+            x6=t.col5.map({("a", "b", "c"): 1}, default=0),
+            x7=t.col4.map({(4, 5, 6): "minus one"}, default=pdt.lit(None)),
+            x8=t.col1.map({0: "zero", 1: None}, default=pdt.lit(None)),
+            x9=t.col5.map({("a", "b", "c"): 1}, default=pdt.lit(None)),
+        ),
+    )
+
+    t = df4[0]
+    res = (
+        t
+        >> select()
+        >> mutate(
+            x=t.col5.map({("a", "b", "c"): "abc"}).map({("abc",): "abcd"}, default=pdt.lit(None)),
+            y=t.col5.map({("a", "b", "c"): "abc"}).map({"abc": "abcd"}, default=pdt.lit(None)),
+        )
+        >> export(pdt.DictOfLists)
+    )
+    assert res["x"] == ["abcd"] * 3 + [None] * 10
+    assert res["y"] == ["abcd"] * 3 + [None] * 10
 
 
 def test_mutate_case_ewise(df4):

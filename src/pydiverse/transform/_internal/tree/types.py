@@ -187,6 +187,7 @@ S = Tyvar("S")
 
 
 def lca_type(dtypes: list[Dtype]) -> Dtype:
+    dtypes = [without_const(dtype) for dtype in dtypes if not isinstance(dtype, NullType)]
     if len(dtypes) == 0:
         return NullType()
 
