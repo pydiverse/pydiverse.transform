@@ -4,11 +4,11 @@
 import polars as pl
 import pytest
 import sqlalchemy as sqa
-from util.filelock import lock
 
 import pydiverse.transform as pdt
 from pydiverse.transform.extended import *
 from tests.util import assert_equal
+from tests.util.filelock import lock
 
 df1 = pl.DataFrame(
     {

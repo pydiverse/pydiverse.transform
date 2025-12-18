@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import pytest
-from util.filelock import lock
 
 import pydiverse.transform as pdt
 from pydiverse.transform.extended import *
 from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
+from tests.util.filelock import lock
 
 
 def test_union_basic(df3, df4):

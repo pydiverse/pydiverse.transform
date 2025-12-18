@@ -5,10 +5,10 @@ from datetime import date, datetime
 
 import polars as pl
 import pytest
-from util.filelock import lock
 
 from tests.fixtures.backend import BACKEND_MARKS, flatten
 from tests.util.backend import BACKEND_TABLES
+from tests.util.filelock import lock
 
 dataframes = {
     "df1": pl.DataFrame(
