@@ -1360,42 +1360,6 @@ def _union_impl(
     *,
     distinct: bool = False,
 ) -> Table:
-    """
-    Unions two tables by stacking rows vertically.
-
-    The left table in the union comes through the pipe `>>` operator from the
-    left.
-
-    :param right:
-        The right table to union with.
-
-    :param distinct:
-        If ``True``, performs UNION (removes duplicates). If ``False``,
-        performs UNION ALL (keeps duplicates).
-
-    Note
-    ----
-    Both tables must have the same number of columns with compatible types.
-    Column names must match between the two tables.
-
-    Examples
-    --------
-    >>> t1 = pdt.Table({"a": [1, 2, 3], "b": [4, 5, 6]}, name="t1")
-    >>> t2 = pdt.Table({"a": [7, 8], "b": [9, 10]}, name="t2")
-    >>> t1 >> union(t2) >> show()
-    shape: (5, 2)
-    ┌─────┬─────┐
-    │ a   ┆ b   │
-    │ --- ┆ --- │
-    │ i64 ┆ i64 │
-    ╞═════╪═════╡
-    │ 1   ┆ 4   │
-    │ 2   ┆ 5   │
-    │ 3   ┆ 6   │
-    │ 7   ┆ 9   │
-    │ 8   ┆ 10  │
-    └─────┴─────┘
-    """
     errors.check_arg_type(Table, "union", "right", right)
 
     if left._cache.backend != right._cache.backend:
@@ -1457,11 +1421,15 @@ def union(
     """
     Unions two tables by stacking rows vertically.
 
-    The left table in the union comes through the pipe `>>` operator from the
+    The left table in the union may come through the pipe `>>` operator from the
     left.
 
+    :param left_or_right:
+        In case of tbl1 >> union(tbl2) this is the right table (tbl2).
+        In case of union(tbl1, tbl2) this is the left table (tbl1).
+
     :param right:
-        The right table to union with.
+        The right table to union with in case of union(tbl1, tbl2).
 
     :param distinct:
         If ``True``, performs UNION (removes duplicates). If ``False``,

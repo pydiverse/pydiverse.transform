@@ -275,7 +275,7 @@ class Table:
                 query = "\n\nQuery:\n" + query
         except Exception:
             query = ""
-        return res + str(df).split("\n", 1)[1]
+        return res + str(df).split("\n", 1)[1] + query
 
     def __dir__(self) -> list[str]:
         return [name for name in self._cache.name_to_uuid.keys()]
@@ -314,7 +314,9 @@ def get_head_tail(tbl: Table) -> tuple[pl.DataFrame, int]:
 
     height = tbl >> summarize(num_rows=pdt.count()) >> export(pdt.Scalar)
     tbl_rows = int(pl.Config.state().get("POLARS_FMT_MAX_ROWS") or 10)
-    head_tail_len = tbl_rows // 2 + 1
+    if height <= tbl_rows:
+        return tbl >> export(pdt.Polars), height
+    head_tail_len = tbl_rows // 2
 
     # Only export the first and last few rows.
     head: pl.DataFrame = tbl >> slice_head(head_tail_len) >> export(pdt.Polars)
