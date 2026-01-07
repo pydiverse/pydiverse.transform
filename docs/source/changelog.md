@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.5 (2026-01-DD)
+- fix sqlalchemy deprecation warnings
+
 ## 0.6.4 (2025-12-18)
 - fix col.map() Null-type handling and string operations
 - fix print display of short tables

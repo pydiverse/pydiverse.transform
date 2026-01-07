@@ -129,6 +129,9 @@ class TestSqlTable:
     def test_export(self, tbl1):
         assert_equal(tbl1 >> export(Polars()), df1)
 
+    def test_export_mutate(self, tbl1):
+        assert_equal(tbl1 >> mutate(col3=tbl1.col1 * 2) >> export(Polars()), df1.with_columns(col3=df1["col1"] * 2))
+
     def test_select(self, tbl1):
         assert_equal(tbl1 >> select(tbl1.col1), df1.select("col1"))
         assert_equal(tbl1 >> select(tbl1.col2), df1.select("col2"))
