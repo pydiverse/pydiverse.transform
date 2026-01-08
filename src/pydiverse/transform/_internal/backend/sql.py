@@ -172,19 +172,19 @@ class SqlImpl(TableImpl):
                     connection=conn,
                     schema_overrides={
                         sql_col.name: schema_overrides[col._uuid]
-                        for sql_col, col in zip(sel.columns.values(), final_select, strict=True)
+                        for sql_col, col in zip(sel.selected_columns.values(), final_select, strict=True)
                         if col._uuid in schema_overrides
                     }
                     | {
                         sql_col.name: NullType().to_polars()
-                        for sql_col, col in zip(sel.columns.values(), final_select, strict=True)
+                        for sql_col, col in zip(sel.selected_columns.values(), final_select, strict=True)
                         if types.without_const(col.dtype()) == NullType()
                     },
                 )
                 # fix column names in case default case is modified by database driver
                 # (for example IBM DB2 returns lowercase columns as uppercase column
                 # names)
-                df.columns = [c.name for c in sel.columns]
+                df.columns = [c.name for c in sel.selected_columns]
                 df.name = nd.name
                 return df
 
