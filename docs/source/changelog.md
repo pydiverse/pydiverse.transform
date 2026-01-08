@@ -1,6 +1,7 @@
 # Changelog
 
-## 0.7.0 (2026-01-DD)
+## 0.7.0 (2026-01-08)
+- accept whitespace problems in MSSQL equality comparisons since the fix killed JOIN performance
 - disable printing of table data for SQL backends (issue #100 is to make this configurable)
 - fix sqlalchemy deprecation warnings
 

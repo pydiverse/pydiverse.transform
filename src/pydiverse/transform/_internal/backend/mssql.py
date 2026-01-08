@@ -234,10 +234,13 @@ with MsSqlImpl.impl_store.impl_manager as impl:
 
     @impl(ops.equal, String(), String())
     def _eq(x, y):
-        return (sqa.func.LENGTH(x + "a") == sqa.func.LENGTH(y + "a")) & (x.collate("Latin1_General_bin") == y)
+        return x == y
+        # # this would be more correct for whitespace only strings, but it kills JOIN performance
+        # return (sqa.func.LENGTH(x + "a") == sqa.func.LENGTH(y + "a")) & (x.collate("Latin1_General_bin") == y)
 
     @impl(ops.not_equal, String(), String())
     def _ne(x, y):
+        # interestingly this actually better matches NOT(x == y)
         return (sqa.func.LENGTH(x + "a") != sqa.func.LENGTH(y + "a")) | (x.collate("Latin1_General_bin") != y)
 
     @impl(ops.less_than, String(), String())
