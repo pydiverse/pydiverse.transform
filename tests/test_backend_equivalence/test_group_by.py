@@ -64,6 +64,30 @@ def test_grouped_join(df1, df3):
     )
 
 
+def test_grouped_join_with_alias(df1, df3):
+    assert_result_equal(
+        (df1, df3),
+        lambda t, u: t >> group_by(C.col1) >> alias() >> join(u, "col1", how="left"),
+    )
+
+    assert_result_equal(
+        (df1, df3),
+        lambda t, u: t >> join(u >> group_by(C.col1) >> alias(), "col1", how="left"),
+    )
+
+
+def test_grouped_join_with_alias_keep_refs(df1, df3):
+    assert_result_equal(
+        (df1, df3),
+        lambda t, u: t >> group_by(C.col1) >> alias(keep_col_refs=True) >> join(u, t.col1 == u.col1, how="left"),
+    )
+
+    assert_result_equal(
+        (df1, df3),
+        lambda t, u: t >> join(u >> group_by(C.col1) >> alias(keep_col_refs=True), t.col1 == u.col1, how="left"),
+    )
+
+
 @pytest.mark.parametrize("how", ["inner", "left"])
 def test_ungrouped_join(df1, df3, how):
     # After ungrouping joining should work again

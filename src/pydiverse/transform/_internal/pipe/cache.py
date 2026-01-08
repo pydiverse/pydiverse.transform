@@ -199,6 +199,7 @@ class Cache:
             }
             res.limit = 0
             res.group_by = set()
+            res.partition_by = []
             res.is_filtered = False
 
         assert len(res.name_to_uuid) == len(res.uuid_to_name)
@@ -251,7 +252,7 @@ class Cache:
                 return "window function among grouping columns"
 
         if isinstance(node, verbs.Join):
-            if self.group_by:
+            if self.group_by or self.partition_by:
                 return "join with a grouped table"
 
             if (node.how == "full" or (node.child not in self.derived_from and node.how == "left")) and any(
