@@ -257,25 +257,29 @@ class Table:
         res = tbl_name + f"(backend: {self._cache.backend.backend_name})\n"
 
         try:
-            df, height = get_head_tail(self)
-            res += f"shape: ({height}, {len(self)})\n"
-
-        except Exception as e:
-            try:
-                ast = repr(self._ast)
-            except Exception:
-                ast = ""
-            return res + f"export failed\n{type(e).__name__}: {str(e)}\n{ast}"
+            ast = repr(self._ast)
+        except Exception:
+            ast = ""
 
         try:
             query = self >> build_query()
-            if query is None:
-                query = ""
-            else:
+            if query is not None:
                 query = "\n\nQuery:\n" + query
-        except Exception:
-            query = ""
-        return res + str(df).split("\n", 1)[1] + query
+            else:
+                query = ""
+        except Exception as e:
+            return res + f"building query failed\n{type(e).__name__}: {str(e)}\n{ast}"
+
+        df_str = ""
+        if query == "":
+            # consider making it configurable to show both query and df_str for sql backends
+            try:
+                df, height = get_head_tail(self)
+                res += f"shape: ({height}, {len(self)})\n"
+                df_str = str(df).split("\n", 1)[1]
+            except Exception as e:
+                return res + f"export failed\n{type(e).__name__}: {str(e)}\n{ast}"
+        return res + df_str + query
 
     def __dir__(self) -> list[str]:
         return [name for name in self._cache.name_to_uuid.keys()]

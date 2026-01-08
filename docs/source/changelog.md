@@ -1,6 +1,7 @@
 # Changelog
 
-## 0.6.5 (2026-01-DD)
+## 0.7.0 (2026-01-DD)
+- disable printing of table data for SQL backends (issue #100 is to make this configurable)
 - fix sqlalchemy deprecation warnings
 
 ## 0.6.4 (2025-12-18)
