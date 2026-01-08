@@ -6,7 +6,7 @@ from tests.fixtures.backend import skip_backends
 from tests.util import assert_result_equal
 
 
-@skip_backends("ibm_db2")  # IBM DB2 is not good with whitespaces
+@skip_backends("ibm_db2", "mssql")  # IBM DB2 and MSSQL are not good with whitespaces
 def test_eq_whitespace(df_strings):
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == " "))
     assert_result_equal(df_strings, lambda t: t >> filter(C.col1 == C.col2))
