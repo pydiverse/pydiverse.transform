@@ -270,6 +270,9 @@ def compile_ast(
 ) -> tuple[pl.LazyFrame, dict[UUID, str], list[UUID], list[UUID]]:
     if isinstance(nd, verbs.Verb):
         df, name_in_df, select, partition_by = compile_ast(nd.child)
+        # SubqueryMarker materializes the table, clearing grouping state
+        if isinstance(nd, verbs.SubqueryMarker):
+            partition_by = []
 
     if isinstance(nd, verbs.Mutate | verbs.Summarize | verbs.Rename):
         if isinstance(nd, verbs.Rename):
@@ -373,7 +376,11 @@ def compile_ast(
         partition_by = []
 
     elif isinstance(nd, verbs.Join):
-        assert len(partition_by) == 0
+        if partition_by:
+            raise ValueError(
+                f"cannot join grouped table `{nd.child.short_name()}`\n"
+                "hint: If you are sure you want to do a subquery, put an `>> alias()` before the join."
+            )
 
         right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
         predicates = split_join_cond(nd.on)
@@ -442,7 +449,11 @@ def compile_ast(
         select += right_select
 
     elif isinstance(nd, verbs.Union):
-        assert len(partition_by) == 0
+        if partition_by:
+            raise ValueError(
+                f"cannot union grouped table `{nd.child.short_name()}`\n"
+                "hint: If you are sure you want to do a subquery, put an `>> alias()` before the union."
+            )
 
         right_df, right_name_in_df, right_select, _ = compile_ast(nd.right)
 

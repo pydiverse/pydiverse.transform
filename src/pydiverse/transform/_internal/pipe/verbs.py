@@ -1100,11 +1100,6 @@ def join(
     if left._cache.backend != right._cache.backend:
         raise TypeError("cannot join two tables with different backends")
 
-    if left._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{left._ast.short_name()}`")
-    elif right._cache.partition_by:
-        raise ValueError(f"cannot join grouped table `{right._ast.short_name()}`")
-
     if intersection := left._cache.derived_from & right._cache.derived_from:
         raise ValueError(
             f"table `{list(intersection)[0].name}` occurs twice in the table "
