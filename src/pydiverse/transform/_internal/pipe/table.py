@@ -1,4 +1,4 @@
-# Copyright (c) QuantCo and pydiverse contributors 2025-2025
+# Copyright (c) QuantCo and pydiverse contributors 2025-2026
 # SPDX-License-Identifier: BSD-3-Clause
 
 import inspect
@@ -314,8 +314,9 @@ class Table:
 
 def get_head_tail(tbl: Table) -> tuple[pl.DataFrame, int]:
     import pydiverse.transform as pdt
-    from pydiverse.transform._internal.pipe.verbs import export, slice_head, summarize
+    from pydiverse.transform._internal.pipe.verbs import export, slice_head, summarize, ungroup
 
+    tbl = tbl >> ungroup()
     height = tbl >> summarize(num_rows=pdt.count()) >> export(pdt.Scalar)
     tbl_rows = int(pl.Config.state().get("POLARS_FMT_MAX_ROWS") or 10)
     if height <= tbl_rows:
