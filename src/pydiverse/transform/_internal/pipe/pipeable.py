@@ -103,38 +103,97 @@ def verb(fn):
 
 
 def check_subquery(new_tbl, child_tbl, *, is_right: bool = False):
-    if (reason := child_tbl._cache.requires_subquery(new_tbl._ast)) is not None:
+    reason = child_tbl._cache.requires_subquery(new_tbl._ast)
+    if reason is not None:
         # Search among descendants of the current node for an `Alias` that can be used
         # to create a subquery. If we hit a `Join` or `SubqueryMarker`, we stop.
+        # First check if the child itself is an Alias (common case)
+        if isinstance(child_tbl._ast, verbs.Alias):
+            nd = child_tbl._ast
+            # Create a new Join with SubqueryMarker as child
+            subquery_marker = verbs.SubqueryMarker(nd)
+            if is_right:
+                assert isinstance(new_tbl._ast, verbs.Join)
+                new_join = verbs.Join(
+                    new_tbl._ast.child,
+                    subquery_marker,
+                    new_tbl._ast.on,
+                    new_tbl._ast.how,
+                    new_tbl._ast.validate,
+                )
+                new_join.name = new_tbl._ast.name
+                subquery_node = new_join.right
+            else:
+                assert isinstance(new_tbl._ast, verbs.Join)
+                new_join = verbs.Join(
+                    subquery_marker,
+                    new_tbl._ast.right,
+                    new_tbl._ast.on,
+                    new_tbl._ast.how,
+                    new_tbl._ast.validate,
+                )
+                new_join.name = new_tbl._ast.name
+                subquery_node = new_join.child
+
+            from pydiverse.transform._internal.pipe.table import Table
+
+            test_tbl = Table(subquery_node)
+            new_join.map_col_nodes(
+                lambda expr: test_tbl._cache.cols[expr._uuid]  # noqa: B023
+                if isinstance(expr, Col) and expr._uuid in test_tbl._cache.cols  # noqa: B023
+                else expr
+            )
+            modified_new_tbl = copy.copy(new_tbl)
+            modified_new_tbl._ast = new_join
+            return (modified_new_tbl, test_tbl)
+
         chain: list[verbs.Verb] = [new_tbl._ast]
         for nd in child_tbl._ast.iter_subtree_preorder():
             if isinstance(nd, verbs.Alias):
-                new_chain = [copy.copy(c) for c in chain]
-                new_chain.append(verbs.SubqueryMarker(nd))
-
-                # rebuild the part of the AST leading to the `Alias`
-                for i in range(1, len(new_chain) - 1):
-                    new_chain[i].child = new_chain[i + 1]
+                # Create a new Join with SubqueryMarker as child
+                # Don't clone the Join - create a new one with the SubqueryMarker
+                subquery_marker = verbs.SubqueryMarker(nd)
                 if is_right:
                     assert isinstance(new_tbl._ast, verbs.Join)
-                    new_chain[0].right = new_chain[1]
+                    # Create a new Join with the same attributes but SubqueryMarker as right child
+                    new_join = verbs.Join(
+                        new_tbl._ast.child,  # left child stays the same
+                        subquery_marker,  # right child is SubqueryMarker
+                        new_tbl._ast.on,
+                        new_tbl._ast.how,
+                        new_tbl._ast.validate,
+                    )
+                    new_join.name = new_tbl._ast.name
+                    subquery_node = new_join.right
                 else:
-                    new_chain[0].child = new_chain[1]
+                    # Create a new Join with SubqueryMarker as left child
+                    assert isinstance(new_tbl._ast, verbs.Join)
+                    new_join = verbs.Join(
+                        subquery_marker,  # left child is SubqueryMarker
+                        new_tbl._ast.right,  # right child stays the same
+                        new_tbl._ast.on,
+                        new_tbl._ast.how,
+                        new_tbl._ast.validate,
+                    )
+                    new_join.name = new_tbl._ast.name
+                    subquery_node = new_join.child
 
                 from pydiverse.transform._internal.pipe.table import Table
 
-                # See if we still need a subquery
-                test_tbl = Table(new_chain[1])
-                new_chain[0].map_col_nodes(
+                # Create a test table from the SubqueryMarker to get its cache (which should have partition_by cleared)
+                test_tbl = Table(subquery_node)
+
+                # Update column references in the new AST to point to columns from the subquery
+                new_join.map_col_nodes(
                     lambda expr: test_tbl._cache.cols[expr._uuid]  # noqa: B023
                     if isinstance(expr, Col) and expr._uuid in test_tbl._cache.cols  # noqa: B023
                     else expr
                 )
-                if test_tbl._cache.requires_subquery(new_chain[0]):
-                    break
 
+                # SubqueryMarker should have cleared partition_by and group_by
+                # Use the modified AST with the SubqueryMarker
                 modified_new_tbl = copy.copy(new_tbl)
-                modified_new_tbl._ast = new_chain[0]
+                modified_new_tbl._ast = new_join
                 return (modified_new_tbl, test_tbl)
 
             if isinstance(nd, verbs.SubqueryMarker | verbs.Join):
