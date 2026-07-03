@@ -27,15 +27,17 @@ def test_string_to_int(df_strings):
 def test_float_to_int(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            **{
-                col.name: pdt.when((col <= (1 << 63) - 1) & (col >= -(1 << 63)))
-                .then(col)
-                .otherwise(0)
-                .cast(pdt.Float64())
-                for col in t
-            }
+        lambda t: (
+            t
+            >> mutate(
+                **{
+                    col.name: pdt.when((col <= (1 << 63) - 1) & (col >= -(1 << 63)))
+                    .then(col)
+                    .otherwise(0)
+                    .cast(pdt.Float64())
+                    for col in t
+                }
+            )
         ),
     )
 
@@ -61,23 +63,27 @@ def test_int_to_string(df_int):
 def test_float_to_string(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(**{c.name: c.cast(pdt.String()) for c in t})
-        >> (lambda s: mutate(**{c.name: c.cast(pdt.Float64()) for c in s})),
+        lambda t: (
+            t
+            >> mutate(**{c.name: c.cast(pdt.String()) for c in t})
+            >> (lambda s: mutate(**{c.name: c.cast(pdt.Float64()) for c in s}))
+        ),
     )
 
 
 def test_datetime_to_string(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=t.col1.cast(pdt.String()),
-            y=t.col2.cast(pdt.String()),
-        )
-        >> mutate(
-            x=C.x.str.to_datetime(),
-            y=C.y.str.to_datetime(),
+        lambda t: (
+            t
+            >> mutate(
+                x=t.col1.cast(pdt.String()),
+                y=t.col2.cast(pdt.String()),
+            )
+            >> mutate(
+                x=C.x.str.to_datetime(),
+                y=C.y.str.to_datetime(),
+            )
         ),
     )
 
@@ -85,11 +91,13 @@ def test_datetime_to_string(df_datetime):
 def test_date_to_string(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=t.col1.cast(pdt.Date()).cast(pdt.String()),
-            y=t.col2.cast(pdt.Date()).cast(pdt.String()),
-            z=t.cdate.cast(pdt.String()),
+        lambda t: (
+            t
+            >> mutate(
+                x=t.col1.cast(pdt.Date()).cast(pdt.String()),
+                y=t.col2.cast(pdt.Date()).cast(pdt.String()),
+                z=t.cdate.cast(pdt.String()),
+            )
         ),
     )
 
@@ -98,12 +106,14 @@ def test_date_to_string(df_datetime):
 def test_non_strict_cast(df_strings):
     assert_result_equal(
         df_strings,
-        lambda t: t
-        >> mutate(
-            **{
-                f"{col.name}_{dtype}": col.cast(dtype, strict=False)
-                for col in t
-                for dtype in (Int64(), Int32(), Float64(), Float32())
-            }
+        lambda t: (
+            t
+            >> mutate(
+                **{
+                    f"{col.name}_{dtype}": col.cast(dtype, strict=False)
+                    for col in t
+                    for dtype in (Int64(), Int32(), Float64(), Float32())
+                }
+            )
         ),
     )

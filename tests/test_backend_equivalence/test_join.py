@@ -38,38 +38,46 @@ def test_join(df1, df2, how):
 
     assert_result_equal(
         (df1, df2),
-        lambda t, u: u
-        >> join(
-            s := t >> left_join(u, on=t.col1 == u.col2) >> alias("b"),
-            on=s.col1 == u.col1,
-            how=how,
+        lambda t, u: (
+            u
+            >> join(
+                s := t >> left_join(u, on=t.col1 == u.col2) >> alias("b"),
+                on=s.col1 == u.col1,
+                how=how,
+            )
         ),
     )
 
     assert_result_equal(
         df1,
-        lambda t: t
-        >> left_join(
-            r := t >> left_join(s := t >> alias("s"), on=t.col1 == s.col1) >> alias("r"),
-            on=t.col1 == r.col1,
+        lambda t: (
+            t
+            >> left_join(
+                r := t >> left_join(s := t >> alias("s"), on=t.col1 == s.col1) >> alias("r"),
+                on=t.col1 == r.col1,
+            )
         ),
     )
 
     assert_result_equal(
         df1,
-        lambda t: t
-        >> left_join(s := t >> alias("s"), on=t.col1 == s.col1)
-        >> left_join(r := t >> alias("r"), on=t.col1 == r.col1),
+        lambda t: (
+            t
+            >> left_join(s := t >> alias("s"), on=t.col1 == s.col1)
+            >> left_join(r := t >> alias("r"), on=t.col1 == r.col1)
+        ),
     )
 
     assert_result_equal(
         (df1, df2),
-        lambda t, u: t
-        >> join(u, (t.col1 == u.col1) & (t.col1 == u.col2), how=how)
-        >> mutate(l=t.col2.str.len())
-        >> left_join(v := u >> alias("v"), v.col2 == C.l)
-        >> mutate(k=v.col1 + C.l + u.col2)
-        >> full_join(w := t >> alias("w"), (t.col1 == w.col1) & (C.k == w.col1)),
+        lambda t, u: (
+            t
+            >> join(u, (t.col1 == u.col1) & (t.col1 == u.col2), how=how)
+            >> mutate(l=t.col2.str.len())
+            >> left_join(v := u >> alias("v"), v.col2 == C.l)
+            >> mutate(k=v.col1 + C.l + u.col2)
+            >> full_join(w := t >> alias("w"), (t.col1 == w.col1) & (C.k == w.col1))
+        ),
         check_row_order=False,
     )
 
@@ -148,41 +156,49 @@ def test_ineq_join(df3, df4, df_strings):
 
     assert_result_equal(
         (df4, df_strings),
-        lambda s, t: s
-        >> inner_join(
-            tm := t >> mutate(u=t.col1.str.len()),
-            s.col3 <= tm.u,
-            suffix="_42",
+        lambda s, t: (
+            s
+            >> inner_join(
+                tm := t >> mutate(u=t.col1.str.len()),
+                s.col3 <= tm.u,
+                suffix="_42",
+            )
         ),
     )
 
     assert_result_equal(
         (df3, df_strings),
-        lambda s, t: s
-        >> inner_join(
-            t,
-            (s.col1 - s.col2 <= t.c.str.len())
-            & (s.col4 >= pdt.when(t.col1.str.starts_with("-")).then(100).otherwise(4)),
+        lambda s, t: (
+            s
+            >> inner_join(
+                t,
+                (s.col1 - s.col2 <= t.c.str.len())
+                & (s.col4 >= pdt.when(t.col1.str.starts_with("-")).then(100).otherwise(4)),
+            )
         ),
     )
 
     assert_result_equal(
         (df3, df_strings),
-        lambda s, t: s
-        >> left_join(
-            t,
-            (s.col1 - s.col2 <= t.c.str.len() * t.d.str.len())
-            & (s.col4 >= pdt.when(t.col1.str.starts_with("-")).then(100).otherwise(7)),
+        lambda s, t: (
+            s
+            >> left_join(
+                t,
+                (s.col1 - s.col2 <= t.c.str.len() * t.d.str.len())
+                & (s.col4 >= pdt.when(t.col1.str.starts_with("-")).then(100).otherwise(7)),
+            )
         ),
     )
 
     assert_result_equal(
         (df3, df_strings),
-        lambda s, t: s
-        >> left_join(
-            t,
-            (s.col4 - s.col2 <= t.col1.str.len() * t.d.str.len())
-            & (s.col4 >= pdt.when(t.col1.str.starts_with(" ")).then(10).otherwise(7)),
+        lambda s, t: (
+            s
+            >> left_join(
+                t,
+                (s.col4 - s.col2 <= t.col1.str.len() * t.d.str.len())
+                & (s.col4 >= pdt.when(t.col1.str.starts_with(" ")).then(10).otherwise(7)),
+            )
         ),
     )
 
@@ -202,10 +218,9 @@ def test_join_summarize(df3, df4):
 
     assert_result_equal(
         (df3, df4),
-        lambda t3, t4: t3
-        >> summarize(y=t3.col1.max(), z=t3.col4.mean())
-        >> alias()
-        >> left_join(t4, on=C.y == t4.col4),
+        lambda t3, t4: (
+            t3 >> summarize(y=t3.col1.max(), z=t3.col4.mean()) >> alias() >> left_join(t4, on=C.y == t4.col4)
+        ),
     )
 
 
@@ -217,10 +232,9 @@ def test_join_window(df3, df4):
 
     assert_result_equal(
         (df3, df4),
-        lambda s, t: s
-        >> mutate(y=s.col1.shift(1, arrange=s.col4.nulls_first()))
-        >> alias()
-        >> inner_join(t, on="col2"),
+        lambda s, t: (
+            s >> mutate(y=s.col1.shift(1, arrange=s.col4.nulls_first())) >> alias() >> inner_join(t, on="col2")
+        ),
     )
 
     assert_result_equal(
@@ -243,12 +257,14 @@ def test_join_where(df2, df3, df4):
 
     assert_result_equal(
         (df3, df4),
-        lambda t3, t4: t3
-        >> filter(t3.col1 % 2 == 0)
-        >> alias(keep_col_refs=True)
-        >> full_join(
-            t4_filtered := t4 >> filter(t4.col1.is_not_null()) >> alias(),
-            on=t3.col2 == t4_filtered.col2,
+        lambda t3, t4: (
+            t3
+            >> filter(t3.col1 % 2 == 0)
+            >> alias(keep_col_refs=True)
+            >> full_join(
+                t4_filtered := t4 >> filter(t4.col1.is_not_null()) >> alias(),
+                on=t3.col2 == t4_filtered.col2,
+            )
         ),
     )
 
@@ -266,11 +282,13 @@ def test_join_const_col(df3, df4):
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=4, y=5)
-        >> mutate(z=C.x + C.y)
-        >> alias(keep_col_refs=True)
-        >> full_join(t_ := t >> alias(), on=t.col1 == t_.col2),
+        lambda t: (
+            t
+            >> mutate(x=4, y=5)
+            >> mutate(z=C.x + C.y)
+            >> alias(keep_col_refs=True)
+            >> full_join(t_ := t >> alias(), on=t.col1 == t_.col2)
+        ),
     )
 
 

@@ -38,12 +38,14 @@ def test_filter_after_mutate(df4):
 def test_filter_is_in(df4):
     assert_result_equal(
         df4,
-        lambda t: t
-        >> filter(
-            C.col1.is_in(0, 2),
-            C.col2.is_in(0, t.col1 * t.col2),
-        )
-        >> mutate(u=C.col3.is_in()),
+        lambda t: (
+            t
+            >> filter(
+                C.col1.is_in(0, 2),
+                C.col2.is_in(0, t.col1 * t.col2),
+            )
+            >> mutate(u=C.col3.is_in())
+        ),
     )
 
     assert_result_equal(
@@ -55,9 +57,11 @@ def test_filter_is_in(df4):
 
     assert_result_equal(
         df4,
-        lambda t: t
-        >> mutate(x=t.col1.is_in(0, 2))
-        >> filter(
-            t.col2.is_in(0, 2) & C.x,
+        lambda t: (
+            t
+            >> mutate(x=t.col1.is_in(0, 2))
+            >> filter(
+                t.col2.is_in(0, 2) & C.x,
+            )
         ),
     )

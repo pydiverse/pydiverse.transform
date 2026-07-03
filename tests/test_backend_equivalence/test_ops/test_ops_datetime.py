@@ -44,11 +44,13 @@ def test_ge(df_datetime):
 def test_year(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.year(),
-            y=C.col2.dt.year(),
-            z=t.cdate.dt.year(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.year(),
+                y=C.col2.dt.year(),
+                z=t.cdate.dt.year(),
+            )
         ),
     )
 
@@ -56,11 +58,13 @@ def test_year(df_datetime):
 def test_month(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.month(),
-            y=C.col2.dt.month(),
-            z=t.cdate.dt.month(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.month(),
+                y=C.col2.dt.month(),
+                z=t.cdate.dt.month(),
+            )
         ),
     )
 
@@ -75,10 +79,12 @@ def test_day(df_datetime):
 def test_hour(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.hour(),
-            y=C.col2.dt.hour(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.hour(),
+                y=C.col2.dt.hour(),
+            )
         ),
     )
 
@@ -92,10 +98,12 @@ def test_hour(df_datetime):
 def test_minute(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.minute(),
-            y=C.col2.dt.minute(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.minute(),
+                y=C.col2.dt.minute(),
+            )
         ),
     )
 
@@ -103,10 +111,12 @@ def test_minute(df_datetime):
 def test_second(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.second(),
-            y=C.col2.dt.second(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.second(),
+                y=C.col2.dt.second(),
+            )
         ),
     )
 
@@ -114,10 +124,12 @@ def test_second(df_datetime):
 def test_millisecond(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.millisecond(),
-            y=C.col2.dt.millisecond(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.millisecond(),
+                y=C.col2.dt.millisecond(),
+            )
         ),
     )
 
@@ -125,10 +137,12 @@ def test_millisecond(df_datetime):
 def test_microseconds(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.microsecond(),
-            y=C.col2.dt.microsecond(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.microsecond(),
+                y=C.col2.dt.microsecond(),
+            )
         ),
     )
 
@@ -136,10 +150,12 @@ def test_microseconds(df_datetime):
 def test_day_of_week(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.day_of_week(),
-            y=C.col2.dt.day_of_week(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.day_of_week(),
+                y=C.col2.dt.day_of_week(),
+            )
         ),
     )
 
@@ -147,10 +163,12 @@ def test_day_of_week(df_datetime):
 def test_day_of_year(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=C.col1.dt.day_of_year(),
-            y=C.col2.dt.day_of_year(),
+        lambda t: (
+            t
+            >> mutate(
+                x=C.col1.dt.day_of_year(),
+                y=C.col2.dt.day_of_year(),
+            )
         ),
     )
 
@@ -158,10 +176,12 @@ def test_day_of_year(df_datetime):
 def test_cast(df_datetime):
     assert_result_equal(
         df_datetime,
-        lambda t: t
-        >> mutate(
-            x=t.cdate.cast(pdt.Datetime()),
-            y=t.col1.cast(pdt.Date()),
+        lambda t: (
+            t
+            >> mutate(
+                x=t.cdate.cast(pdt.Datetime()),
+                y=t.col1.cast(pdt.Date()),
+            )
         ),
     )
 
