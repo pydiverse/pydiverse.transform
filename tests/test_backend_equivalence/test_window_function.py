@@ -1,10 +1,20 @@
 # Copyright (c) QuantCo and pydiverse contributors 2025-2025
 # SPDX-License-Identifier: BSD-3-Clause
 
+import duckdb
+import pytest
+from packaging.version import Version
+
 import pydiverse.transform as pdt
 from pydiverse.transform._internal.errors import FunctionTypeError, SubqueryError
 from pydiverse.transform.extended import *
 from tests.util import assert_result_equal
+
+# DuckDB 1.5.1–1.5.4 have a binder regression (INTERNAL Error: "Failed to bind
+# column reference") that fires when a window-over-aggregate expression is used both
+# standalone and inside an arithmetic expression in the same projection.
+# Fixed on the v1.5-variegata branch (duckdb/duckdb#23383, #23409), expected in 1.5.5.
+_duckdb_window_bind_bug = Version("1.5.1") <= Version(duckdb.__version__) < Version("1.5.5")
 
 
 def test_simple_ungrouped(df3):
@@ -212,6 +222,12 @@ def test_arrange_argument(df3):
     )
 
 
+@pytest.mark.xfail(
+    _duckdb_window_bind_bug,
+    reason="DuckDB 1.5.1-1.5.4 binder regression on duplicated window-over-aggregate "
+    "expressions (duckdb/duckdb#23383), fixed in 1.5.5",
+    strict=False,
+)
 def test_complex(df3):
     # Window function before summarize
     assert_result_equal(
