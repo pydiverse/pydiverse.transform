@@ -48,10 +48,12 @@ def test_none(df4):
     assert_result_equal(df4, lambda t: t >> mutate(x=None))
     assert_result_equal(
         df4,
-        lambda t: t
-        >> mutate(
-            x1=t.col1.is_null(),
-            y1=~t.col2.is_null(),
+        lambda t: (
+            t
+            >> mutate(
+                x1=t.col1.is_null(),
+                y1=~t.col2.is_null(),
+            )
         ),
     )
 

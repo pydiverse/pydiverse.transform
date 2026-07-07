@@ -101,10 +101,12 @@ def test_union_with_hidden_columns_left(df3, df4):
     # Left table has hidden column, right table has all columns visible
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> mutate(hidden_col=t.col1 * 10)  # create a column
-        >> select(t.col1, t.col2)  # hidden_col becomes hidden
-        >> union(u >> select(u.col1, u.col2)),  # right has no hidden columns
+        lambda t, u: (
+            t
+            >> mutate(hidden_col=t.col1 * 10)  # create a column
+            >> select(t.col1, t.col2)  # hidden_col becomes hidden
+            >> union(u >> select(u.col1, u.col2))
+        ),  # right has no hidden columns
         check_row_order=False,
     )
 
@@ -115,9 +117,11 @@ def test_union_with_hidden_columns_right(df3, df4):
     # The hidden column in right should not appear in the union result
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> select(t.col1, t.col2)  # all visible
-        >> union(u >> mutate(hidden_col=u.col1 * 10) >> select(u.col1, u.col2)),  # hidden_col becomes hidden in right
+        lambda t, u: (
+            t
+            >> select(t.col1, t.col2)  # all visible
+            >> union(u >> mutate(hidden_col=u.col1 * 10) >> select(u.col1, u.col2))
+        ),  # hidden_col becomes hidden in right
         check_row_order=False,
     )
 
@@ -128,13 +132,15 @@ def test_union_with_hidden_columns_partial_match(df3, df4):
     # Only hidden columns that exist in BOTH tables should be preserved
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> mutate(shared_hidden=t.col1 * 2, left_only=t.col1 + 100)  # create columns
-        >> select(t.col1, t.col2)  # shared_hidden and left_only become hidden
-        >> union(
-            u
-            >> mutate(shared_hidden=u.col1 * 2, right_only=u.col1 + 200)
-            >> select(u.col1, u.col2)  # shared_hidden and right_only become hidden
+        lambda t, u: (
+            t
+            >> mutate(shared_hidden=t.col1 * 2, left_only=t.col1 + 100)  # create columns
+            >> select(t.col1, t.col2)  # shared_hidden and left_only become hidden
+            >> union(
+                u
+                >> mutate(shared_hidden=u.col1 * 2, right_only=u.col1 + 200)
+                >> select(u.col1, u.col2)  # shared_hidden and right_only become hidden
+            )
         ),
         check_row_order=False,
     )
@@ -145,10 +151,12 @@ def test_union_with_mutate_hidden(df3, df4):
     # Create columns in mutate, then hide some
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> mutate(x=t.col1 * 2, y=t.col2 * 10)
-        >> select(t.col1, C.x)  # y becomes hidden
-        >> union(u >> mutate(x=u.col1 * 2, y=u.col2 * 10) >> select(u.col1, C.x)),
+        lambda t, u: (
+            t
+            >> mutate(x=t.col1 * 2, y=t.col2 * 10)
+            >> select(t.col1, C.x)  # y becomes hidden
+            >> union(u >> mutate(x=u.col1 * 2, y=u.col2 * 10) >> select(u.col1, C.x))
+        ),
         check_row_order=False,
     )
 
@@ -254,9 +262,9 @@ def test_union_different_column_order2(df3, df4):
     # The backend should reorder right table columns to match left order (by column name)
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> select(t.col1, t.col2)
-        >> union(u >> select(u.col2, u.col1)),  # different order - should be reordered
+        lambda t, u: (
+            t >> select(t.col1, t.col2) >> union(u >> select(u.col2, u.col1))
+        ),  # different order - should be reordered
         check_row_order=False,
     )
 
@@ -266,9 +274,11 @@ def test_union_different_column_order3(df3, df4):
     # The backend should not reorder right table columns since order matches based on name
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> select(t.col1, t.col2)
-        >> union(u >> select(u.col2, u.col1) >> rename({u.col1: "col2", u.col2: "col1"})),
+        lambda t, u: (
+            t
+            >> select(t.col1, t.col2)
+            >> union(u >> select(u.col2, u.col1) >> rename({u.col1: "col2", u.col2: "col1"}))
+        ),
         check_row_order=False,
     )
 
@@ -278,8 +288,10 @@ def test_union_different_column_order4(df3, df4):
     # The backend should reorder right table columns to match left order
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> select(t.col1, t.col2)
-        >> union(u >> select(u.col1, u.col2) >> rename({u.col1: "col2", u.col2: "col1"})),
+        lambda t, u: (
+            t
+            >> select(t.col1, t.col2)
+            >> union(u >> select(u.col1, u.col2) >> rename({u.col1: "col2", u.col2: "col1"}))
+        ),
         check_row_order=False,
     )

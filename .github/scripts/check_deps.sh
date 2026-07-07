@@ -5,7 +5,10 @@ set -euo pipefail
 contains_dependency_all=true
 
 while read -r package version; do
-    if [[ $package == "python" ]]; then
+    # Skip the interpreter and build tooling: these are needed to build/install the
+    # package in the pixi environment but are not runtime dependencies, so they
+    # intentionally do not appear in pyproject.toml.
+    if [[ $package == "python" || $package == "pip" || $package == "hatchling" ]]; then
         continue
     fi
 

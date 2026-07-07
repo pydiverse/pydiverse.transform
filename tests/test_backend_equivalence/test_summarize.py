@@ -39,21 +39,25 @@ def test_multi_grouped(df3):
 def test_chained_summarized(df3):
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col1, t.col2)
-        >> summarize(mean3=t.col3.mean())
-        >> alias()
-        >> summarize(mean_of_mean3=C.mean3.mean()),
+        lambda t: (
+            t
+            >> group_by(t.col1, t.col2)
+            >> summarize(mean3=t.col3.mean())
+            >> alias()
+            >> summarize(mean_of_mean3=C.mean3.mean())
+        ),
     )
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(k=(C.col1 + C.col2) * C.col4)
-        >> group_by(C.k)
-        >> summarize(x=C.col4.mean())
-        >> alias()
-        >> summarize(y=C.k.mean()),
+        lambda t: (
+            t
+            >> mutate(k=(C.col1 + C.col2) * C.col4)
+            >> group_by(C.k)
+            >> summarize(x=C.col4.mean())
+            >> alias()
+            >> summarize(y=C.k.mean())
+        ),
     )
 
 
@@ -98,9 +102,11 @@ def test_filter_argument(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col4, t.col1)
-        >> summarize(u=(t.col3 * t.col4 - t.col2).sum(filter=(t.col5.is_in("a", "e", "i", "o", "u")))),
+        lambda t: (
+            t
+            >> group_by(t.col4, t.col1)
+            >> summarize(u=(t.col3 * t.col4 - t.col2).sum(filter=(t.col5.is_in("a", "e", "i", "o", "u"))))
+        ),
     )
 
 
@@ -112,11 +118,9 @@ def test_arrange(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> arrange(-t.col4)
-        >> group_by(t.col1, t.col2)
-        >> summarize(mean3=t.col3.mean())
-        >> arrange(C.mean3),
+        lambda t: (
+            t >> arrange(-t.col4) >> group_by(t.col1, t.col2) >> summarize(mean3=t.col3.mean()) >> arrange(C.mean3)
+        ),
     )
 
 

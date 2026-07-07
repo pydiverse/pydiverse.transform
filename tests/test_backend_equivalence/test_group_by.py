@@ -32,19 +32,21 @@ def test_mutate(df3, df4):
 
     assert_result_equal(
         (df3, df4),
-        lambda t, u: t
-        >> group_by(t.col1, t.col2)
-        >> mutate(col1=t.col1 * t.col2)
-        >> arrange(t.col3.descending().nulls_last())
-        >> ungroup()
-        >> left_join(u, t.col2 == u.col2)
-        >> mutate(
-            x=pdt.row_number(
-                arrange=[u.col4.nulls_last(), t.col4.nulls_first()],
-                partition_by=[t.col1],
-            ),
-            p=t.col1 * u.col4,
-            y=pdt.rank(arrange=[(t.col1 * u.col4).nulls_last().nulls_first().nulls_last()]),
+        lambda t, u: (
+            t
+            >> group_by(t.col1, t.col2)
+            >> mutate(col1=t.col1 * t.col2)
+            >> arrange(t.col3.descending().nulls_last())
+            >> ungroup()
+            >> left_join(u, t.col2 == u.col2)
+            >> mutate(
+                x=pdt.row_number(
+                    arrange=[u.col4.nulls_last(), t.col4.nulls_first()],
+                    partition_by=[t.col1],
+                ),
+                p=t.col1 * u.col4,
+                y=pdt.rank(arrange=[(t.col1 * u.col4).nulls_last().nulls_first().nulls_last()]),
+            )
         ),
     )
 
@@ -96,10 +98,12 @@ def test_group_by_scalar(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> mutate(x=0)
-        >> mutate(y=C.x.sum(partition_by=t.col2))
-        >> group_by(C.y)  # TODO: first alias and then group by should also work
-        >> alias()
-        >> summarize(z=C.col1.min()),
+        lambda t: (
+            t
+            >> mutate(x=0)
+            >> mutate(y=C.x.sum(partition_by=t.col2))
+            >> group_by(C.y)  # TODO: first alias and then group by should also work
+            >> alias()
+            >> summarize(z=C.col1.min())
+        ),
     )

@@ -16,13 +16,15 @@ def test_list_agg(df3):
 
     assert_result_equal(
         df3,
-        lambda t: t
-        >> group_by(t.col2)
-        >> summarize(
-            y=t.col5.list.agg(arrange=t.col4),
-            z=t.col4.list.agg(filter=t.col1 > 0, arrange=[t.col4.descending()]),
-        )
-        >> arrange(t.col2),
+        lambda t: (
+            t
+            >> group_by(t.col2)
+            >> summarize(
+                y=t.col5.list.agg(arrange=t.col4),
+                z=t.col4.list.agg(filter=t.col1 > 0, arrange=[t.col4.descending()]),
+            )
+            >> arrange(t.col2)
+        ),
         check_row_order=True,
     )
 

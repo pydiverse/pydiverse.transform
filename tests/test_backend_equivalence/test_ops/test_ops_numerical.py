@@ -73,9 +73,11 @@ def test_mul(df_num):
 def test_div(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(**{c.name: pdt.when(c.abs() < 1e-50).then(1e-50).otherwise(c) for c in t})
-        >> (lambda s: mutate(**{f"div_{c.name}_{d.name}": c / d for d in s for c in s})),
+        lambda t: (
+            t
+            >> mutate(**{c.name: pdt.when(c.abs() < 1e-50).then(1e-50).otherwise(c) for c in t})
+            >> (lambda s: mutate(**{f"div_{c.name}_{d.name}": c / d for d in s for c in s}))
+        ),
     )
 
 
@@ -106,19 +108,21 @@ def test_ceil(df_num):
 def test_inf_lit(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> select()
-        >> mutate(
-            inf=float("inf"),
-            neg_inf=float("-inf"),
-        )
-        >> mutate(
-            inf_str=C.inf.cast(pdt.String()),
-            neg_inf_str=C.neg_inf.cast(pdt.String()),
-        )
-        >> mutate(
-            inf_back=C.inf_str.cast(pdt.Float64()),
-            neg_inf_back=C.neg_inf_str.cast(pdt.Float64()),
+        lambda t: (
+            t
+            >> select()
+            >> mutate(
+                inf=float("inf"),
+                neg_inf=float("-inf"),
+            )
+            >> mutate(
+                inf_str=C.inf.cast(pdt.String()),
+                neg_inf_str=C.neg_inf.cast(pdt.String()),
+            )
+            >> mutate(
+                inf_back=C.inf_str.cast(pdt.Float64()),
+                neg_inf_back=C.neg_inf_str.cast(pdt.Float64()),
+            )
         ),
     )
 
@@ -129,11 +133,13 @@ def test_inf_lit(df_num):
 def test_nan_lit(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> select()
-        >> mutate(nan=float("nan"))
-        >> mutate(nan_str=C.nan.cast(pdt.String()))
-        >> mutate(nan_back=C.nan_str.cast(pdt.Float64())),
+        lambda t: (
+            t
+            >> select()
+            >> mutate(nan=float("nan"))
+            >> mutate(nan_str=C.nan.cast(pdt.String()))
+            >> mutate(nan_back=C.nan_str.cast(pdt.Float64()))
+        ),
     )
 
 
@@ -143,16 +149,18 @@ def test_nan_lit(df_num):
 def test_is_inf(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(inf=float("inf"))
-        >> mutate(neg_inf=-C.inf)
-        >> mutate(
-            inf_is_inf=C.inf.is_inf(),
-            neg_inf_is_inf=C.neg_inf.is_inf(),
-            **{c.name + "is_inf": c.is_inf() for c in t},
-            inf_is_not_inf=C.inf.is_not_inf(),
-            neg_inf_is_not_inf=C.neg_inf.is_not_inf(),
-            **{c.name + "is_not_inf": c.is_not_inf() for c in t},
+        lambda t: (
+            t
+            >> mutate(inf=float("inf"))
+            >> mutate(neg_inf=-C.inf)
+            >> mutate(
+                inf_is_inf=C.inf.is_inf(),
+                neg_inf_is_inf=C.neg_inf.is_inf(),
+                **{c.name + "is_inf": c.is_inf() for c in t},
+                inf_is_not_inf=C.inf.is_not_inf(),
+                neg_inf_is_not_inf=C.neg_inf.is_not_inf(),
+                **{c.name + "is_not_inf": c.is_not_inf() for c in t},
+            )
         ),
     )
 
@@ -163,13 +171,15 @@ def test_is_inf(df_num):
 def test_is_nan(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(nan=float("nan"))
-        >> mutate(
-            nan_is_nan=C.nan.is_nan(),
-            **{c.name + "is_nan": c.is_nan() for c in t},
-            nan_is_not_nan=C.nan.is_not_nan(),
-            **{c.name + "is_not_nan": c.is_not_nan() for c in t},
+        lambda t: (
+            t
+            >> mutate(nan=float("nan"))
+            >> mutate(
+                nan_is_nan=C.nan.is_nan(),
+                **{c.name + "is_nan": c.is_nan() for c in t},
+                nan_is_not_nan=C.nan.is_not_nan(),
+                **{c.name + "is_not_nan": c.is_not_nan() for c in t},
+            )
         ),
     )
 
@@ -220,10 +230,12 @@ def test_log10(df_num):
 def test_clip(df_num):
     assert_result_equal(
         df_num,
-        lambda t: t
-        >> mutate(
-            **{c.name + "1": c.clip(0.1, 10) for c in t},
-            **{c.name + "2": c.clip(-500, 1024) for c in t},
+        lambda t: (
+            t
+            >> mutate(
+                **{c.name + "1": c.clip(0.1, 10) for c in t},
+                **{c.name + "2": c.clip(-500, 1024) for c in t},
+            )
         ),
     )
 

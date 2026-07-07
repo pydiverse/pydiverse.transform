@@ -126,9 +126,11 @@ def check_subquery(new_tbl, child_tbl, *, is_right: bool = False):
                 # See if we still need a subquery
                 test_tbl = Table(new_chain[1])
                 new_chain[0].map_col_nodes(
-                    lambda expr: test_tbl._cache.cols[expr._uuid]  # noqa: B023
-                    if isinstance(expr, Col) and expr._uuid in test_tbl._cache.cols  # noqa: B023
-                    else expr
+                    lambda expr: (
+                        test_tbl._cache.cols[expr._uuid]  # noqa: B023
+                        if isinstance(expr, Col) and expr._uuid in test_tbl._cache.cols  # noqa: B023
+                        else expr
+                    )
                 )
                 if test_tbl._cache.requires_subquery(new_chain[0]):
                     break
