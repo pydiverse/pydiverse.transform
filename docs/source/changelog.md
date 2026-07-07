@@ -1,6 +1,6 @@
 # Changelog
 
-# 0.7.1 (2026-XX-XX)
+# 0.7.1 (2026-07-07)
 - update dependencies
 
 ## 0.7.0 (2026-01-08)
