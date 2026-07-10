@@ -1,5 +1,8 @@
 # Changelog
 
+# 0.7.2 (2026-07-10)
+- update to pandas 3
+
 # 0.7.1 (2026-07-07)
 - update dependencies
 
